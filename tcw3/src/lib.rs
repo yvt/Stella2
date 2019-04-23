@@ -1,3 +1,5 @@
+pub mod pal;
+
 #[cfg(test)]
 mod tests {
     #[test]

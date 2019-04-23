@@ -3,4 +3,11 @@
 [[package]]
 name = "stella2"
 version = "0.1.0"
+dependencies = [
+ "tcw3 0.1.0",
+]
+
+[[package]]
+name = "tcw3"
+version = "0.1.0"
 
