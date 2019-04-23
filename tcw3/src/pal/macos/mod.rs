@@ -10,7 +10,7 @@ use super::{traits, types};
 
 mod utils;
 mod window;
-use self::utils::{with_autorelease_pool, IdRef};
+use self::utils::IdRef;
 pub use self::window::HWnd;
 
 pub struct WM {}
@@ -59,11 +59,11 @@ impl traits::WM for WM {
         }
     }
 
-    fn new_wnd(&self, attrs: &types::WndAttrs<&str>) -> Self::HWnd {
+    fn new_wnd(&self, attrs: &types::WndAttrs<HWnd, &str>) -> Self::HWnd {
         HWnd::new(attrs)
     }
 
-    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<&str>) {
+    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<HWnd, &str>) {
         window.set_attrs(attrs)
     }
 

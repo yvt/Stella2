@@ -15,7 +15,7 @@ pub struct HWnd {
 }
 
 impl HWnd {
-    pub(super) fn new(attrs: &types::WndAttrs<&str>) -> Self {
+    pub(super) fn new(attrs: &types::WndAttrs<Self, &str>) -> Self {
         unsafe {
             let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
             let masks = NSWindowStyleMask::NSClosableWindowMask
@@ -36,14 +36,14 @@ impl HWnd {
             window.center();
             window.setReleasedWhenClosed_(NO);
 
-            let hwnd = HWnd { window };
-            self.set_wnd_attr(&hwnd, attrs);
+            let this = Self { window };
+            this.set_attrs(attrs);
 
-            hwnd
+            this
         }
     }
 
-    pub(super) fn set_attrs(&self, attrs: &types::WndAttrs<&str>) {
+    pub(super) fn set_attrs(&self, attrs: &types::WndAttrs<Self, &str>) {
         unsafe {
             if let Some(value) = attrs.size {
                 self.window
@@ -64,6 +64,8 @@ impl HWnd {
                 }
                 None => {}
             }
+
+            // TODO: window listener
         }
     }
 
