@@ -1,17 +1,17 @@
 use cocoa::{
     appkit,
-    appkit::{NSApplication, NSApplicationActivationPolicy, NSWindow, NSWindowStyleMask},
-    base::nil,
-    foundation::{NSPoint, NSRect, NSSize, NSString},
+    appkit::{NSApplication, NSApplicationActivationPolicy},
 };
 use fragile::Fragile;
 use lazy_static::lazy_static;
-use objc::{runtime::NO, msg_send, sel, sel_impl};
+use objc::{msg_send, sel, sel_impl};
 
 use super::{traits, types};
 
 mod utils;
+mod window;
 use self::utils::{with_autorelease_pool, IdRef};
+pub use self::window::HWnd;
 
 pub struct WM {}
 
@@ -38,11 +38,6 @@ impl WM {
     }
 }
 
-#[derive(Clone)]
-pub struct HWnd {
-    window: IdRef,
-}
-
 impl traits::WM for WM {
     type HWnd = HWnd;
 
@@ -65,61 +60,14 @@ impl traits::WM for WM {
     }
 
     fn new_wnd(&self, attrs: &types::WndAttrs<&str>) -> Self::HWnd {
-        unsafe {
-            let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
-            let masks = NSWindowStyleMask::NSClosableWindowMask
-                | NSWindowStyleMask::NSMiniaturizableWindowMask
-                | NSWindowStyleMask::NSResizableWindowMask
-                | NSWindowStyleMask::NSTitledWindowMask;
-
-            let window_id = NSWindow::alloc(nil);
-            let window = IdRef::new(window_id.initWithContentRect_styleMask_backing_defer_(
-                frame,
-                masks,
-                appkit::NSBackingStoreBuffered,
-                NO,
-            ))
-            .non_nil()
-            .unwrap();
-
-            window.center();
-            window.setReleasedWhenClosed_(NO);
-
-            let hwnd = HWnd { window };
-            self.set_wnd_attr(&hwnd, attrs);
-
-            hwnd
-        }
+        HWnd::new(attrs)
     }
 
     fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<&str>) {
-        unsafe {
-            if let Some(value) = attrs.size {
-                window
-                    .window
-                    .setContentSize_(NSSize::new(value[0] as _, value[1] as _));
-            }
-
-            if let Some(value) = attrs.caption {
-                let title = IdRef::new(NSString::alloc(nil).init_str(value));
-                window.window.setTitle_(*title);
-            }
-
-            match attrs.visible {
-                Some(true) => {
-                    window.window.makeKeyAndOrderFront_(nil);
-                }
-                Some(false) => {
-                    window.window.orderOut_(nil);
-                }
-                None => {}
-            }
-        }
+        window.set_attrs(attrs)
     }
 
     fn remove_wnd(&self, window: &Self::HWnd) {
-        unsafe {
-            let () = msg_send![*window.window, close];
-        }
+        window.remove();
     }
 }
