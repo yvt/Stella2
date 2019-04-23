@@ -5,3 +5,4 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
+cfg-if = "0.1.7"
