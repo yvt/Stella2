@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "stella2"
+]
+
+[profile.release]
+debug = true
+
+[profile.bench]
+lto = true
+debug = true
+incremental = false
