@@ -1,11 +1,27 @@
+use cocoa::appkit;
+use fragile::Fragile;
+use lazy_static::lazy_static;
+
 use super::{traits, types};
 
 pub struct WM {}
 
 impl WM {
     pub fn global() -> &'static WM {
-        // TODO: check main thread
-        &WM {}
+        lazy_static! {
+            static ref GLOBAL_WM: Fragile<WM> = {
+                // Mark the current thread as the main thread
+                unsafe {
+                    appkit::NSApp();
+                }
+
+                // `Fragile` wraps `!Send` types and performs run-time
+                // main thread checking
+                Fragile::new(WM {})
+            };
+        }
+
+        GLOBAL_WM.get()
     }
 }
 

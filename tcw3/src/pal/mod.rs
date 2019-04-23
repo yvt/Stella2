@@ -18,6 +18,7 @@ cfg_if! {
 }
 
 /// Get the default instance of [`WM`]. It only can be called by a main thread.
+#[inline]
 pub fn wm() -> &'static WM {
     WM::global()
 }
