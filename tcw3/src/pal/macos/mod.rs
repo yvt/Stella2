@@ -57,6 +57,13 @@ impl traits::WM for WM {
         }
     }
 
+    fn terminate(&self) {
+        unsafe {
+            let app = appkit::NSApp();
+            let () = msg_send![app, terminate];
+        }
+    }
+
     fn new_wnd(&self, attrs: &types::WndAttrs<&str>) -> Self::HWnd {
         unsafe {
             let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
