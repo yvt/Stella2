@@ -5,6 +5,16 @@ pub struct WndAttrs<TCaption> {
     pub visible: Option<bool>,
 }
 
+impl<TCaption> Default for WndAttrs<TCaption> {
+    fn default() -> Self {
+        Self {
+            size: None,
+            caption: None,
+            visible: None,
+        }
+    }
+}
+
 impl<TCaption> WndAttrs<TCaption>
 where
     TCaption: AsRef<str>,
