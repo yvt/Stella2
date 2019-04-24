@@ -4,8 +4,8 @@ use cocoa::{
     foundation::NSAutoreleasePool,
 };
 use objc::{
-    msg_send,
-    runtime::{Object, Sel, BOOL, YES},
+    class, msg_send,
+    runtime::{Object, Sel, BOOL, NO, YES},
     sel, sel_impl,
 };
 use std::ops::Deref;
@@ -70,4 +70,16 @@ pub fn with_autorelease_pool(f: impl FnOnce()) {
         f();
         let _: () = msg_send![autoreleasepool, release];
     }
+}
+
+pub fn is_main_thread() -> bool {
+    let result: BOOL = unsafe { msg_send![class!(NSThread), isMainThread] };
+    result != NO
+}
+
+pub fn ensure_main_thread() {
+    assert!(
+        is_main_thread(),
+        "this operation is only valid for a main thread"
+    );
 }

@@ -1,40 +1,23 @@
+//! The backend for macOS/Cocoa.
 use cocoa::{
     appkit,
     appkit::{NSApplication, NSApplicationActivationPolicy},
 };
-use fragile::Fragile;
-use lazy_static::lazy_static;
 use objc::{msg_send, sel, sel_impl};
 
 use super::{traits, types};
 
 mod utils;
 mod window;
-use self::utils::IdRef;
+use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
 
 pub struct WM {}
 
 impl WM {
     pub fn global() -> &'static WM {
-        lazy_static! {
-            static ref GLOBAL_WM: Fragile<WM> = {
-                // Mark the current thread as the main thread
-                unsafe {
-                    appkit::NSApp();
-                }
-
-                // `Fragile` wraps `!Send` types and performs run-time
-                // main thread checking
-                Fragile::new(WM::new())
-            };
-        }
-
-        GLOBAL_WM.get()
-    }
-
-    fn new() -> Self {
-        Self {}
+        ensure_main_thread();
+        &WM {}
     }
 }
 
