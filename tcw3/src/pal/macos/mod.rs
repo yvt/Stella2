@@ -4,6 +4,7 @@ use cocoa::{
     appkit::{NSApplication, NSApplicationActivationPolicy},
 };
 use objc::{msg_send, sel, sel_impl};
+use std::marker::PhantomData;
 
 use super::{traits, types};
 
@@ -12,12 +13,19 @@ mod window;
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
 
-pub struct WM {}
+/// Provides an access to the window system.
+///
+/// `WM` is only accessible by the application's main thread.
+pub struct WM {
+    _no_send_sync: std::marker::PhantomData<*mut ()>,
+}
 
 impl WM {
     pub fn global() -> &'static WM {
         ensure_main_thread();
-        &WM {}
+        &WM {
+            _no_send_sync: PhantomData,
+        }
     }
 }
 
