@@ -8,6 +8,10 @@ pub trait WM: Sized {
     fn terminate(&self);
 
     fn new_wnd(&self, attrs: &WndAttrs<Self, &str>) -> Self::HWnd;
+
+    /// Set the attributes of a window.
+    ///
+    /// Panics if the window has already been closed.
     fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str>);
     fn remove_wnd(&self, window: &Self::HWnd);
 }
