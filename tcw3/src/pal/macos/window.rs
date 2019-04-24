@@ -7,7 +7,7 @@ use cocoa::{
 use objc::{msg_send, runtime::NO, sel, sel_impl};
 
 use super::super::types;
-use super::IdRef;
+use super::{IdRef, WM};
 
 #[derive(Clone)]
 pub struct HWnd {
@@ -15,7 +15,7 @@ pub struct HWnd {
 }
 
 impl HWnd {
-    pub(super) fn new(attrs: &types::WndAttrs<Self, &str>) -> Self {
+    pub(super) fn new(attrs: &types::WndAttrs<WM, &str>) -> Self {
         unsafe {
             let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
             let masks = NSWindowStyleMask::NSClosableWindowMask
@@ -43,7 +43,7 @@ impl HWnd {
         }
     }
 
-    pub(super) fn set_attrs(&self, attrs: &types::WndAttrs<Self, &str>) {
+    pub(super) fn set_attrs(&self, attrs: &types::WndAttrs<WM, &str>) {
         unsafe {
             if let Some(value) = attrs.size {
                 self.window

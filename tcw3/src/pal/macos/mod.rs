@@ -59,11 +59,11 @@ impl traits::WM for WM {
         }
     }
 
-    fn new_wnd(&self, attrs: &types::WndAttrs<HWnd, &str>) -> Self::HWnd {
+    fn new_wnd(&self, attrs: &types::WndAttrs<Self, &str>) -> Self::HWnd {
         HWnd::new(attrs)
     }
 
-    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<HWnd, &str>) {
+    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<Self, &str>) {
         window.set_attrs(attrs)
     }
 
