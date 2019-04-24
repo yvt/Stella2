@@ -60,14 +60,20 @@ impl traits::WM for WM {
     }
 
     fn new_wnd(&self, attrs: &types::WndAttrs<Self, &str>) -> Self::HWnd {
-        HWnd::new(attrs)
+        // Having a reference to `WM` means we are on a main thread, so
+        // this is safe
+        unsafe { HWnd::new(attrs) }
     }
 
     fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<Self, &str>) {
-        window.set_attrs(attrs)
+        // Having a reference to `WM` means we are on a main thread, so
+        // this is safe
+        unsafe { window.set_attrs(attrs) }
     }
 
     fn remove_wnd(&self, window: &Self::HWnd) {
-        window.remove();
+        // Having a reference to `WM` means we are on a main thread, so
+        // this is safe
+        unsafe { window.remove() }
     }
 }

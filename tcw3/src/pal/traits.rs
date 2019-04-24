@@ -2,7 +2,7 @@ use super::types::WndAttrs;
 
 pub trait WM: Sized {
     /// A window handle type.
-    type HWnd: Clone;
+    type HWnd: Send + Sync + Clone;
 
     fn enter_main_loop(&self);
     fn terminate(&self);
