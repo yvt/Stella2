@@ -3,7 +3,11 @@ use cocoa::{
     base::{id, nil},
     foundation::NSAutoreleasePool,
 };
-use objc::{msg_send, sel, sel_impl, runtime::{Object, Sel, YES, BOOL}};
+use objc::{
+    msg_send,
+    runtime::{Object, Sel, BOOL, YES},
+    sel, sel_impl,
+};
 use std::ops::Deref;
 
 pub struct IdRef(id);
