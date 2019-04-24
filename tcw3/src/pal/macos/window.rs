@@ -63,7 +63,6 @@ impl HWnd {
         .non_nil()
         .unwrap();
 
-        window.center();
         window.setReleasedWhenClosed_(NO);
 
         // Create a handle
@@ -79,6 +78,7 @@ impl HWnd {
         });
 
         this.set_attrs(attrs);
+        this.window.center();
 
         this
     }
