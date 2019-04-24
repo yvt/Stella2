@@ -47,40 +47,45 @@ struct WndState {}
 impl HWnd {
     /// Must be called from a main thread.
     pub(super) unsafe fn new(attrs: &types::WndAttrs<WM, &str>) -> Self {
-        let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
-        let masks = NSWindowStyleMask::NSClosableWindowMask
-            | NSWindowStyleMask::NSMiniaturizableWindowMask
-            | NSWindowStyleMask::NSResizableWindowMask
-            | NSWindowStyleMask::NSTitledWindowMask;
-
-        let window_id = NSWindow::alloc(nil);
-        let window = IdRef::new(window_id.initWithContentRect_styleMask_backing_defer_(
-            frame,
-            masks,
-            appkit::NSBackingStoreBuffered,
-            NO,
-        ))
-        .non_nil()
-        .unwrap();
-
-        window.setReleasedWhenClosed_(NO);
-
-        // Create a handle
-        let this = HWnd { window };
-
-        // Create `WndState`
-        let state = Box::new(WndState {});
-
-        // Set the window delegate
-        let delegate = wnd_delegate::new(state);
         with_autorelease_pool(|| {
+            let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
+            let masks = NSWindowStyleMask::NSClosableWindowMask
+                | NSWindowStyleMask::NSMiniaturizableWindowMask
+                | NSWindowStyleMask::NSResizableWindowMask
+                | NSWindowStyleMask::NSTitledWindowMask;
+
+            let window_id = NSWindow::alloc(nil);
+            let window = IdRef::new(window_id.initWithContentRect_styleMask_backing_defer_(
+                frame,
+                masks,
+                appkit::NSBackingStoreBuffered,
+                NO,
+            ))
+            .non_nil()
+            .unwrap();
+
+            window.setReleasedWhenClosed_(NO);
+
+            // Create a handle
+            let this = HWnd { window };
+
+            // Create `WndState`
+            let state = Box::new(WndState {});
+
+            // Set the window delegate
+            let delegate = wnd_delegate::new(state);
             let () = msg_send![*this.window, setDelegate:*delegate];
-        });
+            // `NSWindow.delegate` is `@property(weak)`, so make it behave like
+            // strong by incrementing the delegate's ref count
+            // (This causes a false reading on Xcode's memory memory graph,
+            // though...)
+            std::mem::forget(delegate);
 
-        this.set_attrs(attrs);
-        this.window.center();
+            this.set_attrs(attrs);
+            this.window.center();
 
-        this
+            this
+        })
     }
 
     /// Must be called from a main thread.
@@ -112,7 +117,10 @@ impl HWnd {
     pub(super) unsafe fn remove(&self) {
         with_autorelease_pool(|| {
             let () = msg_send![*self.window, close];
+
+            let delegate: id = msg_send![*self.window, delegate];
             let () = msg_send![*self.window, setDelegate: nil];
+            let () = msg_send![delegate, release];
         });
     }
 }
@@ -144,7 +152,7 @@ mod wnd_delegate {
         unsafe { method_impl(this, |_| NO) }
     }
 
-    extern "C" fn dealloc(this: &Object, _: Sel, _: id) {
+    extern "C" fn dealloc(this: &Object, _: Sel) {
         unsafe {
             let state: *mut c_void = *this.get_ivar("state");
             Box::from_raw(state as *mut WndState);
@@ -163,7 +171,7 @@ mod wnd_delegate {
 
             // FIXME: unregister delegate on close
 
-            decl.add_method(sel!(dealloc:), dealloc as extern "C" fn(&_, _, _) -> _);
+            decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&_, _) -> _);
 
             decl.add_ivar::<*mut c_void>("state");
 

@@ -64,11 +64,12 @@ extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
     YES
 }
 
-pub fn with_autorelease_pool(f: impl FnOnce()) {
+pub fn with_autorelease_pool<T>(f: impl FnOnce() -> T) -> T {
     unsafe {
         let autoreleasepool = NSAutoreleasePool::new(nil);
-        f();
+        let result = f();
         let _: () = msg_send![autoreleasepool, release];
+        result
     }
 }
 
