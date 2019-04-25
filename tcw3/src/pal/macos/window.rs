@@ -3,16 +3,17 @@
 //! The relationship of objects are shown below:
 //!
 //! ```text
-//!      (this cycle is severed at this point
-//!      when the window is closed)
 //!  TCWWindowController -------> NSWindow
 //!    ^             | ^             |
 //!    |             | '-------------' (weak)
+//!    |             |
+//!    |             | <--- (this cycle is severed here
+//!    |             |       when the window is closed)
 //!    |             v
 //!  HWnd <------ WndState  (HWnd == id<TCWWindowController>)
-//!    ^              |
-//!    |              |
-//!    WndListener <--'
+//!    ^                |
+//!    |                |
+//!    '- WndListener <-'
 //! ```
 use cocoa::{
     base::{id, nil},
