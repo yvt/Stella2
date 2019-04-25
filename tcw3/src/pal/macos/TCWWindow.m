@@ -30,7 +30,7 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
                                             defer:NO];
 
         self->window.releasedWhenClosed = NO;
-        self->window.delegate = self;
+        self->window.delegate = (id<NSWindowDelegate>)self;
     }
     return self;
 }
@@ -61,11 +61,13 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
 
 // Implements `NSWindowDelegate`
 - (BOOL)windowShouldClose:(NSWindow *)sender {
+    (void)sender;
     return tcw_wndlistener_should_close(self.listenerUserData);
 }
 
 // Implements `NSWindowDelegate`
 - (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
     self->window.delegate = nil;
     tcw_wndlistener_close(self.listenerUserData);
 }
