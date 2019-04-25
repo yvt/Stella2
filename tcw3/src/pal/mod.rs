@@ -13,6 +13,14 @@ cfg_if! {
 
         /// The default window manager type for the target platform.
         pub type WM = macos::WM;
+
+        /// The default bitmap type for the target platform implementing
+        /// `Bitmap`.
+        pub type Bitmap = macos::Bitmap;
+
+        /// The default bitmap builder type for the target platform implementing
+        /// `BitmapBuilderNew`.
+        pub type BitmapBuilder = macos::BitmapBuilder;
     }
     // TODO: Other platforms
 }

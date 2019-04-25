@@ -32,3 +32,26 @@ pub trait WndListener<T: WM> {
 
     // TODO: more events
 }
+
+/// A immutable, ref-counted bitmap image.
+pub trait Bitmap: Clone + Sized {
+    // TODO
+}
+
+/// Types supporting drawing operations.
+pub trait Canvas {
+    // TODO
+}
+
+/// A builder type for [`Bitmap`] supporting 2D drawing operations via
+/// [`Canvas`].
+pub trait BitmapBuilder: Canvas {
+    type Bitmap: Bitmap;
+
+    fn into_bitmap(self) -> Self::Bitmap;
+}
+
+pub trait BitmapBuilderNew: BitmapBuilder + Sized {
+    /// Create a [`BitmapBuilder`] with a R8G8B8A8 backing bitmap.
+    fn new(size: [u32; 2]) -> Self;
+}

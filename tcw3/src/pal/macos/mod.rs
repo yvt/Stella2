@@ -1,4 +1,4 @@
-//! The backend for macOS/Cocoa.
+//! The backend for macOS, Cocoa, and Core Graphics.
 use cocoa::{
     appkit,
     appkit::{NSApplication, NSApplicationActivationPolicy},
@@ -9,10 +9,12 @@ use std::marker::PhantomData;
 
 use super::{traits, types};
 
+mod bitmap;
 mod utils;
 mod window;
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
+pub use self::bitmap::{Bitmap, BitmapBuilder};
 
 /// Provides an access to the window system.
 ///
