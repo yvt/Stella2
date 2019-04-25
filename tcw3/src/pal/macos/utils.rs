@@ -5,7 +5,7 @@ use cocoa::{
 };
 use objc::{
     class, msg_send,
-    runtime::{Object, Sel, BOOL, NO, YES},
+    runtime::{BOOL, NO},
     sel, sel_impl,
 };
 use std::ops::Deref;
@@ -60,10 +60,6 @@ impl Clone for IdRef {
     }
 }
 
-extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
-    YES
-}
-
 #[derive(Debug)]
 pub struct AutoreleasePool(id);
 
@@ -80,7 +76,7 @@ impl Drop for AutoreleasePool {
 }
 
 pub fn with_autorelease_pool<T>(f: impl FnOnce() -> T) -> T {
-    let _arp = AutoreleasePool::new ();
+    let _arp = AutoreleasePool::new();
     f()
 }
 

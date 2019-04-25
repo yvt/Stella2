@@ -136,6 +136,7 @@ unsafe fn method_impl<T>(
     Some(f(wm, &*ud))
 }
 
+#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
@@ -148,6 +149,7 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
     .unwrap_or(YES)
 }
 
+#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
