@@ -2,6 +2,7 @@
 use cocoa::{
     appkit,
     appkit::{NSApplication, NSApplicationActivationPolicy},
+    base::nil,
 };
 use objc::{msg_send, sel, sel_impl};
 use std::marker::PhantomData;
@@ -50,7 +51,7 @@ impl traits::WM for WM {
     fn terminate(&self) {
         unsafe {
             let app = appkit::NSApp();
-            let () = msg_send![app, terminate];
+            let () = msg_send![app, terminate: nil];
         }
     }
 
