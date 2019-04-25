@@ -12,5 +12,6 @@ objc = "0.2.3"
 cocoa = "0.18.4"
 core-foundation = "0.6"
 core-graphics = "0.17.3"
-lazy_static = "1"
-owning_ref = "0.4.0"
+
+[build-dependencies]
+cc = "1.0.35"
