@@ -64,13 +64,24 @@ extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
     YES
 }
 
-pub fn with_autorelease_pool<T>(f: impl FnOnce() -> T) -> T {
-    unsafe {
-        let autoreleasepool = NSAutoreleasePool::new(nil);
-        let result = f();
-        let _: () = msg_send![autoreleasepool, release];
-        result
+#[derive(Debug)]
+pub struct AutoreleasePool(id);
+
+impl AutoreleasePool {
+    pub fn new() -> Self {
+        Self(unsafe { NSAutoreleasePool::new(nil) })
     }
+}
+
+impl Drop for AutoreleasePool {
+    fn drop(&mut self) {
+        let () = unsafe { msg_send![self.0, release] };
+    }
+}
+
+pub fn with_autorelease_pool<T>(f: impl FnOnce() -> T) -> T {
+    let _arp = AutoreleasePool::new ();
+    f()
 }
 
 pub fn is_main_thread() -> bool {
