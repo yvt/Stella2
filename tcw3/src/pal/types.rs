@@ -6,7 +6,7 @@ pub struct WndAttrs<T: WM, TCaption> {
     pub size: Option<[u32; 2]>,
     pub caption: Option<TCaption>,
     pub visible: Option<bool>,
-    pub listener: Option<Rc<dyn WndListener<T>>>,
+    pub listener: Option<Option<Rc<dyn WndListener<T>>>>,
 }
 
 impl<T: WM, TCaption> Default for WndAttrs<T, TCaption> {

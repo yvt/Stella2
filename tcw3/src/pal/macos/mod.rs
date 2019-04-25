@@ -23,6 +23,10 @@ pub struct WM {
 impl WM {
     pub fn global() -> &'static WM {
         ensure_main_thread();
+        unsafe { Self::global_unchecked() }
+    }
+
+    pub unsafe fn global_unchecked() -> &'static WM {
         &WM {
             _no_send_sync: PhantomData,
         }

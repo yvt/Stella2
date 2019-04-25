@@ -24,12 +24,13 @@ use objc::{
     class,
     declare::ClassDecl,
     msg_send,
-    runtime::{Class, Object, Sel, BOOL, NO},
+    runtime::{Class, Object, Sel, BOOL, NO, YES},
     sel, sel_impl,
 };
-use std::os::raw::c_void;
+use owning_ref::OwningRef;
+use std::{cell::RefCell, os::raw::c_void, rc::Rc};
 
-use super::super::types;
+use super::super::{traits, types};
 use super::{utils::with_autorelease_pool, IdRef, WM};
 
 #[derive(Clone)]
@@ -42,7 +43,10 @@ pub struct HWnd {
 unsafe impl Send for HWnd {}
 unsafe impl Sync for HWnd {}
 
-struct WndState {}
+struct WndState {
+    listener: RefCell<Option<Rc<dyn traits::WndListener<WM>>>>,
+    hwnd: HWnd,
+}
 
 impl HWnd {
     /// Must be called from a main thread.
@@ -70,7 +74,10 @@ impl HWnd {
             let this = HWnd { window };
 
             // Create `WndState`
-            let state = Box::new(WndState {});
+            let state = Box::new(WndState {
+                listener: RefCell::new(None),
+                hwnd: this.clone(),
+            });
 
             // Set the window delegate
             let delegate = wnd_delegate::new(state);
@@ -88,8 +95,21 @@ impl HWnd {
         })
     }
 
+    /// Return a smart pointer to the `WndState` associated with this `HWnd`.
+    fn state(&self) -> impl std::ops::Deref<Target = WndState> {
+        unsafe {
+            let delegate = IdRef::retain(msg_send![*self.window, delegate])
+                .non_nil()
+                .unwrap();
+
+            OwningRef::new(delegate).map(|delegate| wnd_delegate::get_state(&**delegate))
+        }
+    }
+
     /// Must be called from a main thread.
     pub(super) unsafe fn set_attrs(&self, attrs: &types::WndAttrs<WM, &str>) {
+        let state = self.state();
+
         if let Some(value) = attrs.size {
             self.window
                 .setContentSize_(NSSize::new(value[0] as _, value[1] as _));
@@ -110,7 +130,9 @@ impl HWnd {
             None => {}
         }
 
-        // TODO: window listener
+        if let Some(ref value) = attrs.listener {
+            state.listener.replace(value.clone());
+        }
     }
 
     /// Must be called from a main thread.
@@ -144,19 +166,39 @@ mod wnd_delegate {
         &*(state as *const WndState)
     }
 
-    unsafe fn method_impl<T>(this: &Object, f: impl FnOnce(&WndState) -> T) -> T {
-        f(get_state(this))
+    unsafe fn method_impl<T>(this: &Object, f: impl FnOnce(&WM, &WndState) -> T) -> T {
+        let wm = unsafe { WM::global_unchecked() };
+        f(wm, get_state(this))
     }
 
     extern "C" fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
-        unsafe { method_impl(this, |_| NO) }
+        unsafe {
+            method_impl(this, |wm, state| {
+                if let Some(ref listener) = *state.listener.borrow() {
+                    listener.close_requested(&wm, &state.hwnd) as _
+                } else {
+                    YES
+                }
+            })
+        }
+    }
+
+    extern "C" fn window_will_close(this: &Object, _: Sel, _: id) {
+        unsafe {
+            method_impl(this, |wm, state| {
+                if let Some(ref listener) = *state.listener.borrow() {
+                    listener.close(&wm, &state.hwnd)
+                }
+
+                // Let's hope that the parent function maintains a strong
+                // reference to this delegate while calling this method
+                let () = msg_send![*state.hwnd.window, setDelegate: nil];
+            })
+        }
     }
 
     extern "C" fn dealloc(this: &Object, _: Sel) {
-        unsafe {
-            let state: *mut c_void = *this.get_ivar("state");
-            Box::from_raw(state as *mut WndState);
-        }
+        unsafe { Box::from_raw(get_state(this) as *const _ as *mut WndState) };
     }
 
     lazy_static! {
@@ -169,7 +211,10 @@ mod wnd_delegate {
                 window_should_close as extern "C" fn(&_, _, _) -> _,
             );
 
-            // FIXME: unregister delegate on close
+            decl.add_method(
+                sel!(windowWillClose:),
+                window_will_close as extern "C" fn(&_, _, _) -> _,
+            );
 
             decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&_, _) -> _);
 

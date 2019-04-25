@@ -51,6 +51,8 @@ impl Deref for IdRef {
     }
 }
 
+unsafe impl owning_ref::StableAddress for IdRef {}
+
 impl Clone for IdRef {
     fn clone(&self) -> IdRef {
         if self.0 != nil {
