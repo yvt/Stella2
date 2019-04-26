@@ -13,6 +13,7 @@ mod bitmap;
 mod utils;
 mod window;
 mod layer;
+mod mtlocal;
 pub use self::bitmap::{Bitmap, BitmapBuilder};
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
