@@ -12,9 +12,11 @@ use super::{traits, types};
 mod bitmap;
 mod utils;
 mod window;
+mod layer;
+pub use self::bitmap::{Bitmap, BitmapBuilder};
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
-pub use self::bitmap::{Bitmap, BitmapBuilder};
+pub use self::layer::HLayer;
 
 /// Provides an access to the window system.
 ///
@@ -38,6 +40,8 @@ impl WM {
 
 impl traits::WM for WM {
     type HWnd = HWnd;
+    type HLayer = HLayer;
+    type Bitmap = Bitmap;
 
     fn enter_main_loop(&self) {
         unsafe {
@@ -57,13 +61,13 @@ impl traits::WM for WM {
         }
     }
 
-    fn new_wnd(&self, attrs: &types::WndAttrs<Self, &str>) -> Self::HWnd {
+    fn new_wnd(&self, attrs: &types::WndAttrs<Self, &str, Self::HLayer>) -> Self::HWnd {
         // Having a reference to `WM` means we are on a main thread, so
         // this is safe
         unsafe { HWnd::new(attrs) }
     }
 
-    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<Self, &str>) {
+    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &types::WndAttrs<Self, &str, Self::HLayer>) {
         // Having a reference to `WM` means we are on a main thread, so
         // this is safe
         unsafe { window.set_attrs(attrs) }
@@ -73,5 +77,19 @@ impl traits::WM for WM {
         // Having a reference to `WM` means we are on a main thread, so
         // this is safe
         unsafe { window.remove() }
+    }
+
+    fn new_layer(&self, attrs: &types::LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer {
+        unimplemented!()
+    }
+    fn set_layer_attr(
+        &self,
+        layer: &Self::HLayer,
+        attrs: &types::LayerAttrs<Self::Bitmap, Self::HLayer>,
+    ) {
+        unimplemented!()
+    }
+    fn remove_layer(&self, layer: &Self::HLayer) {
+        unimplemented!()
     }
 }

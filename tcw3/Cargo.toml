@@ -6,6 +6,10 @@ edition = "2018"
 
 [dependencies]
 cfg-if = "0.1.7"
+cgmath = "0.17.0"
+rgb = "0.8.13"
+bitflags = "1.0.4"
+cggeom = { path = "../support/cggeom" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.3"

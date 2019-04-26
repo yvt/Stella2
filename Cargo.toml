@@ -2,6 +2,7 @@
 members = [
     "stella2",
     "tcw3",
+    "support/cggeom",
 ]
 
 [profile.release]

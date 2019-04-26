@@ -1,19 +1,33 @@
-use super::types::WndAttrs;
+use super::types::{LayerAttrs, WndAttrs};
 
 pub trait WM: Sized {
     /// A window handle type.
     type HWnd: Send + Sync + Clone;
 
+    /// A layer handle type.
+    type HLayer: Send + Sync + Clone;
+
+    /// A bitmap type.
+    type Bitmap: Bitmap;
+
     fn enter_main_loop(&self);
     fn terminate(&self);
 
-    fn new_wnd(&self, attrs: &WndAttrs<Self, &str>) -> Self::HWnd;
+    fn new_wnd(&self, attrs: &WndAttrs<Self, &str, Self::HLayer>) -> Self::HWnd;
 
     /// Set the attributes of a window.
     ///
     /// Panics if the window has already been closed.
-    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str>);
+    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str, Self::HLayer>);
     fn remove_wnd(&self, window: &Self::HWnd);
+
+    fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
+
+    /// Set the attributes of a layer.
+    ///
+    /// The behavior is unspecified if the layer has already been removed.
+    fn set_layer_attr(&self, layer: &Self::HLayer, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>);
+    fn remove_layer(&self, layer: &Self::HLayer);
 }
 
 /// Window event handlers.

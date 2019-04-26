@@ -27,7 +27,7 @@ use objc::{
 use std::{cell::RefCell, rc::Rc};
 
 use super::super::{traits, types};
-use super::{utils::with_autorelease_pool, IdRef, WM};
+use super::{utils::with_autorelease_pool, IdRef, WM, HLayer};
 
 #[derive(Clone)]
 pub struct HWnd {
@@ -47,7 +47,7 @@ struct WndState {
 
 impl HWnd {
     /// Must be called from a main thread.
-    pub(super) unsafe fn new(attrs: &types::WndAttrs<WM, &str>) -> Self {
+    pub(super) unsafe fn new(attrs: &types::WndAttrs<WM, &str, HLayer>) -> Self {
         with_autorelease_pool(|| {
             extern "C" {
                 /// Return `[TCWWindowController class]`.
@@ -87,7 +87,7 @@ impl HWnd {
     }
 
     /// Must be called from a main thread.
-    pub(super) unsafe fn set_attrs(&self, attrs: &types::WndAttrs<WM, &str>) {
+    pub(super) unsafe fn set_attrs(&self, attrs: &types::WndAttrs<WM, &str, HLayer>) {
         let state = self.state();
 
         if let Some(value) = attrs.size {
