@@ -11,6 +11,9 @@ pub struct Bitmap {
     cg_image: CGImage,
 }
 
+unsafe impl Send for Bitmap {}
+unsafe impl Sync for Bitmap {}
+
 impl traits::Bitmap for Bitmap {}
 
 pub struct BitmapBuilder {

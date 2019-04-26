@@ -48,9 +48,7 @@ pub trait WndListener<T: WM> {
 }
 
 /// A immutable, ref-counted bitmap image.
-pub trait Bitmap: Clone + Sized {
-    // TODO
-}
+pub trait Bitmap: Clone + Sized + Send + Sync {}
 
 /// Types supporting drawing operations.
 pub trait Canvas {
