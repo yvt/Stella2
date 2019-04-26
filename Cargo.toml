@@ -3,6 +3,7 @@ members = [
     "stella2",
     "tcw3",
     "support/cggeom",
+    "support/iterpool",
 ]
 
 [profile.release]
