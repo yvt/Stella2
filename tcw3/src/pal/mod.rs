@@ -4,8 +4,7 @@ use cfg_if::cfg_if;
 pub mod traits;
 pub mod types;
 
-#[doc(no_inline)]
-pub use self::types::*;
+pub use self::types::{LayerFlags, RGBAF32};
 
 cfg_if! {
     if #[cfg(target_os = "macos")] {
@@ -33,3 +32,15 @@ pub fn wm() -> &'static WM {
 
 /// The window handle type of [`WM`].
 pub type HWnd = <WM as traits::WM>::HWnd;
+
+/// The layer handle type of [`WM`].
+pub type HLayer = <WM as traits::WM>::HLayer;
+
+// Implementation notes: It's okay to use the following types in the backend
+// code.
+
+/// A specialization of `WndAttrs` for the default backend.
+pub type WndAttrs<TCaption> = types::WndAttrs<WM, TCaption, HLayer>;
+
+/// A specialization of `LayerAttrs` for the default backend.
+pub type LayerAttrs = types::LayerAttrs<Bitmap, HLayer>;
