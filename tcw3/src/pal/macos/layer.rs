@@ -1,8 +1,10 @@
+use cggeom::prelude::*;
 use cgmath::{prelude::*, Matrix4};
 use cocoa::{
     base::{id, nil},
     quartzcore::CALayer,
 };
+use core_graphics::geometry::CGPoint;
 use iterpool::{Pool, PoolPtr};
 use objc::{class, msg_send, sel, sel_impl};
 use std::cell::{Cell, RefCell};
@@ -173,6 +175,13 @@ impl HLayer {
             this_layer
                 .ca_layer
                 .set_bounds(&cg_rect_from_box2(value.cast().unwrap()));
+
+            // Place the anchor at the point whose local coordinates are (0, 0)
+            let size = value.size();
+            this_layer.ca_layer.set_anchor_point(&CGPoint::new(
+                (-value.min.x / size.x) as f64,
+                (-value.min.y / size.y) as f64,
+            ));
         }
 
         if let Some(value) = attrs_diff.contents_center.take() {

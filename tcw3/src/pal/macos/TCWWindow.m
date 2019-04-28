@@ -5,6 +5,19 @@ typedef void *TCWListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 
+@interface TCWWindowView : NSView
+@end
+
+@implementation TCWWindowView
+
+// Override `NSView`
+- (BOOL)isFlipped {
+    // Flip the window contents to match TCW3's coordinate space
+    return YES;
+}
+
+@end
+
 @interface TCWWindowController : NSObject {
     NSWindow *window;
 }
@@ -32,6 +45,7 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
         self->window.releasedWhenClosed = NO;
         self->window.delegate = (id<NSWindowDelegate>)self;
 
+        self->window.contentView = [TCWWindowView new];
         self->window.contentView.wantsLayer = YES;
     }
     return self;
@@ -62,7 +76,7 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
 }
 
 - (void)setLayer:(CALayer *)layer {
-    self->window.contentView.layer = layer;
+    self->window.contentView.layer.sublayers = @[ layer ];
 }
 
 // Implements `NSWindowDelegate`
