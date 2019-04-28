@@ -195,11 +195,14 @@ impl HLayer {
         }
 
         if let Some(value) = attrs_diff.bg_color.take() {
-            this_layer.ca_layer.set_background_color(if value.a > 0.0 {
-                Some(cg_color_from_rgbaf32(value))
+            let cf_color = if value.a > 0.0 {
+                let c = cg_color_from_rgbaf32(value);
+                std::mem::forget(c.clone());
+                Some(c)
             } else {
                 None
-            });
+            };
+            this_layer.ca_layer.set_background_color(cf_color);
         }
 
         if let Some(value) = attrs_diff.sublayers.take() {
