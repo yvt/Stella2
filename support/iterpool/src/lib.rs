@@ -1,3 +1,4 @@
+#![feature(const_vec_new)]
 //! High-performance non-thread safe object pool (with an optional iteration
 //! functionality).
 //!
@@ -130,8 +131,11 @@ impl<T> ItEntry<T> {
 }
 
 impl<T> Pool<T> {
-    pub fn new() -> Self {
-        Pool::with_capacity(0)
+    pub const fn new() -> Self {
+        Self {
+            storage: Vec::new(),
+            first_free: None,
+        }
     }
     pub fn with_capacity(capacity: usize) -> Self {
         let mut pool = Self {
@@ -202,8 +206,12 @@ impl<T> Pool<T> {
 }
 
 impl<T> IterablePool<T> {
-    pub fn new() -> Self {
-        Self::with_capacity(0)
+    pub const fn new() -> Self {
+        Self {
+            storage: Vec::new(),
+            first_free: None,
+            first_used: None,
+        }
     }
     pub fn with_capacity(capacity: usize) -> Self {
         let mut pool = Self {

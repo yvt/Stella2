@@ -10,18 +10,21 @@ use std::marker::PhantomData;
 use super::{traits, LayerAttrs, WndAttrs};
 
 mod bitmap;
-mod utils;
-mod window;
+mod drawutils;
 mod layer;
 mod mtlocal;
+mod utils;
+mod window;
 pub use self::bitmap::{Bitmap, BitmapBuilder};
+pub use self::layer::HLayer;
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
-pub use self::layer::HLayer;
 
 /// Provides an access to the window system.
 ///
-/// `WM` is only accessible by the application's main thread.
+/// `WM` is only accessible by the application's main thread. Therefore, the
+/// ownership of `&WM` can be used as an evidence that the main thread has the
+/// control.
 pub struct WM {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
@@ -81,12 +84,12 @@ impl traits::WM for WM {
     }
 
     fn new_layer(&self, attrs: &LayerAttrs) -> Self::HLayer {
-        unimplemented!()
+        HLayer::new(self, attrs)
     }
     fn set_layer_attr(&self, layer: &Self::HLayer, attrs: &LayerAttrs) {
-        unimplemented!()
+        layer.set_attrs(self, attrs);
     }
     fn remove_layer(&self, layer: &Self::HLayer) {
-        unimplemented!()
+        layer.remove(self);
     }
 }

@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{BaseNum, Point2, Point3};
+use cgmath::{num_traits::NumCast, BaseNum, Point2, Point3};
 
 use super::{BoolArray, ElementWiseOp, ElementWisePartialOrd};
 
@@ -143,5 +143,37 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box3<T> {
     #[inline]
     fn max(&self) -> Self::Point {
         self.max
+    }
+}
+
+impl<S: NumCast + Copy> Box2<S> {
+    /// Component-wise casting to another type
+    #[inline]
+    pub fn cast<T: NumCast>(&self) -> Option<Box2<T>> {
+        let min = match self.min.cast() {
+            Some(field) => field,
+            None => return None,
+        };
+        let max = match self.max.cast() {
+            Some(field) => field,
+            None => return None,
+        };
+        Some(Box2 { min, max })
+    }
+}
+
+impl<S: NumCast + Copy> Box3<S> {
+    /// Component-wise casting to another type
+    #[inline]
+    pub fn cast<T: NumCast>(&self) -> Option<Box3<T>> {
+        let min = match self.min.cast() {
+            Some(field) => field,
+            None => return None,
+        };
+        let max = match self.max.cast() {
+            Some(field) => field,
+            None => return None,
+        };
+        Some(Box3 { min, max })
     }
 }

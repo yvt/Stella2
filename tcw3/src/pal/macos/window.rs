@@ -27,7 +27,7 @@ use objc::{
 use std::{cell::RefCell, rc::Rc};
 
 use super::super::{traits, types};
-use super::{utils::with_autorelease_pool, IdRef, WM, HLayer};
+use super::{utils::with_autorelease_pool, HLayer, IdRef, WM};
 
 #[derive(Clone)]
 pub struct HWnd {
@@ -112,6 +112,15 @@ impl HWnd {
 
         if let Some(ref value) = attrs.listener {
             state.listener.replace(value.clone());
+        }
+
+        if let Some(ref value) = attrs.layer {
+            let layer = if let Some(hlayer) = value {
+                hlayer.ca_layer(WM::global_unchecked())
+            } else {
+                nil
+            };
+            let () = msg_send![*self.ctrler, setLayer: layer];
         }
     }
 

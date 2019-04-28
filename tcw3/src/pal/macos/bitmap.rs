@@ -8,7 +8,7 @@ use super::super::traits;
 
 #[derive(Clone)]
 pub struct Bitmap {
-    cg_image: CGImage,
+    pub(super) cg_image: CGImage,
 }
 
 unsafe impl Send for Bitmap {}

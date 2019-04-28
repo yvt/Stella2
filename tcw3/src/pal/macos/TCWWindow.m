@@ -59,6 +59,10 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
     [self->window center];
 }
 
+- (void)setLayer:(CALayer *)layer {
+    self->window.contentView.layer = layer;
+}
+
 // Implements `NSWindowDelegate`
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;

@@ -14,7 +14,7 @@ pub struct WndAttrs<T: WM, TCaption, TLayer> {
     pub caption: Option<TCaption>,
     pub visible: Option<bool>,
     pub listener: Option<Option<Rc<dyn WndListener<T>>>>,
-    pub layer: Option<TLayer>,
+    pub layer: Option<Option<TLayer>>,
 }
 
 impl<T: WM, TCaption, TLayer> Default for WndAttrs<T, TCaption, TLayer> {
@@ -83,6 +83,28 @@ pub struct LayerAttrs<TBitmap, TLayer> {
 
     /// Specifies additional options on the layer.
     pub flags: Option<LayerFlags>,
+}
+
+impl<TBitmap, TLayer> LayerAttrs<TBitmap, TLayer> {
+    /// Replace the fields with values from `o` if they are `Some(_)`.
+    pub fn override_with(&mut self, o: Self) {
+        macro_rules! process_one {
+            ($i:ident) => {
+                if let Some(x) = o.$i {
+                    self.$i = Some(x);
+                }
+            };
+        }
+        process_one!(transform);
+        process_one!(contents);
+        process_one!(bounds);
+        process_one!(contents_center);
+        process_one!(contents_scale);
+        process_one!(bg_color);
+        process_one!(sublayers);
+        process_one!(opacity);
+        process_one!(flags);
+    }
 }
 
 impl<TBitmap, TLayer> Default for LayerAttrs<TBitmap, TLayer> {
