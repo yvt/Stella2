@@ -20,6 +20,13 @@ pub trait WM: Sized {
     /// Panics if the window has already been closed.
     fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str, Self::HLayer>);
     fn remove_wnd(&self, window: &Self::HWnd);
+    /// Update a window's contents.
+    ///
+    /// Calling this method requests that the contents of a window is updated
+    /// based on the attributes of the window and its all sublayers as soon as
+    /// possible. Conversely, all attribute updates may be deferred until this
+    /// method is called.
+    fn update_wnd(&self, window: &Self::HWnd);
 
     fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 

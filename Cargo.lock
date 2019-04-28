@@ -258,6 +258,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "stella2"
 version = "0.1.0"
 dependencies = [
+ "cggeom 0.1.0",
+ "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tcw3 0.1.0",
 ]
 

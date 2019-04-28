@@ -83,6 +83,10 @@ impl traits::WM for WM {
         unsafe { window.remove() }
     }
 
+    fn update_wnd(&self, window: &Self::HWnd) {
+        window.update(self);
+    }
+
     fn new_layer(&self, attrs: &LayerAttrs) -> Self::HLayer {
         HLayer::new(self, attrs)
     }

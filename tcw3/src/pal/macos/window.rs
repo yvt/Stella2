@@ -18,13 +18,17 @@
 use cocoa::{
     base::{id, nil},
     foundation::{NSSize, NSString},
+    quartzcore::transaction,
 };
 use objc::{
     msg_send,
     runtime::{BOOL, YES},
     sel, sel_impl,
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use super::super::{traits, types};
 use super::{utils::with_autorelease_pool, HLayer, IdRef, WM};
@@ -42,6 +46,7 @@ unsafe impl Sync for HWnd {}
 
 struct WndState {
     listener: RefCell<Option<Rc<dyn traits::WndListener<WM>>>>,
+    layer: Cell<Option<HLayer>>,
     hwnd: HWnd,
 }
 
@@ -63,6 +68,7 @@ impl HWnd {
             // Create `WndState`
             let state = Rc::new(WndState {
                 listener: RefCell::new(None),
+                layer: Cell::new(None),
                 hwnd: this.clone(),
             });
 
@@ -121,6 +127,7 @@ impl HWnd {
                 nil
             };
             let () = msg_send![*self.ctrler, setLayer: layer];
+            state.layer.set(*value);
         }
     }
 
@@ -129,6 +136,17 @@ impl HWnd {
         with_autorelease_pool(|| {
             let () = msg_send![*self.ctrler, close];
         });
+    }
+
+    pub(super) fn update(&self, wm: &WM) {
+        if let Some(layer) = self.state().layer.get() {
+            with_autorelease_pool(|| {
+                transaction::begin();
+                transaction::set_animation_duration(0.0);
+                layer.flush(wm);
+                transaction::commit();
+            });
+        }
     }
 }
 

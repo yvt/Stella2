@@ -31,6 +31,8 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
 
         self->window.releasedWhenClosed = NO;
         self->window.delegate = (id<NSWindowDelegate>)self;
+
+        self->window.contentView.wantsLayer = YES;
     }
     return self;
 }
