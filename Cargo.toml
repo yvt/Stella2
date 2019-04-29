@@ -20,8 +20,8 @@ incremental = false
 # “Expose more APIs on CGContext”
 # <https://github.com/servo/core-foundation-rs/pull/313>
 [patch.crates-io.core-graphics]
-git = "https://github.com/yvt/core-foundation-rs.git"
-rev = "2d5bdcc9b529bdaddaf45b36588e318aecd28fa3"
+git = "https://github.com/servo/core-foundation-rs.git"
+rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
 [patch.crates-io.core-foundation]
-git = "https://github.com/yvt/core-foundation-rs.git"
-rev = "2d5bdcc9b529bdaddaf45b36588e318aecd28fa3"
+git = "https://github.com/servo/core-foundation-rs.git"
+rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
