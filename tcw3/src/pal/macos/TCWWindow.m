@@ -68,6 +68,14 @@ extern void tcw_wndlistener_resize(TCWListenerUserData ud);
     [self->window setContentSize:size];
 }
 
+- (void)setContentMaxSize:(NSSize)size {
+    [self->window setContentMaxSize:size];
+}
+
+- (void)setContentMinSize:(NSSize)size {
+    [self->window setContentMinSize:size];
+}
+
 - (NSSize)contentSize {
     return self->window.contentView.frame.size;
 }

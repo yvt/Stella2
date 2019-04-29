@@ -107,6 +107,16 @@ impl HWnd {
             let () = msg_send![*self.ctrler, setContentSize: size];
         }
 
+        if let Some(value) = attrs.min_size {
+            let min_size = NSSize::new(value[0] as _, value[1] as _);
+            let () = msg_send![*self.ctrler, setContentMinSize: min_size];
+        }
+
+        if let Some(value) = attrs.max_size {
+            let max_size = NSSize::new(value[0] as _, value[1] as _);
+            let () = msg_send![*self.ctrler, setContentMaxSize: max_size];
+        }
+
         if let Some(value) = attrs.caption {
             let title = IdRef::new(NSString::alloc(nil).init_str(value));
             let () = msg_send![*self.ctrler, setTitle:*title];

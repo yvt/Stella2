@@ -58,6 +58,8 @@ pub trait WM: Sized {
 pub struct WndAttrs<T: WM, TCaption, TLayer> {
     /// The size of the content region.
     pub size: Option<[u32; 2]>,
+    pub min_size: Option<[u32; 2]>,
+    pub max_size: Option<[u32; 2]>,
     pub flags: Option<WndFlags>,
     pub caption: Option<TCaption>,
     pub visible: Option<bool>,
@@ -69,6 +71,8 @@ impl<T: WM, TCaption, TLayer> Default for WndAttrs<T, TCaption, TLayer> {
     fn default() -> Self {
         Self {
             size: None,
+            min_size: None,
+            max_size: None,
             flags: None,
             caption: None,
             visible: None,
@@ -86,6 +90,8 @@ where
     pub fn as_ref(&self) -> WndAttrs<T, &str, TLayer> {
         WndAttrs {
             size: self.size,
+            min_size: self.min_size,
+            max_size: self.max_size,
             flags: self.flags,
             caption: self.caption.as_ref().map(AsRef::as_ref),
             visible: self.visible,
