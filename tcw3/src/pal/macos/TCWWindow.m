@@ -4,6 +4,7 @@
 typedef void *TCWListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
+extern void tcw_wndlistener_resize(TCWListenerUserData ud);
 
 // These flags must be synchronized with `WndFlags`
 #define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
@@ -67,6 +68,10 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
     [self->window setContentSize:size];
 }
 
+- (NSSize)contentSize {
+    return self->window.contentView.frame.size;
+}
+
 - (void)setFlags:(uint32_t)flags {
     // Compute the new masks
     NSWindowStyleMask masks = 0;
@@ -112,6 +117,12 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
     (void)notification;
     self->window.delegate = nil;
     tcw_wndlistener_close(self.listenerUserData);
+}
+
+// Implements `NSWindowDelegate`
+- (void)windowDidResize:(NSNotification *)notification {
+    (void)notification;
+    tcw_wndlistener_resize(self.listenerUserData);
 }
 
 @end

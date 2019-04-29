@@ -2,11 +2,28 @@ use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
 use tcw3::pal::{self, prelude::*};
 
-struct Listener;
+struct Listener {
+    flex_layer: pal::HLayer,
+}
 
 impl WndListener<pal::WM> for Listener {
     fn close(&self, wm: &pal::WM, _: &pal::HWnd) {
         wm.terminate();
+    }
+
+    fn resize(&self, wm: &pal::WM, hwnd: &pal::HWnd) {
+        let [w, h] = wm.get_wnd_size(hwnd);
+        wm.set_layer_attr(
+            &self.flex_layer,
+            &pal::LayerAttrs {
+                bounds: Some(Box2::new(
+                    Point2::new(20.0, 120.0),
+                    Point2::new(w as f32 - 20.0, h as f32 - 20.0),
+                )),
+                ..Default::default()
+            },
+        );
+        wm.update_wnd(hwnd);
     }
 }
 
@@ -40,7 +57,7 @@ fn main() {
         )),
         bg_color: Some(pal::RGBAF32::new(0.8, 0.5, 0.5, 1.0)),
         contents: Some(Some(bmp)),
-        sublayers: Some(vec![layer2]),
+        sublayers: Some(vec![layer2.clone()]),
         transform: Some(cgmath::Matrix3::from_angle(cgmath::Deg(3.0))),
         ..Default::default()
     });
@@ -50,8 +67,8 @@ fn main() {
         visible: Some(true),
         layer: Some(Some(layer)),
         size: Some([220, 270]),
-        listener: Some(Some(std::rc::Rc::new(Listener))),
-        flags: Some(pal::WndFlags::empty()),
+        listener: Some(Some(std::rc::Rc::new(Listener { flex_layer: layer2 }))),
+        flags: Some(pal::WndFlags::default()),
         ..Default::default()
     });
 

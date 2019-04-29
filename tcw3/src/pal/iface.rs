@@ -41,6 +41,8 @@ pub trait WM: Sized {
     /// possible. Conversely, all attribute updates may be deferred until this
     /// method is called.
     fn update_wnd(&self, window: &Self::HWnd);
+    /// Get the size of a window's content region.
+    fn get_wnd_size(&self, window: &Self::HWnd) -> [u32; 2];
 
     fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
@@ -54,6 +56,7 @@ pub trait WM: Sized {
 
 #[derive(Clone)]
 pub struct WndAttrs<T: WM, TCaption, TLayer> {
+    /// The size of the content region.
     pub size: Option<[u32; 2]>,
     pub flags: Option<WndFlags>,
     pub caption: Option<TCaption>,
@@ -207,6 +210,17 @@ pub trait WndListener<T: WM> {
 
     /// A window has been closed.
     fn close(&self, _: &T, _: &T::HWnd) {}
+
+    /// A window is being resized.
+    ///
+    /// While the user is resizing a window, this method is called repeatedly
+    /// as the window's outline is dragged.
+    ///
+    /// The new window size can be retrieved using [`WM::get_wnd_size`].
+    /// Based on the new window size, The client (the implementer of this trait)
+    /// should relayout, update composition layers, and call [`WM::update_wnd`]
+    /// in this method.
+    fn resize(&self, _: &T, _: &T::HWnd) {}
 
     // TODO: more events
 }

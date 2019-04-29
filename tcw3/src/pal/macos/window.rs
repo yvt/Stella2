@@ -154,6 +154,11 @@ impl HWnd {
             });
         }
     }
+
+    pub(super) fn get_size(&self, _: &WM) -> [u32; 2] {
+        let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
+        [ size.width as u32, size.height as u32 ]
+    }
 }
 
 // These functions are called by `TCWWindowController`
@@ -198,4 +203,14 @@ unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     if !ud.is_null() {
         Rc::from_raw(ud);
     }
+}
+
+#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
+    method_impl(ud, |wm, state| {
+        if let Some(ref listener) = *state.listener.borrow() {
+            listener.resize(&wm, &state.hwnd);
+        }
+    });
 }

@@ -87,6 +87,10 @@ impl iface::WM for WM {
         window.update(self);
     }
 
+    fn get_wnd_size(&self, window: &Self::HWnd) -> [u32; 2] {
+        window.get_size(self)
+    }
+
     fn new_layer(&self, attrs: &LayerAttrs) -> Self::HLayer {
         HLayer::new(self, attrs)
     }
