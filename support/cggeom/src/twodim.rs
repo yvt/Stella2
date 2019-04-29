@@ -15,7 +15,7 @@ use cgmath::{BaseFloat, Matrix3, Rad, Vector2};
 /// 3D for `Matrix3`). Thus [they gave up] supporting such problematic
 /// operations at all.
 ///
-/// [they gave up] https://github.com/rustgd/cgmath/pull/469#issuecomment-436041377
+/// [they gave up]: https://github.com/rustgd/cgmath/pull/469#issuecomment-436041377
 pub trait Matrix3TwoDimExt<S>: Sized {
     /// Create a homogeneous transformation matrix from a translation vector.
     fn from_translation(v: Vector2<S>) -> Self;
