@@ -3,6 +3,7 @@ name = "cggeom"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
 
 [dependencies]
 cgmath = "0.17.0"
