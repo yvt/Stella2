@@ -1,8 +1,11 @@
 use super::super::RGBAF32;
 use cggeom::{prelude::*, Box2};
-use cgmath::{prelude::*, Matrix4, Point2, Vector2};
+use cgmath::{prelude::*, Matrix3, Matrix4, Point2, Vector2};
 use cocoa::quartzcore::CATransform3D;
-use core_graphics::{geometry::{CGPoint, CGRect, CGSize}, color::CGColor};
+use core_graphics::{
+    color::CGColor,
+    geometry::{CGAffineTransform, CGPoint, CGRect, CGSize},
+};
 
 pub fn ca_transform_3d_from_matrix4(m: Matrix4<f64>) -> CATransform3D {
     unsafe { std::mem::transmute(m.transpose()) }
@@ -23,4 +26,12 @@ pub fn cg_size_from_vec2(p: Vector2<f64>) -> CGSize {
 pub fn cg_color_from_rgbaf32(x: RGBAF32) -> CGColor {
     // TODO: Use the sRGB color space, not the generic device RGB one
     CGColor::rgb(x.r as f64, x.g as f64, x.b as f64, x.a as f64)
+}
+
+/// Convert a `Matrix3` into `CGAffineTransform`, ignoring a projective component.
+pub fn cg_affine_transform_from_matrix3(mut m: Matrix3<f64>) -> CGAffineTransform {
+    if m.z.z != 1.0 {
+        m /= m.z.z;
+    }
+    CGAffineTransform::new(m.x.x, m.x.y, m.y.x, m.y.y, m.z.x, m.z.y)
 }

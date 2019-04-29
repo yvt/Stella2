@@ -129,3 +129,18 @@ bitflags! {
         const MASK_TO_BOUNDS = 1;
     }
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LineCap {
+    Butt,
+    Round,
+    Square,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LineJoin {
+    Miter,
+    Round,
+    Bevel,
+}

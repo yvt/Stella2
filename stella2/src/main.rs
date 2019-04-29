@@ -5,13 +5,20 @@ use tcw3::pal::traits::*;
 fn main() {
     let wm = tcw3::pal::wm();
 
-    let bmp_builder = tcw3::pal::BitmapBuilder::new([256, 256]);
+    let mut bmp_builder = tcw3::pal::BitmapBuilder::new([100, 100]);
+    bmp_builder.move_to(Point2::new(20.0, 20.0));
+    bmp_builder.line_to(Point2::new(80.0, 20.0));
+    bmp_builder.line_to(Point2::new(20.0, 80.0));
+    bmp_builder.line_to(Point2::new(80.0, 80.0));
+    bmp_builder.quad_bezier_to(Point2::new(80.0, 20.0), Point2::new(20.0, 20.0));
+    bmp_builder.stroke();
+
     let bmp = bmp_builder.into_bitmap();
 
     let layer2 = wm.new_layer(&tcw3::pal::types::LayerAttrs {
         bounds: Some(Box2::new(
             Point2::new(20.0, 120.0),
-            Point2::new(150.0, 180.0),
+            Point2::new(150.0, 250.0),
         )),
         bg_color: Some(tcw3::pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
         contents: Some(Some(bmp.clone())),
