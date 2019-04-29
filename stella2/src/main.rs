@@ -33,7 +33,7 @@ fn main() {
         bg_color: Some(tcw3::pal::RGBAF32::new(0.8, 0.5, 0.5, 1.0)),
         contents: Some(Some(bmp)),
         sublayers: Some(vec![layer2]),
-        transform: Some(cgmath::Matrix4::from_angle_z(cgmath::Deg(3.0))),
+        transform: Some(cgmath::Matrix3::from_angle_z(cgmath::Deg(3.0))),
         ..Default::default()
     });
 

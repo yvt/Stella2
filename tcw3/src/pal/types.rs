@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use cggeom::Box2;
-use cgmath::Matrix4;
+use cgmath::Matrix3;
 use rgb::RGBA;
 use std::rc::Rc;
 
@@ -47,13 +47,17 @@ where
 
 #[derive(Clone)]
 pub struct LayerAttrs<TBitmap, TLayer> {
-    /// The transformation applied to the contents of the layer.
+    /// The 2D transformation applied to the contents of the layer.
     /// It doesn't have an effect on sublayers.
     ///
     /// The input coordinate space is based on `bounds`. The output coordinate
     /// space is virtual pixel coordinates with `(0,0)` at the top left corner
     /// of a window's client region.
-    pub transform: Option<Matrix4<f32>>,
+    ///
+    /// `value.x.z` and `value.y.z` may be assumed to be zero. This means
+    /// projective transformations are not supported and only affine
+    /// transformations can be expressed. `value.z.z` must be positive.
+    pub transform: Option<Matrix3<f32>>,
 
     /// Specifies the content image of the layer.
     pub contents: Option<Option<TBitmap>>,
@@ -129,7 +133,6 @@ bitflags! {
         const MASK_TO_BOUNDS = 1;
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LineCap {

@@ -148,7 +148,7 @@ pub trait Canvas {
     ///
     /// `m.x.z` and `m.y.z` is assumed to be zero. This means projective
     /// transformations are not supported and only affine transformations can
-    /// be expressed.
+    /// be expressed. `m.z.z` must be positive.
     fn mult_transform(&mut self, m: Matrix3<f32>);
 
     // TODO: text rendering

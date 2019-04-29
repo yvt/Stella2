@@ -7,6 +7,19 @@ use core_graphics::{
     geometry::{CGAffineTransform, CGPoint, CGRect, CGSize},
 };
 
+pub fn extend_matrix3_with_identity_z(m: Matrix3<f32>) -> Matrix4<f32> {
+    // ┌                 ┐
+    // │ m00 m01  0  m02 │
+    // │ m10 m11  0  m12 │
+    // │  0   0   1   0  │
+    // │ m20 m21  0   1  │
+    // └                 ┘
+    Matrix4::new(
+        m.x.x, m.x.y, 0.0, m.x.z, m.y.x, m.y.y, 0.0, m.y.z, 0.0, 0.0, 1.0, 0.0, m.z.x, m.z.y, 0.0,
+        m.z.z,
+    )
+}
+
 pub fn ca_transform_3d_from_matrix4(m: Matrix4<f64>) -> CATransform3D {
     unsafe { std::mem::transmute(m.transpose()) }
 }

@@ -11,7 +11,10 @@ use std::cell::{Cell, RefCell};
 
 use super::super::{LayerAttrs, LayerFlags};
 use super::{
-    drawutils::{ca_transform_3d_from_matrix4, cg_color_from_rgbaf32, cg_rect_from_box2},
+    drawutils::{
+        ca_transform_3d_from_matrix4, cg_color_from_rgbaf32, cg_rect_from_box2,
+        extend_matrix3_with_identity_z,
+    },
     mtlocal::MtLocal,
     WM,
 };
@@ -146,13 +149,15 @@ impl HLayer {
         let mut sublayers = this_layer.sublayers.borrow_mut();
 
         if let Some(value) = attrs_diff.transform.take() {
-            let m: Matrix4<f64> = value.cast().unwrap();
+            let m: Matrix4<f64> = extend_matrix3_with_identity_z(value).cast().unwrap();
             this_layer
                 .ca_layer
                 .set_transform(&ca_transform_3d_from_matrix4(m));
 
             // Our `transform` doesn't affect sublayers
-            let m_inv: Matrix4<f64> = value.invert().unwrap().cast().unwrap();
+            let m_inv: Matrix4<f64> = extend_matrix3_with_identity_z(value.invert().unwrap())
+                .cast()
+                .unwrap();
             this_layer
                 .ca_layer
                 .set_sublayer_transform(ca_transform_3d_from_matrix4(m_inv));
