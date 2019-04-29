@@ -55,6 +55,7 @@ pub trait WM: Sized {
 #[derive(Clone)]
 pub struct WndAttrs<T: WM, TCaption, TLayer> {
     pub size: Option<[u32; 2]>,
+    pub flags: Option<WndFlags>,
     pub caption: Option<TCaption>,
     pub visible: Option<bool>,
     pub listener: Option<Option<Rc<dyn WndListener<T>>>>,
@@ -65,6 +66,7 @@ impl<T: WM, TCaption, TLayer> Default for WndAttrs<T, TCaption, TLayer> {
     fn default() -> Self {
         Self {
             size: None,
+            flags: None,
             caption: None,
             visible: None,
             listener: None,
@@ -81,11 +83,25 @@ where
     pub fn as_ref(&self) -> WndAttrs<T, &str, TLayer> {
         WndAttrs {
             size: self.size,
+            flags: self.flags,
             caption: self.caption.as_ref().map(AsRef::as_ref),
             visible: self.visible,
             listener: self.listener.clone(),
             layer: self.layer.clone(),
         }
+    }
+}
+
+bitflags! {
+    pub struct WndFlags: u32 {
+        const RESIZABLE = 1 << 0;
+        const BORDERLESS = 1 << 1;
+    }
+}
+
+impl Default for WndFlags {
+    fn default() -> Self {
+        WndFlags::RESIZABLE
     }
 }
 

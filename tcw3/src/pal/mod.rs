@@ -41,7 +41,7 @@ pub fn wm() -> &'static WM {
 // code. In other words, enabled backends can assume that they are the default
 // backend.
 
-pub use self::iface::{LayerFlags, LineCap, LineJoin, RGBAF32};
+pub use self::iface::{LayerFlags, LineCap, LineJoin, WndFlags, RGBAF32};
 
 /// The window handle type of [`WM`].
 pub type HWnd = <WM as iface::WM>::HWnd;

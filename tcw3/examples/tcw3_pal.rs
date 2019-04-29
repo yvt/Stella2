@@ -51,6 +51,7 @@ fn main() {
         layer: Some(Some(layer)),
         size: Some([220, 270]),
         listener: Some(Some(std::rc::Rc::new(Listener))),
+        flags: Some(pal::WndFlags::empty()),
         ..Default::default()
     });
 

@@ -5,6 +5,10 @@ typedef void *TCWListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 
+// These flags must be synchronized with `WndFlags`
+#define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
+#define kTCW3WndFlagsBorderless ((uint32_t)(1 << 1))
+
 @interface TCWWindowView : NSView
 @end
 
@@ -61,6 +65,24 @@ extern void tcw_wndlistener_close(TCWListenerUserData ud);
 
 - (void)setContentSize:(NSSize)size {
     [self->window setContentSize:size];
+}
+
+- (void)setFlags:(uint32_t)flags {
+    // Compute the new masks
+    NSWindowStyleMask masks = 0;
+
+    if (flags & kTCW3WndFlagsResizable) {
+        masks |= NSWindowStyleMaskResizable;
+    }
+
+    if (flags & kTCW3WndFlagsBorderless) {
+        masks |= NSWindowStyleMaskBorderless;
+    } else {
+        masks |= NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
+                 NSWindowStyleMaskTitled;
+    }
+
+    self->window.styleMask = masks;
 }
 
 - (void)makeKeyAndOrderFront {

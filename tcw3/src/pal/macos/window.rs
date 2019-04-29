@@ -96,6 +96,12 @@ impl HWnd {
     pub(super) unsafe fn set_attrs(&self, attrs: &WndAttrs<&str>) {
         let state = self.state();
 
+        // Call `setFlags` before `setContentSize` to make sure the window
+        // properly sized based on the target window style masks
+        if let Some(value) = attrs.flags {
+            let () = msg_send![*self.ctrler, setFlags: value.bits()];
+        }
+
         if let Some(value) = attrs.size {
             let size = NSSize::new(value[0] as _, value[1] as _);
             let () = msg_send![*self.ctrler, setContentSize: size];
