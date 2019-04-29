@@ -1,10 +1,12 @@
 //! Platform abstraction layer
 use cfg_if::cfg_if;
 
-pub mod traits;
-pub mod types;
+pub mod iface;
 
-pub use self::types::{LayerFlags, RGBAF32};
+/// Re-exports traits from `iface`.
+pub mod prelude {
+    pub use super::iface::{Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, WndListener, WM};
+}
 
 cfg_if! {
     if #[cfg(target_os = "macos")] {
@@ -30,17 +32,32 @@ pub fn wm() -> &'static WM {
     WM::global()
 }
 
+// ============================================================================
+//
+// Type aliases/re-exports from `iface` with concrete backend types are
+// defined below.
+//
+// Implementation notes: It's okay to use the following types in the backend
+// code. In other words, enabled backends can assume that they are the default
+// backend.
+
+pub use self::iface::{LayerFlags, LineCap, LineJoin, RGBAF32};
+
 /// The window handle type of [`WM`].
-pub type HWnd = <WM as traits::WM>::HWnd;
+pub type HWnd = <WM as iface::WM>::HWnd;
 
 /// The layer handle type of [`WM`].
-pub type HLayer = <WM as traits::WM>::HLayer;
-
-// Implementation notes: It's okay to use the following types in the backend
-// code.
+pub type HLayer = <WM as iface::WM>::HLayer;
 
 /// A specialization of `WndAttrs` for the default backend.
-pub type WndAttrs<TCaption> = types::WndAttrs<WM, TCaption, HLayer>;
+pub type WndAttrs<TCaption> = iface::WndAttrs<WM, TCaption, HLayer>;
 
 /// A specialization of `LayerAttrs` for the default backend.
-pub type LayerAttrs = types::LayerAttrs<Bitmap, HLayer>;
+pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
+
+// Trait aliases (unstable at the point of writing) actually do not work
+// exactly like type aliases. Specifically, they cannot be used in every place
+// where traits can be used, like `impl` blocks.
+//
+//      pub trait WndListener = iface::WndListener<WM>;
+//

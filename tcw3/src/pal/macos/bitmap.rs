@@ -6,10 +6,7 @@ use core_graphics::{
     image::{CGImage, CGImageAlphaInfo},
 };
 
-use super::super::{
-    traits,
-    types::{LineCap, LineJoin, RGBAF32},
-};
+use super::super::{iface, LineCap, LineJoin, RGBAF32};
 use super::drawutils::{cg_affine_transform_from_matrix3, cg_rect_from_box2};
 
 #[derive(Clone)]
@@ -20,13 +17,13 @@ pub struct Bitmap {
 unsafe impl Send for Bitmap {}
 unsafe impl Sync for Bitmap {}
 
-impl traits::Bitmap for Bitmap {}
+impl iface::Bitmap for Bitmap {}
 
 pub struct BitmapBuilder {
     cg_context: CGContext,
 }
 
-impl traits::BitmapBuilder for BitmapBuilder {
+impl iface::BitmapBuilder for BitmapBuilder {
     type Bitmap = Bitmap;
 
     fn into_bitmap(self) -> Self::Bitmap {
@@ -35,7 +32,7 @@ impl traits::BitmapBuilder for BitmapBuilder {
     }
 }
 
-impl traits::BitmapBuilderNew for BitmapBuilder {
+impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
         // Get the sRGB color space
         let cs = CGColorSpace::create_with_name(unsafe { kCGColorSpaceSRGB }).unwrap();
@@ -58,7 +55,7 @@ impl traits::BitmapBuilderNew for BitmapBuilder {
     }
 }
 
-impl traits::Canvas for BitmapBuilder {
+impl iface::Canvas for BitmapBuilder {
     fn save(&mut self) {
         self.cg_context.save();
     }

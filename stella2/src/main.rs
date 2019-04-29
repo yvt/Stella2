@@ -1,6 +1,6 @@
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
-use tcw3::pal::traits::*;
+use tcw3::pal::prelude::*;
 
 fn main() {
     let wm = tcw3::pal::wm();
@@ -15,7 +15,7 @@ fn main() {
 
     let bmp = bmp_builder.into_bitmap();
 
-    let layer2 = wm.new_layer(&tcw3::pal::types::LayerAttrs {
+    let layer2 = wm.new_layer(&tcw3::pal::LayerAttrs {
         bounds: Some(Box2::new(
             Point2::new(20.0, 120.0),
             Point2::new(150.0, 250.0),
@@ -25,7 +25,7 @@ fn main() {
         ..Default::default()
     });
 
-    let layer = wm.new_layer(&tcw3::pal::types::LayerAttrs {
+    let layer = wm.new_layer(&tcw3::pal::LayerAttrs {
         bounds: Some(Box2::new(
             Point2::new(20.0, 20.0),
             Point2::new(200.0, 100.0),
@@ -37,7 +37,7 @@ fn main() {
         ..Default::default()
     });
 
-    let wnd = wm.new_wnd(&tcw3::pal::types::WndAttrs {
+    let wnd = wm.new_wnd(&tcw3::pal::WndAttrs {
         caption: Some("Hello world"),
         visible: Some(true),
         layer: Some(Some(layer)),

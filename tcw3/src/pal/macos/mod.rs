@@ -7,7 +7,7 @@ use cocoa::{
 use objc::{msg_send, sel, sel_impl};
 use std::marker::PhantomData;
 
-use super::{traits, LayerAttrs, WndAttrs};
+use super::{iface, LayerAttrs, WndAttrs};
 
 mod bitmap;
 mod drawutils;
@@ -42,7 +42,7 @@ impl WM {
     }
 }
 
-impl traits::WM for WM {
+impl iface::WM for WM {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type Bitmap = Bitmap;

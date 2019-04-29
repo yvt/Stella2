@@ -30,7 +30,7 @@ use std::{
     rc::Rc,
 };
 
-use super::super::{traits, types};
+use super::super::{iface, WndAttrs};
 use super::{utils::with_autorelease_pool, HLayer, IdRef, WM};
 
 #[derive(Clone)]
@@ -45,14 +45,14 @@ unsafe impl Send for HWnd {}
 unsafe impl Sync for HWnd {}
 
 struct WndState {
-    listener: RefCell<Option<Rc<dyn traits::WndListener<WM>>>>,
+    listener: RefCell<Option<Rc<dyn iface::WndListener<WM>>>>,
     layer: Cell<Option<HLayer>>,
     hwnd: HWnd,
 }
 
 impl HWnd {
     /// Must be called from a main thread.
-    pub(super) unsafe fn new(attrs: &types::WndAttrs<WM, &str, HLayer>) -> Self {
+    pub(super) unsafe fn new(attrs: &WndAttrs<&str>) -> Self {
         with_autorelease_pool(|| {
             extern "C" {
                 /// Return `[TCWWindowController class]`.
@@ -93,7 +93,7 @@ impl HWnd {
     }
 
     /// Must be called from a main thread.
-    pub(super) unsafe fn set_attrs(&self, attrs: &types::WndAttrs<WM, &str, HLayer>) {
+    pub(super) unsafe fn set_attrs(&self, attrs: &WndAttrs<&str>) {
         let state = self.state();
 
         if let Some(value) = attrs.size {
