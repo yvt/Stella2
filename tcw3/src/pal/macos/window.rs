@@ -98,7 +98,7 @@ impl HWnd {
 
         if let Some(value) = attrs.size {
             let size = NSSize::new(value[0] as _, value[1] as _);
-            let () = msg_send![*self.ctrler, setCotentSize: size];
+            let () = msg_send![*self.ctrler, setContentSize: size];
         }
 
         if let Some(value) = attrs.caption {
