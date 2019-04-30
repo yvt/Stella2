@@ -5,6 +5,7 @@ use core_graphics::{
     context::{CGContext, CGLineCap, CGLineJoin},
     image::{CGImage, CGImageAlphaInfo},
 };
+use std::fmt;
 
 use super::super::{iface, LineCap, LineJoin, RGBAF32};
 use super::drawutils::{cg_affine_transform_from_matrix3, cg_rect_from_box2};
@@ -17,10 +18,28 @@ pub struct Bitmap {
 unsafe impl Send for Bitmap {}
 unsafe impl Sync for Bitmap {}
 
+impl fmt::Debug for Bitmap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let cg_image: *mut () = unsafe { std::mem::transmute_copy(&self.cg_image) };
+        f.debug_struct("Bitmap")
+            .field("cg_image", &cg_image)
+            .finish()
+    }
+}
+
 impl iface::Bitmap for Bitmap {}
 
 pub struct BitmapBuilder {
     cg_context: CGContext,
+}
+
+impl fmt::Debug for BitmapBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let cg_context: *mut () = unsafe { std::mem::transmute_copy(&self.cg_context) };
+        f.debug_struct("BitmapBuilder")
+            .field("cg_context", &cg_context)
+            .finish()
+    }
 }
 
 impl iface::BitmapBuilder for BitmapBuilder {

@@ -25,6 +25,7 @@ pub use self::window::HWnd;
 /// `WM` is only accessible by the application's main thread. Therefore, the
 /// ownership of `&WM` can be used as an evidence that the main thread has the
 /// control.
+#[derive(Debug)]
 pub struct WM {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }

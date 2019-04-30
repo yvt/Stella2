@@ -33,7 +33,7 @@ use std::{
 use super::super::{iface, WndAttrs};
 use super::{utils::with_autorelease_pool, HLayer, IdRef, WM};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HWnd {
     /// `TCWWindowController`
     ctrler: IdRef,

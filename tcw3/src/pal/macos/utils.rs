@@ -10,6 +10,7 @@ use objc::{
 };
 use std::ops::Deref;
 
+#[derive(Debug)]
 pub struct IdRef(id);
 
 impl IdRef {

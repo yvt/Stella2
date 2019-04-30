@@ -10,16 +10,16 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 pub type RGBAF32 = RGBA<f32>;
 
-pub trait WM: Sized {
+pub trait WM: Sized + Debug {
     /// A window handle type.
-    type HWnd: Send + Sync + Clone;
+    type HWnd: Debug + Send + Sync + Clone;
 
     /// A layer handle type.
-    type HLayer: Send + Sync + Clone;
+    type HLayer: Debug + Send + Sync + Clone;
 
     /// A bitmap type.
     type Bitmap: Bitmap;
@@ -114,7 +114,7 @@ impl Default for WndFlags {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LayerAttrs<TBitmap, TLayer> {
     /// The 2D transformation applied to the contents of the layer.
     /// It doesn't have an effect on sublayers.
@@ -232,10 +232,10 @@ pub trait WndListener<T: WM> {
 }
 
 /// A immutable, ref-counted bitmap image.
-pub trait Bitmap: Clone + Sized + Send + Sync {}
+pub trait Bitmap: Clone + Sized + Send + Sync + Debug {}
 
 /// Types supporting drawing operations.
-pub trait Canvas {
+pub trait Canvas: Debug {
     /// Push a copy of the current graphics state onto the state stack.
     fn save(&mut self);
     /// Pop a graphics state from the state stack.
