@@ -6,34 +6,52 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::layouts::{EmptyLayout, FillLayout},
-    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
+    uicore::{
+        HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndEventSubscription,
+        WndListener,
+    },
 };
 
 struct MyViewListener {
     layer: RefCell<Option<pal::HLayer>>,
+    ss: RefCell<Option<WndEventSubscription>>,
 }
 
 impl MyViewListener {
     fn new() -> Self {
         Self {
             layer: RefCell::new(None),
+            ss: RefCell::new(None),
         }
     }
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: &pal::WM, view: &HView, _: &HWnd) {
+    fn mount(&self, wm: &pal::WM, view: &HView, wnd: &HWnd) {
+        dbg!();
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             bg_color: Some(pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
             ..Default::default()
         }));
 
+        {
+            let view = view.clone();
+            *self.ss.borrow_mut() = Some(wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
+                dbg!();
+                view.pend_update();
+            })));
+        }
+
         view.pend_update();
     }
 
     fn unmount(&self, wm: &pal::WM, _: &HView) {
+        dbg!();
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
+        }
+        if let Some(ss) = self.ss.borrow_mut().take() {
+            ss.unsubscribe().unwrap();
         }
     }
 
@@ -46,10 +64,13 @@ impl ViewListener for MyViewListener {
         let layer = layer.as_ref().unwrap();
 
         let bmp = {
-            let size = view.global_frame().size();
+            let size = view.global_frame().size() * ctx.hwnd().dpi_scale();
+
+            dbg!((view.global_frame().size(), ctx.hwnd().dpi_scale()));
 
             let mut bmp_builder =
                 pal::BitmapBuilder::new([size.x.max(1.0) as u32, size.y.max(1.0) as u32]);
+            bmp_builder.set_line_width(ctx.hwnd().dpi_scale());
             bmp_builder.move_to(Point2::new(size.x * 0.2, size.y * 0.2));
             bmp_builder.line_to(Point2::new(size.x * 0.8, size.y * 0.2));
             bmp_builder.line_to(Point2::new(size.x * 0.2, size.y * 0.8));
