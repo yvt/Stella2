@@ -297,7 +297,16 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn resize(&self, wm: &WM, _: &pal::HWnd) {}
+    fn resize(&self, wm: &WM, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            let view = hwnd.wnd.content_view.borrow();
+            let view = view.as_ref().unwrap();
+
+            view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+
+            hwnd.pend_update();
+        }
+    }
 }
 
 pub(crate) fn new_root_content_view() -> HView {
