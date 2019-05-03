@@ -1,15 +1,22 @@
 use cgmath::prelude::*;
-use cgmath::{num_traits::NumCast, BaseNum, Point2, Point3};
+use cgmath::{num_traits::NumCast, BaseNum, Point2, Point3, Vector2, Vector3};
+use std::ops::Add;
 
 use super::{BoolArray, ElementWiseOp, ElementWisePartialOrd};
 
 pub trait AxisAlignedBox<T>: Sized {
-    type Point: EuclideanSpace + ElementWiseOp + ElementWisePartialOrd;
+    type Point: EuclideanSpace
+        + ElementWiseOp
+        + ElementWisePartialOrd
+        + Add<Self::Vector, Output = Self::Point>;
+    type Vector: Clone;
 
     fn new(min: Self::Point, max: Self::Point) -> Self;
 
     fn min(&self) -> Self::Point;
     fn max(&self) -> Self::Point;
+
+    fn zero() -> Self;
 
     #[inline]
     fn contains_point(&self, point: &Self::Point) -> bool
@@ -64,6 +71,14 @@ pub trait AxisAlignedBox<T>: Sized {
             Some(s)
         }
     }
+
+    #[inline]
+    fn translate(&self, displacement: Self::Vector) -> Self {
+        Self::new(
+            self.min() + displacement.clone(),
+            self.max() + displacement.clone(),
+        )
+    }
 }
 
 /// Represents an axis-aligned 2D box.
@@ -90,6 +105,7 @@ pub struct Box3<T> {
 
 impl<T: BaseNum> AxisAlignedBox<T> for Box2<T> {
     type Point = Point2<T>;
+    type Vector = Vector2<T>;
 
     #[inline]
     fn new(min: Self::Point, max: Self::Point) -> Self {
@@ -108,6 +124,14 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box2<T> {
     }
 
     #[inline]
+    fn zero() -> Self {
+        Self::new(
+            Point2::new(T::zero(), T::zero()),
+            Point2::new(T::zero(), T::zero()),
+        )
+    }
+
+    #[inline]
     fn min(&self) -> Self::Point {
         self.min
     }
@@ -119,6 +143,7 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box2<T> {
 
 impl<T: BaseNum> AxisAlignedBox<T> for Box3<T> {
     type Point = Point3<T>;
+    type Vector = Vector3<T>;
 
     #[inline]
     fn new(min: Self::Point, max: Self::Point) -> Self {
@@ -134,6 +159,14 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box3<T> {
     fn is_empty(&self) -> bool {
         let size = self.size();
         size.x <= T::zero() && size.y <= T::zero() && size.z <= T::zero()
+    }
+
+    #[inline]
+    fn zero() -> Self {
+        Self::new(
+            Point3::new(T::zero(), T::zero(), T::zero()),
+            Point3::new(T::zero(), T::zero(), T::zero()),
+        )
     }
 
     #[inline]

@@ -131,6 +131,9 @@ pub struct LayerAttrs<TBitmap, TLayer> {
     /// Specifies the content image of the layer.
     pub contents: Option<Option<TBitmap>>,
     /// Specifies the bounds of the content image.
+    ///
+    /// Because of how the anchor point is calculated in the macOS bakcend, it
+    /// must not be empty.
     pub bounds: Option<Box2<f32>>,
     /// Specifies the flexible region of the content image.
     ///
