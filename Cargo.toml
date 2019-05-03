@@ -4,6 +4,7 @@ members = [
     "tcw3",
     "support/cggeom",
     "support/iterpool",
+    "support/subscriber_list",
 ]
 
 [profile.release]
