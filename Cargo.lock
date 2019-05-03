@@ -356,6 +356,7 @@ dependencies = [
  "iterpool 0.1.0",
  "objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "subscriber_list 0.1.0",
 ]
 
 [[package]]

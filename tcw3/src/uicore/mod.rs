@@ -22,6 +22,7 @@ use std::{
     fmt,
     rc::{Rc, Weak},
 };
+use subscriber_list::{SubscriberList, Subscription};
 
 use crate::pal::{self, prelude::WM as _, WM};
 
@@ -62,6 +63,9 @@ pub struct DefaultWndListener;
 
 impl WndListener for DefaultWndListener {}
 
+pub type WndEventHandler = Box<dyn Fn(&'static WM, &HWnd)>;
+pub type WndEventSubscription = Subscription<WndEventHandler>;
+
 struct Wnd {
     wm: &'static WM,
     dirty: Cell<window::WndDirtyFlags>,
@@ -73,6 +77,7 @@ struct Wnd {
     content_view: RefCell<Option<HView>>,
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
+    dpi_scale_changed_handlers: RefCell<SubscriberList<WndEventHandler>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -89,6 +94,7 @@ impl fmt::Debug for Wnd {
             .field("content_view", &self.content_view)
             .field("style_attrs", &self.style_attrs)
             .field("updating", &self.updating)
+            .field("dpi_scale_changed_handlers", &())
             .finish()
     }
 }
@@ -109,6 +115,7 @@ impl Wnd {
             content_view: RefCell::new(Some(content_view)),
             style_attrs: RefCell::new(Default::default()),
             updating: Cell::new(false),
+            dpi_scale_changed_handlers: RefCell::new(SubscriberList::new()),
         }
     }
 }
@@ -332,6 +339,14 @@ impl HWnd {
         } else {
             1.0
         }
+    }
+
+    /// Register a function that gets called whenever `dpi_scene` changes.
+    ///
+    /// Returns a [`subscriber_list::Subscription`], which can be used to
+    /// unregister the function.
+    pub fn subscribe_dpi_scale_changed(&self, cb: WndEventHandler) -> WndEventSubscription {
+        self.wnd.dpi_scale_changed_handlers.borrow_mut().insert(cb)
     }
 
     /// Get the content view of a window.

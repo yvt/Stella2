@@ -323,6 +323,15 @@ impl pal::iface::WndListener<WM> for PalWndListener {
             hwnd.update();
         }
     }
+
+    fn dpi_scale_changed(&self, _: &WM, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            let handlers = hwnd.wnd.dpi_scale_changed_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(hwnd.wnd.wm, &hwnd);
+            }
+        }
+    }
 }
 
 pub(crate) fn new_root_content_view() -> HView {

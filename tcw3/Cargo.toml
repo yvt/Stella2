@@ -13,6 +13,7 @@ bitflags = "1.0.4"
 cggeom = { path = "../support/cggeom" }
 flags-macro = "0.1.3"
 derive_more = "0.14.0"
+subscriber_list = { path = "../support/subscriber_list" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.3"
