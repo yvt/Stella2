@@ -41,6 +41,10 @@ impl WM {
             _no_send_sync: PhantomData,
         }
     }
+
+    pub fn invoke_on_main_thread(f: impl FnOnce(&WM) + Send + 'static) {
+        dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
+    }
 }
 
 impl iface::WM for WM {

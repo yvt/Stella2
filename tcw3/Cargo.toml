@@ -19,6 +19,7 @@ objc = "0.2.3"
 cocoa = "0.18.4"
 core-foundation = "0.6"
 core-graphics = "0.17.3"
+dispatch = "0.1.4"
 iterpool = { path = "../support/iterpool" }
 
 [build-dependencies]
