@@ -1,4 +1,4 @@
-//! Provides a type for representing a list of subscribers. When adding an
+//! Provides a type representing a list of subscribers. When adding an
 //! element, the caller gets a ticket for deleting (i.e., unsubscribing) that
 //! element.
 use iterpool::{self, IterablePool, PoolPtr};
@@ -9,11 +9,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
+/// A type representing a list of subscribers.
 #[derive(Debug)]
 pub struct SubscriberList<T> {
     pool: Rc<RefCell<IterablePool<T>>>,
 }
 
+/// An element (subscriber) in [`SubscriberList`].
 #[derive(Debug)]
 pub struct Subscription<T> {
     pool: Weak<RefCell<IterablePool<T>>>,
@@ -70,6 +72,16 @@ impl<T> Subscription<T> {
             Ok(None)
         }
     }
+
+    pub fn untype(self) -> UntypedSubscription
+    where
+        T: 'static,
+    {
+        UntypedSubscription {
+            pool: self.pool,
+            ptr: self.ptr,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -97,6 +109,42 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+/// Type-erased [`Subscription`].
+pub struct UntypedSubscription {
+    pool: Weak<RefCell<dyn ErasedPool>>,
+    ptr: PoolPtr,
+}
+
+trait ErasedPool {
+    fn deallocate(&mut self, ptr: PoolPtr);
+}
+
+impl<T> ErasedPool for IterablePool<T> {
+    fn deallocate(&mut self, ptr: PoolPtr) {
+        self.deallocate(ptr);
+    }
+}
+
+impl fmt::Debug for UntypedSubscription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UntypedSubscription")
+            .field("ptr", &self.ptr)
+            .finish()
+    }
+}
+
+impl UntypedSubscription {
+    /// Remove the element that `self` represents.
+    pub fn unsubscribe(self) -> Result<Option<()>, IterationActive> {
+        if let Some(pool) = self.pool.upgrade() {
+            let mut pool = pool.try_borrow_mut().map_err(|_| IterationActive)?;
+            Ok(Some(pool.deallocate(self.ptr)))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -139,6 +187,32 @@ mod tests {
     fn list_dropped() {
         let mut list = SubscriberList::new();
         let ss = list.insert(1);
+        drop(list);
+        assert_eq!(ss.unsubscribe(), Ok(None));
+    }
+
+    #[test]
+    fn untyped_remove_subscription() {
+        let mut list = SubscriberList::new();
+        let ss = list.insert(1).untype();
+        assert_eq!(list.iter().cloned().collect::<Vec<_>>(), vec![1]);
+        assert_eq!(list.iter_mut().map(|x| *x).collect::<Vec<_>>(), vec![1]);
+        assert_eq!(ss.unsubscribe(), Ok(Some(())));
+        assert_eq!(list.iter().cloned().collect::<Vec<_>>(), vec![]);
+    }
+
+    #[test]
+    fn untyped_iteration_active() {
+        let mut list = SubscriberList::new();
+        let ss = list.insert(1).untype();
+        let _it = list.iter();
+        assert_eq!(ss.unsubscribe(), Err(IterationActive));
+    }
+
+    #[test]
+    fn untyped_list_dropped() {
+        let mut list = SubscriberList::new();
+        let ss = list.insert(1).untype();
         drop(list);
         assert_eq!(ss.unsubscribe(), Ok(None));
     }
