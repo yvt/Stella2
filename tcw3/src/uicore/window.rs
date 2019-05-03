@@ -125,7 +125,14 @@ impl HWnd {
         let style_attrs = self.wnd.style_attrs.borrow();
         style_attrs.transfer_to_pal(dirty, &mut attrs);
 
+        // Suppress resize events (caused by `set_wnd_attr`)
+        self.wnd.updating.set(true);
+
+        // Update PAL window attributes
         self.wnd.wm.set_wnd_attr(pal_wnd, &attrs);
+
+        // Un-suppress resize events
+        self.wnd.updating.set(false);
 
         // Update layers
         self.wnd.wm.update_wnd(pal_wnd);
@@ -297,14 +304,23 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn resize(&self, wm: &WM, _: &pal::HWnd) {
+    fn resize(&self, _: &WM, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
-            let view = hwnd.wnd.content_view.borrow();
-            let view = view.as_ref().unwrap();
+            if hwnd.wnd.updating.get() {
+                // Prevent recursion
+                return;
+            }
 
-            view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+            {
+                let view = hwnd.wnd.content_view.borrow();
+                let view = view.as_ref().unwrap();
 
-            hwnd.pend_update();
+                view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+            }
+
+            // Layers should be updated *within* the call to thie method
+            // for them to properly follow the window outline being dragged.
+            hwnd.update();
         }
     }
 }

@@ -72,6 +72,7 @@ struct Wnd {
     /// The content view, which can be `None` only after the window is closed.
     content_view: RefCell<Option<HView>>,
     style_attrs: RefCell<window::WndStyleAttrs>,
+    updating: Cell<bool>,
 }
 
 impl fmt::Debug for Wnd {
@@ -87,6 +88,7 @@ impl fmt::Debug for Wnd {
             .field("closed", &self.closed)
             .field("content_view", &self.content_view)
             .field("style_attrs", &self.style_attrs)
+            .field("updating", &self.updating)
             .finish()
     }
 }
@@ -106,6 +108,7 @@ impl Wnd {
             closed: Cell::new(false),
             content_view: RefCell::new(Some(content_view)),
             style_attrs: RefCell::new(Default::default()),
+            updating: Cell::new(false),
         }
     }
 }
