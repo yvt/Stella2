@@ -42,10 +42,28 @@ impl HWnd {
     /// clears `Wnd::dirty`.
     pub(super) fn pend_update(&self) {
         assert!(!self.wnd.closed.get(), "the window has been already closed");
-        unimplemented!()
+
+        // Already queued?
+        let dirty = &self.wnd.dirty;
+        if dirty.get().contains(WndDirtyFlags::UPDATE) {
+            return;
+        }
+        dirty.set(dirty.get() | WndDirtyFlags::UPDATE);
+
+        let hwnd: HWnd = self.clone();
+
+        self.wnd.wm.invoke(move |_| {
+            hwnd.update();
+        });
     }
 
     fn update(&self) {
+        // Clear the flag
+        {
+            let dirty = &self.wnd.dirty;
+            dirty.set(dirty.get() - WndDirtyFlags::UPDATE);
+        }
+
         if self.wnd.closed.get() {
             return;
         }
@@ -310,12 +328,15 @@ bitflags! {
         const STYLE_VISIBLE = 1 << 2;
         const STYLE_FLAGS = 1 << 3;
         const STYLE_CAPTION = 1 << 4;
+
+        /// `update` is queued to the main event queue.
+        const UPDATE = 1 << 5;
     }
 }
 
 impl Default for WndDirtyFlags {
     fn default() -> Self {
-        WndDirtyFlags::all()
+        WndDirtyFlags::all() - WndDirtyFlags::UPDATE
     }
 }
 
