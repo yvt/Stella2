@@ -372,6 +372,11 @@ impl HWnd {
         self.pend_update();
     }
 
+    /// Set the window listener.
+    pub fn set_listener(&self, listener: Box<dyn WndListener>) {
+        *self.wnd.listener.borrow_mut() = listener;
+    }
+
     /// Set the visibility of a window.
     ///
     /// The default value is `false`. Note that hiding a window doesn't release
