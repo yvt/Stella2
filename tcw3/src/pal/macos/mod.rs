@@ -50,6 +50,19 @@ impl iface::WM for WM {
         dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
     }
 
+    fn invoke(&self, f: impl FnOnce(&'static Self) + 'static) {
+        // Give `Send` uncondionally because we don't `Send` actually
+        // (we are already on the main thread)
+        struct AssertSend<T>(T);
+        unsafe impl<T> Send for AssertSend<T> {}
+        let cell = AssertSend(f);
+
+        Self::invoke_on_main_thread(move |wm| {
+            let AssertSend(f) = cell;
+            f(wm);
+        });
+    }
+
     fn enter_main_loop(&self) {
         unsafe {
             let app = appkit::NSApp();

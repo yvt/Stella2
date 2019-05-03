@@ -30,8 +30,12 @@ pub trait WM: Sized + Debug + 'static {
     /// Get the default instance of [`WM`] without checking the calling thread.
     unsafe fn global_unchecked() -> &'static Self;
 
-    /// Call the specified function on the main thread.
+    /// Enqueue a call to the specified function on the main thread. The calling
+    /// thread can be any thread.
     fn invoke_on_main_thread(f: impl FnOnce(&'static Self) + Send + 'static);
+
+    /// Enqueue a call to the specified function on the main thread.
+    fn invoke(&self, f: impl FnOnce(&'static Self) + 'static);
 
     fn enter_main_loop(&self);
     fn terminate(&self);
