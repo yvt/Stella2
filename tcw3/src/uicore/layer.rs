@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use flags_macro::flags;
 
-use super::{HView, ViewDirtyFlags, ViewFlags};
+use super::{HView, HWnd, ViewDirtyFlags, ViewFlags};
 use crate::pal::{self, WM};
 
 impl HView {
@@ -35,7 +35,7 @@ impl HView {
     ///
     /// Returns `true` if `layers` has changed. The return value is used to
     /// implement a recursive algorithm of `update_layers` itself.
-    pub(super) fn update_layers(&self, wm: &WM) -> bool {
+    pub(super) fn update_layers(&self, wm: &WM, hwnd: &HWnd) -> bool {
         let dirty = &self.view.dirty;
 
         let mut layers_changed = false;
@@ -48,7 +48,7 @@ impl HView {
             dirty.set(dirty.get() - desc_flags);
 
             for subview in self.view.layout.borrow().subviews().iter() {
-                layers_changed |= subview.update_layers(wm);
+                layers_changed |= subview.update_layers(wm, hwnd);
             }
         }
 
@@ -66,6 +66,7 @@ impl HView {
             let mut layers = self.view.layers.borrow_mut();
 
             let mut ctx = UpdateCtx {
+                hwnd,
                 reason: UpdateReason::empty(),
                 sublayers: None,
                 layers: &mut *layers,
@@ -111,9 +112,15 @@ pub struct UpdateCtx<'a> {
     sublayers: Option<Vec<pal::HLayer>>,
     layers: &'a mut Vec<pal::HLayer>,
     layers_updated: bool,
+    hwnd: &'a HWnd,
 }
 
 impl<'a> UpdateCtx<'a> {
+    /// Get the window the view belongs to.
+    pub fn hwnd(&self) -> &HWnd {
+        self.hwnd
+    }
+
     /// Get flags indicating why `update` was called.
     pub fn reason(&self) -> UpdateReason {
         self.reason

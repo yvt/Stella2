@@ -216,7 +216,7 @@ impl HWnd {
             view.flush_position_event(self.wnd.wm);
 
             // Update visual
-            view.update_layers(self.wnd.wm);
+            view.update_layers(self.wnd.wm, self);
         }
 
         panic!("Window update did not converge");
