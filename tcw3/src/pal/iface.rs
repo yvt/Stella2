@@ -57,7 +57,9 @@ pub trait WM: Sized + Debug + 'static {
     /// Get the size of a window's content region.
     fn get_wnd_size(&self, window: &Self::HWnd) -> [u32; 2];
     /// Get the DPI scaling factor of a window.
-    fn get_wnd_dpi_scale(&self, _window: &Self::HWnd) -> f32 { 1.0 }
+    fn get_wnd_dpi_scale(&self, _window: &Self::HWnd) -> f32 {
+        1.0
+    }
 
     fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
