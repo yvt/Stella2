@@ -8,8 +8,22 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::{HView, HWnd, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags};
+use super::{
+    HView, HWnd, Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener,
+    Wnd, WndStyleFlags,
+};
 use crate::pal::{self, prelude::WM as _, WM};
+
+impl HView {
+    /// Get the containing window for a view.
+    pub(super) fn containing_wnd(&self) -> Option<HWnd> {
+        match self.view.superview.borrow().upgrade() {
+            None => None,
+            Some(SuperviewStrong::View(sv)) => HView { view: sv }.containing_wnd(),
+            Some(SuperviewStrong::Window(wnd)) => Some(HWnd { wnd }),
+        }
+    }
+}
 
 impl HWnd {
     fn ensure_materialized(&self) {
@@ -124,7 +138,29 @@ impl Wnd {
             return;
         }
 
-        // TODO: detach the content view
+        // Detach the content view
+        {
+            let view: HView = self.content_view.borrow_mut().take().unwrap();
+
+            debug_assert!(std::ptr::eq(
+                self,
+                // Get the superview
+                &*view
+                    .view
+                    .superview
+                    .borrow()
+                    // Assuming it's a window...
+                    .wnd()
+                    .unwrap()
+                    // It should be still valid...
+                    .upgrade()
+                    .unwrap()
+            ));
+
+            *view.view.superview.borrow_mut() = Superview::empty();
+
+            view.call_unmount(self.wm);
+        }
 
         if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
             // TODO: should clarify whether `pal::WndListener::close` is called or not
@@ -156,9 +192,11 @@ impl Wnd {
         for _ in 0..100 {
             let view: HView = self.content_view.borrow().clone().unwrap();
 
-            if view.view.dirty.get().is_empty() {
+            if !view.view.dirty.get().is_dirty() {
                 return (new_size, min_size, max_size);
             }
+
+            view.call_pending_mount_if_dirty(self.wm);
 
             // Layout: down phase
             view.update_size_traits();

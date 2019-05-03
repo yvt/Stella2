@@ -27,6 +27,7 @@ use crate::pal::{self, WM};
 
 mod layer;
 mod layout;
+mod mount;
 mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
@@ -92,13 +93,18 @@ impl fmt::Debug for Wnd {
 
 impl Wnd {
     fn new(wm: &'static WM) -> Self {
+        let content_view = window::new_root_content_view();
+
+        // Pend mount
+        content_view.set_dirty_flags(ViewDirtyFlags::MOUNT);
+
         Self {
             wm,
             dirty: Cell::new(Default::default()),
             pal_wnd: RefCell::new(None),
             listener: RefCell::new(Box::new(DefaultWndListener)),
             closed: Cell::new(false),
-            content_view: RefCell::new(Some(window::new_root_content_view())),
+            content_view: RefCell::new(Some(content_view)),
             style_attrs: RefCell::new(Default::default()),
         }
     }
@@ -130,10 +136,14 @@ bitflags! {
 /// View event handlers.
 pub trait ViewListener {
     /// A view was added to a window.
-    fn mount(&self, _: &WM, _: &HView) {} // TODO: call this
+    ///
+    /// It's generally not safe to modify view properties from this method.
+    fn mount(&self, _: &WM, _: &HView) {}
 
     /// A view was removed from a window.
-    fn unmount(&self, _: &WM, _: &HView) {} // TODO: call this
+    ///
+    /// It's generally not safe to modify view properties from this method.
+    fn unmount(&self, _: &WM, _: &HView) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
     /// updated.
@@ -256,6 +266,13 @@ impl Superview {
             Superview::Window(weak) => None,
         }
     }
+
+    fn wnd(&self) -> Option<&Weak<Wnd>> {
+        match self {
+            Superview::View(weak) => None,
+            Superview::Window(weak) => Some(weak),
+        }
+    }
 }
 
 impl PartialEq<Weak<View>> for Superview {
@@ -304,6 +321,7 @@ impl HWnd {
         );
         assert!(!self.wnd.closed.get(), "the window has been already closed");
 
+        let old_content_view;
         {
             let mut content_view = self.wnd.content_view.borrow_mut();
 
@@ -318,10 +336,19 @@ impl HWnd {
                 "the view already has a parent"
             );
 
-            *content_view = Some(view);
+            // Pend a call to `ViewListener::mount`
+            let dirty = &view.view.dirty;
+            dirty.set(dirty.get() | ViewDirtyFlags::MOUNT);
+
+            old_content_view = std::mem::replace(&mut *content_view, Some(view));
+
+            // Pend a root layer change
             let dirty = &self.wnd.dirty;
             dirty.set(dirty.get() | window::WndDirtyFlags::LAYER);
         }
+
+        // Unmount the old content view
+        old_content_view.unwrap().call_unmount(self.wnd.wm);
 
         self.pend_update();
     }
@@ -415,9 +442,9 @@ impl HView {
 
     /// Set a new [`Layout`].
     ///
-    /// It's now allowed to call this method from [`ViewListener::update`].
+    /// It's not allowed to call this method from [`ViewListener::update`].
     pub fn set_layout(&self, layout: Box<dyn Layout>) {
-        let cur_layout = self.view.layout.borrow();
+        let mut cur_layout = self.view.layout.borrow_mut();
         let subviews_changed = !layout.has_same_subviews(&**cur_layout);
 
         let mut new_flags = ViewDirtyFlags::empty();
@@ -449,6 +476,14 @@ impl HView {
 
             new_flags = new_flags.raise_level();
 
+            // Is there any unseen view?
+            for hview_sub in layout.subviews().iter() {
+                if !hview_sub.view.dirty.get().contains(ViewDirtyFlags::MOUNTED) {
+                    new_flags |= ViewDirtyFlags::MOUNT;
+                    break;
+                }
+            }
+
             // Pend the update of the containing layer's sublayer set
             if let Some(vwcl) = self.view_with_containing_layer() {
                 vwcl.set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
@@ -461,6 +496,22 @@ impl HView {
             flags![ViewDirtyFlags::{DESCENDANT_SUBVIEWS_FRAME | DESCENDANT_SIZE_TRAITS}]
                 | new_flags,
         );
+
+        // Replace the layout
+        let old_layout = std::mem::replace(&mut *cur_layout, layout);
+        drop(cur_layout);
+
+        if subviews_changed && self.view.dirty.get().contains(ViewDirtyFlags::MOUNTED) {
+            // `MOUNTED` implies that the view is already added to some window
+            let hwnd = self.containing_wnd().unwrap();
+
+            // Check for disconnected views
+            for hview_sub in old_layout.subviews().iter() {
+                if hview_sub.view.superview.borrow().is_empty() {
+                    hview_sub.call_unmount(hwnd.wnd.wm);
+                }
+            }
+        }
     }
 
     /// Pend a call to [`ViewListener::update`].
@@ -532,6 +583,18 @@ bitflags! {
 
         /// Some of the descendants have `SUBLAYERS`.
         const DESCENDANT_SUBLAYERS = 1 << 9;
+
+        /// `ViewListener::mount` already has been called for this view.
+        /// (Technically, this is not a dirty bit.)
+        ///
+        /// This flag implies that there is a connection to a window via
+        /// `View::superview`. It also implies the superview (if any) has
+        /// `MOUNTED`, too.
+        const MOUNTED = 1 << 10;
+
+        /// The view is added to a window, but `ViewListener::mount` hasn't yet
+        /// been called for some of the view and its subviews.
+        const MOUNT = 1 << 11;
     }
 }
 
@@ -548,7 +611,8 @@ impl ViewDirtyFlags {
                 DESCENDANT_SUBVIEWS_FRAME |
                 DESCENDANT_POSITION_EVENT |
                 DESCENDANT_UPDATE_EVENT |
-                DESCENDANT_SUBLAYERS
+                DESCENDANT_SUBLAYERS |
+                MOUNT
             }];
 
         let lowered = self
@@ -561,6 +625,10 @@ impl ViewDirtyFlags {
             }];
 
         thru | ViewDirtyFlags::from_bits_truncate(lowered.bits() << 1)
+    }
+
+    fn is_dirty(self) -> bool {
+        !(self - ViewDirtyFlags::MOUNTED).is_empty()
     }
 }
 
