@@ -69,8 +69,6 @@ impl HWnd {
         }
 
         // Clear views' dirty flags
-        let (new_size, min_size, max_size) = self.wnd.update_views();
-
         if self.wnd.style_attrs.borrow().visible {
             self.ensure_materialized();
         }
@@ -81,6 +79,8 @@ impl HWnd {
         } else {
             return;
         };
+
+        let (new_size, min_size, max_size) = self.wnd.update_views();
 
         // Update the window's attributes
         let mut attrs = pal::WndAttrs::default();
@@ -140,7 +140,8 @@ impl Wnd {
         dirty.set(dirty.get() | new_flags);
     }
 
-    /// Perform pending updates. Returns a new, min, and max window size.
+    /// Perform pending updates. Also, returns a new, min, and max window size
+    /// based on the `SizeTraits` of the root view.
     fn update_views(&self) -> (Option<[u32; 2]>, Option<[u32; 2]>, Option<[u32; 2]>) {
         let pal_wnd = self.pal_wnd.borrow();
         let pal_wnd = pal_wnd.as_ref().unwrap();

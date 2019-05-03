@@ -82,7 +82,10 @@ impl HView {
 
                 // Compile a list of direct sublayers
                 let mut sublayers = Vec::new();
-                self.enum_sublayers(&mut |layer| sublayers.push(layer.clone()));
+
+                for subview in self.view.layout.borrow().subviews().iter() {
+                    subview.enum_sublayers(&mut |layer| sublayers.push(layer.clone()));
+                }
 
                 ctx.sublayers = Some(sublayers);
             }
