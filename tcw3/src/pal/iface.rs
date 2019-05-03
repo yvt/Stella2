@@ -16,10 +16,10 @@ pub type RGBAF32 = RGBA<f32>;
 
 pub trait WM: Sized + Debug + 'static {
     /// A window handle type.
-    type HWnd: Debug + Send + Sync + Clone;
+    type HWnd: Debug + Clone;
 
     /// A layer handle type.
-    type HLayer: Debug + Send + Sync + Clone;
+    type HLayer: Debug + Clone;
 
     /// A bitmap type.
     type Bitmap: Bitmap;

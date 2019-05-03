@@ -42,11 +42,6 @@ pub struct HWnd {
     ctrler: IdRef,
 }
 
-// FIXME: perhaps it's possible to cause `dealloc` to be called in a worker
-//        thread
-unsafe impl Send for HWnd {}
-unsafe impl Sync for HWnd {}
-
 struct WndState {
     listener: RefCell<Option<Rc<dyn iface::WndListener<WM>>>>,
     layer: Cell<Option<HLayer>>,
