@@ -263,13 +263,13 @@ impl Superview {
     fn view(&self) -> Option<&Weak<View>> {
         match self {
             Superview::View(weak) => Some(weak),
-            Superview::Window(weak) => None,
+            Superview::Window(_) => None,
         }
     }
 
     fn wnd(&self) -> Option<&Weak<Wnd>> {
         match self {
-            Superview::View(weak) => None,
+            Superview::View(_) => None,
             Superview::Window(weak) => Some(weak),
         }
     }
@@ -279,7 +279,7 @@ impl PartialEq<Weak<View>> for Superview {
     fn eq(&self, other: &Weak<View>) -> bool {
         match self {
             Superview::View(weak) => Weak::ptr_eq(weak, other),
-            Superview::Window(weak) => false,
+            Superview::Window(_) => false,
         }
     }
 }
