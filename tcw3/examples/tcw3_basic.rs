@@ -5,7 +5,7 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::layouts::{EmptyLayout, FillLayout},
-    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
 struct MyViewListener {
@@ -69,6 +69,14 @@ impl ViewListener for MyViewListener {
     }
 }
 
+struct MyWndListener;
+
+impl WndListener for MyWndListener {
+    fn close(&self, wm: &pal::WM, _: &HWnd) {
+        wm.terminate();
+    }
+}
+
 fn main() {
     let wm = pal::WM::global();
 
@@ -79,6 +87,7 @@ fn main() {
 
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);
+    wnd.set_listener(Box::new(MyWndListener));
 
     let subview = HView::new(ViewFlags::empty());
     subview.set_listener(Box::new(MyViewListener::new()));
