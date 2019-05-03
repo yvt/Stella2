@@ -107,6 +107,10 @@ impl iface::WM for WM {
         window.get_size(self)
     }
 
+    fn get_wnd_dpi_scale(&self, window: &Self::HWnd) -> f32 {
+        window.get_dpi_scale(self)
+    }
+
     fn new_layer(&self, attrs: &LayerAttrs) -> Self::HLayer {
         HLayer::new(self, attrs)
     }

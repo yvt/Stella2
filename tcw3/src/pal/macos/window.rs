@@ -167,6 +167,10 @@ impl HWnd {
         let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
         [size.width as u32, size.height as u32]
     }
+
+    pub(super) fn get_dpi_scale(&self, _: &WM) -> f32 {
+        unsafe { msg_send![*self.ctrler, dpiScale] }
+    }
 }
 
 // These functions are called by `TCWWindowController`
@@ -219,6 +223,16 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         if let Some(ref listener) = *state.listener.borrow() {
             listener.resize(&wm, &state.hwnd);
+        }
+    });
+}
+
+#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
+    method_impl(ud, |wm, state| {
+        if let Some(ref listener) = *state.listener.borrow() {
+            listener.dpi_scale_changed(&wm, &state.hwnd);
         }
     });
 }

@@ -56,6 +56,8 @@ pub trait WM: Sized + Debug + 'static {
     fn update_wnd(&self, window: &Self::HWnd);
     /// Get the size of a window's content region.
     fn get_wnd_size(&self, window: &Self::HWnd) -> [u32; 2];
+    /// Get the DPI scaling factor of a window.
+    fn get_wnd_dpi_scale(&self, _window: &Self::HWnd) -> f32 { 1.0 }
 
     fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
@@ -243,6 +245,9 @@ pub trait WndListener<T: WM> {
     /// should relayout, update composition layers, and call [`WM::update_wnd`]
     /// in this method.
     fn resize(&self, _: &T, _: &T::HWnd) {}
+
+    /// The DPI scaling factor of a window has been updated.
+    fn dpi_scale_changed(&self, _: &T, _: &T::HWnd) {}
 
     // TODO: more events
 }

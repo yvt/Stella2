@@ -5,6 +5,7 @@ typedef void *TCWListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_resize(TCWListenerUserData ud);
+extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
 
 // These flags must be synchronized with `WndFlags`
 #define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
@@ -114,6 +115,10 @@ extern void tcw_wndlistener_resize(TCWListenerUserData ud);
     self->window.contentView.layer.sublayers = @[ layer ];
 }
 
+- (float)dpiScale {
+    return (float)self->window.backingScaleFactor;
+}
+
 // Implements `NSWindowDelegate`
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;
@@ -131,6 +136,12 @@ extern void tcw_wndlistener_resize(TCWListenerUserData ud);
 - (void)windowDidResize:(NSNotification *)notification {
     (void)notification;
     tcw_wndlistener_resize(self.listenerUserData);
+}
+
+// Implements `NSWindowDelegate`
+- (void)windowDidChangeBackingProperties:(NSNotification *)notification {
+    (void)notification;
+    tcw_wndlistener_dpi_scale_changed(self.listenerUserData);
 }
 
 @end

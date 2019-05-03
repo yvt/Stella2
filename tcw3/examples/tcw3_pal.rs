@@ -7,6 +7,10 @@ struct Listener {
 }
 
 impl WndListener<pal::WM> for Listener {
+    fn dpi_scale_changed(&self, wm: &pal::WM, wnd: &pal::HWnd) {
+        dbg!(wm.get_wnd_dpi_scale(wnd));
+    }
+
     fn close(&self, wm: &pal::WM, _: &pal::HWnd) {
         wm.terminate();
     }
