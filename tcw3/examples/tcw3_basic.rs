@@ -41,7 +41,7 @@ impl ViewListener for MyViewListener {
         view.pend_update();
     }
 
-    fn unmount(&self, _: &pal::WM, _: &HView) {
+    fn unmount(&self, wm: &pal::WM, _: &HView) {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }

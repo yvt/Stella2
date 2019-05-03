@@ -1,4 +1,4 @@
-use cggeom::{Box2, prelude::*};
+use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
 
 use crate::uicore::{HView, Layout, LayoutCtx, SizeTraits};
