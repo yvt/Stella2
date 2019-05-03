@@ -227,7 +227,7 @@ impl Wnd {
                 min(max(wnd_size[0], min_s[0]), max_s[0]),
                 min(max(wnd_size[1], min_s[1]), max_s[1]),
             ];
-            if new_wnd_size != wnd_size {
+            if new_wnd_size != wnd_size || resize_to_preferred {
                 // Resize the window to satisfy the constraint
                 new_size = Some(new_wnd_size);
             }
