@@ -138,6 +138,9 @@ pub trait ViewListener {
     /// A view was added to a window.
     ///
     /// It's generally not safe to modify view properties from this method.
+    ///
+    /// If the view has an associated layer, it's advised to insert a call to
+    /// [`HView::pend_update`] here.
     fn mount(&self, _: &WM, _: &HView) {}
 
     /// A view was removed from a window.
@@ -148,8 +151,8 @@ pub trait ViewListener {
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
     /// updated.
     ///
-    /// If the view has an associated layer, this is the optimal place to insert
-    /// a call to [`HView::pend_update`].
+    /// If the view has an associated layer, it's advised to insert a call to
+    /// [`HView::pend_update`] here.
     fn position(&self, _: &WM, _: &HView) {}
 
     /// A view should be updated.
