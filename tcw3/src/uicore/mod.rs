@@ -144,7 +144,7 @@ pub trait ViewListener {
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn mount(&self, _: &WM, _: &HView) {}
+    fn mount(&self, _: &WM, _: &HView, _: &HWnd) {}
 
     /// A view was removed from a window.
     ///

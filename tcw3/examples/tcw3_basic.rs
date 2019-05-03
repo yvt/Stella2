@@ -22,7 +22,7 @@ impl MyViewListener {
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: &pal::WM, view: &HView) {
+    fn mount(&self, wm: &pal::WM, view: &HView, _: &HWnd) {
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             bg_color: Some(pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
             ..Default::default()

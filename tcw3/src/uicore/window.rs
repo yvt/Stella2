@@ -94,7 +94,7 @@ impl HWnd {
             return;
         };
 
-        let (new_size, min_size, max_size) = self.wnd.update_views();
+        let (new_size, min_size, max_size) = self.update_views();
 
         // Update the window's attributes
         let mut attrs = pal::WndAttrs::default();
@@ -137,80 +137,35 @@ impl HWnd {
         // Update layers
         self.wnd.wm.update_wnd(pal_wnd);
     }
-}
-
-impl Wnd {
-    pub(super) fn close(&self) {
-        if self.closed.get() {
-            return;
-        }
-
-        // Detach the content view
-        {
-            let view: HView = self.content_view.borrow_mut().take().unwrap();
-
-            debug_assert!(std::ptr::eq(
-                self,
-                // Get the superview
-                &*view
-                    .view
-                    .superview
-                    .borrow()
-                    // Assuming it's a window...
-                    .wnd()
-                    .unwrap()
-                    // It should be still valid...
-                    .upgrade()
-                    .unwrap()
-            ));
-
-            *view.view.superview.borrow_mut() = Superview::empty();
-
-            view.call_unmount(self.wm);
-        }
-
-        if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
-            // TODO: should clarify whether `pal::WndListener::close` is called or not
-            self.wm.remove_wnd(&hwnd);
-        }
-
-        self.closed.set(true);
-    }
-
-    /// Set dirty flags on a window.
-    pub(super) fn set_dirty_flags(&self, new_flags: WndDirtyFlags) {
-        let dirty = &self.dirty;
-        dirty.set(dirty.get() | new_flags);
-    }
 
     /// Perform pending updates. Also, returns a new, min, and max window size
     /// based on the `SizeTraits` of the root view.
     fn update_views(&self) -> (Option<[u32; 2]>, Option<[u32; 2]>, Option<[u32; 2]>) {
-        let pal_wnd = self.pal_wnd.borrow();
+        let pal_wnd = self.wnd.pal_wnd.borrow();
         let pal_wnd = pal_wnd.as_ref().unwrap();
 
         let mut new_size = None;
         let mut min_size = None;
         let mut max_size = None;
 
-        let resize_to_preferred = self.dirty.get().contains(WndDirtyFlags::DEFAULT_SIZE);
+        let resize_to_preferred = self.wnd.dirty.get().contains(WndDirtyFlags::DEFAULT_SIZE);
 
         // Repeat until the update converges...
         for _ in 0..100 {
-            let view: HView = self.content_view.borrow().clone().unwrap();
+            let view: HView = self.wnd.content_view.borrow().clone().unwrap();
 
             if !view.view.dirty.get().is_dirty() {
                 return (new_size, min_size, max_size);
             }
 
-            view.call_pending_mount_if_dirty(self.wm);
+            view.call_pending_mount_if_dirty(self.wnd.wm, self);
 
             // Layout: down phase
             view.update_size_traits();
 
             // Constrain the window size
             let size_traits = view.view.size_traits.get();
-            let mut wnd_size = self.wm.get_wnd_size(pal_wnd);
+            let mut wnd_size = self.wnd.wm.get_wnd_size(pal_wnd);
 
             if resize_to_preferred {
                 wnd_size = [
@@ -258,13 +213,58 @@ impl Wnd {
             view.update_subview_frames();
 
             // Position views
-            view.flush_position_event(self.wm);
+            view.flush_position_event(self.wnd.wm);
 
             // Update visual
-            view.update_layers(self.wm);
+            view.update_layers(self.wnd.wm);
         }
 
         panic!("Window update did not converge");
+    }
+}
+
+impl Wnd {
+    pub(super) fn close(&self) {
+        if self.closed.get() {
+            return;
+        }
+
+        // Detach the content view
+        {
+            let view: HView = self.content_view.borrow_mut().take().unwrap();
+
+            debug_assert!(std::ptr::eq(
+                self,
+                // Get the superview
+                &*view
+                    .view
+                    .superview
+                    .borrow()
+                    // Assuming it's a window...
+                    .wnd()
+                    .unwrap()
+                    // It should be still valid...
+                    .upgrade()
+                    .unwrap()
+            ));
+
+            *view.view.superview.borrow_mut() = Superview::empty();
+
+            view.call_unmount(self.wm);
+        }
+
+        if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
+            // TODO: should clarify whether `pal::WndListener::close` is called or not
+            self.wm.remove_wnd(&hwnd);
+        }
+
+        self.closed.set(true);
+    }
+
+    /// Set dirty flags on a window.
+    pub(super) fn set_dirty_flags(&self, new_flags: WndDirtyFlags) {
+        let dirty = &self.dirty;
+        dirty.set(dirty.get() | new_flags);
     }
 }
 
@@ -344,7 +344,7 @@ impl RootViewListener {
 }
 
 impl ViewListener for RootViewListener {
-    fn mount(&self, wm: &WM, _: &HView) {
+    fn mount(&self, wm: &WM, _: &HView, _: &HWnd) {
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(Box2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))),
