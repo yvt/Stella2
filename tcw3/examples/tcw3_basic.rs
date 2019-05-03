@@ -7,14 +7,13 @@ use tcw3::{
     pal::prelude::*,
     ui::layouts::{EmptyLayout, FillLayout},
     uicore::{
-        HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndEventSubscription,
-        WndListener,
+        HView, HWnd, SizeTraits, Subscription, UpdateCtx, ViewFlags, ViewListener, WndListener,
     },
 };
 
 struct MyViewListener {
     layer: RefCell<Option<pal::HLayer>>,
-    ss: RefCell<Option<WndEventSubscription>>,
+    ss: RefCell<Option<Subscription>>,
 }
 
 impl MyViewListener {

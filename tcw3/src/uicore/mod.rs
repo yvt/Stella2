@@ -22,7 +22,7 @@ use std::{
     fmt,
     rc::{Rc, Weak},
 };
-use subscriber_list::{SubscriberList, Subscription};
+use subscriber_list::{SubscriberList, UntypedSubscription};
 
 use crate::pal::{self, prelude::WM as _, WM};
 
@@ -64,7 +64,7 @@ pub struct DefaultWndListener;
 impl WndListener for DefaultWndListener {}
 
 pub type WndEventHandler = Box<dyn Fn(&'static WM, &HWnd)>;
-pub type WndEventSubscription = Subscription<WndEventHandler>;
+pub type Subscription = UntypedSubscription;
 
 struct Wnd {
     wm: &'static WM,
@@ -345,8 +345,12 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::Subscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_dpi_scale_changed(&self, cb: WndEventHandler) -> WndEventSubscription {
-        self.wnd.dpi_scale_changed_handlers.borrow_mut().insert(cb)
+    pub fn subscribe_dpi_scale_changed(&self, cb: WndEventHandler) -> Subscription {
+        self.wnd
+            .dpi_scale_changed_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
     }
 
     /// Get the content view of a window.
