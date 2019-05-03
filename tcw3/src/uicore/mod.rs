@@ -297,9 +297,22 @@ impl PartialEq<Weak<View>> for Superview {
 impl HWnd {
     /// Construct a window object and return a handle to it.
     pub fn new(wm: &'static WM) -> Self {
-        Self {
+        let hwnd = Self {
             wnd: Rc::new(Wnd::new(wm)),
-        }
+        };
+
+        // Now, set `superview` of the default content view.
+        *hwnd
+            .wnd
+            .content_view
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .view
+            .superview
+            .borrow_mut() = Superview::Window(Rc::downgrade(&hwnd.wnd));
+
+        hwnd
     }
 
     /// Close a window.
