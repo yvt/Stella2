@@ -23,7 +23,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::pal::{self, WM};
+use crate::pal::{self, prelude::WM as _, WM};
 
 mod layer;
 mod layout;
@@ -321,6 +321,17 @@ impl HWnd {
     /// with the window are released.
     pub fn close(&self) {
         self.wnd.close();
+    }
+
+    /// Get the DPI scaling factor for a window.
+    ///
+    /// This function returns `1.0` if the window is not materialized yet.
+    pub fn dpi_scale(&self) -> f32 {
+        if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
+            self.wnd.wm.get_wnd_dpi_scale(pal_wnd)
+        } else {
+            1.0
+        }
     }
 
     /// Get the content view of a window.
