@@ -1,11 +1,11 @@
 use tcw3::{pal, pal::prelude::*, uicore};
 
 fn main() {
-    let wm = pal::wm();
+    let wm = pal::WM::global();
 
-    pal::invoke_on_main_thread(|_| {
+    pal::WM::invoke_on_main_thread(|_| {
         // The following statement panics if we are not on the main thread
-        pal::wm();
+        pal::WM::global();
     });
 
     let wnd = uicore::HWnd::new(wm);

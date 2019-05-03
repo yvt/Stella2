@@ -14,7 +14,7 @@ use std::{fmt::Debug, rc::Rc};
 
 pub type RGBAF32 = RGBA<f32>;
 
-pub trait WM: Sized + Debug {
+pub trait WM: Sized + Debug + 'static {
     /// A window handle type.
     type HWnd: Debug + Send + Sync + Clone;
 
@@ -23,6 +23,15 @@ pub trait WM: Sized + Debug {
 
     /// A bitmap type.
     type Bitmap: Bitmap;
+
+    /// Get the default instance of [`WM`]. It only can be called by a main thread.
+    fn global() -> &'static Self;
+
+    /// Get the default instance of [`WM`] without checking the calling thread.
+    unsafe fn global_unchecked() -> &'static Self;
+
+    /// Call the specified function on the main thread.
+    fn invoke_on_main_thread(f: impl FnOnce(&'static Self) + Send + 'static);
 
     fn enter_main_loop(&self);
     fn terminate(&self);

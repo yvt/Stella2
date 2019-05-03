@@ -26,18 +26,6 @@ cfg_if! {
     // TODO: Other platforms
 }
 
-/// Get the default instance of [`WM`]. It only can be called by a main thread.
-#[inline]
-pub fn wm() -> &'static WM {
-    WM::global()
-}
-
-/// Call the specified function on the main thread.
-#[inline]
-pub fn invoke_on_main_thread(f: impl FnOnce(&WM) + Send + 'static) {
-    WM::invoke_on_main_thread(f)
-}
-
 // ============================================================================
 //
 // Type aliases/re-exports from `iface` with concrete backend types are

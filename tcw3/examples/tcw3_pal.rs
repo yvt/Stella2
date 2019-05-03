@@ -28,7 +28,7 @@ impl WndListener<pal::WM> for Listener {
 }
 
 fn main() {
-    let wm = pal::wm();
+    let wm = pal::WM::global();
 
     let mut bmp_builder = pal::BitmapBuilder::new([100, 100]);
     bmp_builder.move_to(Point2::new(20.0, 20.0));

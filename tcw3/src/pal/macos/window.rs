@@ -30,7 +30,10 @@ use std::{
     rc::Rc,
 };
 
-use super::super::{iface, WndAttrs};
+use super::super::{
+    iface::{self, WM as _},
+    WndAttrs,
+};
 use super::{utils::with_autorelease_pool, HLayer, IdRef, WM};
 
 #[derive(Debug, Clone)]
@@ -167,7 +170,7 @@ impl HWnd {
 
     pub(super) fn get_size(&self, _: &WM) -> [u32; 2] {
         let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
-        [ size.width as u32, size.height as u32 ]
+        [size.width as u32, size.height as u32]
     }
 }
 

@@ -30,27 +30,25 @@ pub struct WM {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
-impl WM {
-    pub fn global() -> &'static WM {
+impl iface::WM for WM {
+    type HWnd = HWnd;
+    type HLayer = HLayer;
+    type Bitmap = Bitmap;
+
+    fn global() -> &'static WM {
         ensure_main_thread();
         unsafe { Self::global_unchecked() }
     }
 
-    pub unsafe fn global_unchecked() -> &'static WM {
+    unsafe fn global_unchecked() -> &'static WM {
         &WM {
             _no_send_sync: PhantomData,
         }
     }
 
-    pub fn invoke_on_main_thread(f: impl FnOnce(&WM) + Send + 'static) {
+    fn invoke_on_main_thread(f: impl FnOnce(&'static WM) + Send + 'static) {
         dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
     }
-}
-
-impl iface::WM for WM {
-    type HWnd = HWnd;
-    type HLayer = HLayer;
-    type Bitmap = Bitmap;
 
     fn enter_main_loop(&self) {
         unsafe {
