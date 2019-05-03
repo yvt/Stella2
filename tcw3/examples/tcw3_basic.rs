@@ -1,3 +1,4 @@
+use cggeom::prelude::*;
 use cgmath::{vec2, Point2};
 use std::cell::RefCell;
 
@@ -22,19 +23,8 @@ impl MyViewListener {
 
 impl ViewListener for MyViewListener {
     fn mount(&self, wm: &pal::WM, view: &HView) {
-        let mut bmp_builder = pal::BitmapBuilder::new([100, 100]);
-        bmp_builder.move_to(Point2::new(20.0, 20.0));
-        bmp_builder.line_to(Point2::new(80.0, 20.0));
-        bmp_builder.line_to(Point2::new(20.0, 80.0));
-        bmp_builder.line_to(Point2::new(80.0, 80.0));
-        bmp_builder.quad_bezier_to(Point2::new(80.0, 20.0), Point2::new(20.0, 20.0));
-        bmp_builder.stroke();
-
-        let bmp = bmp_builder.into_bitmap();
-
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             bg_color: Some(pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
-            contents: Some(Some(bmp.clone())),
             ..Default::default()
         }));
 
@@ -55,9 +45,28 @@ impl ViewListener for MyViewListener {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 
+        let bmp = {
+            let size = view.global_frame().size();
+
+            let mut bmp_builder =
+                pal::BitmapBuilder::new([size.x.max(1.0) as u32, size.y.max(1.0) as u32]);
+            bmp_builder.move_to(Point2::new(size.x * 0.2, size.y * 0.2));
+            bmp_builder.line_to(Point2::new(size.x * 0.8, size.y * 0.2));
+            bmp_builder.line_to(Point2::new(size.x * 0.2, size.y * 0.8));
+            bmp_builder.line_to(Point2::new(size.x * 0.8, size.y * 0.8));
+            bmp_builder.quad_bezier_to(
+                Point2::new(size.x * 0.8, size.y * 0.2),
+                Point2::new(size.x * 0.2, size.y * 0.2),
+            );
+            bmp_builder.stroke();
+
+            bmp_builder.into_bitmap()
+        };
+
         wm.set_layer_attr(
             &layer,
             &pal::LayerAttrs {
+                contents: Some(Some(bmp)),
                 bounds: Some(view.global_frame()),
                 ..Default::default()
             },
