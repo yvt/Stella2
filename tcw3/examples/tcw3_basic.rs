@@ -6,21 +6,19 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::layouts::{EmptyLayout, FillLayout},
-    uicore::{
-        HView, HWnd, SizeTraits, Subscription, UpdateCtx, ViewFlags, ViewListener, WndListener,
-    },
+    uicore::{HView, HWnd, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
 struct MyViewListener {
     layer: RefCell<Option<pal::HLayer>>,
-    ss: RefCell<Option<Subscription>>,
+    ev_sub: RefCell<Option<Sub>>,
 }
 
 impl MyViewListener {
     fn new() -> Self {
         Self {
             layer: RefCell::new(None),
-            ss: RefCell::new(None),
+            ev_sub: RefCell::new(None),
         }
     }
 }
@@ -35,10 +33,11 @@ impl ViewListener for MyViewListener {
 
         {
             let view = view.clone();
-            *self.ss.borrow_mut() = Some(wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
-                dbg!();
-                view.pend_update();
-            })));
+            *self.ev_sub.borrow_mut() =
+                Some(wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
+                    dbg!();
+                    view.pend_update();
+                })));
         }
 
         view.pend_update();
@@ -49,8 +48,8 @@ impl ViewListener for MyViewListener {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }
-        if let Some(ss) = self.ss.borrow_mut().take() {
-            ss.unsubscribe().unwrap();
+        if let Some(ev_sub) = self.ev_sub.borrow_mut().take() {
+            ev_sub.unsubscribe().unwrap();
         }
     }
 

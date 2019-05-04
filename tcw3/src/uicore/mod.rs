@@ -63,8 +63,15 @@ pub struct DefaultWndListener;
 
 impl WndListener for DefaultWndListener {}
 
-pub type WndEventHandler = Box<dyn Fn(&'static WM, &HWnd)>;
-pub type Subscription = UntypedSubscription;
+/// The boxed function type for window events with no extra parameters.
+pub type WndEvtHandler = Box<dyn Fn(&'static WM, &HWnd)>;
+
+/// Represents an event subscription.
+///
+/// This type is returned by a method such as
+/// [`HWnd::subscribe_dpi_scale_changed`]. The client can unregister event
+/// handlers by calling the `Sub::unsubscribe` method.
+pub type Sub = UntypedSubscription;
 
 struct Wnd {
     wm: &'static WM,
@@ -77,7 +84,7 @@ struct Wnd {
     content_view: RefCell<Option<HView>>,
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
-    dpi_scale_changed_handlers: RefCell<SubscriberList<WndEventHandler>>,
+    dpi_scale_changed_handlers: RefCell<SubscriberList<WndEvtHandler>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -343,9 +350,9 @@ impl HWnd {
 
     /// Register a function that gets called whenever `dpi_scene` changes.
     ///
-    /// Returns a [`subscriber_list::Subscription`], which can be used to
+    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_dpi_scale_changed(&self, cb: WndEventHandler) -> Subscription {
+    pub fn subscribe_dpi_scale_changed(&self, cb: WndEvtHandler) -> Sub {
         self.wnd
             .dpi_scale_changed_handlers
             .borrow_mut()
