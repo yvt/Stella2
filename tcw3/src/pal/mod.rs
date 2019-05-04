@@ -8,6 +8,11 @@ pub mod prelude {
     pub use super::iface::{Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, WndListener, WM};
 }
 
+// TODO: color management
+//       Core Animation performs CPU-based color matching if the color profile
+//       of images doesn't match that of the display. This overhead can be
+//       addressed by assigning a correct profile on images.
+
 cfg_if! {
     if #[cfg(target_os = "macos")] {
         pub mod macos;
