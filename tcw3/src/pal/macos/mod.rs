@@ -13,10 +13,12 @@ mod bitmap;
 mod drawutils;
 mod layer;
 mod mtlocal;
+mod text;
 mod utils;
 mod window;
 pub use self::bitmap::{Bitmap, BitmapBuilder};
 pub use self::layer::HLayer;
+pub use self::text::{CharStyle, TextLayout};
 use self::utils::{ensure_main_thread, IdRef};
 pub use self::window::HWnd;
 

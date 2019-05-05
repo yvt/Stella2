@@ -1,5 +1,5 @@
 use cggeom::prelude::*;
-use cgmath::{vec2, Point2};
+use cgmath::{vec2, Matrix3, Point2};
 use std::cell::RefCell;
 
 use tcw3::{
@@ -62,13 +62,15 @@ impl ViewListener for MyViewListener {
         let layer = layer.as_ref().unwrap();
 
         let bmp = {
-            let size = view.global_frame().size() * ctx.hwnd().dpi_scale();
+            let virt_size = view.global_frame().size();
+            let dpi_scale = ctx.hwnd().dpi_scale();
+            let size = virt_size * dpi_scale;
 
-            dbg!((view.global_frame().size(), ctx.hwnd().dpi_scale()));
+            dbg!((virt_size, dpi_scale));
 
             let mut bmp_builder =
                 pal::BitmapBuilder::new([size.x.max(1.0) as u32, size.y.max(1.0) as u32]);
-            bmp_builder.set_line_width(ctx.hwnd().dpi_scale());
+            bmp_builder.set_line_width(dpi_scale);
             bmp_builder.move_to(Point2::new(size.x * 0.2, size.y * 0.2));
             bmp_builder.line_to(Point2::new(size.x * 0.8, size.y * 0.2));
             bmp_builder.line_to(Point2::new(size.x * 0.2, size.y * 0.8));
@@ -78,6 +80,21 @@ impl ViewListener for MyViewListener {
                 Point2::new(size.x * 0.2, size.y * 0.2),
             );
             bmp_builder.stroke();
+
+            let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
+                ..Default::default()
+            });
+            let text_layout = pal::TextLayout::from_text(
+                lipsum::LOREM_IPSUM,
+                &char_style,
+                Some(virt_size.x - 20.0),
+            );
+            bmp_builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
+            bmp_builder.draw_text(
+                &text_layout,
+                Point2::new(10.0, 10.0),
+                pal::RGBAF32::new(0.0, 0.0, 0.4, 1.0),
+            );
 
             bmp_builder.into_bitmap()
         };

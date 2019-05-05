@@ -5,7 +5,10 @@ pub mod iface;
 
 /// Re-exports traits from `iface`.
 pub mod prelude {
-    pub use super::iface::{Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, WndListener, WM};
+    pub use super::iface::{
+        Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, TextLayout,
+        WndListener, WM,
+    };
 }
 
 // TODO: color management
@@ -25,8 +28,16 @@ cfg_if! {
         pub type Bitmap = macos::Bitmap;
 
         /// The default bitmap builder type for the target platform implementing
-        /// `BitmapBuilderNew`.
+        /// `BitmapBuilderNew` and `CanvasText<TextLayout>`.
         pub type BitmapBuilder = macos::BitmapBuilder;
+
+        /// The default character style type for the target platform
+        /// implementing `CharStyle`.
+        pub type CharStyle = macos::CharStyle;
+
+        /// The default text layout type for the target platform
+        /// implementing `TextLayout`.
+        pub type TextLayout = macos::TextLayout;
     }
     // TODO: Other platforms
 }
@@ -40,7 +51,9 @@ cfg_if! {
 // code. In other words, enabled backends can assume that they are the default
 // backend.
 
-pub use self::iface::{LayerFlags, LineCap, LineJoin, WndFlags, RGBAF32};
+pub use self::iface::{
+    LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,
+};
 
 /// The window handle type of [`WM`].
 pub type HWnd = <WM as iface::WM>::HWnd;
@@ -53,6 +66,9 @@ pub type WndAttrs<TCaption> = iface::WndAttrs<WM, TCaption, HLayer>;
 
 /// A specialization of `LayerAttrs` for the default backend.
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
+
+/// A specialization of `CharStyleAttrs` for the default backend.
+pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
 // Trait aliases (unstable at the point of writing) actually do not work
 // exactly like type aliases. Specifically, they cannot be used in every place

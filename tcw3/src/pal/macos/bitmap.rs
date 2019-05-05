@@ -30,7 +30,7 @@ impl fmt::Debug for Bitmap {
 impl iface::Bitmap for Bitmap {}
 
 pub struct BitmapBuilder {
-    cg_context: CGContext,
+    pub(super) cg_context: CGContext,
 }
 
 impl fmt::Debug for BitmapBuilder {

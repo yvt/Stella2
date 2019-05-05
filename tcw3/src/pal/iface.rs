@@ -379,3 +379,80 @@ pub trait BitmapBuilderNew: BitmapBuilder + Sized {
     /// Create a [`BitmapBuilder`] with a R8G8B8A8 backing bitmap.
     fn new(size: [u32; 2]) -> Self;
 }
+
+/// Encapsulates information needed to layout a given text.
+///
+/// This corresponds to `CTFrame` of Core Text and `IDWriteTextLayout` of
+/// DirectWrite.
+pub trait TextLayout: Send + Sync + Sized {
+    type CharStyle: CharStyle;
+
+    fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self;
+    // TODO: construct a `TextLayout` from an attributed text
+    // TODO: query metrics
+    // TODO: hit test & get selection rectangles from a subscring
+    // TODO: alignment
+    // TODO: inline/foreign object
+}
+
+pub trait CanvasText<TLayout>: Canvas {
+    fn draw_text(&mut self, layout: &TLayout, origin: Point2<f32>, color: RGBAF32);
+}
+
+/// An immutable, thread-safe handle type representing a character style.
+pub trait CharStyle: Clone + Send + Sync + Sized {
+    /// Construct a `CharStyle`.
+    fn new(attrs: CharStyleAttrs<Self>) -> Self;
+
+    /// Get the font size.
+    fn size(&self) -> f32;
+}
+
+#[derive(Debug, Clone)]
+pub struct CharStyleAttrs<TCharStyle> {
+    pub template: Option<TCharStyle>,
+    pub sys: Option<SysFontType>,
+    pub size: Option<f32>,
+    pub decor: Option<TextDecorFlags>,
+    /// The text color.
+    ///
+    /// The color value passed to [`CanvasText::draw_text`] is used if `None` is
+    /// specified.
+    pub color: Option<Option<RGBAF32>>,
+}
+
+impl<TCharStyle> Default for CharStyleAttrs<TCharStyle> {
+    fn default() -> Self {
+        Self {
+            template: None,
+            sys: None,
+            size: None,
+            decor: None,
+            color: None,
+        }
+    }
+}
+
+bitflags! {
+    pub struct TextDecorFlags: u8 {
+        const UNDERLINE = 1 << 0;
+        const OVERLINE = 1 << 1;
+        const STRIKETHROUGH = 1 << 2;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SysFontType {
+    /// The font used for UI elements.
+    Normal,
+    /// The font used for emphasis in UI elements.
+    Emph,
+    /// The font used for small UI elements.
+    Small,
+    /// The font used for emphasis in small UI elements.
+    SmallEmph,
+    /// The font used for editable document.
+    User,
+    /// The monospace font used for editable document.
+    UserMonospace,
+}
