@@ -49,12 +49,12 @@ pub struct HWnd {
 pub trait WndListener {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
-    fn close_requested(&self, _: &WM, _: &HWnd) -> bool {
+    fn close_requested(&self, _: WM, _: &HWnd) -> bool {
         true
     }
 
     /// A window has been closed.
-    fn close(&self, _: &WM, _: &HWnd) {}
+    fn close(&self, _: WM, _: &HWnd) {}
 }
 
 /// A no-op implementation of `WndListener`.
@@ -64,7 +64,7 @@ pub struct DefaultWndListener;
 impl WndListener for DefaultWndListener {}
 
 /// The boxed function type for window events with no extra parameters.
-pub type WndEvtHandler = Box<dyn Fn(&'static WM, &HWnd)>;
+pub type WndEvtHandler = Box<dyn Fn(WM, &HWnd)>;
 
 /// Represents an event subscription.
 ///
@@ -74,7 +74,7 @@ pub type WndEvtHandler = Box<dyn Fn(&'static WM, &HWnd)>;
 pub type Sub = UntypedSubscription;
 
 struct Wnd {
-    wm: &'static WM,
+    wm: WM,
     dirty: Cell<window::WndDirtyFlags>,
     pal_wnd: RefCell<Option<pal::HWnd>>,
     listener: RefCell<Box<dyn WndListener>>,
@@ -107,7 +107,7 @@ impl fmt::Debug for Wnd {
 }
 
 impl Wnd {
-    fn new(wm: &'static WM) -> Self {
+    fn new(wm: WM) -> Self {
         let content_view = window::new_root_content_view();
 
         // Pend mount
@@ -158,19 +158,19 @@ pub trait ViewListener {
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn mount(&self, _: &WM, _: &HView, _: &HWnd) {}
+    fn mount(&self, _: WM, _: &HView, _: &HWnd) {}
 
     /// A view was removed from a window.
     ///
     /// It's generally not safe to modify view properties from this method.
-    fn unmount(&self, _: &WM, _: &HView) {}
+    fn unmount(&self, _: WM, _: &HView) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
     /// updated.
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn position(&self, _: &WM, _: &HView) {}
+    fn position(&self, _: WM, _: &HView) {}
 
     /// A view should be updated.
     ///
@@ -182,7 +182,7 @@ pub trait ViewListener {
     /// associated layers (if any).
     ///
     /// [`WM::update_wnd`]: crate::pal::iface::WM::update_wnd
-    fn update(&self, _: &WM, _: &HView, _: &mut UpdateCtx<'_>) {}
+    fn update(&self, _: WM, _: &HView, _: &mut UpdateCtx<'_>) {}
 }
 
 /// A no-op implementation of `ViewListener`.
@@ -310,7 +310,7 @@ impl PartialEq<Weak<View>> for Superview {
 
 impl HWnd {
     /// Construct a window object and return a handle to it.
-    pub fn new(wm: &'static WM) -> Self {
+    pub fn new(wm: WM) -> Self {
         let hwnd = Self {
             wnd: Rc::new(Wnd::new(wm)),
         };

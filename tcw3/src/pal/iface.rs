@@ -14,7 +14,7 @@ use std::{fmt::Debug, rc::Rc};
 
 pub type RGBAF32 = RGBA<f32>;
 
-pub trait WM: Sized + Debug + 'static {
+pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// A window handle type.
     type HWnd: Debug + Clone;
 
@@ -25,50 +25,50 @@ pub trait WM: Sized + Debug + 'static {
     type Bitmap: Bitmap;
 
     /// Get the default instance of [`WM`]. It only can be called by a main thread.
-    fn global() -> &'static Self;
+    fn global() -> Self;
 
     /// Get the default instance of [`WM`] without checking the calling thread.
-    unsafe fn global_unchecked() -> &'static Self;
+    unsafe fn global_unchecked() -> Self;
 
     /// Enqueue a call to the specified function on the main thread. The calling
     /// thread can be any thread.
-    fn invoke_on_main_thread(f: impl FnOnce(&'static Self) + Send + 'static);
+    fn invoke_on_main_thread(f: impl FnOnce(Self) + Send + 'static);
 
     /// Enqueue a call to the specified function on the main thread.
-    fn invoke(&self, f: impl FnOnce(&'static Self) + 'static);
+    fn invoke(self, f: impl FnOnce(Self) + 'static);
 
-    fn enter_main_loop(&self);
-    fn terminate(&self);
+    fn enter_main_loop(self);
+    fn terminate(self);
 
-    fn new_wnd(&self, attrs: &WndAttrs<Self, &str, Self::HLayer>) -> Self::HWnd;
+    fn new_wnd(self, attrs: &WndAttrs<Self, &str, Self::HLayer>) -> Self::HWnd;
 
     /// Set the attributes of a window.
     ///
     /// Panics if the window has already been closed.
-    fn set_wnd_attr(&self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str, Self::HLayer>);
-    fn remove_wnd(&self, window: &Self::HWnd);
+    fn set_wnd_attr(self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str, Self::HLayer>);
+    fn remove_wnd(self, window: &Self::HWnd);
     /// Update a window's contents.
     ///
     /// Calling this method requests that the contents of a window is updated
     /// based on the attributes of the window and its all sublayers as soon as
     /// possible. Conversely, all attribute updates may be deferred until this
     /// method is called.
-    fn update_wnd(&self, window: &Self::HWnd);
+    fn update_wnd(self, window: &Self::HWnd);
     /// Get the size of a window's content region.
-    fn get_wnd_size(&self, window: &Self::HWnd) -> [u32; 2];
+    fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2];
     /// Get the DPI scaling factor of a window.
-    fn get_wnd_dpi_scale(&self, _window: &Self::HWnd) -> f32 {
+    fn get_wnd_dpi_scale(self, _window: &Self::HWnd) -> f32 {
         1.0
     }
 
-    fn new_layer(&self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
+    fn new_layer(self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
     // FIXME: Maybe pass `LayerAttrs` by value to elide the costly copy?
     /// Set the attributes of a layer.
     ///
     /// The behavior is unspecified if the layer has already been removed.
-    fn set_layer_attr(&self, layer: &Self::HLayer, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>);
-    fn remove_layer(&self, layer: &Self::HLayer);
+    fn set_layer_attr(self, layer: &Self::HLayer, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>);
+    fn remove_layer(self, layer: &Self::HLayer);
 }
 
 #[derive(Clone)]
@@ -230,12 +230,12 @@ bitflags! {
 pub trait WndListener<T: WM> {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
-    fn close_requested(&self, _: &T, _: &T::HWnd) -> bool {
+    fn close_requested(&self, _: T, _: &T::HWnd) -> bool {
         true
     }
 
     /// A window has been closed.
-    fn close(&self, _: &T, _: &T::HWnd) {}
+    fn close(&self, _: T, _: &T::HWnd) {}
 
     /// A window is being resized.
     ///
@@ -246,10 +246,10 @@ pub trait WndListener<T: WM> {
     /// Based on the new window size, The client (the implementer of this trait)
     /// should relayout, update composition layers, and call [`WM::update_wnd`]
     /// in this method.
-    fn resize(&self, _: &T, _: &T::HWnd) {}
+    fn resize(&self, _: T, _: &T::HWnd) {}
 
     /// The DPI scaling factor of a window has been updated.
-    fn dpi_scale_changed(&self, _: &T, _: &T::HWnd) {}
+    fn dpi_scale_changed(&self, _: T, _: &T::HWnd) {}
 
     // TODO: more events
 }

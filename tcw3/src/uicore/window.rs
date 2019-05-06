@@ -286,7 +286,7 @@ impl PalWndListener {
 }
 
 impl pal::iface::WndListener<WM> for PalWndListener {
-    fn close_requested(&self, wm: &WM, _: &pal::HWnd) -> bool {
+    fn close_requested(&self, wm: WM, _: &pal::HWnd) -> bool {
         if let Some(hwnd) = self.hwnd() {
             let listener = hwnd.wnd.listener.borrow();
             listener.close_requested(wm, &hwnd)
@@ -295,7 +295,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn close(&self, wm: &WM, _: &pal::HWnd) {
+    fn close(&self, wm: WM, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             hwnd.close();
 
@@ -304,7 +304,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn resize(&self, _: &WM, _: &pal::HWnd) {
+    fn resize(&self, _: WM, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             if hwnd.wnd.updating.get() {
                 // Prevent recursion
@@ -324,7 +324,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn dpi_scale_changed(&self, _: &WM, _: &pal::HWnd) {
+    fn dpi_scale_changed(&self, _: WM, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             let handlers = hwnd.wnd.dpi_scale_changed_handlers.borrow();
             for handler in handlers.iter() {
@@ -353,7 +353,7 @@ impl RootViewListener {
 }
 
 impl ViewListener for RootViewListener {
-    fn mount(&self, wm: &WM, _: &HView, _: &HWnd) {
+    fn mount(&self, wm: WM, _: &HView, _: &HWnd) {
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(Box2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))),
@@ -361,13 +361,13 @@ impl ViewListener for RootViewListener {
         }));
     }
 
-    fn unmount(&self, wm: &WM, _: &HView) {
+    fn unmount(&self, wm: WM, _: &HView) {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }
     }
 
-    fn update(&self, wm: &WM, _: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: WM, _: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 

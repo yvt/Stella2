@@ -172,7 +172,7 @@ impl HView {
     }
 
     /// Call `ViewListener::position` for subviews as necessary.
-    pub(super) fn flush_position_event(&self, wm: &WM) {
+    pub(super) fn flush_position_event(&self, wm: WM) {
         fn traverse(this: &HView, cb: &mut impl FnMut(&HView)) {
             let dirty = &this.view.dirty;
             let layout = this.view.layout.borrow();

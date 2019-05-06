@@ -37,7 +37,7 @@ impl<T> MtLocal<T> {
     }
 
     /// Get a reference to the inner value with compile-time thread checking.
-    pub fn get_with_wm(&self, _: &WM) -> &T {
+    pub fn get_with_wm(&self, _: WM) -> &T {
         unsafe { &*self.cell.get() }
     }
 

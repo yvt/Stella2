@@ -7,15 +7,15 @@ struct Listener {
 }
 
 impl WndListener<pal::WM> for Listener {
-    fn dpi_scale_changed(&self, wm: &pal::WM, wnd: &pal::HWnd) {
+    fn dpi_scale_changed(&self, wm: pal::WM, wnd: &pal::HWnd) {
         dbg!(wm.get_wnd_dpi_scale(wnd));
     }
 
-    fn close(&self, wm: &pal::WM, _: &pal::HWnd) {
+    fn close(&self, wm: pal::WM, _: &pal::HWnd) {
         wm.terminate();
     }
 
-    fn resize(&self, wm: &pal::WM, hwnd: &pal::HWnd) {
+    fn resize(&self, wm: pal::WM, hwnd: &pal::HWnd) {
         let [w, h] = wm.get_wnd_size(hwnd);
         wm.set_layer_attr(
             &self.flex_layer,

@@ -35,7 +35,7 @@ impl HView {
     ///
     /// Returns `true` if `layers` has changed. The return value is used to
     /// implement a recursive algorithm of `update_layers` itself.
-    pub(super) fn update_layers(&self, wm: &WM, hwnd: &HWnd) -> bool {
+    pub(super) fn update_layers(&self, wm: WM, hwnd: &HWnd) -> bool {
         let dirty = &self.view.dirty;
 
         let mut layers_changed = false;

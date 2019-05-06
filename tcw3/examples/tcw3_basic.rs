@@ -24,7 +24,7 @@ impl MyViewListener {
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: &pal::WM, view: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::WM, view: &HView, wnd: &HWnd) {
         dbg!();
         *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
             bg_color: Some(pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
@@ -43,7 +43,7 @@ impl ViewListener for MyViewListener {
         view.pend_update();
     }
 
-    fn unmount(&self, wm: &pal::WM, _: &HView) {
+    fn unmount(&self, wm: pal::WM, _: &HView) {
         dbg!();
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
@@ -53,11 +53,11 @@ impl ViewListener for MyViewListener {
         }
     }
 
-    fn position(&self, _: &pal::WM, view: &HView) {
+    fn position(&self, _: pal::WM, view: &HView) {
         view.pend_update();
     }
 
-    fn update(&self, wm: &pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 
@@ -117,7 +117,7 @@ impl ViewListener for MyViewListener {
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: &pal::WM, _: &HWnd) {
+    fn close(&self, wm: pal::WM, _: &HWnd) {
         wm.terminate();
     }
 }

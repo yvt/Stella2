@@ -152,7 +152,7 @@ impl HWnd {
         });
     }
 
-    pub(super) fn update(&self, wm: &WM) {
+    pub(super) fn update(&self, wm: WM) {
         if let Some(layer) = self.state().layer.get() {
             with_autorelease_pool(|| {
                 transaction::begin();
@@ -163,12 +163,12 @@ impl HWnd {
         }
     }
 
-    pub(super) fn get_size(&self, _: &WM) -> [u32; 2] {
+    pub(super) fn get_size(&self, _: WM) -> [u32; 2] {
         let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
         [size.width as u32, size.height as u32]
     }
 
-    pub(super) fn get_dpi_scale(&self, _: &WM) -> f32 {
+    pub(super) fn get_dpi_scale(&self, _: WM) -> f32 {
         unsafe { msg_send![*self.ctrler, dpiScale] }
     }
 }
@@ -178,7 +178,7 @@ type TCWListenerUserData = *const WndState;
 
 unsafe fn method_impl<T>(
     ud: TCWListenerUserData,
-    f: impl FnOnce(&WM, &WndState) -> T,
+    f: impl FnOnce(WM, &WndState) -> T,
 ) -> Option<T> {
     if ud.is_null() {
         return None;
@@ -192,7 +192,7 @@ unsafe fn method_impl<T>(
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
         if let Some(ref listener) = *state.listener.borrow() {
-            listener.close_requested(&wm, &state.hwnd) as _
+            listener.close_requested(wm, &state.hwnd) as _
         } else {
             YES
         }
@@ -205,7 +205,7 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         if let Some(ref listener) = *state.listener.borrow() {
-            listener.close(&wm, &state.hwnd)
+            listener.close(wm, &state.hwnd)
         }
 
         // Detach the listener from the controller
@@ -222,7 +222,7 @@ unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
 unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         if let Some(ref listener) = *state.listener.borrow() {
-            listener.resize(&wm, &state.hwnd);
+            listener.resize(wm, &state.hwnd);
         }
     });
 }
@@ -232,7 +232,7 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
 unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         if let Some(ref listener) = *state.listener.borrow() {
-            listener.dpi_scale_changed(&wm, &state.hwnd);
+            listener.dpi_scale_changed(wm, &state.hwnd);
         }
     });
 }
