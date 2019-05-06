@@ -1,3 +1,4 @@
+use as_any::AsAny;
 use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Vector2};
 use std::{fmt, rc::Rc};
@@ -17,7 +18,7 @@ use crate::pal::WM;
 /// `Layout` is logically immutable. That means the return values of these
 /// methods only can change based on input values. You should always
 /// re-create `Layout` objects if you want to modify its parameters.
-pub trait Layout {
+pub trait Layout: AsAny {
     /// Get the subviews of a layout.
     ///
     /// The returned value must be constant.
@@ -39,9 +40,14 @@ pub trait Layout {
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>);
 
     /// Return `true` if `self.subviews()` is identical to `other.subviews()`
-    /// with a potential negative positive. Reordering counts as difference.
+    /// with a potential negative positive. *Reordering counts as difference.*
+    ///
+    /// This method is used to expedite the process of swapping layouts if they
+    /// share an identical set of subviews.
+    ///
+    /// It can be assumed that the pointer values of `self` and `other` are
+    /// never equal to each other.
     fn has_same_subviews(&self, _other: &dyn Layout) -> bool {
-        // TODO: Give `Layout` `Any` so this can actually be implemented
         false
     }
 }
@@ -68,6 +74,10 @@ impl Layout for DefaultLayout {
         SizeTraits::default()
     }
     fn arrange(&self, _: &mut LayoutCtx<'_>, _: Vector2<f32>) {}
+    fn has_same_subviews(&self, other: &dyn Layout) -> bool {
+        // See if `other` has the same type
+        as_any::Downcast::is::<Self>(other)
+    }
 }
 
 /// Minimum, maximum, and preferred sizes.

@@ -365,6 +365,7 @@ dependencies = [
 name = "tcw3"
 version = "0.1.0"
 dependencies = [
+ "as_any 0.1.0",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",

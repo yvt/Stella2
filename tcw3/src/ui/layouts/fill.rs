@@ -43,4 +43,12 @@ impl Layout for FillLayout {
             ),
         );
     }
+
+    fn has_same_subviews(&self, other: &dyn Layout) -> bool {
+        if let Some(other) = as_any::Downcast::downcast_ref::<Self>(other) {
+            self.subview[0] == other.subview[0]
+        } else {
+            false
+        }
+    }
 }

@@ -24,4 +24,9 @@ impl Layout for EmptyLayout {
     }
 
     fn arrange(&self, _: &mut LayoutCtx<'_>, _: Vector2<f32>) {}
+
+    fn has_same_subviews(&self, other: &dyn Layout) -> bool {
+        // See if `other` has the same type
+        as_any::Downcast::is::<Self>(other)
+    }
 }
