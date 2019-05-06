@@ -184,7 +184,10 @@ impl CanvasMixin {
     ///
     /// This method internally calls `UpdateCtx::set_layers`. If you need
     /// more control over a view's backing layers, you should use
-    /// [`Self::update_layer`] and [`Self::layer`] instead.
+    /// [`update_layer`] and [`layer`] instead.
+    ///
+    /// [`update_layer`]: CanvasMixin::update_layer
+    /// [`layer`]: CanvasMixin::layer
     pub fn update(
         &mut self,
         wm: pal::WM,
@@ -203,11 +206,11 @@ impl CanvasMixin {
 
     /// Pend a redraw.
     ///
-    /// This method updates an internal flag and calls [`View::pend_redraw`].
+    /// This method updates an internal flag and calls [`HView::pend_update`].
     /// As a result, a caller-supplied draw function will be used to update
     /// the layer contents when `update` is called for the next time.
     ///
-    /// [`View::pend_redraw`]: crate::uicore::View::pend_redraw
+    /// [`HView::pend_update`]: crate::uicore::HView::pend_update
     pub fn pend_draw(&mut self, view: &HView) {
         if let Some(state) = &mut self.state {
             state.last_size = None;
