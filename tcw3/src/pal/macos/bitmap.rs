@@ -27,7 +27,11 @@ impl fmt::Debug for Bitmap {
     }
 }
 
-impl iface::Bitmap for Bitmap {}
+impl iface::Bitmap for Bitmap {
+    fn size(&self) -> [u32; 2] {
+        [self.cg_image.width() as u32, self.cg_image.height() as u32]
+    }
+}
 
 pub struct BitmapBuilder {
     pub(super) cg_context: CGContext,

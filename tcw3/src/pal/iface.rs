@@ -255,7 +255,10 @@ pub trait WndListener<T: WM> {
 }
 
 /// A immutable, ref-counted bitmap image.
-pub trait Bitmap: Clone + Sized + Send + Sync + Debug {}
+pub trait Bitmap: Clone + Sized + Send + Sync + Debug {
+    /// Get the dimensions of a bitmap.
+    fn size(&self) -> [u32; 2];
+}
 
 /// Types supporting drawing operations.
 pub trait Canvas: Debug {
