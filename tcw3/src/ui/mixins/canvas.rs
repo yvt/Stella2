@@ -67,6 +67,8 @@ impl CanvasMixin {
             sub,
             last_size: None,
         });
+
+        view.pend_update();
     }
 
     /// Implements [`ViewListener::unmount`].
