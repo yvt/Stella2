@@ -1,5 +1,6 @@
 use cggeom::{prelude::*, Box2};
-use cgmath::{Matrix3, Vector2};
+use cgmath::{vec2, Matrix3, Point2, Vector2};
+use std::cmp::max;
 
 use crate::{
     pal,
@@ -92,11 +93,17 @@ impl CanvasMixin {
 
     /// Update the backing layer. The caller-supplied draw function is used
     /// to provide new layer contents if necessary.
+    ///
+    /// `visual_bounds` is a rectangle specified in the view's coordinate space,
+    /// which clips and encloses the drawn contents. In this coordinate space,
+    /// the frame of the view is specified as
+    /// `Box2::with_size(Point2::new(0.0, 0.0), frame().size())`.
     pub fn update_layer(
         &mut self,
         wm: pal::WM,
         view: &HView,
         wnd: &HWnd,
+        visual_bounds: Box2<f32>,
         draw: impl FnOnce(&mut DrawContext<'_>),
     ) {
         let state = self.state.as_mut().expect("not mounted");
@@ -104,14 +111,28 @@ impl CanvasMixin {
         let layer = &state.layer;
 
         let view_frame = view.global_frame();
-        let view_size = view_frame.size();
         let dpi_scale = wnd.dpi_scale();
 
         // Calculate the new bitmap size
-        let bmp_size = [
-            (view_size.x * dpi_scale).max(1.0).ceil() as u32,
-            (view_size.y * dpi_scale).max(1.0).ceil() as u32,
+        let phys_vis_bounds = [
+            Point2::new(
+                (visual_bounds.min.x * dpi_scale).floor() as i32,
+                (visual_bounds.min.y * dpi_scale).floor() as i32,
+            ),
+            Point2::new(
+                (visual_bounds.max.x * dpi_scale).ceil() as i32,
+                (visual_bounds.max.y * dpi_scale).ceil() as i32,
+            ),
         ];
+        let phys_vis_bounds = [
+            phys_vis_bounds[0],
+            Point2::new(
+                max(phys_vis_bounds[0].x + 1, phys_vis_bounds[1].x),
+                max(phys_vis_bounds[0].y + 1, phys_vis_bounds[1].y),
+            ),
+        ];
+        let bmp_size: Vector2<i32> = (phys_vis_bounds[1] - phys_vis_bounds[0]).into();
+        let bmp_size: [u32; 2] = bmp_size.cast::<u32>().unwrap().into();
         let bmp_pt_size = Vector2::from(bmp_size).cast::<f32>().unwrap() / dpi_scale;
 
         // (Re-)create the bitmap if needed
@@ -119,6 +140,10 @@ impl CanvasMixin {
             let mut builder = pal::BitmapBuilder::new(bmp_size);
 
             // Apply DPI scaling
+            builder.mult_transform(Matrix3::from_translation(vec2(
+                -(phys_vis_bounds[0].x as f32),
+                -(phys_vis_bounds[0].y as f32),
+            )));
             builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
 
             // Call the draw function
@@ -136,7 +161,11 @@ impl CanvasMixin {
         };
 
         // Calculate the new layer bounds
-        let bounds = Box2::new(view_frame.min, view_frame.min + bmp_pt_size);
+        let bounds = Box2::new(
+            phys_vis_bounds[0].cast::<f32>().unwrap() / dpi_scale,
+            phys_vis_bounds[1].cast::<f32>().unwrap() / dpi_scale,
+        )
+        .translate(vec2(view_frame.min.x, view_frame.min.y));
 
         wm.set_layer_attr(
             layer,
@@ -163,7 +192,9 @@ impl CanvasMixin {
         ctx: &mut UpdateCtx<'_>,
         draw: impl FnOnce(&mut DrawContext<'_>),
     ) {
-        self.update_layer(wm, view, ctx.hwnd(), draw);
+        let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
+
+        self.update_layer(wm, view, ctx.hwnd(), visual_bounds, draw);
 
         if ctx.layers().len() != 1 {
             ctx.set_layers(vec![self.layer().unwrap().clone()]);
