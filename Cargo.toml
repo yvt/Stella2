@@ -2,6 +2,7 @@
 members = [
     "stella2",
     "tcw3",
+    "support/as_any",
     "support/cggeom",
     "support/iterpool",
     "support/subscriber_list",
