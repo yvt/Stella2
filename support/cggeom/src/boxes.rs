@@ -12,6 +12,9 @@ pub trait AxisAlignedBox<T>: Sized {
     type Vector: Clone;
 
     fn new(min: Self::Point, max: Self::Point) -> Self;
+    fn with_size(min: Self::Point, size: Self::Vector) -> Self {
+        Self::new(min, min + size)
+    }
 
     fn min(&self) -> Self::Point;
     fn max(&self) -> Self::Point;
