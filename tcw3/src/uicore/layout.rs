@@ -5,7 +5,18 @@ use std::{fmt, rc::Rc};
 use super::{HView, ViewDirtyFlags};
 use crate::pal::WM;
 
-/// Types that define the positioning of subviews.
+/// Represents a type defining the positioning of subviews.
+///
+/// Associated with a single view (referred to by [`HView`]) via [`set_layout`],
+/// a layout controls the layout properties of the view as well as the
+/// arrangement of its subviews.
+///
+/// [`HView`]: crate::uicore::HView
+/// [`set_layout`]: crate::uicore::HView::set_layout
+///
+/// `Layout` is logically immutable. That means the return values of these
+/// methods only can change based on input values. You should always
+/// re-create `Layout` objects if you want to modify its parameters.
 pub trait Layout {
     /// Get the subviews of a layout.
     ///
