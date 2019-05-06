@@ -15,7 +15,6 @@ lto = true
 [profile.bench]
 lto = true
 debug = true
-incremental = false
 
 # The following two include:
 # “Expose more APIs on CGContext”
