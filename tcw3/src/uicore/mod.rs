@@ -436,8 +436,7 @@ impl HWnd {
 
     /// Set the caption of a window.
     ///
-    /// The default value is `false`. Note that hiding a window doesn't release
-    /// resources associated with it.
+    /// The default value is `false`.
     pub fn set_caption(&self, caption: impl Into<String>) {
         self.set_caption_inner(caption.into());
     }
@@ -460,8 +459,7 @@ impl HWnd {
 
     /// Set the style flags of a window.
     ///
-    /// The default value is `false`. Note that hiding a window doesn't release
-    /// resources associated with it.
+    /// The default value is `false`.
     pub fn set_style_flags(&self, flags: WndStyleFlags) {
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.flags == flags {
