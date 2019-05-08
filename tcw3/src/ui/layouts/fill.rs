@@ -11,6 +11,17 @@ pub struct FillLayout {
 }
 
 impl FillLayout {
+    /// Construct a `FillLayout` that fills the associated view with a
+    /// specified view.
+    pub fn new(subview: HView) -> Self {
+        Self {
+            subview: [subview],
+            margin: 0.0,
+        }
+    }
+
+    /// Construct a `FillLayout` that fills the associated view with a
+    /// specified view using a specified margin value applied for all edges.
     pub fn with_uniform_margin(subview: HView, margin: f32) -> Self {
         Self {
             subview: [subview],
