@@ -174,13 +174,17 @@ impl HWnd {
                 ];
             }
 
+            // `<u32>::max_value() as f32` using the rounded-toward-zero
+            // rounding mode.
+            const U32_MAX: f32 = 4294967000.0;
+
             let min_s = [
                 size_traits.min.x.ceil() as u32,
                 size_traits.min.y.ceil() as u32,
             ];
             let max_s = [
-                size_traits.max.x.min(<u32>::max_value() as f32) as u32,
-                size_traits.max.y.min(<u32>::max_value() as f32) as u32,
+                size_traits.max.x.min(U32_MAX) as u32,
+                size_traits.max.y.min(U32_MAX) as u32,
             ];
 
             let max_s = [max(max_s[0], min_s[0]), max(max_s[1], min_s[1])];
