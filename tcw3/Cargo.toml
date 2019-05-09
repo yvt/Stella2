@@ -30,3 +30,4 @@ cc = "1.0.35"
 
 [dev-dependencies]
 lipsum = "0.6.0"
+structopt = "0.2.15"
