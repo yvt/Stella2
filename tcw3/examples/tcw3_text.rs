@@ -16,7 +16,8 @@ use tcw3::{
 #[derive(StructOpt, Debug)]
 #[structopt(name = "tcw3_text")]
 struct Opt {
-    #[structopt(short = "t", long = "text", help = "Specify the displayed text")]
+    /// Specify the displayed text
+    #[structopt(short = "t", long = "text")]
     text: Option<String>,
 }
 
