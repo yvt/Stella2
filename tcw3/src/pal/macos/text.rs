@@ -90,7 +90,7 @@ impl iface::TextLayout for TextLayout {
         let mut attr_str = CFMutableAttributedString::new();
         attr_str.replace_str(&text.into(), CFRange::init(0, 0));
 
-        let text_range = CFRange::init(0, text.len() as i64);
+        let text_range = CFRange::init(0, attr_str.char_len());
         attr_str.set_attribute(
             text_range,
             unsafe { string_attributes::kCTFontAttributeName },
