@@ -59,17 +59,6 @@ impl ViewListener for MyViewListener {
                 Point2::new(size.x * 0.2, size.y * 0.2),
             );
             c.stroke();
-
-            let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
-                ..Default::default()
-            });
-            let text_layout =
-                pal::TextLayout::from_text(lipsum::LOREM_IPSUM, &char_style, Some(size.x - 20.0));
-            c.draw_text(
-                &text_layout,
-                Point2::new(10.0, 10.0),
-                pal::RGBAF32::new(0.0, 0.0, 0.4, 1.0),
-            );
         });
     }
 }
