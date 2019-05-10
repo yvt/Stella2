@@ -441,7 +441,7 @@ impl Default for WndStyleAttrs {
 }
 
 impl WndStyleAttrs {
-    fn transfer_to_pal<'a>(&'a self, dirty: WndDirtyFlags, attrs: &mut pal::WndAttrs<&'a str>) {
+    fn transfer_to_pal<'a>(&'a self, dirty: WndDirtyFlags, attrs: &mut pal::WndAttrs<'a>) {
         if dirty.contains(WndDirtyFlags::STYLE_VISIBLE) {
             attrs.visible = Some(self.visible);
         }
@@ -449,7 +449,7 @@ impl WndStyleAttrs {
             attrs.flags = Some(self.flags);
         }
         if dirty.contains(WndDirtyFlags::STYLE_CAPTION) {
-            attrs.caption = Some(self.caption.as_ref());
+            attrs.caption = Some(self.caption[..].into());
         }
     }
 }

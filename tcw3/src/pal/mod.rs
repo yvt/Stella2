@@ -62,7 +62,7 @@ pub type HWnd = <WM as iface::WM>::HWnd;
 pub type HLayer = <WM as iface::WM>::HLayer;
 
 /// A specialization of `WndAttrs` for the default backend.
-pub type WndAttrs<TCaption> = iface::WndAttrs<WM, TCaption, HLayer>;
+pub type WndAttrs<'a> = iface::WndAttrs<'a, WM, HLayer>;
 
 /// A specialization of `LayerAttrs` for the default backend.
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;

@@ -67,7 +67,7 @@ fn main() {
     });
 
     let wnd = wm.new_wnd(&pal::WndAttrs {
-        caption: Some("Hello world"),
+        caption: Some("Hello world".into()),
         visible: Some(true),
         layer: Some(Some(layer)),
         size: Some([220, 270]),

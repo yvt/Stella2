@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug, rc::Rc};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -40,12 +40,12 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     fn enter_main_loop(self);
     fn terminate(self);
 
-    fn new_wnd(self, attrs: &WndAttrs<Self, &str, Self::HLayer>) -> Self::HWnd;
+    fn new_wnd(self, attrs: &WndAttrs<'_, Self, Self::HLayer>) -> Self::HWnd;
 
     /// Set the attributes of a window.
     ///
     /// Panics if the window has already been closed.
-    fn set_wnd_attr(self, window: &Self::HWnd, attrs: &WndAttrs<Self, &str, Self::HLayer>);
+    fn set_wnd_attr(self, window: &Self::HWnd, attrs: &WndAttrs<'_, Self, Self::HLayer>);
     fn remove_wnd(self, window: &Self::HWnd);
     /// Update a window's contents.
     ///
@@ -72,19 +72,19 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
 }
 
 #[derive(Clone)]
-pub struct WndAttrs<T: WM, TCaption, TLayer> {
+pub struct WndAttrs<'a, T: WM, TLayer> {
     /// The size of the content region.
     pub size: Option<[u32; 2]>,
     pub min_size: Option<[u32; 2]>,
     pub max_size: Option<[u32; 2]>,
     pub flags: Option<WndFlags>,
-    pub caption: Option<TCaption>,
+    pub caption: Option<Cow<'a, str>>,
     pub visible: Option<bool>,
     pub listener: Option<Option<Rc<dyn WndListener<T>>>>,
     pub layer: Option<Option<TLayer>>,
 }
 
-impl<T: WM, TCaption, TLayer> Default for WndAttrs<T, TCaption, TLayer> {
+impl<'a, T: WM, TLayer> Default for WndAttrs<'a, T, TLayer> {
     fn default() -> Self {
         Self {
             size: None,
@@ -95,25 +95,6 @@ impl<T: WM, TCaption, TLayer> Default for WndAttrs<T, TCaption, TLayer> {
             visible: None,
             listener: None,
             layer: None,
-        }
-    }
-}
-
-impl<T: WM, TCaption, TLayer> WndAttrs<T, TCaption, TLayer>
-where
-    TCaption: AsRef<str>,
-    TLayer: Clone,
-{
-    pub fn as_ref(&self) -> WndAttrs<T, &str, TLayer> {
-        WndAttrs {
-            size: self.size,
-            min_size: self.min_size,
-            max_size: self.max_size,
-            flags: self.flags,
-            caption: self.caption.as_ref().map(AsRef::as_ref),
-            visible: self.visible,
-            listener: self.listener.clone(),
-            layer: self.layer.clone(),
         }
     }
 }
