@@ -43,7 +43,7 @@ pub struct HWnd {
 }
 
 struct WndState {
-    listener: RefCell<Option<Rc<dyn iface::WndListener<WM>>>>,
+    listener: RefCell<Box<dyn iface::WndListener<WM>>>,
     layer: Cell<Option<HLayer>>,
     hwnd: HWnd,
 }
@@ -65,7 +65,7 @@ impl HWnd {
 
             // Create `WndState`
             let state = Rc::new(WndState {
-                listener: RefCell::new(None),
+                listener: RefCell::new(Box::new(iface::DefaultWndListener)),
                 layer: Cell::new(None),
                 hwnd: this.clone(),
             });
@@ -191,11 +191,7 @@ unsafe fn method_impl<T>(
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
-        if let Some(ref listener) = *state.listener.borrow() {
-            listener.close_requested(wm, &state.hwnd) as _
-        } else {
-            YES
-        }
+        state.listener.borrow().close_requested(wm, &state.hwnd) as _
     })
     .unwrap_or(YES)
 }
@@ -204,9 +200,7 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
-        if let Some(ref listener) = *state.listener.borrow() {
-            listener.close(wm, &state.hwnd)
-        }
+        state.listener.borrow().close(wm, &state.hwnd);
 
         // Detach the listener from the controller
         msg_send![*state.hwnd.ctrler, setListenerUserData: nil];
@@ -221,9 +215,7 @@ unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
-        if let Some(ref listener) = *state.listener.borrow() {
-            listener.resize(wm, &state.hwnd);
-        }
+        state.listener.borrow().resize(wm, &state.hwnd);
     });
 }
 
@@ -231,8 +223,6 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
-        if let Some(ref listener) = *state.listener.borrow() {
-            listener.dpi_scale_changed(wm, &state.hwnd);
-        }
+        state.listener.borrow().dpi_scale_changed(wm, &state.hwnd);
     });
 }

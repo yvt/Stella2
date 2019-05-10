@@ -35,9 +35,9 @@ impl HWnd {
         }
 
         let mut attrs = pal::WndAttrs {
-            listener: Some(Some(Rc::new(PalWndListener {
+            listener: Some(Box::new(PalWndListener {
                 wnd: Rc::downgrade(&self.wnd),
-            }))),
+            })),
             ..Default::default()
         };
         let dirty = &self.wnd.dirty;

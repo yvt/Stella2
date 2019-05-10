@@ -72,7 +72,7 @@ fn main() {
         layer: Some(Some(layer)),
         size: Some([220, 270]),
         min_size: Some([220, 270]),
-        listener: Some(Some(std::rc::Rc::new(Listener { flex_layer: layer2 }))),
+        listener: Some(Box::new(Listener { flex_layer: layer2 })),
         flags: Some(pal::WndFlags::default()),
         ..Default::default()
     });

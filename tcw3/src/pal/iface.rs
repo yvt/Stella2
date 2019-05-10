@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{borrow::Cow, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -71,7 +71,6 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     fn remove_layer(self, layer: &Self::HLayer);
 }
 
-#[derive(Clone)]
 pub struct WndAttrs<'a, T: WM, TLayer> {
     /// The size of the content region.
     pub size: Option<[u32; 2]>,
@@ -80,7 +79,7 @@ pub struct WndAttrs<'a, T: WM, TLayer> {
     pub flags: Option<WndFlags>,
     pub caption: Option<Cow<'a, str>>,
     pub visible: Option<bool>,
-    pub listener: Option<Option<Rc<dyn WndListener<T>>>>, // TODO: change to `Box`
+    pub listener: Option<Box<dyn WndListener<T>>>,
     pub layer: Option<Option<TLayer>>,
 }
 
@@ -234,6 +233,12 @@ pub trait WndListener<T: WM> {
 
     // TODO: more events
 }
+
+/// A default implementation of [`WndListener`].
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultWndListener;
+
+impl<T: WM> WndListener<T> for DefaultWndListener {}
 
 /// A immutable, ref-counted bitmap image.
 pub trait Bitmap: Clone + Sized + Send + Sync + Debug {
