@@ -66,7 +66,7 @@ impl Layer {
 }
 
 impl HLayer {
-    pub(super) fn new(wm: WM, attrs: &LayerAttrs) -> Self {
+    pub(super) fn new(wm: WM, attrs: LayerAttrs) -> Self {
         let layer = Layer::new(wm);
         let ptr = LAYER_POOL.get_with_wm(wm).borrow_mut().allocate(layer);
         let this = Self { ptr };
@@ -78,7 +78,7 @@ impl HLayer {
         LAYER_POOL.get_with_wm(wm).borrow_mut().deallocate(self.ptr);
     }
 
-    pub(super) fn set_attrs(&self, wm: WM, attrs: &LayerAttrs) {
+    pub(super) fn set_attrs(&self, wm: WM, attrs: LayerAttrs) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
         let layer_pool = &mut *layer_pool; // enable split borrow
 
@@ -102,7 +102,7 @@ impl HLayer {
         layer_pool[self.ptr]
             .attrs_diff
             .borrow_mut()
-            .override_with(attrs.clone());
+            .override_with(attrs);
 
         if update_sublayers {
             // Connect sublayers

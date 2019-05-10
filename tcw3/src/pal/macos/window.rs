@@ -50,7 +50,7 @@ struct WndState {
 
 impl HWnd {
     /// Must be called from a main thread.
-    pub(super) unsafe fn new(attrs: &WndAttrs<&str>) -> Self {
+    pub(super) unsafe fn new(attrs: WndAttrs<'_>) -> Self {
         with_autorelease_pool(|| {
             extern "C" {
                 /// Return `[TCWWindowController class]`.
@@ -91,7 +91,7 @@ impl HWnd {
     }
 
     /// Must be called from a main thread.
-    pub(super) unsafe fn set_attrs(&self, attrs: &WndAttrs<&str>) {
+    pub(super) unsafe fn set_attrs(&self, attrs: WndAttrs<'_>) {
         let state = self.state();
 
         // Call `setFlags` before `setContentSize` to make sure the window
@@ -115,8 +115,8 @@ impl HWnd {
             let () = msg_send![*self.ctrler, setContentMaxSize: max_size];
         }
 
-        if let Some(value) = attrs.caption {
-            let title = IdRef::new(NSString::alloc(nil).init_str(value));
+        if let Some(value) = &attrs.caption {
+            let title = IdRef::new(NSString::alloc(nil).init_str(&**value));
             let () = msg_send![*self.ctrler, setTitle:*title];
         }
 
@@ -130,18 +130,18 @@ impl HWnd {
             None => {}
         }
 
-        if let Some(ref value) = attrs.listener {
-            state.listener.replace(value.clone());
+        if let Some(value) = attrs.listener {
+            state.listener.replace(value);
         }
 
-        if let Some(ref value) = attrs.layer {
+        if let Some(value) = attrs.layer {
             let layer = if let Some(hlayer) = value {
                 hlayer.ca_layer(WM::global_unchecked())
             } else {
                 nil
             };
             let () = msg_send![*self.ctrler, setLayer: layer];
-            state.layer.set(*value);
+            state.layer.set(value);
         }
     }
 

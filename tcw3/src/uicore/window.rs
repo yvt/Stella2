@@ -46,7 +46,7 @@ impl HWnd {
         style_attrs.transfer_to_pal(dirty.get(), &mut attrs);
         dirty.set(dirty.get() - WndDirtyFlags::style());
 
-        let pal_wnd = self.wnd.wm.new_wnd(&attrs);
+        let pal_wnd = self.wnd.wm.new_wnd(attrs);
         *pal_wnd_cell = Some(pal_wnd);
     }
 
@@ -129,7 +129,7 @@ impl HWnd {
         self.wnd.updating.set(true);
 
         // Update PAL window attributes
-        self.wnd.wm.set_wnd_attr(pal_wnd, &attrs);
+        self.wnd.wm.set_wnd_attr(pal_wnd, attrs);
 
         // Un-suppress resize events
         self.wnd.updating.set(false);
@@ -358,7 +358,7 @@ impl RootViewListener {
 
 impl ViewListener for RootViewListener {
     fn mount(&self, wm: WM, _: &HView, _: &HWnd) {
-        *self.layer.borrow_mut() = Some(wm.new_layer(&pal::LayerAttrs {
+        *self.layer.borrow_mut() = Some(wm.new_layer(pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(Box2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))),
             ..Default::default()
@@ -378,7 +378,7 @@ impl ViewListener for RootViewListener {
         if let Some(sublayers) = ctx.sublayers().take() {
             wm.set_layer_attr(
                 &layer,
-                &pal::LayerAttrs {
+                pal::LayerAttrs {
                     sublayers: Some(sublayers),
                     ..Default::default()
                 },

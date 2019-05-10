@@ -83,13 +83,13 @@ impl iface::WM for WM {
         }
     }
 
-    fn new_wnd(self, attrs: &WndAttrs<&str>) -> Self::HWnd {
+    fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
         // Having a reference to `WM` means we are on a main thread, so
         // this is safe
         unsafe { HWnd::new(attrs) }
     }
 
-    fn set_wnd_attr(self, window: &Self::HWnd, attrs: &WndAttrs<&str>) {
+    fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
         // Having a reference to `WM` means we are on a main thread, so
         // this is safe
         unsafe { window.set_attrs(attrs) }
@@ -113,10 +113,10 @@ impl iface::WM for WM {
         window.get_dpi_scale(self)
     }
 
-    fn new_layer(self, attrs: &LayerAttrs) -> Self::HLayer {
+    fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
         HLayer::new(self, attrs)
     }
-    fn set_layer_attr(self, layer: &Self::HLayer, attrs: &LayerAttrs) {
+    fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
         layer.set_attrs(self, attrs);
     }
     fn remove_layer(self, layer: &Self::HLayer) {

@@ -40,7 +40,7 @@ impl ViewListener for MyViewListener {
         self.canvas.borrow_mut().mount(wm, view, wnd);
         wm.set_layer_attr(
             self.canvas.borrow().layer().unwrap(),
-            &pal::LayerAttrs {
+            pal::LayerAttrs {
                 bg_color: Some(pal::RGBAF32::new(0.8, 0.8, 0.8, 1.0)),
                 ..Default::default()
             },

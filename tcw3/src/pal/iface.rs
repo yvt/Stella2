@@ -40,12 +40,12 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     fn enter_main_loop(self);
     fn terminate(self);
 
-    fn new_wnd(self, attrs: &WndAttrs<'_, Self, Self::HLayer>) -> Self::HWnd;
+    fn new_wnd(self, attrs: WndAttrs<'_, Self, Self::HLayer>) -> Self::HWnd;
 
     /// Set the attributes of a window.
     ///
     /// Panics if the window has already been closed.
-    fn set_wnd_attr(self, window: &Self::HWnd, attrs: &WndAttrs<'_, Self, Self::HLayer>);
+    fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_, Self, Self::HLayer>);
     fn remove_wnd(self, window: &Self::HWnd);
     /// Update a window's contents.
     ///
@@ -61,13 +61,13 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
         1.0
     }
 
-    fn new_layer(self, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
+    fn new_layer(self, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
     // FIXME: Maybe pass `LayerAttrs` by value to elide the costly copy?
     /// Set the attributes of a layer.
     ///
     /// The behavior is unspecified if the layer has already been removed.
-    fn set_layer_attr(self, layer: &Self::HLayer, attrs: &LayerAttrs<Self::Bitmap, Self::HLayer>);
+    fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>);
     fn remove_layer(self, layer: &Self::HLayer);
 }
 
@@ -80,7 +80,7 @@ pub struct WndAttrs<'a, T: WM, TLayer> {
     pub flags: Option<WndFlags>,
     pub caption: Option<Cow<'a, str>>,
     pub visible: Option<bool>,
-    pub listener: Option<Option<Rc<dyn WndListener<T>>>>,
+    pub listener: Option<Option<Rc<dyn WndListener<T>>>>, // TODO: change to `Box`
     pub layer: Option<Option<TLayer>>,
 }
 

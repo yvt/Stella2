@@ -51,7 +51,7 @@ impl CanvasMixin {
     pub fn mount(&mut self, wm: pal::WM, view: &HView, wnd: &HWnd) {
         assert!(self.state.is_none());
 
-        let layer = wm.new_layer(&pal::LayerAttrs {
+        let layer = wm.new_layer(pal::LayerAttrs {
             ..Default::default()
         });
 
@@ -171,7 +171,7 @@ impl CanvasMixin {
 
         wm.set_layer_attr(
             layer,
-            &pal::LayerAttrs {
+            pal::LayerAttrs {
                 contents: bmp.map(Some),
                 bounds: Some(bounds),
                 ..Default::default()

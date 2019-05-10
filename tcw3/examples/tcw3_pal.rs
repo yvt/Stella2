@@ -19,7 +19,7 @@ impl WndListener<pal::WM> for Listener {
         let [w, h] = wm.get_wnd_size(hwnd);
         wm.set_layer_attr(
             &self.flex_layer,
-            &pal::LayerAttrs {
+            pal::LayerAttrs {
                 bounds: Some(Box2::new(
                     Point2::new(20.0, 120.0),
                     Point2::new(w as f32 - 20.0, h as f32 - 20.0),
@@ -44,7 +44,7 @@ fn main() {
 
     let bmp = bmp_builder.into_bitmap();
 
-    let layer2 = wm.new_layer(&pal::LayerAttrs {
+    let layer2 = wm.new_layer(pal::LayerAttrs {
         bounds: Some(Box2::new(
             Point2::new(20.0, 120.0),
             Point2::new(150.0, 250.0),
@@ -54,7 +54,7 @@ fn main() {
         ..Default::default()
     });
 
-    let layer = wm.new_layer(&pal::LayerAttrs {
+    let layer = wm.new_layer(pal::LayerAttrs {
         bounds: Some(Box2::new(
             Point2::new(20.0, 20.0),
             Point2::new(200.0, 100.0),
@@ -66,7 +66,7 @@ fn main() {
         ..Default::default()
     });
 
-    let wnd = wm.new_wnd(&pal::WndAttrs {
+    let wnd = wm.new_wnd(pal::WndAttrs {
         caption: Some("Hello world".into()),
         visible: Some(true),
         layer: Some(Some(layer)),
