@@ -71,7 +71,7 @@ impl HWnd {
             });
 
             // Attach `WndState`
-            msg_send![*this.ctrler, setListenerUserData: Rc::into_raw(state)];
+            let () = msg_send![*this.ctrler, setListenerUserData: Rc::into_raw(state)];
 
             this.set_attrs(attrs);
             let () = msg_send![*this.ctrler, center];
@@ -203,7 +203,7 @@ unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
         state.listener.borrow().close(wm, &state.hwnd);
 
         // Detach the listener from the controller
-        msg_send![*state.hwnd.ctrler, setListenerUserData: nil];
+        let () = msg_send![*state.hwnd.ctrler, setListenerUserData: nil];
     });
 
     if !ud.is_null() {
