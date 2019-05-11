@@ -82,6 +82,16 @@ impl ViewListener for MyViewListener {
                 Point2::new(10.0, 10.0),
                 vec2(wrap_width, size.y),
             ));
+
+            // Draw the visual bounds
+            let bounds = text_layout.visual_bounds();
+            c.set_stroke_rgb(pal::RGBAF32::new(0.6, 0.6, 0.1, 0.8));
+            c.stroke_rect(bounds.translate(vec2(10.0, 10.0)));
+
+            // Draw the layout bounds
+            let bounds = text_layout.layout_bounds();
+            c.set_stroke_rgb(pal::RGBAF32::new(0.1, 0.1, 0.7, 0.8));
+            c.stroke_rect(bounds.translate(vec2(10.0, 10.0)));
         });
     }
 }

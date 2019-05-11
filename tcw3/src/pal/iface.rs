@@ -378,7 +378,12 @@ pub trait TextLayout: Send + Sync + Sized {
 
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self;
     // TODO: construct a `TextLayout` from an attributed text
-    // TODO: query metrics
+
+    /// Get the visual bounds of a `TextLayout`.
+    fn visual_bounds(&self) -> Box2<f32>;
+    /// Get the layout bounds of a `TextLayout`.
+    fn layout_bounds(&self) -> Box2<f32>;
+
     // TODO: hit test & get selection rectangles from a subscring
     // TODO: alignment
     // TODO: inline/foreign object

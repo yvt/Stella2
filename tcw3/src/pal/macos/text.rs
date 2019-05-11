@@ -1,22 +1,33 @@
-use cgmath::Point2;
+use cggeom::{prelude::*, Box2};
+use cgmath::{vec2, Point2};
 use core_foundation::{
+    array::{CFArray, CFArrayRef},
     attributed_string::CFMutableAttributedString,
     base::{CFRange, TCFType},
     number::CFNumber,
     string::{CFString, CFStringRef},
 };
 use core_graphics::{
+    base::CGFloat,
+    color_space::CGColorSpace,
+    context::{CGContext, CGContextRef},
     geometry::{CGPoint, CGRect, CGSize},
+    image::CGImageAlphaInfo,
     path::CGPath,
 };
 use core_text::{
     font as ct_font,
     font::{CTFont, CTFontRef},
-    frame::CTFrame,
+    frame::{CTFrame, CTFrameRef},
     framesetter::{CTFramesetter, CTFramesetterRef},
+    line::{CTLine, CTLineRef},
     string_attributes,
 };
-use std::os::raw::c_void;
+use lazy_static::lazy_static;
+use std::{
+    f32::{INFINITY, NEG_INFINITY},
+    os::raw::c_void,
+};
 
 use super::super::{
     iface,
@@ -78,6 +89,7 @@ impl iface::CharStyle for CharStyle {
 #[derive(Debug)]
 pub struct TextLayout {
     frame: CTFrame,
+    height: f32,
 }
 
 unsafe impl Send for TextLayout {}
@@ -121,7 +133,104 @@ impl iface::TextLayout for TextLayout {
 
         let frame = framesetter.create_frame(text_range, &frame_path);
 
-        Self { frame }
+        Self {
+            frame,
+            height: frame_size.height as f32,
+        }
+    }
+
+    fn visual_bounds(&self) -> Box2<f32> {
+        let (lines, origins) = self.get_lines_and_line_origins();
+
+        struct ContextCell(CGContext);
+
+        // `CTLineGetImageBounds` doesn't mutate `CGContext`, I suppose.
+        unsafe impl Send for ContextCell {}
+        unsafe impl Sync for ContextCell {}
+
+        // From the documentation of `CTLineGetImageBounds`
+        // (https://developer.apple.com/documentation/coretext/ctline):
+        //
+        // > The context for which the image bounds are calculated. This is
+        // > required because the context could have settings in it that woul
+        // > cause changes in the image bounds.
+        lazy_static! {
+            static ref ATTR_CONTEXT: ContextCell = ContextCell({
+                CGContext::create_bitmap_context(
+                    None,
+                    1,
+                    1,
+                    8,
+                    0,
+                    &CGColorSpace::create_device_rgb(),
+                    CGImageAlphaInfo::CGImageAlphaPremultipliedLast as u32,
+                )
+            });
+        }
+
+        let mut bounds = Box2::new(
+            Point2::new(INFINITY, INFINITY),
+            Point2::new(NEG_INFINITY, NEG_INFINITY),
+        );
+
+        for (line, line_origin) in lines.iter().zip(origins.iter()) {
+            let image_bounds = ctline_get_image_bounds(&line, &ATTR_CONTEXT.0);
+
+            // The line origin points returned by the API are apparently
+            // relative to the path used to create the `CTFrame`, so we need
+            // to use `self.height` here to figure out their absolute
+            // coordeinates
+            let line_origin = vec2(line_origin.x as f32, self.height - line_origin.y as f32);
+
+            bounds.union_assign(
+                &Box2::with_size(
+                    Point2::new(
+                        image_bounds.origin.x as f32,
+                        -(image_bounds.origin.y as f32) - (image_bounds.size.height as f32),
+                    ),
+                    vec2(
+                        image_bounds.size.width as f32,
+                        image_bounds.size.height as f32,
+                    ),
+                )
+                .translate(line_origin),
+            );
+        }
+
+        bounds
+    }
+
+    fn layout_bounds(&self) -> Box2<f32> {
+        let (lines, origins) = self.get_lines_and_line_origins();
+
+        let mut bounds = Box2::new(Point2::new(INFINITY, 0.0), Point2::new(NEG_INFINITY, 0.0));
+
+        for (line, line_origin) in lines.iter().zip(origins.iter()) {
+            let typo_bounds = ctline_get_typographic_bounds(&line);
+
+            // See the comment in `visual_bounds`.
+            let line_origin = vec2(line_origin.x as f32, self.height - line_origin.y as f32);
+
+            bounds.min.x = bounds.min.x.min(line_origin.x);
+            bounds.max.x = bounds.max.x.max(line_origin.x + typo_bounds.width as f32);
+
+            // Not sure how to calculate the updated bottom position...
+            // I couldn't find the defiition of these metrics values anywhere
+            // in Core Text's documentation. Might wanna double-check as soon as
+            // I start working on other backends.
+            bounds.max.y = line_origin.y + (typo_bounds.leading + typo_bounds.descent) as f32;
+        }
+
+        bounds
+    }
+}
+
+impl TextLayout {
+    fn get_lines_and_line_origins(&self) -> (CFArray<CTLine>, Vec<CGPoint>) {
+        let lines = ctframe_get_lines(&self.frame);
+        let mut origins = vec![CGPoint::new(0.0, 0.0); lines.len() as usize];
+        ctframe_get_line_origins(&self.frame, 0, &mut origins[..]);
+        (lines, origins)
     }
 }
 
@@ -151,6 +260,19 @@ extern "C" {
         constraints: CGSize,
         fit_range: *mut CFRange,
     ) -> CGSize;
+
+    fn CTFrameGetLines(frame: CTFrameRef) -> CFArrayRef;
+
+    fn CTFrameGetLineOrigins(frame: CTFrameRef, range: CFRange, origins: *mut CGPoint);
+
+    fn CTLineGetTypographicBounds(
+        line: CTLineRef,
+        ascent: *mut CGFloat,
+        descent: *mut CGFloat,
+        leading: *mut CGFloat,
+    ) -> CGFloat;
+
+    fn CTLineGetImageBounds(line: CTLineRef, context: *const u8) -> CGRect;
 }
 
 fn ctfont_new_ui(ty: ct_font::CTFontUIFontType, size: f64, language: Option<&str>) -> CTFont {
@@ -183,4 +305,52 @@ fn ctframesetter_suggest_frame_size(
         );
         (size, fit_range)
     }
+}
+
+fn ctframe_get_lines(this: &CTFrame) -> CFArray<CTLine> {
+    unsafe {
+        let array_ref = CTFrameGetLines(this.as_concrete_TypeRef());
+        CFArray::wrap_under_get_rule(array_ref)
+    }
+}
+
+fn ctframe_get_line_origins(this: &CTFrame, start_line: i64, out_origins: &mut [CGPoint]) {
+    assert!(
+        (out_origins.len() as u64) <= <i64>::max_value() as u64,
+        "integer overflow"
+    );
+    let range = CFRange::init(
+        start_line,
+        start_line
+            .checked_add(out_origins.len() as i64)
+            .expect("integer overflow"),
+    );
+    unsafe {
+        CTFrameGetLineOrigins(this.as_concrete_TypeRef(), range, out_origins.as_mut_ptr());
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+struct TypographicBounds {
+    width: CGFloat,
+    ascent: CGFloat,
+    descent: CGFloat,
+    leading: CGFloat,
+}
+
+fn ctline_get_typographic_bounds(this: &CTLine) -> TypographicBounds {
+    let mut bounds = TypographicBounds::default();
+    unsafe {
+        bounds.width = CTLineGetTypographicBounds(
+            this.as_concrete_TypeRef(),
+            &mut bounds.ascent,
+            &mut bounds.descent,
+            &mut bounds.leading,
+        );
+    }
+    bounds
+}
+
+fn ctline_get_image_bounds(this: &CTLine, context: &CGContextRef) -> CGRect {
+    unsafe { CTLineGetImageBounds(this.as_concrete_TypeRef(), context as *const _ as *const u8) }
 }
