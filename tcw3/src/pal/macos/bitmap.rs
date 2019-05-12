@@ -1,13 +1,17 @@
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
+use core_foundation::base::TCFType;
 use core_graphics::{
-    context::{CGContext, CGLineCap, CGLineJoin},
+    color::SysCGColorRef,
+    context::{CGContext, CGContextRef, CGLineCap, CGLineJoin},
     image::{CGImage, CGImageAlphaInfo},
 };
 use std::fmt;
 
 use super::super::{iface, LineCap, LineJoin, RGBAF32};
-use super::drawutils::{cg_affine_transform_from_matrix3, cg_rect_from_box2, cg_color_space_srgb};
+use super::drawutils::{
+    cg_affine_transform_from_matrix3, cg_color_from_rgbaf32, cg_color_space_srgb, cg_rect_from_box2,
+};
 
 #[derive(Clone)]
 pub struct Bitmap {
@@ -134,16 +138,15 @@ impl iface::Canvas for BitmapBuilder {
     }
 
     fn set_fill_rgb(&mut self, rgb: RGBAF32) {
-        self.cg_context
-            .set_rgb_fill_color(rgb.r as f64, rgb.g as f64, rgb.b as f64, rgb.a as f64);
+        self.cg_context.set_fill_color(&cg_color_from_rgbaf32(rgb));
     }
     fn set_stroke_rgb(&mut self, rgb: RGBAF32) {
-        self.cg_context.set_rgb_stroke_color(
-            rgb.r as f64,
-            rgb.g as f64,
-            rgb.b as f64,
-            rgb.a as f64,
-        );
+        unsafe {
+            CGContextSetStrokeColorWithColor(
+                (&*self.cg_context) as *const CGContextRef as *const u8,
+                cg_color_from_rgbaf32(rgb).as_concrete_TypeRef(),
+            );
+        }
     }
 
     fn set_line_cap(&mut self, cap: LineCap) {
@@ -175,4 +178,9 @@ impl iface::Canvas for BitmapBuilder {
         self.cg_context
             .concat_ctm(cg_affine_transform_from_matrix3(m.cast().unwrap()));
     }
+}
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGContextSetStrokeColorWithColor(context: *const u8, color: SysCGColorRef);
 }
