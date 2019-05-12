@@ -11,3 +11,8 @@ pub mod mixins {
     pub mod canvas;
     pub use self::canvas::CanvasMixin;
 }
+
+pub mod views {
+    mod label;
+    pub use self::label::Label;
+}
