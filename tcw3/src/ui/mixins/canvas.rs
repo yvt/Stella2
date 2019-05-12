@@ -28,6 +28,12 @@ pub struct DrawContext<'a> {
     /// should draw the layer contents to a backing store.
     ///
     /// [`Canvas`]: crate::pal::iface::Canvas
+    ///
+    /// When a draw function is called, `canvas` is configured to use the
+    /// target view's coordinate space. This means that `(0, 0)` always matches
+    /// the top-left corner of the view's frame and the coordinates are
+    /// represented by logical pixels and are independent of physical pixel
+    /// density.
     pub canvas: &'a mut pal::BitmapBuilder,
 
     /// The size of the backing store measured in points (virtual pixels).
@@ -141,11 +147,13 @@ impl CanvasMixin {
         let bmp = if Some(bmp_size) != state.last_size {
             let mut builder = pal::BitmapBuilder::new(bmp_size);
 
-            // Apply DPI scaling
+            // Configure the canvas to use the view's coordinate space
             builder.mult_transform(Matrix3::from_translation(vec2(
                 -(phys_vis_bounds[0].x as f32),
                 -(phys_vis_bounds[0].y as f32),
             )));
+
+            // Apply DPI scaling
             builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
 
             // Call the draw function
