@@ -187,6 +187,8 @@ unsafe fn method_impl<T>(
     Some(f(wm, &*ud))
 }
 
+// TODO: catch panics
+
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {

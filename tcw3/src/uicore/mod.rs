@@ -129,6 +129,7 @@ impl Wnd {
 
 // TODO: mouse events
 // TODO: keyboard events
+// TODO: keyboard focus management
 
 /// A view handle type.
 #[derive(Debug, Clone)]
