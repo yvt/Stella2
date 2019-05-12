@@ -2,10 +2,14 @@ use super::super::RGBAF32;
 use cggeom::{prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Matrix4, Point2, Vector2};
 use cocoa::quartzcore::CATransform3D;
+use core_foundation::base::TCFType;
 use core_graphics::{
-    color::CGColor,
+    base::CGFloat,
+    color::{CGColor, SysCGColorRef},
+    color_space::{kCGColorSpaceSRGB, CGColorSpace, CGColorSpaceRef},
     geometry::{CGAffineTransform, CGPoint, CGRect, CGSize},
 };
+use lazy_static::lazy_static;
 
 pub fn extend_matrix3_with_identity_z(m: Matrix3<f32>) -> Matrix4<f32> {
     // ┌                 ┐
@@ -36,9 +40,34 @@ pub fn cg_size_from_vec2(p: Vector2<f64>) -> CGSize {
     CGSize::new(p.x, p.y)
 }
 
+struct CGColorSpaceCell(CGColorSpace);
+
+unsafe impl Send for CGColorSpaceCell {}
+unsafe impl Sync for CGColorSpaceCell {}
+
+lazy_static! {
+    static ref CG_COLOR_SPACE_SRGB: CGColorSpaceCell =
+        CGColorSpaceCell(CGColorSpace::create_with_name(unsafe { kCGColorSpaceSRGB }).unwrap());
+}
+
+/// Get the sRGB color space.
+pub fn cg_color_space_srgb() -> &'static CGColorSpace {
+    &CG_COLOR_SPACE_SRGB.0
+}
+
 pub fn cg_color_from_rgbaf32(x: RGBAF32) -> CGColor {
-    // TODO: Use the sRGB color space, not the generic device RGB one
-    CGColor::rgb(x.r as f64, x.g as f64, x.b as f64, x.a as f64)
+    unsafe {
+        let ptr = CGColorCreate(
+            (&**cg_color_space_srgb()) as *const CGColorSpaceRef as *const u8,
+            [x.r as f64, x.g as f64, x.b as f64, x.a as f64].as_ptr(),
+        );
+        CGColor::wrap_under_create_rule(ptr)
+    }
+}
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGColorCreate(space: *const u8, components: *const CGFloat) -> SysCGColorRef;
 }
 
 /// Convert a `Matrix3` into `CGAffineTransform`, ignoring a projective component.

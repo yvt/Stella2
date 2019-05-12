@@ -1,14 +1,13 @@
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use core_graphics::{
-    color_space::{kCGColorSpaceSRGB, CGColorSpace},
     context::{CGContext, CGLineCap, CGLineJoin},
     image::{CGImage, CGImageAlphaInfo},
 };
 use std::fmt;
 
 use super::super::{iface, LineCap, LineJoin, RGBAF32};
-use super::drawutils::{cg_affine_transform_from_matrix3, cg_rect_from_box2};
+use super::drawutils::{cg_affine_transform_from_matrix3, cg_rect_from_box2, cg_color_space_srgb};
 
 #[derive(Clone)]
 pub struct Bitmap {
@@ -57,16 +56,13 @@ impl iface::BitmapBuilder for BitmapBuilder {
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
-        // Get the sRGB color space
-        let cs = CGColorSpace::create_with_name(unsafe { kCGColorSpaceSRGB }).unwrap();
-
         let cg_context = CGContext::create_bitmap_context(
             None,         // data
             size[0] as _, // width
             size[1] as _, // width
             8,            // bits_per_component
             0,            // bytes_per_row
-            &cs,
+            &cg_color_space_srgb(),
             CGImageAlphaInfo::CGImageAlphaPremultipliedLast as u32,
         );
 
