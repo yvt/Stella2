@@ -103,15 +103,27 @@ impl Default for SizeTraits {
 impl HView {
     /// Get the frame (bounding rectangle) of a view in the superview's
     /// coordinate space.
+    ///
+    /// This method might return an out-dated value unless it's called under
+    /// certain circumstances. The layout system arranges to make sure that all
+    /// views in a window have up-to-date `frame` coordinates before calling
+    /// [`ViewListener::position`], a handler method for detecting changes in
+    /// `frame`. Thus, `ViewListener::position` is the only place where the
+    /// final value of `frame` can be retrieved reliably.
+    ///
+    /// [`ViewListener::position`]: crate::uicore::ViewListener::position
     pub fn frame(&self) -> Box2<f32> {
-        // TODO: trigger relayout if necessary
         self.view.frame.get()
     }
 
     /// Get the frame (bounding rectangle) of a view in the containing window's
     /// coordinate space.
+    ///
+    /// This method might return an out-dated value unless it's called under
+    /// certain circumstances. See [`frame`] for details.
+    ///
+    /// [`frame`]: crate::uicore::HView::frame
     pub fn global_frame(&self) -> Box2<f32> {
-        // TODO: trigger relayout if necessary
         self.view.global_frame.get()
     }
 
