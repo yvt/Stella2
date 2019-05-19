@@ -239,7 +239,7 @@ unsafe extern "C" fn tcw_wndlistener_mouse_motion(ud: TCWListenerUserData, loc: 
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData, loc: NSPoint)  {
+unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData)  {
     method_impl(ud, |wm, state| {
         state.listener.borrow().mouse_leave(wm, &state.hwnd);
     });

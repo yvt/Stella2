@@ -28,10 +28,10 @@
                                             defer:NO];
 
         self->window.releasedWhenClosed = NO;
-        self->window.acceptsMouseMovedEvents = YES;
         self->window.delegate = (id<NSWindowDelegate>)self;
 
-        self->window.contentView = [TCWWindowView new];
+        self->window.contentView =
+            [[TCWWindowView alloc] initWithController:self];
         self->window.contentView.wantsLayer = YES;
 
         // Create the first gesture handler view

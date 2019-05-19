@@ -130,27 +130,6 @@
     [self mouseUp:event];
 }
 
-// Implements `NSResponder`
-- (void)mouseMoved:(NSEvent *)event {
-    if (!self->controller) {
-        return;
-    }
-
-    NSPoint loc = [self->controller locationOfEvent:event];
-
-    tcw_wndlistener_mouse_motion(self->controller.listenerUserData, loc);
-}
-
-// Implements `NSResponder`
-- (void)mouseLeave:(NSEvent *)event {
-    // FIXME: This event doesn't fire
-    if (!self->controller) {
-        return;
-    }
-
-    tcw_wndlistener_mouse_leave(self->controller.listenerUserData);
-}
-
 - (void)cancelGesture {
     self->controller = nil;
 
