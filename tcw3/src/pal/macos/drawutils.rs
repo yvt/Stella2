@@ -1,7 +1,7 @@
 use super::super::RGBAF32;
 use cggeom::{prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Matrix4, Point2, Vector2};
-use cocoa::quartzcore::CATransform3D;
+use cocoa::{quartzcore::CATransform3D, foundation::NSPoint};
 use core_foundation::base::TCFType;
 use core_graphics::{
     base::CGFloat,
@@ -38,6 +38,10 @@ pub fn cg_point_from_point2(p: Point2<f64>) -> CGPoint {
 
 pub fn cg_size_from_vec2(p: Vector2<f64>) -> CGSize {
     CGSize::new(p.x, p.y)
+}
+
+pub fn point2_from_ns_point(p: NSPoint) -> Point2<f64> {
+    Point2::new(p.x, p.y)
 }
 
 struct CGColorSpaceCell(CGColorSpace);

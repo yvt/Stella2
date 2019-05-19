@@ -29,6 +29,42 @@ impl WndListener<pal::WM> for Listener {
         );
         wm.update_wnd(hwnd);
     }
+
+    fn mouse_motion(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>) {
+        println!("mouse_motion {:?}", loc);
+    }
+
+    fn mouse_leave(&self, _: pal::WM, _: &pal::HWnd) {
+        println!("mouse_leave");
+    }
+
+    fn mouse_drag(
+        &self,
+        _: pal::WM,
+        _: &pal::HWnd,
+        loc: Point2<f32>,
+        button: u8,
+    ) -> Box<dyn MouseDragListener<pal::WM>> {
+        println!("mouse_drag {:?}", (loc, button));
+        Box::new(DragListener)
+    }
+}
+
+struct DragListener;
+
+impl MouseDragListener<pal::WM> for DragListener {
+    fn mouse_motion(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>) {
+        println!("drag: mouse_motion {:?}", loc);
+    }
+    fn mouse_down(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+        println!("drag: mouse_down {:?}", (loc, button));
+    }
+    fn mouse_up(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+        println!("drag: mouse_up {:?}", (loc, button));
+    }
+    fn cancel(&self, _: pal::WM, _: &pal::HWnd) {
+        println!("drag: cancel");
+    }
 }
 
 fn main() {

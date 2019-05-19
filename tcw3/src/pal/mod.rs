@@ -6,8 +6,8 @@ pub mod iface;
 /// Re-exports traits from `iface`.
 pub mod prelude {
     pub use super::iface::{
-        Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, TextLayout,
-        WndListener, WM,
+        Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
+        TextLayout, WndListener, WM,
     };
 }
 

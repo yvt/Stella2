@@ -231,7 +231,36 @@ pub trait WndListener<T: WM> {
     /// The DPI scaling factor of a window has been updated.
     fn dpi_scale_changed(&self, _: T, _: &T::HWnd) {}
 
+    /// The mouse pointer has moved inside a window when none of the mouse
+    /// buttons are pressed.
+    fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
+
+    /// The mouse pointer has left a window.
+    fn mouse_leave(&self, _: T, _: &T::HWnd) {}
+
+    /// Get event handlers for handling the mouse drag gesture initiated by
+    /// a mouse down event described by `loc` and `button`.
+    ///
+    /// This method is called when a mouse button is pressed for the first time.
+    /// The returned `MouseDragListener` will be used to handle mouse events
+    /// (including the mouse down event that initiated the call) until all
+    /// mouse buttons are released.
+    fn mouse_drag(
+        &self,
+        _: T,
+        _: &T::HWnd,
+        _loc: Point2<f32>,
+        _button: u8,
+    ) -> Box<dyn MouseDragListener<T>> {
+        Box::new(DefaultMouseDragListener)
+    }
+
     // TODO: more events
+    //  - Scroll wheel event
+    //  - Pointer device gestures (swipe, zoom, rotate)
+    //  - Keyboard
+    //  - Input method
+    //  - Mouse cursor
 }
 
 /// A default implementation of [`WndListener`].
@@ -239,6 +268,41 @@ pub trait WndListener<T: WM> {
 pub struct DefaultWndListener;
 
 impl<T: WM> WndListener<T> for DefaultWndListener {}
+
+/// Mouse event handlers for mouse drag gestures.
+///
+/// A `MouseDragListener` object lives until one of the following events occur:
+///
+///  - `mouse_up` is called and there are no currently pressed buttons.
+///  - `cancel` is called.
+///
+pub trait MouseDragListener<T: WM> {
+    /// The mouse pointer has moved inside a window when at least one of the
+    /// mouse buttons are pressed.
+    fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
+
+    /// A mouse button was pressed inside a window.
+    fn mouse_down(&self, _: T, _: &T::HWnd, _loc: Point2<f32>, _button: u8) {}
+
+    /// A mouse button was released inside a window.
+    ///
+    /// When all mouse buttons are released, a reference to `MouseDragListener`
+    /// is destroyed.
+    /// A brand new `MouseDragListener` will be created via
+    /// [`WndListener::mouse_drag`] next time a mouse button is pressed.
+    ///
+    /// [`WndListener::mouse_drag`]: crate::pal::iface::WndListener::mouse_drag
+    fn mouse_up(&self, _: T, _: &T::HWnd, _loc: Point2<f32>, _button: u8) {}
+
+    /// A mouse drag gesture was cancelled.
+    fn cancel(&self, _: T, _: &T::HWnd) {}
+}
+
+/// A default implementation of [`MouseDragListener`].
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultMouseDragListener;
+
+impl<T: WM> MouseDragListener<T> for DefaultMouseDragListener {}
 
 /// A immutable, ref-counted bitmap image.
 pub trait Bitmap: Clone + Sized + Send + Sync + Debug {

@@ -1,15 +1,6 @@
-#import <Cocoa/Cocoa.h>
-
-// These callbacks are defined in `window.rs`
-typedef void *TCWListenerUserData;
-extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
-extern void tcw_wndlistener_close(TCWListenerUserData ud);
-extern void tcw_wndlistener_resize(TCWListenerUserData ud);
-extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
-
-// These flags must be synchronized with `WndFlags`
-#define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
-#define kTCW3WndFlagsBorderless ((uint32_t)(1 << 1))
+#import "TCWWindow.h"
+#import "TCWBridge.h"
+#import "TCWGestureHandlerView.h"
 
 @interface TCWWindowView : NSView
 @end
@@ -24,13 +15,13 @@ extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
 
 @end
 
-@interface TCWWindowController : NSObject {
+@implementation TCWWindowController {
     NSWindow *window;
-}
-@property TCWListenerUserData listenerUserData;
-@end
 
-@implementation TCWWindowController
+    TCWGestureHandlerView *inactiveGestureHandler;
+
+    NSMutableArray<TCWGestureHandlerView *> *gestureHandlers;
+}
 
 - (id)init {
     if (self) {
@@ -49,10 +40,16 @@ extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
                                             defer:NO];
 
         self->window.releasedWhenClosed = NO;
+        self->window.acceptsMouseMovedEvents = YES;
         self->window.delegate = (id<NSWindowDelegate>)self;
 
         self->window.contentView = [TCWWindowView new];
         self->window.contentView.wantsLayer = YES;
+
+        // Create the first gesture handler view
+        self->inactiveGestureHandler = [self newGestureHandlerView];
+        self->gestureHandlers = [NSMutableArray new];
+        [self->window.contentView addSubview:self->inactiveGestureHandler];
     }
     return self;
 }
@@ -129,6 +126,12 @@ extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
 - (void)windowWillClose:(NSNotification *)notification {
     (void)notification;
     self->window.delegate = nil;
+
+    // Cancel all input gestures
+    for (TCWGestureHandlerView *view in self->gestureHandlers) {
+        [view cancelGesture];
+    }
+
     tcw_wndlistener_close(self.listenerUserData);
 }
 
@@ -142,6 +145,54 @@ extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification {
     (void)notification;
     tcw_wndlistener_dpi_scale_changed(self.listenerUserData);
+}
+
+/**
+ * Create a new `TCWGestureHandlerView` and add it to the window.
+ */
+- (TCWGestureHandlerView *)newGestureHandlerView {
+    TCWGestureHandlerView *view =
+        [[TCWGestureHandlerView alloc] initWithController:self];
+
+    view.frame = self->window.contentView.frame;
+
+    [self->window.contentView addSubview:view];
+
+    return view;
+}
+
+- (void)gestureStartedInView:(TCWGestureHandlerView *)view {
+    if (self->inactiveGestureHandler != view) {
+        return;
+    }
+
+    [view removeFromSuperview];
+
+    [self->gestureHandlers addObject:view];
+
+    self->inactiveGestureHandler = [self newGestureHandlerView];
+
+    if (self->gestureHandlers.count > 10) {
+        NSLog(@"Evicting excessive gesture handlers "
+               "(perhaps there's an unhandled 'end of gesture' event?)");
+
+        TCWGestureHandlerView *deletedView =
+            [self->gestureHandlers objectAtIndex:0];
+        [deletedView cancelGesture];
+        [self->gestureHandlers removeObjectAtIndex:0];
+    }
+}
+
+- (void)gestureEndedInView:(TCWGestureHandlerView *)view {
+    NSUInteger index = [self->gestureHandlers indexOfObject:view];
+    NSAssert(index != NSNotFound, @"Unrecognized view");
+
+    [self->gestureHandlers removeObjectAtIndex:index];
+}
+
+- (NSPoint)locationOfEvent:(NSEvent *)event {
+    NSPoint windowLoc = event.locationInWindow;
+    return [self->window.contentView convertPoint:windowLoc fromView:nil];
 }
 
 @end
