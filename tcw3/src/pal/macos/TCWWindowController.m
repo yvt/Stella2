@@ -1,19 +1,7 @@
 #import "TCWWindowController.h"
 #import "TCWBridge.h"
 #import "TCWGestureHandlerView.h"
-
-@interface TCWWindowView : NSView
-@end
-
-@implementation TCWWindowView
-
-// Override `NSView`
-- (BOOL)isFlipped {
-    // Flip the window contents to match TCW3's coordinate space
-    return YES;
-}
-
-@end
+#import "TCWWindowView.h"
 
 @implementation TCWWindowController {
     NSWindow *window;
