@@ -8,7 +8,7 @@
 #define kMaxButtonNumber 63
 
 @implementation TCWGestureHandlerView {
-    TCWWindowController *controller;
+    TCWWindowController __weak *controller;
 
     TCWMouseDragListenerUserData mouseDragListener;
     BOOL hasMouseDragListener;
