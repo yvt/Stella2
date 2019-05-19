@@ -1,4 +1,4 @@
-#import "TCWWindow.h"
+#import "TCWWindowController.h"
 #import "TCWBridge.h"
 #import "TCWGestureHandlerView.h"
 

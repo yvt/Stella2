@@ -1,5 +1,5 @@
 #import "TCWGestureHandlerView.h"
-#import "TCWWindow.h"
+#import "TCWWindowController.h"
 
 /**
  * The maximum button number handled. The button number is limited by
