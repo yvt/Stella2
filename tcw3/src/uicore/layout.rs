@@ -63,10 +63,7 @@ impl fmt::Debug for dyn Layout {
 }
 
 /// `Layout` with no subviews, no size limitation, and 0x0 as the preferred size.
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultLayout;
-
-impl Layout for DefaultLayout {
+impl Layout for () {
     fn subviews(&self) -> &[HView] {
         &[]
     }

@@ -252,7 +252,7 @@ pub trait WndListener<T: WM> {
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener<T>> {
-        Box::new(DefaultMouseDragListener)
+        Box::new(())
     }
 
     // TODO: more events
@@ -264,10 +264,7 @@ pub trait WndListener<T: WM> {
 }
 
 /// A default implementation of [`WndListener`].
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultWndListener;
-
-impl<T: WM> WndListener<T> for DefaultWndListener {}
+impl<T: WM> WndListener<T> for () {}
 
 /// Mouse event handlers for mouse drag gestures.
 ///
@@ -299,10 +296,7 @@ pub trait MouseDragListener<T: WM> {
 }
 
 /// A default implementation of [`MouseDragListener`].
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultMouseDragListener;
-
-impl<T: WM> MouseDragListener<T> for DefaultMouseDragListener {}
+impl<T: WM> MouseDragListener<T> for () {}
 
 /// A immutable, ref-counted bitmap image.
 pub trait Bitmap: Clone + Sized + Send + Sync + Debug {

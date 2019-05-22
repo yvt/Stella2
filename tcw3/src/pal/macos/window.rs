@@ -65,7 +65,7 @@ impl HWnd {
 
             // Create `WndState`
             let state = Rc::new(WndState {
-                listener: RefCell::new(Box::new(iface::DefaultWndListener)),
+                listener: RefCell::new(Box::new(())),
                 layer: Cell::new(None),
                 hwnd: this.clone(),
             });

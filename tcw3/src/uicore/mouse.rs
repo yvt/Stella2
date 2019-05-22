@@ -36,10 +36,7 @@ pub trait MouseDragListener {
 }
 
 /// A default implementation of [`MouseDragListener`].
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultMouseDragListener;
-
-impl MouseDragListener for DefaultMouseDragListener {}
+impl MouseDragListener for () {}
 
 #[derive(Debug)]
 pub(super) struct WndMouseState {
@@ -82,7 +79,7 @@ impl HWnd {
         if st.drag_gestures.is_some() {
             // Can't have more than one active drag gesture
             // (Is that even possible?)
-            return Box::new(pal::iface::DefaultMouseDragListener);
+            return Box::new(());
         }
 
         let hit_view = {
@@ -112,7 +109,7 @@ impl HWnd {
                 wnd: Rc::downgrade(&self.wnd),
             })
         } else {
-            Box::new(pal::iface::DefaultMouseDragListener)
+            Box::new(())
         }
     }
 }

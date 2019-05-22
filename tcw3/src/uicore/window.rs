@@ -348,7 +348,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         if let Some(hwnd) = self.hwnd() {
             hwnd.handle_mouse_drag(loc, button)
         } else {
-            Box::new(pal::iface::DefaultMouseDragListener)
+            Box::new(())
         }
     }
 }

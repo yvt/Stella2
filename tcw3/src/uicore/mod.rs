@@ -34,8 +34,8 @@ mod mouse;
 mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
-pub use self::layout::{DefaultLayout, Layout, LayoutCtx, SizeTraits};
-pub use self::mouse::{DefaultMouseDragListener, MouseDragListener};
+pub use self::layout::{Layout, LayoutCtx, SizeTraits};
+pub use self::mouse::MouseDragListener;
 
 pub use crate::pal::WndFlags as WndStyleFlags;
 
@@ -61,10 +61,7 @@ pub trait WndListener {
 }
 
 /// A no-op implementation of `WndListener`.
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultWndListener;
-
-impl WndListener for DefaultWndListener {}
+impl WndListener for () {}
 
 /// The boxed function type for window events with no extra parameters.
 pub type WndEvtHandler = Box<dyn Fn(WM, &HWnd)>;
@@ -124,7 +121,7 @@ impl Wnd {
             wm,
             dirty: Cell::new(Default::default()),
             pal_wnd: RefCell::new(None),
-            listener: RefCell::new(Box::new(DefaultWndListener)),
+            listener: RefCell::new(Box::new(())),
             closed: Cell::new(false),
             content_view: RefCell::new(Some(content_view)),
             style_attrs: RefCell::new(Default::default()),
@@ -234,15 +231,12 @@ pub trait ViewListener {
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
-        Box::new(mouse::DefaultMouseDragListener)
+        Box::new(())
     }
 }
 
 /// A no-op implementation of `ViewListener`.
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultViewListener;
-
-impl ViewListener for DefaultViewListener {}
+impl ViewListener for () {}
 
 struct View {
     dirty: Cell<ViewDirtyFlags>,
@@ -291,8 +285,8 @@ impl View {
         Self {
             dirty: Cell::new(dirty),
             flags: Cell::new(flags),
-            listener: RefCell::new(Box::new(DefaultViewListener)),
-            layout: RefCell::new(Box::new(DefaultLayout)),
+            listener: RefCell::new(Box::new(())),
+            layout: RefCell::new(Box::new(())),
             superview: RefCell::new(Superview::empty()),
             size_traits: Cell::new(SizeTraits::default()),
             frame: Cell::new(Box2::zero()),
