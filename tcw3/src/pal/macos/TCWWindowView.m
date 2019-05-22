@@ -49,6 +49,8 @@
 
 // Implements `NSResponder`
 - (void)mouseExited:(NSEvent *)event {
+    (void)event;
+
     if (!self->controller) {
         return;
     }
