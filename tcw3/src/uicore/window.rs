@@ -254,6 +254,7 @@ impl Wnd {
 
             *view.view.superview.borrow_mut() = Superview::empty();
 
+            view.cancel_mouse_gestures_of_subviews(self);
             view.call_unmount(self.wm);
         }
 
@@ -334,6 +335,20 @@ impl pal::iface::WndListener<WM> for PalWndListener {
             for handler in handlers.iter() {
                 handler(hwnd.wnd.wm, &hwnd);
             }
+        }
+    }
+
+    fn mouse_drag(
+        &self,
+        _: WM,
+        _: &pal::HWnd,
+        loc: Point2<f32>,
+        button: u8,
+    ) -> Box<dyn pal::iface::MouseDragListener<WM>> {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.handle_mouse_drag(loc, button)
+        } else {
+            Box::new(pal::iface::DefaultMouseDragListener)
         }
     }
 }

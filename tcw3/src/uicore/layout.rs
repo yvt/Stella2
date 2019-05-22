@@ -1,9 +1,9 @@
 use as_any::AsAny;
 use cggeom::{prelude::*, Box2};
-use cgmath::{vec2, Vector2};
+use cgmath::{vec2, Point2, Vector2};
 use std::{fmt, rc::Rc};
 
-use super::{HView, ViewDirtyFlags};
+use super::{HView, ViewDirtyFlags, ViewFlags};
 use crate::pal::WM;
 
 /// Represents a type defining the positioning of subviews.
@@ -235,6 +235,45 @@ impl HView {
 
         for view in list.iter() {
             view.view.listener.borrow().position(wm, view);
+        }
+    }
+
+    /// Perform a hit test for the point `p` specified in the window coordinate
+    /// space.
+    ///
+    /// `accept_flag` specifies a flag that causes a view to be taken into
+    /// consideration. `deny_flag` specifies a flag that excludes a view and its
+    /// subviews.
+    pub(super) fn hit_test(
+        &self,
+        p: Point2<f32>,
+        accept_flag: ViewFlags,
+        deny_flag: ViewFlags,
+    ) -> Option<HView> {
+        let flags = self.view.flags.get();
+
+        if flags.intersects(deny_flag) {
+            return None;
+        }
+
+        let hit_local = self.view.global_frame.get().contains_point(&p);
+
+        if flags.intersects(ViewFlags::CLIP_HITTEST) && !hit_local {
+            return None;
+        }
+
+        // Check subviews
+        let layout = self.view.layout.borrow();
+        for subview in layout.subviews().iter().rev() {
+            if let Some(found_view) = subview.hit_test(p, accept_flag, deny_flag) {
+                return Some(found_view);
+            }
+        }
+
+        if hit_local && flags.intersects(accept_flag) {
+            Some(self.clone())
+        } else {
+            None
         }
     }
 }

@@ -15,6 +15,7 @@
 //!
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
+use cgmath::Point2;
 use derive_more::From;
 use flags_macro::flags;
 use std::{
@@ -29,10 +30,12 @@ use crate::pal::{self, prelude::WM as _, WM};
 mod layer;
 mod layout;
 mod mount;
+mod mouse;
 mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
 pub use self::layout::{DefaultLayout, Layout, LayoutCtx, SizeTraits};
+pub use self::mouse::{DefaultMouseDragListener, MouseDragListener};
 
 pub use crate::pal::WndFlags as WndStyleFlags;
 
@@ -85,6 +88,9 @@ struct Wnd {
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndEvtHandler>>,
+
+    // Mouse inputs
+    mouse_state: RefCell<mouse::WndMouseState>,
 }
 
 impl fmt::Debug for Wnd {
@@ -102,6 +108,7 @@ impl fmt::Debug for Wnd {
             .field("style_attrs", &self.style_attrs)
             .field("updating", &self.updating)
             .field("dpi_scale_changed_handlers", &())
+            .field("mouse_state", &self.mouse_state)
             .finish()
     }
 }
@@ -123,11 +130,14 @@ impl Wnd {
             style_attrs: RefCell::new(Default::default()),
             updating: Cell::new(false),
             dpi_scale_changed_handlers: RefCell::new(SubscriberList::new()),
+            mouse_state: RefCell::new(mouse::WndMouseState::new()),
         }
     }
 }
 
-// TODO: mouse events
+// TODO: scroll wheel events
+// TODO: mouse motion events
+// TODO: mouse enter/leave events
 // TODO: keyboard events
 // TODO: keyboard focus management
 
@@ -150,28 +160,43 @@ bitflags! {
         ///
         /// This flag cannot be added or removed once a view is created.
         const LAYER_GROUP = 1 << 0;
+
+        /// Clip hit testing (e.g., the one performed when the user presses
+        /// a mouse button) by the view's frame.
+        const CLIP_HITTEST = 1 << 1;
+
+        /// Prevent the view and its subviews from accepting mouse events.
+        const DENY_MOUSE = 1 << 2;
+
+        /// The view accepts mouse drag events.
+        const ACCEPT_MOUSE_DRAG = 1 << 3;
+    }
+}
+
+impl Default for ViewFlags {
+    fn default() -> Self {
+        ViewFlags::CLIP_HITTEST
     }
 }
 
 impl ViewFlags {
     fn mutable_flags() -> Self {
-        Self::empty()
+        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG}]
     }
 }
 
 /// View event handlers.
+///
+/// It's generally not safe to modify view properties and/or hierarchy from
+/// these methods. Consider deferring modifications using `WM::invoke`.
 pub trait ViewListener {
     /// A view was added to a window.
-    ///
-    /// It's generally not safe to modify view properties from this method.
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
     fn mount(&self, _: WM, _: &HView, _: &HWnd) {}
 
     /// A view was removed from a window.
-    ///
-    /// It's generally not safe to modify view properties from this method.
     fn unmount(&self, _: WM, _: &HView) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
@@ -192,6 +217,25 @@ pub trait ViewListener {
     ///
     /// [`WM::update_wnd`]: crate::pal::iface::WM::update_wnd
     fn update(&self, _: WM, _: &HView, _: &mut UpdateCtx<'_>) {}
+
+    /// Get event handlers for handling the mouse drag gesture initiated by
+    /// a mouse down event described by `loc` and `button`.
+    ///
+    /// This method is called when a mouse button is pressed for the first time.
+    /// The returned `MouseDragListener` will be used to handle subsequent
+    /// mouse events (including the mouse down event that initiated the call)
+    /// until all mouse buttons are released.
+    ///
+    /// You must set [`ViewFlags::ACCEPT_MOUSE_DRAG`] for this to be called.
+    fn mouse_drag(
+        &self,
+        _: WM,
+        _: &HView,
+        _loc: Point2<f32>,
+        _button: u8,
+    ) -> Box<dyn MouseDragListener> {
+        Box::new(mouse::DefaultMouseDragListener)
+    }
 }
 
 /// A no-op implementation of `ViewListener`.
@@ -413,7 +457,9 @@ impl HWnd {
         }
 
         // Unmount the old content view
-        old_content_view.unwrap().call_unmount(self.wnd.wm);
+        let old_content_view = old_content_view.unwrap();
+        old_content_view.cancel_mouse_gestures_of_subviews(&self.wnd);
+        old_content_view.call_unmount(self.wnd.wm);
 
         self.pend_update();
     }
@@ -576,6 +622,7 @@ impl HView {
             // Check for disconnected views
             for hview_sub in old_layout.subviews().iter() {
                 if hview_sub.view.superview.borrow().is_empty() {
+                    hview_sub.cancel_mouse_gestures_of_subviews(&hwnd.wnd);
                     hview_sub.call_unmount(hwnd.wnd.wm);
                 }
             }
@@ -596,6 +643,22 @@ impl HView {
             "view flag(s) {:?} cannot be added or removed once a view is created",
             changed - ViewFlags::mutable_flags()
         );
+
+        if (value & changed).contains(ViewFlags::DENY_MOUSE) {
+            // The subviews are no longer allowed to have active mouse gestures, so
+            // cancel them if they have any
+            if let Some(hwnd) = self.containing_wnd() {
+                self.cancel_mouse_gestures_of_subviews(&hwnd.wnd);
+            }
+        }
+
+        if (!value & changed).contains(ViewFlags::ACCEPT_MOUSE_DRAG) {
+            // The view is no longer allowed to have an active drag gesture so
+            // cancel it if it has one
+            if let Some(hwnd) = self.containing_wnd() {
+                self.cancel_mouse_drag_gestures(&hwnd.wnd);
+            }
+        }
 
         self.view.flags.set(value);
     }
@@ -755,6 +818,31 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
             }]) {
                 HWnd { wnd }.pend_update();
             }
+        }
+    }
+}
+
+// =======================================================================
+//                            Helper methods
+// =======================================================================
+
+impl HView {
+    /// Return `true` if `self` is an improper subview of `of_view`.
+    ///
+    /// The word "improper" means `x.is_improper_subview_of(x)` returns `true`.
+    fn is_improper_subview_of(&self, of_view: &HView) -> bool {
+        if Rc::ptr_eq(&self.view, &of_view.view) {
+            true
+        } else if let Some(sv) = self
+            .view
+            .superview
+            .borrow()
+            .view()
+            .and_then(|weak| weak.upgrade())
+        {
+            HView { view: sv }.is_improper_subview_of(of_view)
+        } else {
+            false
         }
     }
 }
