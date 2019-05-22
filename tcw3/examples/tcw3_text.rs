@@ -114,7 +114,7 @@ fn main() {
     wnd.set_visibility(true);
     wnd.set_listener(Box::new(MyWndListener));
 
-    let v = HView::new(ViewFlags::empty());
+    let v = HView::new(ViewFlags::default());
     v.set_listener(Box::new(MyViewListener::new(opt)));
     v.set_layout(Box::new(EmptyLayout::new(SizeTraits {
         preferred: vec2(320.0, 180.0),

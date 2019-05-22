@@ -105,7 +105,7 @@ fn main() {
                 1.0,
             );
 
-            let subview = HView::new(ViewFlags::empty());
+            let subview = HView::new(ViewFlags::default());
             subview.set_listener(Box::new(MyViewListener::new(color)));
 
             let frame = Box2::with_size(

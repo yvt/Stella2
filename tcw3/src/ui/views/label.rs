@@ -33,7 +33,7 @@ struct TextLayoutInfo {
 impl Label {
     pub fn new() -> Self {
         let this = Self {
-            view: HView::new(ViewFlags::empty()),
+            view: HView::new(ViewFlags::default()),
             state: Rc::new(RefCell::new(State {
                 text: String::new(),
                 text_layout_info: None,
