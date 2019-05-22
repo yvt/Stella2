@@ -73,6 +73,19 @@ pub type WndEvtHandler = Box<dyn Fn(WM, &HWnd)>;
 /// handlers by calling the `Sub::unsubscribe` method.
 pub type Sub = UntypedSubscription;
 
+/// The internal data of a window.
+///
+/// Internal functions use `Wnd` or `HWnd` depending on various factors, some of
+/// which are shown below:
+///
+///  - Client-facing method always use `HWnd`, so naturally functions accepting
+///    `HWnd` take less code to call.
+///  - Windows being destructed do not have `HWnd`. Even in such situations,
+///    `Wnd::drop` has to call `Wnd::close`.
+///  - Functions accepting `&Wnd` are more generic than those accepting `&HWnd`.
+///    However, the implementation of those accepting `&Wnd` can't retain
+///    a reference to the provided `Wnd`.
+///
 struct Wnd {
     wm: WM,
     dirty: Cell<window::WndDirtyFlags>,
