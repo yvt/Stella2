@@ -147,7 +147,15 @@ bitflags! {
         /// If this bit is set, the client should implement
         /// [`ViewListener::update`] and add [`UpdateCtx::sublayers`]`()` to
         /// a client-provided PAL layer as sublayers.
+        ///
+        /// This flag cannot be added or removed once a view is created.
         const LAYER_GROUP = 1 << 0;
+    }
+}
+
+impl ViewFlags {
+    fn mutable_flags() -> Self {
+        Self::empty()
     }
 }
 
@@ -194,7 +202,7 @@ impl ViewListener for DefaultViewListener {}
 
 struct View {
     dirty: Cell<ViewDirtyFlags>,
-    flags: ViewFlags,
+    flags: Cell<ViewFlags>,
 
     listener: RefCell<Box<dyn ViewListener>>,
     layout: RefCell<Box<dyn Layout>>,
@@ -238,7 +246,7 @@ impl View {
 
         Self {
             dirty: Cell::new(dirty),
-            flags,
+            flags: Cell::new(flags),
             listener: RefCell::new(Box::new(DefaultViewListener)),
             layout: RefCell::new(Box::new(DefaultLayout)),
             superview: RefCell::new(Superview::empty()),
@@ -373,7 +381,7 @@ impl HWnd {
     /// *exactly one layer* as the view's associated layer.
     pub fn set_content_view(&self, view: HView) {
         assert!(
-            view.view.flags.contains(ViewFlags::LAYER_GROUP),
+            view.view.flags.get().contains(ViewFlags::LAYER_GROUP),
             "the view must have LAYER_GROUP"
         );
         assert!(!self.wnd.closed.get(), "the window has been already closed");
@@ -572,6 +580,29 @@ impl HView {
                 }
             }
         }
+    }
+
+    /// Set the flags of a view.
+    ///
+    /// Some flags cannot be added or removed once a view is created. Such flags
+    /// only can be specified via [`HView::new`]. See [`ViewFlags`] for the list
+    /// of immutable flags.
+    pub fn set_flags(&self, value: ViewFlags) {
+        let changed = value ^ self.view.flags.get();
+
+        debug_assert_eq!(
+            changed - ViewFlags::mutable_flags(),
+            ViewFlags::empty(),
+            "view flag(s) {:?} cannot be added or removed once a view is created",
+            changed - ViewFlags::mutable_flags()
+        );
+
+        self.view.flags.set(value);
+    }
+
+    /// Get the flags of a view.
+    pub fn flags(&self) -> ViewFlags {
+        self.view.flags.get()
     }
 
     /// Pend a call to [`ViewListener::update`].

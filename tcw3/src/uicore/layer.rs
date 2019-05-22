@@ -10,7 +10,7 @@ impl HView {
             .view()
             .and_then(|weak| weak.upgrade());
         while let Some(view) = view_or_not {
-            if view.flags.contains(ViewFlags::LAYER_GROUP) {
+            if view.flags.get().contains(ViewFlags::LAYER_GROUP) {
                 return Some(HView { view });
             }
             view_or_not = (view.superview.borrow())
@@ -24,7 +24,7 @@ impl HView {
         for layer in self.view.layers.borrow().iter() {
             cb(layer);
         }
-        if !self.view.flags.contains(ViewFlags::LAYER_GROUP) {
+        if !self.view.flags.get().contains(ViewFlags::LAYER_GROUP) {
             for subview in self.view.layout.borrow().subviews().iter() {
                 subview.enum_sublayers(&mut *cb);
             }
@@ -54,7 +54,7 @@ impl HView {
 
         // If this is a layer group, then changes in the subtree of layers are
         // handled here
-        if self.view.flags.contains(ViewFlags::LAYER_GROUP) {
+        if self.view.flags.get().contains(ViewFlags::LAYER_GROUP) {
             if layers_changed {
                 self.set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
                 layers_changed = false;
@@ -79,7 +79,7 @@ impl HView {
             if dirty.get().intersects(ViewDirtyFlags::SUBLAYERS) {
                 ctx.reason |= UpdateReason::SUBLAYERS_CHANGE;
 
-                debug_assert!(self.view.flags.contains(ViewFlags::LAYER_GROUP));
+                debug_assert!(self.view.flags.get().contains(ViewFlags::LAYER_GROUP));
 
                 // Compile a list of direct sublayers
                 let mut sublayers = Vec::new();
