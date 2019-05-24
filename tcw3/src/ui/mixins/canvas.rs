@@ -19,7 +19,7 @@ pub struct CanvasMixin {
 struct MountState {
     layer: pal::HLayer,
     sub: Sub,
-    last_size: Option<[u32; 2]>,
+    last_phys_vis_bounds: Option<[Point2<i32>; 2]>,
 }
 
 #[derive(Debug)]
@@ -71,7 +71,7 @@ impl CanvasMixin {
         self.state = Some(MountState {
             layer,
             sub,
-            last_size: None,
+            last_phys_vis_bounds: None,
         });
 
         view.pend_update();
@@ -144,7 +144,7 @@ impl CanvasMixin {
         let bmp_pt_size = Vector2::from(bmp_size).cast::<f32>().unwrap() / dpi_scale;
 
         // (Re-)create the bitmap if needed
-        let bmp = if Some(bmp_size) != state.last_size {
+        let bmp = if Some(phys_vis_bounds) != state.last_phys_vis_bounds {
             let mut builder = pal::BitmapBuilder::new(bmp_size);
 
             // Configure the canvas to use the view's coordinate space
@@ -163,7 +163,7 @@ impl CanvasMixin {
                 dpi_scale,
             });
 
-            state.last_size = Some(bmp_size);
+            state.last_phys_vis_bounds = Some(phys_vis_bounds);
 
             Some(builder.into_bitmap())
         } else {
@@ -223,7 +223,7 @@ impl CanvasMixin {
     /// [`HView::pend_update`]: crate::uicore::HView::pend_update
     pub fn pend_draw(&mut self, view: &HView) {
         if let Some(state) = &mut self.state {
-            state.last_size = None;
+            state.last_phys_vis_bounds = None;
             view.pend_update();
         }
     }
