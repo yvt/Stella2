@@ -8,8 +8,9 @@ pub mod layouts {
 
 /// Reusable building blocks for creating UI components.
 pub mod mixins {
+    pub mod button;
     pub mod canvas;
-    pub use self::canvas::CanvasMixin;
+    pub use self::{button::ButtonMixin, canvas::CanvasMixin};
 }
 
 pub mod views {
