@@ -18,31 +18,47 @@ pub mod prelude {
 //       of images doesn't match that of the display. This overhead can be
 //       addressed by assigning a correct profile on images.
 
-cfg_if! {
-    if #[cfg(target_os = "macos")] {
-        pub mod macos;
+#[cfg(target_os = "macos")]
+pub mod macos;
 
-        /// The default window manager type for the target platform.
-        pub type WM = macos::WM;
+/// The type aliases for the current target platform.
+pub mod native {
+    use super::*;
 
-        /// The default bitmap type for the target platform implementing
-        /// `Bitmap`.
-        pub type Bitmap = macos::Bitmap;
-
-        /// The default bitmap builder type for the target platform implementing
-        /// `BitmapBuilderNew` and `CanvasText<TextLayout>`.
-        pub type BitmapBuilder = macos::BitmapBuilder;
-
-        /// The default character style type for the target platform
-        /// implementing `CharStyle`.
-        pub type CharStyle = macos::CharStyle;
-
-        /// The default text layout type for the target platform
-        /// implementing `TextLayout`.
-        pub type TextLayout = macos::TextLayout;
+    cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            pub type WM = macos::WM;
+            pub type Bitmap = macos::Bitmap;
+            pub type BitmapBuilder = macos::BitmapBuilder;
+            pub type CharStyle = macos::CharStyle;
+            pub type TextLayout = macos::TextLayout;
+        }
     }
-    // TODO: Other platforms
 }
+
+// TODO: Other platforms
+
+// TODO: A test driver, which replaces the following type aliases, allowing
+//       UI tests to provide stimuli
+
+/// The default window manager type for the target platform.
+pub type WM = native::WM;
+
+/// The default bitmap type for the target platform implementing
+/// `Bitmap`.
+pub type Bitmap = native::Bitmap;
+
+/// The default bitmap builder type for the target platform implementing
+/// `BitmapBuilderNew` and `CanvasText<TextLayout>`.
+pub type BitmapBuilder = native::BitmapBuilder;
+
+/// The default character style type for the target platform
+/// implementing `CharStyle`.
+pub type CharStyle = native::CharStyle;
+
+/// The default text layout type for the target platform
+/// implementing `TextLayout`.
+pub type TextLayout = native::TextLayout;
 
 // ============================================================================
 //
