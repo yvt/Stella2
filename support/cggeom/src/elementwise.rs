@@ -101,7 +101,7 @@ impl BoolArray for [bool; 2] {
     }
     #[inline]
     fn all(&self) -> bool {
-        self[1] && self[1]
+        self[0] && self[1]
     }
 }
 
@@ -112,6 +112,6 @@ impl BoolArray for [bool; 3] {
     }
     #[inline]
     fn all(&self) -> bool {
-        self[1] && self[1] && self[2]
+        self[0] && self[1] && self[2]
     }
 }
