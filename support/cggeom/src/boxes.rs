@@ -21,6 +21,25 @@ pub trait AxisAlignedBox<T>: Sized {
 
     fn zero() -> Self;
 
+    /// Return `true` if a point is inside a box.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{prelude::*, Box2};
+    ///     use cgmath::Point2;
+    ///
+    ///     let b = Box2::new(
+    ///         Point2::new(0.0, 0.0),
+    ///         Point2::new(1.0, 1.0),
+    ///     );
+    ///     assert!(b.contains_point(&Point2::new(0.0, 0.0)));
+    ///     assert!(b.contains_point(&Point2::new(0.5, 0.5)));
+    ///
+    ///     assert!(!b.contains_point(&Point2::new(0.5, -1.0)));
+    ///     assert!(!b.contains_point(&Point2::new(0.5, 1.0)));
+    ///     assert!(!b.contains_point(&Point2::new(-1.0, 0.5)));
+    ///     assert!(!b.contains_point(&Point2::new(1.0, 0.5)));
+    ///
     #[inline]
     fn contains_point(&self, point: &Self::Point) -> bool
     where
