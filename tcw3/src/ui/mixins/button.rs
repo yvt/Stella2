@@ -55,11 +55,11 @@ impl ButtonMixin {
     /// [`ViewListener::mouse_drag`]: crate::uicore::ViewListener::mouse_drag
     pub fn mouse_drag(
         &self,
-        listener: impl Into<Box<dyn ButtonListener + 'static>>,
+        listener: Box<dyn ButtonListener + 'static>,
     ) -> Box<dyn MouseDragListener> {
         Box::new(MouseDragListenerImpl {
             inner: Rc::clone(&self.inner),
-            client_listener: listener.into(),
+            client_listener: listener,
         })
     }
 
