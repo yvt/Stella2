@@ -14,6 +14,7 @@ pub mod mixins {
 }
 
 pub mod views {
+    mod button;
     mod label;
-    pub use self::label::Label;
+    pub use self::{button::Button, label::Label};
 }
