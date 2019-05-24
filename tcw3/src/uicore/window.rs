@@ -210,6 +210,7 @@ impl HWnd {
             );
             if new_frame != view.view.frame.get() {
                 view.view.frame.set(new_frame);
+                view.view.global_frame.set(new_frame);
                 view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
