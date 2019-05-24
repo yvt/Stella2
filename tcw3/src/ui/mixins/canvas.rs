@@ -187,6 +187,87 @@ impl CanvasMixin {
         );
     }
 
+    /// Update the backing layer. The layer will use 9-grid scaling to flexibly
+    /// resize without re-painting.
+    /// The caller-supplied draw function is used to provide new layer contents
+    /// if necessary.
+    ///
+    /// The client must choose between `update_layer` and `update_layer_border`
+    /// depending on whether the contents is eligible for 9-grid scaling or not.
+    /// It's not allowed switch to the other one after calling one.
+    ///
+    /// `draw` draws the border image within the region
+    /// `(-radius, -radius)-(radius, radius)`.
+    pub fn update_layer_border(
+        &mut self,
+        wm: pal::WM,
+        view: &HView,
+        wnd: &HWnd,
+        radius: f32,
+        draw: impl FnOnce(&mut DrawContext<'_>),
+    ) {
+        // TODO: Review this API. Perhaps this had better be merged into
+        // `update_layer`. The usefulness of this API is questionable because it
+        // gives up the opportunity of sharing a single pre-rendered image in
+        // UI elements of the same kind, and such elements are likely to be the
+        // main use cases of this API.
+        let state = self.state.as_mut().expect("not mounted");
+
+        let layer = &state.layer;
+
+        let view_frame = view.global_frame();
+        let dpi_scale = wnd.dpi_scale();
+
+        let bmp_size = max((radius * dpi_scale) as u32, 1);
+
+        // This value is used just for detecting size changes, not really
+        // makes sense
+        let phys_vis_bounds = [
+            Point2::new(0, 0),
+            Point2::new(bmp_size as i32, bmp_size as i32),
+        ];
+
+        let bmp_pt_size = bmp_size as f32 / dpi_scale;
+
+        // (Re-)create the bitmap if needed
+        let bmp = if Some(phys_vis_bounds) != state.last_phys_vis_bounds {
+            let mut builder = pal::BitmapBuilder::new([bmp_size * 2, bmp_size * 2]);
+
+            // Move the origin to the center of the bitmap
+            builder.mult_transform(Matrix3::from_translation(vec2(
+                bmp_size as f32,
+                bmp_size as f32,
+            )));
+
+            // Apply DPI scaling
+            builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
+
+            // Call the draw function
+            draw(&mut DrawContext {
+                canvas: &mut builder,
+                size: vec2(bmp_pt_size, bmp_pt_size) * 2.0,
+                dpi_scale,
+            });
+
+            state.last_phys_vis_bounds = Some(phys_vis_bounds);
+
+            Some(builder.into_bitmap())
+        } else {
+            None
+        };
+
+        wm.set_layer_attr(
+            layer,
+            pal::LayerAttrs {
+                contents: bmp.map(Some),
+                bounds: Some(view_frame),
+                contents_scale: Some(dpi_scale),
+                contents_center: Some(Box2::new(Point2::new(0.5, 0.5), Point2::new(0.5, 0.5))),
+                ..Default::default()
+            },
+        );
+    }
+
     /// Implements [`ViewListener::update`] using a caller-supplied draw
     /// function.
     ///
