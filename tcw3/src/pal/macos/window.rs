@@ -17,7 +17,7 @@
 //! ```
 use cocoa::{
     base::{id, nil},
-    foundation::{NSSize, NSString, NSPoint},
+    foundation::{NSPoint, NSSize, NSString},
     quartzcore::transaction,
 };
 use objc::{
@@ -34,7 +34,7 @@ use super::super::{
     iface::{self, WM as _},
     WndAttrs,
 };
-use super::{utils::with_autorelease_pool, HLayer, IdRef, WM, drawutils::point2_from_ns_point};
+use super::{drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, WM};
 
 #[derive(Debug, Clone)]
 pub struct HWnd {
@@ -176,10 +176,7 @@ impl HWnd {
 // These functions are called by `TCWWindowController`
 type TCWListenerUserData = *const WndState;
 
-unsafe fn method_impl<T>(
-    ud: TCWListenerUserData,
-    f: impl FnOnce(WM, &WndState) -> T,
-) -> Option<T> {
+unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(WM, &WndState) -> T) -> Option<T> {
     if ud.is_null() {
         return None;
     }
@@ -231,15 +228,19 @@ unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) 
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_wndlistener_mouse_motion(ud: TCWListenerUserData, loc: NSPoint)  {
+unsafe extern "C" fn tcw_wndlistener_mouse_motion(ud: TCWListenerUserData, loc: NSPoint) {
     method_impl(ud, |wm, state| {
-        state.listener.borrow().mouse_motion(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap());
+        state.listener.borrow().mouse_motion(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+        );
     });
 }
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData)  {
+unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         state.listener.borrow().mouse_leave(wm, &state.hwnd);
     });
@@ -247,9 +248,18 @@ unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData)  {
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_wndlistener_mouse_drag(ud: TCWListenerUserData, loc: NSPoint, button: u8) -> TCWMouseDragListenerUserData {
+unsafe extern "C" fn tcw_wndlistener_mouse_drag(
+    ud: TCWListenerUserData,
+    loc: NSPoint,
+    button: u8,
+) -> TCWMouseDragListenerUserData {
     method_impl(ud, |wm, state| {
-        let listener = state.listener.borrow().mouse_drag(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap(), button);
+        let listener = state.listener.borrow().mouse_drag(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+            button,
+        );
 
         let state = DragState {
             listener,
@@ -257,7 +267,8 @@ unsafe extern "C" fn tcw_wndlistener_mouse_drag(ud: TCWListenerUserData, loc: NS
         };
 
         Box::into_raw(Box::new(state)) as *const _
-    }).unwrap_or(std::ptr::null())
+    })
+    .unwrap_or(std::ptr::null())
 }
 
 type TCWMouseDragListenerUserData = *const DragState;
@@ -280,7 +291,7 @@ unsafe fn drag_method_impl<T>(
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_mousedraglistener_release(ud: TCWMouseDragListenerUserData)  {
+unsafe extern "C" fn tcw_mousedraglistener_release(ud: TCWMouseDragListenerUserData) {
     if !ud.is_null() {
         Box::from_raw(ud as *mut DragState);
     }
@@ -288,7 +299,7 @@ unsafe extern "C" fn tcw_mousedraglistener_release(ud: TCWMouseDragListenerUserD
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_mousedraglistener_cancel(ud: TCWMouseDragListenerUserData)  {
+unsafe extern "C" fn tcw_mousedraglistener_cancel(ud: TCWMouseDragListenerUserData) {
     drag_method_impl(ud, |wm, state| {
         state.listener.cancel(wm, &state.hwnd);
     });
@@ -296,24 +307,47 @@ unsafe extern "C" fn tcw_mousedraglistener_cancel(ud: TCWMouseDragListenerUserDa
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_mousedraglistener_mouse_motion(ud: TCWMouseDragListenerUserData, loc :NSPoint)  {
+unsafe extern "C" fn tcw_mousedraglistener_mouse_motion(
+    ud: TCWMouseDragListenerUserData,
+    loc: NSPoint,
+) {
     drag_method_impl(ud, |wm, state| {
-        state.listener.mouse_motion(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap());
+        state
+            .listener
+            .mouse_motion(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap());
     });
 }
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_mousedraglistener_mouse_down(ud: TCWMouseDragListenerUserData, loc :NSPoint, button: u8)  {
+unsafe extern "C" fn tcw_mousedraglistener_mouse_down(
+    ud: TCWMouseDragListenerUserData,
+    loc: NSPoint,
+    button: u8,
+) {
     drag_method_impl(ud, |wm, state| {
-        state.listener.mouse_down(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap(), button);
+        state.listener.mouse_down(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+            button,
+        );
     });
 }
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
-unsafe extern "C" fn tcw_mousedraglistener_mouse_up(ud: TCWMouseDragListenerUserData, loc :NSPoint, button: u8)  {
+unsafe extern "C" fn tcw_mousedraglistener_mouse_up(
+    ud: TCWMouseDragListenerUserData,
+    loc: NSPoint,
+    button: u8,
+) {
     drag_method_impl(ud, |wm, state| {
-        state.listener.mouse_up(wm, &state.hwnd, point2_from_ns_point(loc).cast().unwrap(), button);
+        state.listener.mouse_up(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+            button,
+        );
     });
 }
