@@ -1,0 +1,23 @@
+[package]
+name = "alt_fp"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/yvt/alt_fp-rs"
+description = """
+Provides alternative (faster in most cases) implementation for
+floating-point operations.
+"""
+keywords = ["floating-point", "performance", "simd"]
+
+[dependencies]
+packed_simd = "0.3.0"
+
+[dev-dependencies]
+bencher = "0.1.5"
+
+[[bench]]
+name = "castf32"
+harness = false
