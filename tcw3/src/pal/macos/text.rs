@@ -1,3 +1,4 @@
+use alt_fp::FloatOrd;
 use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2};
 use core_foundation::{
@@ -211,8 +212,8 @@ impl iface::TextLayout for TextLayout {
             // See the comment in `visual_bounds`.
             let line_origin = vec2(line_origin.x as f32, self.height - line_origin.y as f32);
 
-            bounds.min.x = bounds.min.x.min(line_origin.x);
-            bounds.max.x = bounds.max.x.max(line_origin.x + typo_bounds.width as f32);
+            bounds.min.x = bounds.min.x.fmin(line_origin.x);
+            bounds.max.x = bounds.max.x.fmax(line_origin.x + typo_bounds.width as f32);
 
             // Not sure how to calculate the updated bottom position...
             // I couldn't find the defiition of these metrics values anywhere

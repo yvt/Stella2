@@ -1,3 +1,4 @@
+use alt_fp::FloatOrd;
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
@@ -183,8 +184,8 @@ impl HWnd {
                 size_traits.min.y.ceil() as u32,
             ];
             let max_s = [
-                size_traits.max.x.min(U32_MAX) as u32,
-                size_traits.max.y.min(U32_MAX) as u32,
+                size_traits.max.x.fmin(U32_MAX) as u32,
+                size_traits.max.y.fmin(U32_MAX) as u32,
             ];
 
             let max_s = [max(max_s[0], min_s[0]), max(max_s[1], min_s[1])];
