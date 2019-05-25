@@ -1,3 +1,4 @@
+use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
 use std::{cell::RefCell, fmt, rc::Rc};
 
@@ -116,11 +117,10 @@ impl ViewListener for ButtonViewListener {
             };
             c.set_fill_rgb(bg_color);
 
-            // TODO: Make it rounded
-            c.move_to(Point2::new(0.0, -RADIUS));
-            c.line_to(Point2::new(RADIUS, 0.0));
-            c.line_to(Point2::new(0.0, RADIUS));
-            c.line_to(Point2::new(-RADIUS, 0.0));
+            c.rounded_rect(
+                Box2::new(Point2::new(-RADIUS, -RADIUS), Point2::new(RADIUS, RADIUS)),
+                [[RADIUS - 1.0; 2]; 4],
+            );
             c.fill();
         });
 
