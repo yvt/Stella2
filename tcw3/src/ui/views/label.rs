@@ -42,9 +42,9 @@ impl Label {
         };
 
         this.view
-            .set_layout(Box::new(LabelListener::new(Rc::clone(&this.state))));
+            .set_layout(LabelListener::new(Rc::clone(&this.state)));
         this.view
-            .set_listener(Box::new(LabelListener::new(Rc::clone(&this.state))));
+            .set_listener(LabelListener::new(Rc::clone(&this.state)));
 
         this
     }
@@ -70,7 +70,7 @@ impl Label {
             state.canvas.pend_draw(&self.view);
         }
         self.view
-            .set_layout(Box::new(LabelListener::new(Rc::clone(&self.state))));
+            .set_layout(LabelListener::new(Rc::clone(&self.state)));
     }
 }
 

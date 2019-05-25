@@ -45,10 +45,10 @@ impl Button {
         let label = Label::new();
 
         let margin = 4.0;
-        view.set_layout(Box::new(FillLayout::with_uniform_margin(
+        view.set_layout(FillLayout::with_uniform_margin(
             label.view().clone(),
             margin,
-        )));
+        ));
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
@@ -57,9 +57,9 @@ impl Button {
             activate_handler: RefCell::new(Box::new(|_| {})),
         });
 
-        view.set_listener(Box::new(ButtonViewListener {
+        view.set_listener(ButtonViewListener {
             inner: Rc::clone(&inner),
-        }));
+        });
 
         Self { view, inner }
     }

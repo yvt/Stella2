@@ -357,7 +357,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
 
 pub(crate) fn new_root_content_view() -> HView {
     let view = HView::new(ViewFlags::default() | ViewFlags::LAYER_GROUP);
-    view.set_listener(Box::new(RootViewListener::new()));
+    view.set_listener(RootViewListener::new());
     view
 }
 

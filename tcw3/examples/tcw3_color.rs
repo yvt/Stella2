@@ -86,7 +86,7 @@ fn main() {
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);
     wnd.set_style_flags(WndStyleFlags::default() - WndStyleFlags::RESIZABLE);
-    wnd.set_listener(Box::new(MyWndListener));
+    wnd.set_listener(MyWndListener);
 
     const CELL_W: f32 = 50.0;
     const CELL_H: f32 = 20.0;
@@ -106,7 +106,7 @@ fn main() {
             );
 
             let subview = HView::new(ViewFlags::default());
-            subview.set_listener(Box::new(MyViewListener::new(color)));
+            subview.set_listener(MyViewListener::new(color));
 
             let frame = Box2::with_size(
                 Point2::new(CELL_W * col as f32 + MARGIN, CELL_H * row as f32 + MARGIN),
@@ -119,14 +119,14 @@ fn main() {
 
     let size = vec2(CELL_W * 3.0 + MARGIN * 2.0, CELL_H * 10.0 + MARGIN * 2.0);
 
-    wnd.content_view().set_layout(Box::new(AbsLayout::new(
+    wnd.content_view().set_layout(AbsLayout::new(
         SizeTraits {
             min: size,
             max: size,
             preferred: size,
         },
         views,
-    )));
+    ));
 
     wm.enter_main_loop();
 }

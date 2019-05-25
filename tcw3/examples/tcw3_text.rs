@@ -112,16 +112,16 @@ fn main() {
 
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);
-    wnd.set_listener(Box::new(MyWndListener));
+    wnd.set_listener(MyWndListener);
 
     let v = HView::new(ViewFlags::default());
-    v.set_listener(Box::new(MyViewListener::new(opt)));
-    v.set_layout(Box::new(EmptyLayout::new(SizeTraits {
+    v.set_listener(MyViewListener::new(opt));
+    v.set_layout(EmptyLayout::new(SizeTraits {
         preferred: vec2(320.0, 180.0),
         ..Default::default()
-    })));
+    }));
 
-    wnd.content_view().set_layout(Box::new(FillLayout::new(v)));
+    wnd.content_view().set_layout(FillLayout::new(v));
 
     wm.enter_main_loop();
 }

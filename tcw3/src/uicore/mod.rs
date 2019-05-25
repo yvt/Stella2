@@ -63,6 +63,12 @@ pub trait WndListener {
 /// A no-op implementation of `WndListener`.
 impl WndListener for () {}
 
+impl<T: WndListener + 'static> From<T> for Box<dyn WndListener> {
+    fn from(x: T) -> Box<dyn WndListener> {
+        Box::new(x)
+    }
+}
+
 /// The boxed function type for window events with no extra parameters.
 pub type WndEvtHandler = Box<dyn Fn(WM, &HWnd)>;
 
@@ -250,6 +256,12 @@ pub trait ViewListener {
 
 /// A no-op implementation of `ViewListener`.
 impl ViewListener for () {}
+
+impl<T: ViewListener + 'static> From<T> for Box<dyn ViewListener> {
+    fn from(x: T) -> Box<dyn ViewListener> {
+        Box::new(x)
+    }
+}
 
 struct View {
     dirty: Cell<ViewDirtyFlags>,
@@ -472,8 +484,8 @@ impl HWnd {
     }
 
     /// Set the window listener.
-    pub fn set_listener(&self, listener: Box<dyn WndListener>) {
-        *self.wnd.listener.borrow_mut() = listener;
+    pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>) {
+        *self.wnd.listener.borrow_mut() = listener.into();
     }
 
     /// Set the visibility of a window.
@@ -557,14 +569,15 @@ impl HView {
     /// Set a new [`ViewListener`].
     ///
     /// It's now allowed to call this method from `ViewListener`'s methods.
-    pub fn set_listener(&self, listener: Box<dyn ViewListener>) {
-        *self.view.listener.borrow_mut() = listener;
+    pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>) {
+        *self.view.listener.borrow_mut() = listener.into();
     }
 
     /// Set a new [`Layout`].
     ///
     /// It's not allowed to call this method from [`ViewListener::update`].
-    pub fn set_layout(&self, layout: Box<dyn Layout>) {
+    pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>) {
+        let layout = layout.into();
         let mut cur_layout = self.view.layout.borrow_mut();
         let subviews_changed = !layout.has_same_subviews(&**cur_layout);
 

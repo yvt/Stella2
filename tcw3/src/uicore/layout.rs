@@ -52,6 +52,12 @@ pub trait Layout: AsAny {
     }
 }
 
+impl<T: Layout + 'static> From<T> for Box<dyn Layout> {
+    fn from(x: T) -> Box<dyn Layout> {
+        Box::new(x)
+    }
+}
+
 impl fmt::Debug for dyn Layout {
     /// Output the address of `self` and `self.subviews()`.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
