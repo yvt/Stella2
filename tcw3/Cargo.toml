@@ -16,6 +16,8 @@ derive_more = "0.14.0"
 subscriber_list = { path = "../support/subscriber_list" }
 as_any = { path = "../support/as_any" }
 alt_fp = { path = "../support/alt_fp" }
+array = "0.0.1"
+packed_simd = "0.3.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.3"

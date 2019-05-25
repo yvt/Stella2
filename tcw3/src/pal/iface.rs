@@ -327,6 +327,45 @@ pub trait Canvas: Debug {
     /// provided control point.
     fn quad_bezier_to(&mut self, cp: Point2<f32>, p: Point2<f32>);
 
+    /// Add a rectangle to the current path.
+    fn rect(&mut self, bx: Box2<f32>) {
+        super::canvas::canvas_rect(self, bx)
+    }
+    /// Add a rounded rectangle to the current path.
+    ///
+    /// `radii` specifies the corner radii (width/height) of the four corners of
+    /// the rectangle in a clock-wise order, starting from the upper-left corner.
+    /// Overlapping corner curves are handled based on [CSS's definition] - all
+    /// corners are uniformly scaled down until no corner curves overlap.
+    ///
+    /// [CSS's definition]: https://drafts.csswg.org/css-backgrounds-3/#corner-overlap
+    ///
+    /// The behaviour with an invalid `bx` (having a negative width/height) is
+    /// unspecified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use {cggeom::Box2, cggeom::prelude::*, cgmath::Point2};
+    /// # use tcw3::pal::iface::Canvas;
+    /// # fn test(canvas: &mut impl Canvas) {
+    /// let bx = Box2::new(Point2::new(0.0, 0.0), Point2::new(50.0, 40.0));
+    /// // Rounded rectangle with a uniform radius
+    /// canvas.rounded_rect(bx, [[5.0; 2]; 4]);
+    /// // Rounded rectangle having four circular arcs with different radii
+    /// canvas.rounded_rect(bx, [[1.0; 2], [2.0; 2], [3.0; 2], [4.0; 2]]);
+    /// // Ellipse (no straight edges)
+    /// canvas.rounded_rect(bx, [[25.0, 20.0]; 4]);
+    /// # }
+    /// ```
+    fn rounded_rect(&mut self, bx: Box2<f32>, radii: [[f32; 2]; 4]) {
+        super::canvas::canvas_rounded_rect(self, bx, radii)
+    }
+    /// Add an ellipse bounded by the specified rectangle to the current path.
+    fn ellipse(&mut self, bx: Box2<f32>) {
+        super::canvas::canvas_ellipse(self, bx)
+    }
+
     /// Fill the area within the current path, using the non-zero winding number
     /// rule.
     fn fill(&mut self);
@@ -341,11 +380,7 @@ pub trait Canvas: Debug {
     /// The implementation of this method may invalidate the current path.
     fn stroke_rect(&mut self, bx: Box2<f32>) {
         self.begin_path();
-        self.move_to(Point2::new(bx.min.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.max.y));
-        self.line_to(Point2::new(bx.min.x, bx.max.y));
-        self.close_path();
+        self.rect(bx);
         self.stroke();
     }
     /// Fill the specified rectangle.
@@ -353,11 +388,7 @@ pub trait Canvas: Debug {
     /// The implementation of this method may invalidate the current path.
     fn fill_rect(&mut self, bx: Box2<f32>) {
         self.begin_path();
-        self.move_to(Point2::new(bx.min.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.max.y));
-        self.line_to(Point2::new(bx.min.x, bx.max.y));
-        self.close_path();
+        self.rect(bx);
         self.fill();
     }
     /// Set the current clipping region to its intersection with the specified
@@ -366,11 +397,7 @@ pub trait Canvas: Debug {
     /// The implementation of this method may invalidate the current path.
     fn clip_rect(&mut self, bx: Box2<f32>) {
         self.begin_path();
-        self.move_to(Point2::new(bx.min.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.min.y));
-        self.line_to(Point2::new(bx.max.x, bx.max.y));
-        self.line_to(Point2::new(bx.min.x, bx.max.y));
-        self.close_path();
+        self.rect(bx);
         self.clip();
     }
 

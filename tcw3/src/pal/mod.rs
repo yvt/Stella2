@@ -1,6 +1,7 @@
 //! Platform abstraction layer
 use cfg_if::cfg_if;
 
+mod canvas;
 pub mod iface;
 
 /// Re-exports traits from `iface`.
