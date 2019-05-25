@@ -1,5 +1,6 @@
 use cggeom::{prelude::*, Box2};
 use cgmath::{Point2, Vector2};
+use momo::momo;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
@@ -55,11 +56,9 @@ impl Label {
     }
 
     /// Set the text displayed in a label widget.
+    #[momo]
     pub fn set_text(&mut self, value: impl Into<String>) {
-        self.set_text_core(value.into());
-    }
-
-    fn set_text_core(&mut self, value: String) {
+        let value = value.into();
         {
             let mut state = self.state.borrow_mut();
             if state.text == value {

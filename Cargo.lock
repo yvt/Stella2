@@ -240,6 +240,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "momo"
+version = "0.1.0"
+source = "git+https://github.com/llogiq/momo.git?rev=3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40#3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40"
+dependencies = [
+ "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -497,6 +506,7 @@ dependencies = [
  "iterpool 0.1.0",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lipsum 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "momo 0.1.0 (git+https://github.com/llogiq/momo.git?rev=3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40)",
  "objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "packed_simd 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -592,6 +602,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)" = "bedcc7a809076656486ffe045abeeac163da1b558e963a31e29fbfbeba916917"
 "checksum lipsum 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "58e4464067d52ca040073c04dfd9185658ec8a32236b857b5e1577f9d19f9d5a"
 "checksum malloc_buf 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
+"checksum momo 0.1.0 (git+https://github.com/llogiq/momo.git?rev=3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40)" = "<none>"
 "checksum num-traits 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "0b3a5d7cc97d6d30d8b9bc8fa19bf45349ffe46241e8816f50f62f6d6aaabee1"
 "checksum numtoa 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
 "checksum objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "31d20fd2b37e07cf5125be68357b588672e8cefe9a96f8c17a9d46053b3e590d"

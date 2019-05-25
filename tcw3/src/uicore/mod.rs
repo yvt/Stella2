@@ -18,6 +18,7 @@ use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
 use derive_more::From;
 use flags_macro::flags;
+use momo::momo;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -484,6 +485,7 @@ impl HWnd {
     }
 
     /// Set the window listener.
+    #[momo]
     pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>) {
         *self.wnd.listener.borrow_mut() = listener.into();
     }
@@ -511,11 +513,9 @@ impl HWnd {
     /// Set the caption of a window.
     ///
     /// The default value is `false`.
+    #[momo]
     pub fn set_caption(&self, caption: impl Into<String>) {
-        self.set_caption_inner(caption.into());
-    }
-
-    fn set_caption_inner(&self, caption: String) {
+        let caption = caption.into();
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.caption == caption {
             return;
@@ -569,6 +569,7 @@ impl HView {
     /// Set a new [`ViewListener`].
     ///
     /// It's now allowed to call this method from `ViewListener`'s methods.
+    #[momo]
     pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>) {
         *self.view.listener.borrow_mut() = listener.into();
     }
@@ -576,6 +577,7 @@ impl HView {
     /// Set a new [`Layout`].
     ///
     /// It's not allowed to call this method from [`ViewListener::update`].
+    #[momo]
     pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>) {
         let layout = layout.into();
         let mut cur_layout = self.view.layout.borrow_mut();
