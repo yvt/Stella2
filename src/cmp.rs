@@ -1,4 +1,5 @@
 //! Fast maximum/minimum value functions for floating-point types.
+#[cfg(feature = "packed_simd")]
 use packed_simd::f32x4;
 
 #[cfg(target_feature = "sse")]
@@ -96,6 +97,7 @@ impl FloatOrd for f64 {
     }
 }
 
+#[cfg(feature = "packed_simd")]
 #[cfg(not(target_feature = "sse"))]
 impl FloatOrd for f32x4 {
     #[inline]
@@ -109,6 +111,7 @@ impl FloatOrd for f32x4 {
     }
 }
 
+#[cfg(feature = "packed_simd")]
 #[cfg(target_feature = "sse")]
 impl FloatOrd for f32x4 {
     #[inline]
