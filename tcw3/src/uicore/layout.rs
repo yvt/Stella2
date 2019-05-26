@@ -103,6 +103,32 @@ impl Default for SizeTraits {
     }
 }
 
+impl SizeTraits {
+    /// Update `min` with a new value and return a new `SizeTraits`.
+    pub fn with_min(self, min: Vector2<f32>) -> Self {
+        Self {
+            min: min.into(),
+            ..self
+        }
+    }
+
+    /// Update `max` with a new value and return a new `SizeTraits`.
+    pub fn with_max(self, max: Vector2<f32>) -> Self {
+        Self {
+            max: max.into(),
+            ..self
+        }
+    }
+
+    /// Update `preferred` with a new value and return a new `SizeTraits`.
+    pub fn with_preferred(self, preferred: Vector2<f32>) -> Self {
+        Self {
+            preferred: preferred.into(),
+            ..self
+        }
+    }
+}
+
 impl HView {
     /// Get the frame (bounding rectangle) of a view in the superview's
     /// coordinate space.

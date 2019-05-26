@@ -16,5 +16,10 @@ pub mod mixins {
 pub mod views {
     mod button;
     mod label;
-    pub use self::{button::Button, label::Label};
+    mod spacer;
+    pub use self::{
+        button::Button,
+        label::Label,
+        spacer::{new_spacer, Spacer},
+    };
 }
