@@ -1,5 +1,5 @@
-use cggeom::{prelude::*, Box2};
-use cgmath::{vec2, Point2, Vector2};
+use cggeom::box2;
+use cgmath::{vec2, Vector2};
 
 use crate::uicore::{HView, Layout, LayoutCtx, SizeTraits};
 
@@ -46,10 +46,10 @@ impl Layout for FillLayout {
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         ctx.set_subview_frame(
             &self.subview[0],
-            Box2::new(
-                Point2::new(self.margin, self.margin),
-                Point2::new(size.x - self.margin, size.y - self.margin),
-            ),
+            box2! {
+                min: [self.margin, self.margin],
+                max: [size.x - self.margin, size.y - self.margin],
+            },
         );
     }
 

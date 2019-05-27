@@ -346,10 +346,10 @@ pub trait Canvas: Debug {
     /// # Examples
     ///
     /// ```
-    /// # use {cggeom::Box2, cggeom::prelude::*, cgmath::Point2};
+    /// # use cggeom::box2;
     /// # use tcw3::pal::iface::Canvas;
     /// # fn test(canvas: &mut impl Canvas) {
-    /// let bx = Box2::new(Point2::new(0.0, 0.0), Point2::new(50.0, 40.0));
+    /// let bx = box2! { min: [0.0, 0.0], max: [50.0, 40.0] };
     /// // Rounded rectangle with a uniform radius
     /// canvas.rounded_rect(bx, [[5.0; 2]; 4]);
     /// // Rounded rectangle having four circular arcs with different radii

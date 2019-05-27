@@ -1,4 +1,4 @@
-use cggeom::{prelude::*, Box2};
+use cggeom::{box2, prelude::*, Box2};
 use cgmath::{vec2, Matrix3, Point2, Vector2};
 use std::cmp::max;
 
@@ -262,7 +262,7 @@ impl CanvasMixin {
                 contents: bmp.map(Some),
                 bounds: Some(view_frame),
                 contents_scale: Some(dpi_scale),
-                contents_center: Some(Box2::new(Point2::new(0.5, 0.5), Point2::new(0.5, 0.5))),
+                contents_center: Some(box2! { point: [0.5, 0.5] }),
                 ..Default::default()
             },
         );

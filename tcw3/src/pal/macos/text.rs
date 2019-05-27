@@ -1,5 +1,5 @@
 use alt_fp::FloatOrd;
-use cggeom::{prelude::*, Box2};
+use cggeom::{box2, prelude::*, Box2};
 use cgmath::{vec2, Point2};
 use core_foundation::{
     array::{CFArray, CFArrayRef},
@@ -169,10 +169,10 @@ impl iface::TextLayout for TextLayout {
             });
         }
 
-        let mut bounds = Box2::new(
-            Point2::new(INFINITY, INFINITY),
-            Point2::new(NEG_INFINITY, NEG_INFINITY),
-        );
+        let mut bounds = box2! {
+            min: [INFINITY, INFINITY],
+            max: [NEG_INFINITY, NEG_INFINITY],
+        };
 
         for (line, line_origin) in lines.iter().zip(origins.iter()) {
             let image_bounds = ctline_get_image_bounds(&line, &ATTR_CONTEXT.0);
@@ -184,16 +184,16 @@ impl iface::TextLayout for TextLayout {
             let line_origin = vec2(line_origin.x as f32, self.height - line_origin.y as f32);
 
             bounds.union_assign(
-                &Box2::with_size(
-                    Point2::new(
+                &box2! {
+                    bottom_left: [
                         image_bounds.origin.x as f32,
-                        -(image_bounds.origin.y as f32) - (image_bounds.size.height as f32),
-                    ),
-                    vec2(
+                        -(image_bounds.origin.y as f32),
+                    ],
+                    size: [
                         image_bounds.size.width as f32,
                         image_bounds.size.height as f32,
-                    ),
-                )
+                    ],
+                }
                 .translate(line_origin),
             );
         }
@@ -204,7 +204,7 @@ impl iface::TextLayout for TextLayout {
     fn layout_bounds(&self) -> Box2<f32> {
         let (lines, origins) = self.get_lines_and_line_origins();
 
-        let mut bounds = Box2::new(Point2::new(INFINITY, 0.0), Point2::new(NEG_INFINITY, 0.0));
+        let mut bounds = box2! { min: [INFINITY, 0.0], max: [NEG_INFINITY, 0.0] };
 
         for (line, line_origin) in lines.iter().zip(origins.iter()) {
             let typo_bounds = ctline_get_typographic_bounds(&line);

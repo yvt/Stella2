@@ -1,4 +1,4 @@
-use cggeom::{prelude::*, Box2};
+use cggeom::{box2, prelude::*};
 use cgmath::Point2;
 use tcw3::pal::{self, prelude::*};
 
@@ -20,10 +20,10 @@ impl WndListener<pal::WM> for Listener {
         wm.set_layer_attr(
             &self.flex_layer,
             pal::LayerAttrs {
-                bounds: Some(Box2::new(
-                    Point2::new(20.0, 120.0),
-                    Point2::new(w as f32 - 20.0, h as f32 - 20.0),
-                )),
+                bounds: Some(box2! {
+                    min: [20.0, 120.0],
+                    max: [w as f32 - 20.0, h as f32 - 20.0],
+                }),
                 ..Default::default()
             },
         );
@@ -81,20 +81,14 @@ fn main() {
     let bmp = bmp_builder.into_bitmap();
 
     let layer2 = wm.new_layer(pal::LayerAttrs {
-        bounds: Some(Box2::new(
-            Point2::new(20.0, 120.0),
-            Point2::new(150.0, 250.0),
-        )),
+        bounds: Some(box2! { min: [20.0, 120.0], max: [150.0, 250.0] }),
         bg_color: Some(pal::RGBAF32::new(0.5, 0.8, 0.5, 1.0)),
         contents: Some(Some(bmp.clone())),
         ..Default::default()
     });
 
     let layer = wm.new_layer(pal::LayerAttrs {
-        bounds: Some(Box2::new(
-            Point2::new(20.0, 20.0),
-            Point2::new(200.0, 100.0),
-        )),
+        bounds: Some(box2! { min: [20.0, 20.0], max: [200.0, 100.0] }),
         bg_color: Some(pal::RGBAF32::new(0.8, 0.5, 0.5, 1.0)),
         contents: Some(Some(bmp)),
         sublayers: Some(vec![layer2.clone()]),

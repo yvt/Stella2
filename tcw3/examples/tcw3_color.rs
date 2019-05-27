@@ -1,5 +1,5 @@
-use cggeom::{prelude::*, Box2};
-use cgmath::{vec2, Point2};
+use cggeom::box2;
+use cgmath::vec2;
 use std::cell::RefCell;
 use tcw3::{
     pal,
@@ -54,20 +54,11 @@ impl ViewListener for MyViewListener {
             // painted, revealing the background color of the layer.
             // The both halves should display the same color.
             c.set_fill_rgb(self.color);
-            c.fill_rect(Box2::new(
-                Point2::new(0.0, 0.0),
-                Point2::new(size.x * 0.5, size.y),
-            ));
+            c.fill_rect(box2! { min: [0.0, 0.0], max: [size.x * 0.5, size.y] });
 
             c.set_stroke_rgb(pal::RGBAF32::new(0.0, 0.0, 0.0, 1.0));
-            c.stroke_rect(Box2::new(
-                Point2::new(0.5, 0.5),
-                Point2::new(size.x - 0.5, size.y - 0.5),
-            ));
-            c.stroke_rect(Box2::new(
-                Point2::new(0.5, 0.5),
-                Point2::new(size.x * 0.5 - 0.5, size.y - 0.5),
-            ));
+            c.stroke_rect(box2! { min: [0.5, 0.5], max: [size.x - 0.5, size.y - 0.5] });
+            c.stroke_rect(box2! { min: [0.5, 0.5], max: [size.x * 0.5 - 0.5, size.y - 0.5] });
         });
     }
 }
@@ -108,10 +99,10 @@ fn main() {
             let subview = HView::new(ViewFlags::default());
             subview.set_listener(MyViewListener::new(color));
 
-            let frame = Box2::with_size(
-                Point2::new(CELL_W * col as f32 + MARGIN, CELL_H * row as f32 + MARGIN),
-                vec2(CELL_W, CELL_H),
-            );
+            let frame = box2! {
+                top_left: [CELL_W * col as f32 + MARGIN, CELL_H * row as f32 + MARGIN],
+                size: [CELL_W, CELL_H],
+            };
 
             (subview, frame, AlignFlags::JUSTIFY)
         })

@@ -1,4 +1,4 @@
-use cggeom::{prelude::*, Box2};
+use cggeom::{box2, prelude::*};
 use cgmath::{vec2, Point2};
 use std::cell::RefCell;
 use structopt::StructOpt;
@@ -78,10 +78,7 @@ impl ViewListener for MyViewListener {
 
             // Draw text layout outline
             c.set_stroke_rgb(pal::RGBAF32::new(0.5, 0.5, 0.5, 1.0));
-            c.stroke_rect(Box2::with_size(
-                Point2::new(10.0, 10.0),
-                vec2(wrap_width, size.y),
-            ));
+            c.stroke_rect(box2! { top_left: [10.0, 10.0], size: [wrap_width, size.y] });
 
             // Draw the visual bounds
             let bounds = text_layout.visual_bounds();

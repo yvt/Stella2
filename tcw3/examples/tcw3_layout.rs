@@ -1,4 +1,4 @@
-use cggeom::{prelude::*, Box2};
+use cggeom::box2;
 use cgmath::{vec2, Point2};
 use flags_macro::flags;
 use std::cell::RefCell;
@@ -52,18 +52,12 @@ impl ViewListener for MyViewListener {
             let size = draw_ctx.size;
 
             c.set_fill_rgb(pal::RGBAF32::new(0.3, 0.9, 0.3, 0.3));
-            c.fill_rect(Box2::with_size(
-                Point2::new(0.0, 0.0),
-                self.size_traits.preferred,
-            ));
+            c.fill_rect(box2! { top_left: [0.0, 0.0], size: self.size_traits.preferred });
 
             c.set_fill_rgb(pal::RGBAF32::new(0.9, 0.3, 0.3, 0.8));
-            c.fill_rect(Box2::with_size(Point2::new(0.0, 0.0), self.size_traits.min));
+            c.fill_rect(box2! { top_left: [0.0, 0.0], size: self.size_traits.min });
 
-            c.stroke_rect(Box2::new(
-                Point2::new(0.5, 0.5),
-                Point2::new(size.x - 0.5, size.y - 0.5),
-            ));
+            c.stroke_rect(box2! { min: [0.5, 0.5], max: [size.x - 0.5, size.y - 0.5] });
         });
     }
 }
@@ -106,7 +100,7 @@ fn main() {
             size_traits,
             Some((
                 label.view().clone(),
-                Box2::new(Point2::new(5.0, 5.0), Point2::new(5.0, 5.0)),
+                box2! { point: Point2::new(5.0, 5.0) },
                 flags![AlignFlags::{LEFT | TOP}],
             )),
         ));

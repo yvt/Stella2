@@ -1,6 +1,6 @@
 use alt_fp::FloatOrd;
 use bitflags::bitflags;
-use cggeom::{prelude::*, Box2};
+use cggeom::box2;
 use cgmath::Point2;
 use flags_macro::flags;
 use std::{
@@ -203,12 +203,10 @@ impl HWnd {
             max_size = Some(max_s);
 
             // Resize the root view to fit the window
-            let new_frame = Box2::new(
-                Point2::new(0.0, 0.0),
-                Point2::new(new_wnd_size[0], new_wnd_size[1])
-                    .cast()
-                    .unwrap(),
-            );
+            let new_frame = box2! {
+                min: [0.0, 0.0],
+                max: [new_wnd_size[0] as f32, new_wnd_size[1] as f32],
+            };
             if new_frame != view.view.frame.get() {
                 view.view.frame.set(new_frame);
                 view.view.global_frame.set(new_frame);
@@ -377,7 +375,7 @@ impl ViewListener for RootViewListener {
     fn mount(&self, wm: WM, _: &HView, _: &HWnd) {
         *self.layer.borrow_mut() = Some(wm.new_layer(pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
-            bounds: Some(Box2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))),
+            bounds: Some(box2! { min: [0.0, 0.0], max: [1.0, 1.0] }),
             ..Default::default()
         }));
     }
