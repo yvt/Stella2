@@ -1,7 +1,7 @@
 //! A helper library for `cgmath`.
 //!
 //! Provides additional types useful in computer graphics.
-extern crate cgmath;
+pub extern crate cgmath;
 
 mod boxes;
 mod elementwise;

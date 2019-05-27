@@ -232,3 +232,104 @@ impl<S: NumCast + Copy> Box3<S> {
         Some(Box3 { min, max })
     }
 }
+
+/// A macro for constructing `Box2` using various types of origin points and
+/// using `Into::into`.
+///
+/// The syntax of this macro assumes a coordinate space where the increases in
+/// X and Y coordinates correspond to the right and down direction, respectively.
+///
+/// # Examples
+///
+/// ```
+/// use {cggeom::{box2, Box2, prelude::*}, cgmath::Point2};
+///
+/// let ref_box = Box2::new(Point2::new(1, 2), Point2::new(5, 10));
+///
+/// assert_eq!(ref_box, box2!{ min: [1, 2], max: [5, 10] });
+/// assert_eq!(ref_box, box2!{ top_left: [1, 2], size: [4, 8] });
+/// assert_eq!(ref_box, box2!{ top_right: [5, 2], size: [4, 8] });
+/// assert_eq!(ref_box, box2!{ bottom_left: [1, 10], size: [4, 8] });
+/// assert_eq!(ref_box, box2!{ bottom_right: [5, 10], size: [4, 8] });
+///
+/// let ref_point = Box2::new(Point2::new(1, 2), Point2::new(1, 2));
+///
+/// assert_eq!(ref_point, box2!{ point: [1, 2] });
+/// ```
+#[macro_export]
+macro_rules! box2 {
+    {
+        point: $point:expr$(,)*
+    } => {
+        {
+            let point: $crate::cgmath::Point2<_> = Into::into($point);
+            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(point, point)
+        }
+    };
+
+    {
+        min: $min:expr,
+        max: $max:expr$(,)*
+    } => {
+        <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
+            Into::into($min),
+            Into::into($max),
+        )
+    };
+
+    {
+        top_left: $origin:expr,
+        size: $size:expr$(,)*
+    } => {
+        {
+            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
+            let size: $crate::cgmath::Vector2<_> = Into::into($size);
+            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
+                $crate::cgmath::Point2::new(origin.x, origin.y),
+                $crate::cgmath::Point2::new(origin.x + size.x, origin.y + size.y),
+            )
+        }
+    };
+
+    {
+        top_right: $origin:expr,
+        size: $size:expr$(,)*
+    } => {
+        {
+            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
+            let size: $crate::cgmath::Vector2<_> = Into::into($size);
+            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
+                $crate::cgmath::Point2::new(origin.x - size.x, origin.y),
+                $crate::cgmath::Point2::new(origin.x, origin.y + size.y),
+            )
+        }
+    };
+
+    {
+        bottom_left: $origin:expr,
+        size: $size:expr$(,)*
+    } => {
+        {
+            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
+            let size: $crate::cgmath::Vector2<_> = Into::into($size);
+            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
+                $crate::cgmath::Point2::new(origin.x, origin.y - size.y),
+                $crate::cgmath::Point2::new(origin.x + size.x, origin.y),
+            )
+        }
+    };
+
+    {
+        bottom_right: $origin:expr,
+        size: $size:expr$(,)*
+    } => {
+        {
+            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
+            let size: $crate::cgmath::Vector2<_> = Into::into($size);
+            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
+                $crate::cgmath::Point2::new(origin.x - size.x, origin.y - size.y),
+                $crate::cgmath::Point2::new(origin.x, origin.y),
+            )
+        }
+    }
+}
