@@ -24,7 +24,7 @@ fn main() {
     label.set_text("Hello, world! «coi ro do .ui» Saluton! nuqneH");
 
     wnd.content_view()
-        .set_layout(FillLayout::with_uniform_margin(label.view().clone(), 20.0));
+        .set_layout(FillLayout::new(label.view().clone()).with_uniform_margin(20.0));
 
     wm.enter_main_loop();
 }

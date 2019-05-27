@@ -45,10 +45,7 @@ impl Button {
         let label = Label::new();
 
         let margin = 4.0;
-        view.set_layout(FillLayout::with_uniform_margin(
-            label.view().clone(),
-            margin,
-        ));
+        view.set_layout(FillLayout::new(label.view().clone()).with_uniform_margin(margin));
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
