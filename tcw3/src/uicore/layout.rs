@@ -266,15 +266,9 @@ impl HView {
             }
         }
 
-        // Construct the list of `HView`s first so the callback functions
-        // do not panic with an "already borrowed" error attempting to modify
-        // layouts
-        let mut list = Vec::new();
-        traverse(self, &mut |hview| list.push(hview.clone()));
-
-        for view in list.iter() {
-            view.view.listener.borrow().position(wm, view);
-        }
+        traverse(self, &mut |hview| {
+            hview.view.listener.borrow().position(wm, hview);
+        });
     }
 
     /// Perform a hit test for the point `p` specified in the window coordinate
