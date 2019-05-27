@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::{layouts::AbsLayout, mixins::CanvasMixin},
+    ui::{layouts::AbsLayout, mixins::CanvasMixin, AlignFlags},
     uicore::{
         HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener, WndStyleFlags,
     },
@@ -113,7 +113,7 @@ fn main() {
                 vec2(CELL_W, CELL_H),
             );
 
-            (subview, frame)
+            (subview, frame, AlignFlags::JUSTIFY)
         })
         .collect();
 
