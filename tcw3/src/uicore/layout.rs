@@ -1,6 +1,7 @@
 use as_any::AsAny;
 use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
+use flags_macro::flags;
 use std::{fmt, rc::Rc};
 
 use super::{HView, ViewDirtyFlags, ViewFlags};
@@ -219,6 +220,10 @@ impl HView {
         let dirty = &self.view.dirty;
         let layout = self.view.layout.borrow();
 
+        let may_pend_position = dirty
+            .get()
+            .intersects(flags![ViewDirtyFlags::{SUBVIEWS_FRAME | DESCENDANT_SUBVIEWS_FRAME}]);
+
         if dirty.get().intersects(ViewDirtyFlags::SUBVIEWS_FRAME) {
             dirty.set(dirty.get() - ViewDirtyFlags::SUBVIEWS_FRAME);
 
@@ -241,34 +246,82 @@ impl HView {
                 subview.update_subview_frames();
             }
         }
+
+        if may_pend_position {
+            let mut new_position_dirty = ViewDirtyFlags::empty();
+
+            for subview in layout.subviews().iter() {
+                new_position_dirty |=
+                    subview.view.dirty.get() & ViewDirtyFlags::DESCENDANT_POSITION_EVENT;
+            }
+
+            // Propagate `DESCENDANT_POSITION_EVENT`
+            dirty.set(dirty.get() | new_position_dirty);
+        }
     }
 
     /// Call `ViewListener::position` for subviews as necessary.
     pub(super) fn flush_position_event(&self, wm: WM) {
-        fn traverse(this: &HView, cb: &mut impl FnMut(&HView)) {
+        fn update_global_frame(this: &HView, global_offset: Point2<f32>) {
+            // Global position
+            let frame = this.view.frame.get();
+            let global_frame = frame.translate(vec2(global_offset.x, global_offset.y));
+            this.view.global_frame.set(global_frame);
+        }
+
+        fn traverse_all(this: &HView, cb: &mut impl FnMut(&HView), global_offset: Point2<f32>) {
+            let dirty = &this.view.dirty;
+            let layout = this.view.layout.borrow();
+
+            update_global_frame(this, global_offset);
+
+            dirty.set(
+                dirty.get() - flags![ViewDirtyFlags::{POSITION_EVENT | DESCENDANT_POSITION_EVENT}],
+            );
+            cb(this);
+
+            for subview in layout.subviews().iter() {
+                traverse_all(subview, &mut *cb, this.view.global_frame.get().min);
+            }
+        }
+
+        fn traverse(this: &HView, cb: &mut impl FnMut(&HView), global_offset: Point2<f32>) {
             let dirty = &this.view.dirty;
             let layout = this.view.layout.borrow();
 
             if dirty.get().intersects(ViewDirtyFlags::POSITION_EVENT) {
-                dirty.set(dirty.get() - ViewDirtyFlags::POSITION_EVENT);
-                cb(this);
-            }
+                update_global_frame(this, global_offset);
 
-            if dirty
+                dirty.set(
+                    dirty.get()
+                        - flags![ViewDirtyFlags::{POSITION_EVENT | DESCENDANT_POSITION_EVENT}],
+                );
+                cb(this);
+
+                // If we encounter `POSITION_EVENT`, call `position` on every
+                // descendant.
+                for subview in layout.subviews().iter() {
+                    traverse_all(subview, &mut *cb, this.view.global_frame.get().min);
+                }
+            } else if dirty
                 .get()
                 .intersects(ViewDirtyFlags::DESCENDANT_POSITION_EVENT)
             {
                 dirty.set(dirty.get() - ViewDirtyFlags::DESCENDANT_POSITION_EVENT);
 
                 for subview in layout.subviews().iter() {
-                    traverse(subview, &mut *cb);
+                    traverse(subview, &mut *cb, this.view.global_frame.get().min);
                 }
             }
         }
 
-        traverse(self, &mut |hview| {
-            hview.view.listener.borrow().position(wm, hview);
-        });
+        traverse(
+            self,
+            &mut |hview| {
+                hview.view.listener.borrow().position(wm, hview);
+            },
+            Point2::new(0.0, 0.0),
+        );
     }
 
     /// Perform a hit test for the point `p` specified in the window coordinate
@@ -336,18 +389,13 @@ impl<'a> LayoutCtx<'a> {
                 .set_dirty_flags(ViewDirtyFlags::DESCENDANT_SUBVIEWS_FRAME);
         }
 
-        hview.view.frame.set(frame);
-
-        // Global position
-        let global_offset = self.active_view.view.global_frame.get().min;
-        let global_frame = frame.translate(vec2(global_offset.x, global_offset.y));
-
-        if global_frame != hview.view.global_frame.get() {
-            hview.view.global_frame.set(global_frame);
+        if frame != hview.view.frame.get() {
             hview.set_dirty_flags(ViewDirtyFlags::POSITION_EVENT);
             self.active_view
                 .set_dirty_flags(ViewDirtyFlags::DESCENDANT_POSITION_EVENT);
         }
+
+        hview.view.frame.set(frame);
     }
 
     /// Panic if `hview` is not a subview of the active view and

@@ -741,7 +741,9 @@ bitflags! {
         /// Some of the descendants have `SUBVIEWS_FRAME`.
         const DESCENDANT_SUBVIEWS_FRAME = 1 << 3;
 
-        /// `ViewListener::position` needs to be called.
+        /// `ViewListener::position` needs to be called on the view and all of
+        /// its descendants. Also, `global_frame` of the view and its
+        /// descendants may be out-of-date.
         const POSITION_EVENT = 1 << 4;
 
         /// Some of the descendants have `POSITION_EVENT`.
