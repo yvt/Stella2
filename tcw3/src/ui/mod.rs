@@ -3,7 +3,8 @@ pub mod layouts {
     mod abs;
     mod empty;
     mod fill;
-    pub use self::{abs::*, empty::*, fill::*};
+    mod table;
+    pub use self::{abs::*, empty::*, fill::*, table::*};
 }
 
 /// Reusable building blocks for creating UI components.
@@ -23,3 +24,6 @@ pub mod views {
         spacer::{new_spacer, Spacer},
     };
 }
+
+mod types;
+pub use self::types::AlignFlags;

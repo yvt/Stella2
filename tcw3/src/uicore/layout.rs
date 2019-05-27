@@ -32,11 +32,21 @@ pub trait Layout: AsAny {
 
     /// Position the subviews of a layout.
     ///
-    /// `size` is the size of the view associated with the layout.
+    /// `size` is the size of the view associated with the layout. This value
+    /// is bounded by the `SizeTraits` returned by `self.size_traits(ctx)`.
+    /// However, the implementation must be prepared to gracefully handle
+    /// an out-of-range value of `size` caused by rounding errors and/or
+    /// unsatisfiable constraints.
     ///
     /// The callee must position every subview using [`LayoutCtx::set_subview_frame`].
     /// The result must be a function of `self`, `size`, and `SizeTraits`es of
     /// subviews retrieved via [`LayoutCtx::subview_size_traits`].
+    ///
+    /// The layout engine needs to know the view's `SizeTraits` before
+    /// determining its size, thus whenever a subview's `SizeTraits` is updated,
+    /// `size_traits` is called before `arrange` is called for the next time.
+    /// This behaviour can be utilized by updating a `Layout`'s internal cache
+    /// when `size_traits` is called.
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>);
 
     /// Return `true` if `self.subviews()` is identical to `other.subviews()`
