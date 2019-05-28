@@ -18,10 +18,12 @@ pub mod views {
     mod button;
     mod label;
     mod spacer;
+    mod split;
     pub use self::{
         button::Button,
         label::Label,
         spacer::{new_spacer, Spacer},
+        split::Split,
     };
 }
 
