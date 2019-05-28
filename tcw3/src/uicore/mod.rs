@@ -838,7 +838,8 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
         }
         Some(SuperviewStrong::Window(wnd)) => {
             if new_flags.intersects(flags![ViewDirtyFlags::{
-                DESCENDANT_UPDATE_EVENT | DESCENDANT_SUBLAYERS
+                DESCENDANT_UPDATE_EVENT | DESCENDANT_SUBLAYERS |
+                DESCENDANT_SIZE_TRAITS | DESCENDANT_SUBVIEWS_FRAME
             }]) {
                 HWnd { wnd }.pend_update();
             }
