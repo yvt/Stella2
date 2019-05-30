@@ -111,6 +111,8 @@ impl Default for WndFlags {
     }
 }
 
+#[cfg_attr(rustdoc, svgbobdoc::transform)]
+/// Specifies layer attributes.
 #[derive(Debug, Clone)]
 pub struct LayerAttrs<TBitmap, TLayer> {
     /// The 2D transformation applied to the contents of the layer.
@@ -134,8 +136,29 @@ pub struct LayerAttrs<TBitmap, TLayer> {
     pub bounds: Option<Box2<f32>>,
     /// Specifies the flexible region of the content image.
     ///
-    /// Defaults to `(0,0)-(1,1)`, indicating entire the image is scaled in
-    /// both directions to match the content bounds.
+    /// It defaults to `(0,0)-(1,1)`, indicating entire the image is scaled in
+    /// both directions to match the content bounds. When set to a non-default
+    /// value, the content image is split into 3×3 slices. The four corner
+    /// slices do not scale and the four edge slices only scale along their
+    /// corresponding edges, while only the central slice scales freely.
+    /// `contents_center` specifies the location of the central slice within the
+    /// source image. This is commonly referred to as [*9-slice scaling*].
+    ///
+    /// [*9-slice scaling*]: https://en.wikipedia.org/wiki/9-slice_scaling
+    ///
+    /// ```svgbob
+    ///                                                              ,--+-------------+--,
+    /// (0,0)  min  max                                              |A |             | B|
+    ///      *--*----*--,                           ,--+----+--,     +--+-------------+--+
+    ///      |A |    | B|            ,--+--+--,     |A |    | B|     |  |      .      |  |
+    ///  min *--+----+--+            |A |  | B|     +--+----+--+     |  |     / \     |  |
+    ///      |  | △  |  |    --->    +--+--+--+     |  | △  |  |     |  |    /   \    |  |
+    ///  max *--+----+--+            |D |  | C|     +--+----+--+     |  |   /     \   |  |
+    ///      |D |    | C|            '--+--+--'     |D |    | C|     |  |  +-------+  |  |
+    ///      '--+----+--*                           '--+----+--'     +--+-------------+--+
+    ///                  (1,1)                                       |D |             | C|
+    ///                                                              '--+-------------+--'
+    /// ```
     pub contents_center: Option<Box2<f32>>,
     /// Specifies the natural scaling ratio of the content image.
     ///

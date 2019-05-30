@@ -5,7 +5,22 @@ use cggeom::{prelude::*, Box2};
 use crate::uicore::SizeTraits;
 
 bitflags! {
+    #[cfg_attr(rustdoc, svgbobdoc::transform)]
     /// Describes how to align a layout element within the containing box.
+    ///
+    /// ```svgbob
+    /// ,--------------------------------, ,--+-------------+--+--------------+--,
+    /// |                                | |  |     TOP     |  |              |  |
+    /// +------, ,-------------, ,-------+ |  '-------------'  |              |  |
+    /// | LEFT | | HORZ_CENTER | | RIGHT | |                   |              |  |
+    /// +------' '-------------' '-------+ |  ,-------------,  |              |  |
+    /// |                                | |  | VERT_CENTER |  | VERT_JUSTIFY |  |
+    /// +--------------------------------+ |  '-------------'  |              |  |
+    /// |          HORZ_JUSTIFY          | |                   |              |  |
+    /// +--------------------------------+ |  ,-------------,  |              |  |
+    /// |                                | |  |    BOTTOM   |  |              |  |
+    /// '--------------------------------' '--+-------------+--+--------------+--'
+    /// ```
     pub struct AlignFlags: u8 {
         /// Align the element with the left edge.
         const LEFT = 0x1;
