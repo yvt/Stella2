@@ -18,7 +18,7 @@ pub mod views {
     mod button;
     mod label;
     mod spacer;
-    mod split;
+    pub mod split;
     pub use self::{
         button::Button,
         label::Label,
