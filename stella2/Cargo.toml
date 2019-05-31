@@ -9,3 +9,4 @@ license = "GPL-3.0-or-later"
 tcw3 = { path = "../tcw3" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
+cfg-if = "0.1.7"

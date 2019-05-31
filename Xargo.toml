@@ -1,3 +1,5 @@
 [target.x86_64-apple-darwin.dependencies.std]
+# Build without the backtrace functionality. It's not used at all because we
+# rely on macOS's CrashReporter.
 features = []
 default-features = false
