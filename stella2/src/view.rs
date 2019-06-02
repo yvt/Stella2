@@ -101,15 +101,10 @@ impl WndView {
         let toolbar = toolbar::ToolbarView::new(Elem::clone(&wnd_state));
 
         let new_test_view = |text: &str| {
-            // Fortunately, `Label` can operate even if it outlives the
-            // controller (`Label`)
-            let mut label = Label::new();
-            label.set_text(text);
-
             let wrapper = HView::new(ViewFlags::default());
             wrapper.set_layout(
                 TableLayout::new(Some((
-                    label.view().clone(),
+                    Label::new().with_text(text).into_view(),
                     [0, 0],
                     AlignFlags::TOP | AlignFlags::LEFT,
                 )))
