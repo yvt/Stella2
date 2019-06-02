@@ -6,13 +6,15 @@ use std::{
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::layouts::{FillLayout, TableLayout},
+    ui::layouts::TableLayout,
     ui::views::{split::SplitDragListener, Label, Split},
     ui::AlignFlags,
     uicore::{HView, HWnd, ViewFlags},
 };
 
 use crate::model;
+
+mod toolbar;
 
 pub struct AppView {
     wm: pal::WM,
@@ -36,7 +38,7 @@ impl AppView {
 
         {
             let this_weak = Rc::downgrade(&this);
-            *this.main_wnd.dispatch.borrow_mut() = Box::new(move |wnd_action| {
+            this.main_wnd.set_dispatch(move |wnd_action| {
                 Self::dispatch_weak(&this_weak, model::AppAction::Wnd(wnd_action))
             });
         }
@@ -89,11 +91,14 @@ struct WndView {
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
     split_editor: RefCell<Split>,
     split_side: RefCell<Split>,
+    toolbar: Rc<toolbar::ToolbarView>,
 }
 
 impl WndView {
     pub fn new(wm: pal::WM, wnd_state: Elem<model::WndState>) -> Rc<Self> {
         let hwnd = HWnd::new(wm);
+
+        let toolbar = toolbar::ToolbarView::new(Elem::clone(&wnd_state));
 
         let new_test_view = |text: &str| {
             // Fortunately, `Label` can operate even if it outlives the
@@ -129,10 +134,12 @@ impl WndView {
         split_side.set_subviews([sidebar_view, split_editor.view().clone()]);
         // TODO: call dispatch when the split is moved
 
-        // TODO: tool bar
+        let main_layout = TableLayout::stack_vert(vec![
+            (toolbar.view().clone(), AlignFlags::JUSTIFY),
+            (split_side.view().clone(), AlignFlags::JUSTIFY),
+        ]);
 
-        hwnd.content_view()
-            .set_layout(FillLayout::new(split_side.view().clone()));
+        hwnd.content_view().set_layout(main_layout);
 
         hwnd.set_visibility(true);
 
@@ -142,9 +149,18 @@ impl WndView {
             dispatch: RefCell::new(Box::new(|_| {})),
             split_editor: RefCell::new(split_editor),
             split_side: RefCell::new(split_side),
+            toolbar,
         });
 
         // Event handlers
+        {
+            let this_weak = Rc::downgrade(&this);
+            this.toolbar.set_dispatch(move |wnd_action| {
+                if let Some(this) = this_weak.upgrade() {
+                    this.dispatch.borrow()(wnd_action);
+                }
+            });
+        }
         {
             let this_weak = Rc::downgrade(&this);
             this.split_editor.borrow_mut().set_on_drag(move |_| {
@@ -173,6 +189,10 @@ impl WndView {
         this
     }
 
+    fn set_dispatch(&self, cb: impl Fn(model::WndAction) + 'static) {
+        *self.dispatch.borrow_mut() = Box::new(cb);
+    }
+
     fn poll(&self, new_wnd_state: &Elem<model::WndState>) {
         let mut wnd_state = self.wnd_state.borrow_mut();
 
@@ -188,6 +208,8 @@ impl WndView {
         self.split_side
             .borrow_mut()
             .set_value(new_wnd_state.sidebar_width);
+
+        self.toolbar.poll(new_wnd_state);
     }
 }
 
