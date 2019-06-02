@@ -537,6 +537,7 @@ dependencies = [
 name = "stellavg_tcw3"
 version = "0.1.0"
 dependencies = [
+ "stellavg_io 0.1.0",
  "tcw3 0.1.0",
 ]
 

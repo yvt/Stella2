@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 tcw3 = { path = "../../tcw3" }
+stellavg_io = { path = "../io" }
