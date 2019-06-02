@@ -1,3 +1,4 @@
+use harmony::Elem;
 use std::{cell::RefCell, rc::Rc};
 use tcw3::{
     pal,
@@ -12,7 +13,7 @@ use crate::model;
 
 pub struct AppView {
     wm: pal::WM,
-    state: RefCell<Rc<model::AppState>>,
+    state: RefCell<Elem<model::AppState>>,
     pending_actions: RefCell<Vec<model::AppAction>>,
     main_wnd: Rc<WndView>,
 }
@@ -21,12 +22,12 @@ impl AppView {
     pub fn new(wm: pal::WM) -> Rc<Self> {
         let state = model::AppState::new();
 
-        let main_wnd = WndView::new(wm, &state.main_wnd);
+        let main_wnd = WndView::new(wm, Elem::clone(&state.main_wnd));
 
         let this = Rc::new(Self {
             wm,
             main_wnd,
-            state: RefCell::new(Rc::new(state)),
+            state: RefCell::new(Elem::new(state)),
             pending_actions: RefCell::new(Vec::new()),
         });
 
@@ -66,9 +67,9 @@ impl AppView {
             let mut state = self.state.borrow_mut();
             let mut pending_actions = self.pending_actions.borrow_mut();
 
-            let mut new_state = Rc::clone(&*state);
+            let mut new_state = Elem::clone(&*state);
             for action in pending_actions.drain(..) {
-                new_state = model::AppState::reduce(new_state, action);
+                new_state = model::AppState::reduce(new_state, &action);
             }
             *state = new_state;
         }
@@ -81,13 +82,14 @@ impl AppView {
 
 struct WndView {
     _hwnd: HWnd,
+    wnd_state: RefCell<Elem<model::WndState>>,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
     split_editor: RefCell<Split>,
     split_side: RefCell<Split>,
 }
 
 impl WndView {
-    pub fn new(wm: pal::WM, wnd_state: &model::WndState) -> Rc<Self> {
+    pub fn new(wm: pal::WM, wnd_state: Elem<model::WndState>) -> Rc<Self> {
         let hwnd = HWnd::new(wm);
 
         let new_test_view = |text: &str| {
@@ -133,6 +135,7 @@ impl WndView {
 
         let this = Rc::new(Self {
             _hwnd: hwnd,
+            wnd_state: RefCell::new(wnd_state),
             dispatch: RefCell::new(Box::new(|_| {})),
             split_editor: RefCell::new(split_editor),
             split_side: RefCell::new(split_side),
@@ -167,13 +170,21 @@ impl WndView {
         this
     }
 
-    fn hydrate(&self, wnd_state: &model::WndState) {
+    fn hydrate(&self, new_wnd_state: &Elem<model::WndState>) {
+        let mut wnd_state = self.wnd_state.borrow_mut();
+
+        if Elem::ptr_eq(&wnd_state, new_wnd_state) {
+            return;
+        }
+
+        *wnd_state = Elem::clone(new_wnd_state);
+
         self.split_editor
             .borrow_mut()
-            .set_value(wnd_state.editor_height);
+            .set_value(new_wnd_state.editor_height);
         self.split_side
             .borrow_mut()
-            .set_value(wnd_state.sidebar_width);
+            .set_value(new_wnd_state.sidebar_width);
     }
 }
 

@@ -7,6 +7,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 tcw3 = { path = "../tcw3" }
+harmony = { path = "../harmony" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"

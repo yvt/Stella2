@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use harmony::{set_field, Elem};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-    pub main_wnd: Rc<WndState>,
+    pub main_wnd: Elem<WndState>,
 }
 
 #[derive(Debug, Clone)]
@@ -17,7 +17,7 @@ impl AppState {
     // TODO: Restore session state
     pub fn new() -> Self {
         Self {
-            main_wnd: Rc::new(WndState {
+            main_wnd: Elem::new(WndState {
                 sidebar_width: 200.0,
                 editor_height: 50.0,
             }),
@@ -37,38 +37,27 @@ pub enum WndAction {
 }
 
 impl AppState {
-    pub fn reduce(this: Rc<Self>, action: AppAction) -> Rc<Self> {
+    pub fn reduce(this: Elem<Self>, action: &AppAction) -> Elem<Self> {
         match action {
-            AppAction::Wnd(wnd_action) => Rc::new(AppState {
-                main_wnd: WndState::reduce(Rc::clone(&this.main_wnd), wnd_action),
-            }),
+            AppAction::Wnd(wnd_action) => set_field! {
+                main_wnd: WndState::reduce(Elem::clone(&this.main_wnd), wnd_action),
+                ..this
+            },
         }
     }
 }
 
 impl WndState {
-    fn reduce(this: Rc<Self>, action: WndAction) -> Rc<Self> {
+    fn reduce(this: Elem<Self>, action: &WndAction) -> Elem<Self> {
         match action {
-            WndAction::SetSidebarWidth(x) => {
-                if x == this.sidebar_width {
-                    this
-                } else {
-                    Rc::new(Self {
-                        sidebar_width: x,
-                        ..Self::clone(&this)
-                    })
-                }
-            }
-            WndAction::SetEditorHeight(x) => {
-                if x == this.editor_height {
-                    this
-                } else {
-                    Rc::new(Self {
-                        editor_height: x,
-                        ..Self::clone(&this)
-                    })
-                }
-            }
+            WndAction::SetSidebarWidth(x) => set_field! {
+                sidebar_width: *x,
+                ..this
+            },
+            WndAction::SetEditorHeight(x) => set_field! {
+                editor_height: *x,
+                ..this
+            },
         }
     }
 }
