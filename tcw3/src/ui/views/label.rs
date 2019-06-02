@@ -55,6 +55,11 @@ impl Label {
         &self.view
     }
 
+    /// Get the view representing a label widget, consuming `self`.
+    pub fn into_view(self) -> HView {
+        self.view
+    }
+
     /// Set the text displayed in a label widget.
     #[momo]
     pub fn set_text(&mut self, value: impl Into<String>) {
