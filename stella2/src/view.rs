@@ -1,5 +1,8 @@
 use harmony::Elem;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 use tcw3::{
     pal,
     pal::prelude::*,
@@ -34,13 +37,17 @@ impl AppView {
         {
             let this_weak = Rc::downgrade(&this);
             *this.main_wnd.dispatch.borrow_mut() = Box::new(move |wnd_action| {
-                if let Some(this) = this_weak.upgrade() {
-                    Self::dispatch(&this, model::AppAction::Wnd(wnd_action));
-                }
+                Self::dispatch_weak(&this_weak, model::AppAction::Wnd(wnd_action))
             });
         }
 
         this
+    }
+
+    fn dispatch_weak(this_weak: &Weak<Self>, action: model::AppAction) {
+        if let Some(this) = this_weak.upgrade() {
+            Self::dispatch(&this, action);
+        }
     }
 
     fn dispatch(this: &Rc<Self>, action: model::AppAction) {
@@ -51,17 +58,13 @@ impl AppView {
         pending_actions.push(action);
 
         if pending_actions.len() == 0 {
-            // Schedule hydration
-            let this_weak = Rc::downgrade(this);
-            this.wm.invoke(move |_| {
-                if let Some(this) = this_weak.upgrade() {
-                    this.hydrate();
-                }
-            });
+            // Schedule polling
+            let this = Rc::clone(this);
+            this.wm.invoke(move |_| this.poll());
         }
     }
 
-    fn hydrate(&self) {
+    fn poll(&self) {
         // Update the state
         {
             let mut state = self.state.borrow_mut();
@@ -76,7 +79,7 @@ impl AppView {
 
         let state = self.state.borrow();
 
-        self.main_wnd.hydrate(&state.main_wnd);
+        self.main_wnd.poll(&state.main_wnd);
     }
 }
 
@@ -170,7 +173,7 @@ impl WndView {
         this
     }
 
-    fn hydrate(&self, new_wnd_state: &Elem<model::WndState>) {
+    fn poll(&self, new_wnd_state: &Elem<model::WndState>) {
         let mut wnd_state = self.wnd_state.borrow_mut();
 
         if Elem::ptr_eq(&wnd_state, new_wnd_state) {
