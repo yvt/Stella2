@@ -2,6 +2,7 @@
 members = [
     "stella2",
     "tcw3",
+    "harmony",
     "support/alt_fp",
     "support/as_any",
     "support/cggeom",
