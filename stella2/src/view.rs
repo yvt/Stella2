@@ -120,14 +120,12 @@ impl WndView {
         let mut split_editor = Split::new(true, Some(1));
         split_editor.set_value(wnd_state.editor_height);
         split_editor.set_subviews([log_view, editor_view]);
-        // TODO: call dispatch when the split is moved
 
         let sidebar_view = new_test_view("sidebar: todo!");
 
         let mut split_side = Split::new(false, Some(0));
         split_side.set_value(wnd_state.sidebar_width);
         split_side.set_subviews([sidebar_view, split_editor.view().clone()]);
-        // TODO: call dispatch when the split is moved
 
         let main_layout = TableLayout::stack_vert(vec![
             (toolbar.view().clone(), AlignFlags::JUSTIFY),
