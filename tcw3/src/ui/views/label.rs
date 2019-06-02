@@ -76,6 +76,15 @@ impl Label {
         self.view
             .set_layout(LabelListener::new(Rc::clone(&self.state)));
     }
+
+    /// Call `set_text`, retuning `self`.
+    ///
+    /// This method is useful for constructing `Label` using the builder
+    /// pattern.
+    pub fn with_text(mut self, value: impl Into<String>) -> Self {
+        self.set_text(value);
+        self
+    }
 }
 
 impl State {
