@@ -1,5 +1,6 @@
 use cggeom::ElementWiseOp;
 use cgmath::Vector2;
+use momo::momo;
 
 use crate::{
     ui::layouts::EmptyLayout,
@@ -55,6 +56,19 @@ impl Spacer {
     pub fn with_preferred(self, preferred: impl Into<Vector2<f32>>) -> Self {
         Self {
             size_traits: self.size_traits.with_preferred(preferred.into()),
+        }
+    }
+
+    /// Update `SizeTraits::{min, max, preferred}` and return a new `Spacer`,
+    /// consuming `self`.
+    #[momo]
+    pub fn with_fixed(self, size: impl Into<Vector2<f32>>) -> Self {
+        Self {
+            size_traits: SizeTraits {
+                min: size,
+                max: size,
+                preferred: size,
+            },
         }
     }
 
