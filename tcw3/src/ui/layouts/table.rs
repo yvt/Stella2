@@ -114,6 +114,28 @@ impl TableLayout {
         Self::new_inner(subviews.into(), items.into())
     }
 
+    /// Construct a `TableLayout` from a set of tuples `(view, align)`, stacking
+    /// the subviews horizontally from left to right.
+    pub fn stack_horz(cells: impl IntoIterator<Item = (HView, AlignFlags)>) -> Self {
+        Self::new(
+            cells
+                .into_iter()
+                .enumerate()
+                .map(|(i, (view, align))| (view, [i, 0], align)),
+        )
+    }
+
+    /// Construct a `TableLayout` from a set of tuples `(view, align)`, stacking
+    /// the subviews vertically from top to bottom.
+    pub fn stack_vert(cells: impl IntoIterator<Item = (HView, AlignFlags)>) -> Self {
+        Self::new(
+            cells
+                .into_iter()
+                .enumerate()
+                .map(|(i, (view, align))| (view, [0, i], align)),
+        )
+    }
+
     fn new_inner(subviews: Box<[HView]>, items: Box<[Item]>) -> Self {
         let num_columns = items.iter().map(|item| item.cell[0] + 1).max().unwrap_or(0);
         let num_rows = items.iter().map(|item| item.cell[1] + 1).max().unwrap_or(0);
