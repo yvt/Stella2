@@ -1,0 +1,10 @@
+[package]
+name = "stellavg_io"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+cgmath = "0.17.0"
+rgb = "0.8.13"
+arrayvec = "0.4.10"
