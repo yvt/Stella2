@@ -654,7 +654,10 @@ dependencies = [
 name = "stellavg_tcw3"
 version = "0.1.0"
 dependencies = [
+ "cggeom 0.1.0",
+ "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "stellavg_io 0.1.0",
+ "stellavg_macro 0.1.0",
  "tcw3 0.1.0",
 ]
 
