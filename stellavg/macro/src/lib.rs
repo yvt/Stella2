@@ -11,6 +11,7 @@
 extern crate proc_macro;
 
 use cgmath::Point2;
+use pathfinder_geometry as pf_geo;
 use quote::ToTokens;
 use rgb::RGBA8;
 use std::path::Path;
@@ -151,9 +152,71 @@ impl Converter {
                         }
                     }
                     self.encoder.fill();
-                }
+                } // let Some(fill)
 
-                // TODO: stroke
+                if let Some(stroke) = &path.stroke {
+                    use self::pf_geo::{
+                        outline::Outline, segment::SegmentKind, stroke::OutlineStrokeToFill,
+                    };
+                    set_paint_as_fill(
+                        &mut self.encoder,
+                        &stroke.paint,
+                        opacity * stroke.opacity.value() as f32,
+                    );
+
+                    // StellaVG doesn't support strokes, so convert them to fills
+                    let stroke_style = pf_geo::stroke::StrokeStyle {
+                        line_width: stroke.width.value() as f32,
+                        line_cap: pf_line_cap_from_usvg(stroke.linecap),
+                        line_join: pf_line_join_from_usvg(
+                            stroke.linejoin,
+                            stroke.miterlimit.value() as f32,
+                        ),
+                    };
+
+                    // Convert the path to a Pathfinder `Outline`
+                    let path = UsvgPathToSegments::new(path.segments.iter().cloned());
+                    let outline = Outline::from_segments(path);
+
+                    // Stroke the `Outline`
+                    let mut stroke_to_fill = OutlineStrokeToFill::new(&outline, stroke_style);
+                    stroke_to_fill.offset();
+                    let mut outline = stroke_to_fill.into_outline();
+                    outline.transform(&pf_transform_2d_from_usvg(&node_xform));
+
+                    // Encode commands
+                    self.encoder.begin_path();
+                    for contour in outline.contours().iter() {
+                        self.encoder.move_to(point_from_pf(contour.position_of(0)));
+
+                        // Skip the last segment - Fills automatically closes
+                        // the path, so the last (closing) segment is redundant
+                        let count = contour.iter().count() - 1;
+
+                        for seg in contour.iter().take(count) {
+                            match seg.kind {
+                                SegmentKind::None => unreachable!(),
+                                SegmentKind::Line => {
+                                    self.encoder.line_to(point_from_pf(seg.baseline.to()));
+                                }
+                                SegmentKind::Quadratic => {
+                                    self.encoder.quad_bezier_to([
+                                        point_from_pf(seg.ctrl.from()),
+                                        point_from_pf(seg.baseline.to()),
+                                    ]);
+                                }
+                                SegmentKind::Cubic => {
+                                    self.encoder.cubic_bezier_to([
+                                        point_from_pf(seg.ctrl.from()),
+                                        point_from_pf(seg.ctrl.to()),
+                                        point_from_pf(seg.baseline.to()),
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                    self.encoder.fill();
+                } // let Some(stroke)
             }
             _ => {}
         }
@@ -181,4 +244,139 @@ fn point_from(x: f64, y: f64) -> Point2<i16> {
     }
 
     Point2::new(x as i16, y as i16)
+}
+
+fn point_from_pf(p: pf_geo::basic::point::Point2DF) -> Point2<i16> {
+    let (x, y) = (p.x(), p.y());
+    let range = <i16>::min_value() as f32..<i16>::max_value() as f32;
+
+    if !range.contains(&x) || !range.contains(&y) {
+        panic!("coordinates overflowed i16");
+    }
+
+    Point2::new(x as i16, y as i16)
+}
+
+fn pf_line_cap_from_usvg(usvg_line_cap: usvg::LineCap) -> pf_geo::stroke::LineCap {
+    match usvg_line_cap {
+        usvg::LineCap::Butt => pf_geo::stroke::LineCap::Butt,
+        usvg::LineCap::Round => pf_geo::stroke::LineCap::Round,
+        usvg::LineCap::Square => pf_geo::stroke::LineCap::Square,
+    }
+}
+
+fn pf_line_join_from_usvg(
+    usvg_line_join: usvg::LineJoin,
+    miter_limit: f32,
+) -> pf_geo::stroke::LineJoin {
+    match usvg_line_join {
+        usvg::LineJoin::Miter => pf_geo::stroke::LineJoin::Miter(miter_limit),
+        usvg::LineJoin::Round => pf_geo::stroke::LineJoin::Round,
+        usvg::LineJoin::Bevel => pf_geo::stroke::LineJoin::Bevel,
+    }
+}
+
+fn pf_transform_2d_from_usvg(
+    transform: &usvg::Transform,
+) -> pf_geo::basic::transform2d::Transform2DF {
+    pf_geo::basic::transform2d::Transform2DF::row_major(
+        transform.a as f32,
+        transform.b as f32,
+        transform.c as f32,
+        transform.d as f32,
+        transform.e as f32,
+        transform.f as f32,
+    )
+}
+
+// This struct and the methods were taken from `pathfinder_svg`.
+// <https://github.com/servo/pathfinder/blob/678b6f12c7bc4b8076ed5c66bf77a60f7a56a9f6/svg/src/lib.rs#L287-L294>
+struct UsvgPathToSegments<I>
+where
+    I: Iterator<Item = usvg::PathSegment>,
+{
+    iter: I,
+    first_subpath_point: pf_geo::basic::point::Point2DF,
+    last_subpath_point: pf_geo::basic::point::Point2DF,
+    just_moved: bool,
+}
+
+impl<I> UsvgPathToSegments<I>
+where
+    I: Iterator<Item = usvg::PathSegment>,
+{
+    fn new(iter: I) -> UsvgPathToSegments<I> {
+        UsvgPathToSegments {
+            iter,
+            first_subpath_point: pf_geo::basic::point::Point2DF::default(),
+            last_subpath_point: pf_geo::basic::point::Point2DF::default(),
+            just_moved: false,
+        }
+    }
+}
+
+impl<I> Iterator for UsvgPathToSegments<I>
+where
+    I: Iterator<Item = usvg::PathSegment>,
+{
+    type Item = pf_geo::segment::Segment;
+
+    fn next(&mut self) -> Option<pf_geo::segment::Segment> {
+        use self::pf_geo::{
+            basic::{line_segment::LineSegmentF, point::Point2DF},
+            segment::{Segment, SegmentFlags},
+        };
+
+        match self.iter.next()? {
+            usvg::PathSegment::MoveTo { x, y } => {
+                let to = Point2DF::new(x as f32, y as f32);
+                self.first_subpath_point = to;
+                self.last_subpath_point = to;
+                self.just_moved = true;
+                self.next()
+            }
+            usvg::PathSegment::LineTo { x, y } => {
+                let to = Point2DF::new(x as f32, y as f32);
+                let mut segment = Segment::line(&LineSegmentF::new(self.last_subpath_point, to));
+                if self.just_moved {
+                    segment.flags.insert(SegmentFlags::FIRST_IN_SUBPATH);
+                }
+                self.last_subpath_point = to;
+                self.just_moved = false;
+                Some(segment)
+            }
+            usvg::PathSegment::CurveTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                let ctrl0 = Point2DF::new(x1 as f32, y1 as f32);
+                let ctrl1 = Point2DF::new(x2 as f32, y2 as f32);
+                let to = Point2DF::new(x as f32, y as f32);
+                let mut segment = Segment::cubic(
+                    &LineSegmentF::new(self.last_subpath_point, to),
+                    &LineSegmentF::new(ctrl0, ctrl1),
+                );
+                if self.just_moved {
+                    segment.flags.insert(SegmentFlags::FIRST_IN_SUBPATH);
+                }
+                self.last_subpath_point = to;
+                self.just_moved = false;
+                Some(segment)
+            }
+            usvg::PathSegment::ClosePath => {
+                let mut segment = Segment::line(&LineSegmentF::new(
+                    self.last_subpath_point,
+                    self.first_subpath_point,
+                ));
+                segment.flags.insert(SegmentFlags::CLOSES_SUBPATH);
+                self.just_moved = false;
+                self.last_subpath_point = self.first_subpath_point;
+                Some(segment)
+            }
+        }
+    }
 }
