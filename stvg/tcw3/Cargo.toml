@@ -1,14 +1,14 @@
 [package]
-name = "stellavg_tcw3"
+name = "stvg_tcw3"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
 tcw3 = { path = "../../tcw3" }
-stellavg_io = { path = "../io" }
+stvg_io = { path = "../io" }
 
 [dev-dependencies]
 cgmath = "0.17.0"
 cggeom = { path = "../../support/cggeom" }
-stellavg_macro = { path = "../macro" }
+stvg_macro = { path = "../macro" }

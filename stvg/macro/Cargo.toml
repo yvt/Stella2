@@ -1,11 +1,11 @@
 [package]
-name = "stellavg_macro"
+name = "stvg_macro"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
-stellavg_io = { path = "../io" }
+stvg_io = { path = "../io" }
 usvg = "0.6.1"
 syn = "0.15"
 quote = "0.6.12"

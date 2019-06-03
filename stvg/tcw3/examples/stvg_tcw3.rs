@@ -13,7 +13,7 @@ use tcw3::{
     uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
-static STVG_IMAGE: &[u8] = stellavg_macro::include_stellavg!("./stellavg/tests/horse.svgz");
+static STVG_IMAGE: &[u8] = stvg_macro::include_stvg!("./stvg/tests/horse.svgz");
 
 struct MyViewListener {
     canvas: RefCell<CanvasMixin>,
@@ -49,7 +49,7 @@ impl ViewListener for MyViewListener {
             let scale = (size.x / img_size.x).min(size.y / img_size.y);
             let scaled_img_size = img_size * scale;
 
-            use stellavg_tcw3::{CanvasStellavgExt, Options};
+            use stvg_tcw3::{CanvasStvgExt, Options};
 
             c.mult_transform(
                 Matrix3::from_translation((size - scaled_img_size) * 0.5)

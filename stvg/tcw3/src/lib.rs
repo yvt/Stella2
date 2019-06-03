@@ -1,15 +1,15 @@
 //! The TCW3 binding for StellaVG
-use stellavg_io::{Cmd, CmdDecoder};
+use stvg_io::{Cmd, CmdDecoder};
 use tcw3::pal::{iface::Canvas, RGBAF32};
 
 /// An extension trait for `Canvas` that provides methods for drawing
 /// StellaVG images.
-pub trait CanvasStellavgExt: Canvas {
+pub trait CanvasStvgExt: Canvas {
     /// Draw a StellaVG image.
     fn draw_stellavg(&mut self, bytes: &[u8], options: &Options<'_>);
 }
 
-/// Options for [`CanvasStellavgExt::draw_stellavg`].
+/// Options for [`CanvasStvgExt::draw_stellavg`].
 #[derive(Clone, Copy)]
 pub struct Options<'a> {
     color_xform: &'a dyn Fn(RGBAF32) -> RGBAF32,
@@ -35,7 +35,7 @@ impl<'a> Default for Options<'a> {
     }
 }
 
-impl<T: Canvas + ?Sized> CanvasStellavgExt for T {
+impl<T: Canvas + ?Sized> CanvasStvgExt for T {
     fn draw_stellavg(&mut self, bytes: &[u8], options: &Options<'_>) {
         self.save();
         for cmd in CmdDecoder::from_bytes(bytes) {

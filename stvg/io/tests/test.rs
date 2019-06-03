@@ -1,15 +1,15 @@
 use cgmath::Point2;
 use rgb::RGBA8;
 
-use stellavg_io::Cmd;
+use stvg_io::Cmd;
 
 fn decode(b: &[u8]) -> Vec<Cmd> {
-    stellavg_io::CmdDecoder::from_bytes(b).collect()
+    stvg_io::CmdDecoder::from_bytes(b).collect()
 }
 
 fn encode(cmds: impl IntoIterator<Item = Cmd>) -> Vec<u8> {
     cmds.into_iter()
-        .collect::<stellavg_io::CmdEncoder>()
+        .collect::<stvg_io::CmdEncoder>()
         .take_bytes()
 }
 

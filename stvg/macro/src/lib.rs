@@ -4,8 +4,8 @@
 //!
 //! ```
 //! #![feature(proc_macro_hygiene)]
-//! use stellavg_macro::include_stellavg;
-//! static TIGER: &[u8] = include_stellavg!("../tests/tiger.svgz");
+//! use stvg_macro::include_stvg;
+//! static TIGER: &[u8] = include_stvg!("../tests/tiger.svgz");
 //! println!("{}", TIGER.len());
 //! ```
 extern crate proc_macro;
@@ -15,12 +15,12 @@ use pathfinder_geometry as pf_geo;
 use quote::ToTokens;
 use rgb::RGBA8;
 use std::path::Path;
-use stellavg_io::CmdEncoder;
+use stvg_io::CmdEncoder;
 use syn::{parse_macro_input, spanned::Spanned, Lit, LitByteStr};
 
 /// Include the specified SVG file as StellaVG data (`[u8; _]`).
 #[proc_macro]
-pub fn include_stellavg(params: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let path_lit: Lit = parse_macro_input!(params);
 
     let path = if let Lit::Str(lit_str) = &path_lit {
