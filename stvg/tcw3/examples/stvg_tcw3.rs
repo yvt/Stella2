@@ -1,6 +1,6 @@
 #![feature(proc_macro_hygiene)]
 use cggeom::prelude::*;
-use cgmath::{vec2, Matrix3};
+use cgmath::{vec2, Matrix3, Vector2};
 use std::cell::RefCell;
 
 use tcw3::{
@@ -13,7 +13,7 @@ use tcw3::{
     uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
-static STVG_IMAGE: &[u8] = stvg_macro::include_stvg!("./stvg/tests/horse.svgz");
+static STVG_IMAGE: (&[u8], [f32; 2]) = stvg_macro::include_stvg!("./stvg/tests/horse.svgz");
 
 struct MyViewListener {
     canvas: RefCell<CanvasMixin>,
@@ -45,7 +45,7 @@ impl ViewListener for MyViewListener {
             let size = draw_ctx.size;
             let c = &mut draw_ctx.canvas;
 
-            let img_size = vec2(4096.0, 4096.0);
+            let img_size: Vector2<f32> = STVG_IMAGE.1.into();
             let scale = (size.x / img_size.x).min(size.y / img_size.y);
             let scaled_img_size = img_size * scale;
 
@@ -55,7 +55,7 @@ impl ViewListener for MyViewListener {
                 Matrix3::from_translation((size - scaled_img_size) * 0.5)
                     * Matrix3::from_scale_2d(scale),
             );
-            c.draw_stellavg(STVG_IMAGE, &Options::new());
+            c.draw_stellavg(STVG_IMAGE.0, &Options::new());
         });
     }
 }
@@ -73,7 +73,7 @@ fn main() {
         // Export the StellaVG data. Useful for comparing the compressed size
         // against SVG.
         use std::io::Write;
-        std::io::stdout().write_all(&STVG_IMAGE).unwrap();
+        std::io::stdout().write_all(&STVG_IMAGE.0).unwrap();
         return;
     }
 
@@ -81,7 +81,7 @@ fn main() {
 
     println!(
         "The size of the StellaVG image is {} bytes",
-        STVG_IMAGE.len()
+        STVG_IMAGE.0.len()
     );
 
     let wnd = HWnd::new(wm);

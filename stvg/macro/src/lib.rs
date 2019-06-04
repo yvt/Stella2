@@ -5,14 +5,15 @@
 //! ```
 //! #![feature(proc_macro_hygiene)]
 //! use stvg_macro::include_stvg;
-//! static TIGER: &[u8] = include_stvg!("../tests/tiger.svgz");
-//! println!("{}", TIGER.len());
+//! static TIGER: (&[u8], [f32; 2]) = include_stvg!("../tests/tiger.svgz");
+//! println!("len = {}", TIGER.0.len());
+//! println!("size = {:?}", TIGER.1);
 //! ```
 extern crate proc_macro;
 
 use cgmath::Point2;
 use pathfinder_geometry as pf_geo;
-use quote::ToTokens;
+use quote::quote;
 use rgb::RGBA8;
 use std::path::Path;
 use stvg_io::CmdEncoder;
@@ -50,6 +51,7 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
     };
 
     let svg_root = &svg_tree.root();
+    let size;
 
     let mut converter = Converter {
         encoder: CmdEncoder::new(),
@@ -58,7 +60,7 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
     use usvg::NodeKind;
     match &*svg_root.borrow() {
         NodeKind::Svg(svg) => {
-            let size = &svg.size;
+            size = svg.size;
             let viewbox = &svg.view_box;
 
             // Calculate the root transform. Scale the viewbox to maximally
@@ -85,9 +87,14 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
     let stvg_bytes = converter.encoder.take_bytes();
 
-    LitByteStr::new(&stvg_bytes, path_lit.span())
-        .into_token_stream()
-        .into()
+    let syn_bytes = LitByteStr::new(&stvg_bytes, path_lit.span());
+    let width = size.width as f32;
+    let height = size.height as f32;
+
+    (quote! {
+        (#syn_bytes, [#width, #height])
+    })
+    .into()
 }
 
 struct Converter {
