@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "stella2",
+    "stella2_assets",
     "tcw3",
     "harmony",
     "stvg/io",
