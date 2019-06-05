@@ -152,6 +152,8 @@ impl Split {
     /// Set the split position.
     ///
     /// See [`value`] for the interpretation of the value.
+    ///
+    /// [`value`]: self::Split::value
     pub fn set_value(&mut self, new_value: f32) {
         self.shared.set_value(new_value);
     }
