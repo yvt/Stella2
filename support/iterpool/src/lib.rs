@@ -18,6 +18,8 @@
 //! the global heap without destroying entire the pool.
 use std::{mem, ops};
 
+pub mod intrusive_list;
+
 /// High-performance non-thread safe object pool.
 #[derive(Debug, Clone)]
 pub struct Pool<T> {
