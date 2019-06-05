@@ -85,10 +85,3 @@ pub fn is_main_thread() -> bool {
     let result: BOOL = unsafe { msg_send![class!(NSThread), isMainThread] };
     result != NO
 }
-
-pub fn ensure_main_thread() {
-    assert!(
-        is_main_thread(),
-        "this operation is only valid for a main thread"
-    );
-}
