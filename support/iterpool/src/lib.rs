@@ -205,6 +205,22 @@ impl<T> Pool<T> {
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
         self.storage[fp.0].as_mut()
     }
+    /// Iterate over objects. Unlike `IterablePool`, `Pool` can't skip free
+    /// space, so this might be less efficient.
+    pub fn iter(&self) -> impl Iterator<Item = &'_ T> + '_ {
+        self.storage.iter().filter_map(|e| match e {
+            Entry::Free(_) => None,
+            Entry::Used(x) => Some(x),
+        })
+    }
+    /// Iterate over objects, allowing mutation. Unlike `IterablePool`,
+    /// `Pool` can't skip free space, so this might be less efficient.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut T> + '_ {
+        self.storage.iter_mut().filter_map(|e| match e {
+            Entry::Free(_) => None,
+            Entry::Used(x) => Some(x),
+        })
+    }
 }
 
 impl<T> IterablePool<T> {
@@ -404,6 +420,10 @@ fn test() {
     let ptr2 = pool.allocate(2);
     assert_eq!(pool[ptr1], 1);
     assert_eq!(pool[ptr2], 2);
+
+    assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![1, 2]);
+    pool.deallocate(ptr1);
+    assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![2]);
 }
 
 #[test]
