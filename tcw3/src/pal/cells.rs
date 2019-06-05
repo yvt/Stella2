@@ -104,3 +104,55 @@ impl<T: 'static> Drop for MtSticky<T> {
         }
     }
 }
+
+/// Main-Thread Lock — Like `ReentrantMutex`, but only accessible to the main thread.
+pub struct MtLock<T> {
+    cell: UnsafeCell<T>,
+}
+
+unsafe impl<T: Send> Send for MtLock<T> {}
+unsafe impl<T: Send> Sync for MtLock<T> {}
+
+#[allow(dead_code)]
+impl<T> MtLock<T> {
+    /// Construct a `MtLock`.
+    #[inline]
+    pub const fn new(x: T) -> Self {
+        Self {
+            cell: UnsafeCell::new(x),
+        }
+    }
+
+    /// Get a raw pointer to the inner value.
+    #[inline]
+    pub const fn get_ptr(&self) -> *mut T {
+        self.cell.get()
+    }
+
+    /// Take the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.cell.into_inner()
+    }
+
+    /// Get a reference to the `Sync` inner value.
+    #[inline]
+    pub fn get(&self) -> &T
+    where
+        T: Sync,
+    {
+        unsafe { &*self.get_ptr() }
+    }
+
+    /// Get a mutably reference to the inner value.
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.get_ptr() }
+    }
+
+    /// Get a reference to the inner value with compile-time thread checking.
+    #[inline]
+    pub fn get_with_wm(&self, _: &WM) -> &T {
+        unsafe { &*self.get_ptr() }
+    }
+}
