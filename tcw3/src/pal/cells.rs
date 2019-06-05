@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, mem::ManuallyDrop};
+use std::{cell::UnsafeCell, fmt, mem::ManuallyDrop};
 
 use super::{iface::WM as _, WM};
 
@@ -17,6 +17,18 @@ pub struct MtSticky<T: 'static> {
 
 unsafe impl<T: 'static> Send for MtSticky<T> {}
 unsafe impl<T: 'static> Sync for MtSticky<T> {}
+
+impl<T: 'static + fmt::Debug> fmt::Debug for MtSticky<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Ok(wm) = WM::try_global() {
+            f.debug_tuple("MtSticky")
+                .field(self.get_with_wm(wm))
+                .finish()
+        } else {
+            write!(f, "MtSticky(<not main thread>)")
+        }
+    }
+}
 
 #[allow(dead_code)]
 impl<T: 'static> MtSticky<T> {
@@ -112,6 +124,16 @@ pub struct MtLock<T> {
 
 unsafe impl<T: Send> Send for MtLock<T> {}
 unsafe impl<T: Send> Sync for MtLock<T> {}
+
+impl<T: fmt::Debug> fmt::Debug for MtLock<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Ok(wm) = WM::try_global() {
+            f.debug_tuple("MtLock").field(self.get_with_wm(wm)).finish()
+        } else {
+            write!(f, "MtLock(<not main thread>)")
+        }
+    }
+}
 
 #[allow(dead_code)]
 impl<T> MtLock<T> {

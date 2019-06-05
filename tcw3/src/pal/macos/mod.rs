@@ -19,7 +19,7 @@ mod window;
 pub use self::bitmap::{Bitmap, BitmapBuilder};
 pub use self::layer::HLayer;
 pub use self::text::{CharStyle, TextLayout};
-use self::utils::{ensure_main_thread, IdRef};
+use self::utils::{is_main_thread, IdRef};
 pub use self::window::HWnd;
 
 /// Provides an access to the window system.
@@ -37,15 +37,14 @@ impl iface::WM for WM {
     type HLayer = HLayer;
     type Bitmap = Bitmap;
 
-    fn global() -> WM {
-        ensure_main_thread();
-        unsafe { Self::global_unchecked() }
-    }
-
     unsafe fn global_unchecked() -> WM {
         WM {
             _no_send_sync: PhantomData,
         }
+    }
+
+    fn is_main_thread() -> bool {
+        is_main_thread()
     }
 
     fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {

@@ -25,10 +25,22 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     type Bitmap: Bitmap;
 
     /// Get the default instance of [`WM`]. It only can be called by a main thread.
-    fn global() -> Self;
+    fn global() -> Self {
+        Self::try_global().unwrap()
+    }
 
     /// Get the default instance of [`WM`] without checking the calling thread.
     unsafe fn global_unchecked() -> Self;
+
+    fn try_global() -> Result<Self, BadThread> {
+        if Self::is_main_thread() {
+            Ok(unsafe { Self::global_unchecked() })
+        } else {
+            Err(BadThread)
+        }
+    }
+
+    fn is_main_thread() -> bool;
 
     /// Enqueue a call to the specified function on the main thread. The calling
     /// thread can be any thread.
@@ -70,6 +82,18 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>);
     fn remove_layer(self, layer: &Self::HLayer);
 }
+
+/// Returned when a function/method is called from an invalid thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BadThread;
+
+impl std::fmt::Display for BadThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "the operation is invalid for the current thread")
+    }
+}
+
+impl std::error::Error for BadThread {}
 
 pub struct WndAttrs<'a, T: WM, TLayer> {
     /// The size of the content region.

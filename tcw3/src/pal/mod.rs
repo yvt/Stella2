@@ -71,7 +71,7 @@ pub type TextLayout = native::TextLayout;
 // backend.
 
 pub use self::iface::{
-    LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,
+    BadThread, LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,
 };
 
 /// The window handle type of [`WM`].
