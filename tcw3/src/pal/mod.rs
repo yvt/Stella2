@@ -101,4 +101,4 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 // Utilities
 //
 mod cells;
-pub use self::cells::{MtSticky, MtLock};
+pub use self::cells::{MtLock, MtSticky};

@@ -16,7 +16,7 @@ pub struct MtSticky<T: 'static> {
 }
 
 unsafe impl<T: 'static> Send for MtSticky<T> {}
-unsafe impl<T: 'static + Sync> Sync for MtSticky<T> {}
+unsafe impl<T: 'static> Sync for MtSticky<T> {}
 
 #[allow(dead_code)]
 impl<T: 'static> MtSticky<T> {
@@ -77,13 +77,13 @@ impl<T: 'static> MtSticky<T> {
 
     /// Get a reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_with_wm(&self, _: &WM) -> &T {
+    pub fn get_with_wm(&self, _: WM) -> &T {
         unsafe { &*self.get_ptr() }
     }
 
     /// Get a mutable reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_mut_with_wm(&mut self, _: &WM) -> &mut T {
+    pub fn get_mut_with_wm(&mut self, _: WM) -> &mut T {
         unsafe { &mut *self.get_ptr() }
     }
 }
@@ -152,7 +152,7 @@ impl<T> MtLock<T> {
 
     /// Get a reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_with_wm(&self, _: &WM) -> &T {
+    pub fn get_with_wm(&self, _: WM) -> &T {
         unsafe { &*self.get_ptr() }
     }
 }
