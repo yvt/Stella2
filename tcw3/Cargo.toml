@@ -20,6 +20,8 @@ alt_fp = { path = "../support/alt_fp" }
 array = "0.0.1"
 packed_simd = "0.3.0"
 svgbobdoc = "0.2"
+quick-error2 = "2.0.1"
+iterpool = { path = "../support/iterpool" }
 
 [dependencies.momo]
 git = "https://github.com/llogiq/momo.git"
@@ -32,7 +34,6 @@ core-foundation = "0.6"
 core-graphics = "0.17.3"
 core-text = "13.2.0"
 dispatch = "0.1.4"
-iterpool = { path = "../support/iterpool" }
 lazy_static = "1"
 
 [build-dependencies]

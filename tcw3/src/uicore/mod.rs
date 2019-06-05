@@ -399,7 +399,14 @@ impl HWnd {
             .superview
             .borrow_mut() = Superview::Window(Rc::downgrade(&hwnd.wnd));
 
+        // `ui::images` wants to know DPI scale values.
+        crate::ui::images::handle_new_wnd(&hwnd);
+
         hwnd
+    }
+
+    pub(crate) fn wm(&self) -> WM {
+        self.wnd.wm
     }
 
     /// Close a window.

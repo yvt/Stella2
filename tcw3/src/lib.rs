@@ -9,6 +9,7 @@
 #![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
+#![feature(const_vec_new)] // `Vec::new()` in a constant context
 pub mod pal;
 pub mod ui;
 pub mod uicore;
