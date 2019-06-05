@@ -95,3 +95,10 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 //
 //      pub trait WndListener = iface::WndListener<WM>;
 //
+
+// ============================================================================
+//
+// Utilities
+//
+mod cells;
+pub use self::cells::MtSticky;
