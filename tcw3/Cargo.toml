@@ -9,8 +9,7 @@ license = "MIT"
 cfg-if = "0.1.7"
 cgmath = "0.17.0"
 rgb = "0.8.13"
-# bitflags supports custom attribute macros as of 1.0.6, which isn't on crates.io yet
-bitflags = { git = "https://github.com/bitflags/bitflags.git", rev = "d06e657056cb88822200aab882966a4b8fcf325f" }
+bitflags = "1.1.0"
 cggeom = { path = "../support/cggeom" }
 flags-macro = "0.1.3"
 derive_more = "0.14.0"
