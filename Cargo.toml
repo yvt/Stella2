@@ -12,6 +12,7 @@ members = [
     "support/cggeom",
     "support/iterpool",
     "support/subscriber_list",
+    "support/sorted_diff",
 ]
 
 [profile.release]
