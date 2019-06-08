@@ -36,5 +36,18 @@ pub mod images {
     pub use self::{bitmap::*, img::*};
 }
 
+/// Theming support
+pub mod theming {
+    mod manager;
+    mod style;
+    mod stylesheet;
+    mod view;
+    pub use self::{
+        manager::Manager,
+        style::{ClassSet, ElemClassPath, Prop, PropValue, Role},
+        view::StyledBox,
+    };
+}
+
 mod types;
 pub use self::types::AlignFlags;

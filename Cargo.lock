@@ -836,6 +836,7 @@ dependencies = [
  "packed_simd 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error2 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sorted_diff 0.1.0",
  "structopt 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "subscriber_list 0.1.0",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
