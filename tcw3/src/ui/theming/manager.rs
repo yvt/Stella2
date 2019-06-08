@@ -149,6 +149,7 @@ pub(crate) struct Elem {
 }
 
 impl Elem {
+    /// Construct an `Elem`.
     pub(crate) fn new() -> Self {
         Self {
             rules: Vec::new(),

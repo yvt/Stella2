@@ -9,6 +9,10 @@ bitflags! {
     /// A set of styling classes.
     pub struct ClassSet: u8 {
         /// The mouse pointer inside the element.
+        ///
+        /// Be aware that this is a normal styling class like other ones. This
+        /// does not get applied automatically like CSS's `:hover` pseudo
+        /// selector.
         const HOVER = 1 << 0;
         /// The element is active, e.g., a button is being pressed down.
         const ACTIVE = 1 << 1;
@@ -42,6 +46,7 @@ impl Default for ElemClassPath {
 /// A role of a subview.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
+    /// The default role.
     Generic,
 }
 
@@ -124,6 +129,7 @@ impl PropValue {
     }
 }
 
+/// Describes the placement of a rectangle (e.g., layer) inside a container.
 #[derive(Debug, Clone, Copy)]
 pub struct Metrics {
     /// Distances from corresponding edges. Non-finite values (e.g., NaN) mean
@@ -195,11 +201,20 @@ impl Metrics {
     }
 }
 
+/// Represents transformation of a layer.
 #[derive(Debug, Clone, Copy)]
 pub struct LayerXform {
+    /// The anchor point, which is a fixed point of rotation and scaling.
+    ///
+    /// The point is specified relative to the layer's bounding rectangle.
+    /// `[0, 0]` and `[1, 1]` represent the upper-left and lower-right corners,
+    /// respectively.
     pub anchor: Point2<f32>,
+    /// The scaling factor.
     pub scale: [f32; 2],
+    /// The rotation angle.
     pub rotate: Rad<f32>,
+    /// The translation vector, measured in points.
     pub translate: Vector2<f32>,
 }
 
