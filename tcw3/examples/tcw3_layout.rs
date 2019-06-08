@@ -8,6 +8,7 @@ use tcw3::{
     ui::{
         layouts::{AbsLayout, TableLayout},
         mixins::CanvasMixin,
+        theming,
         views::Label,
         AlignFlags,
     },
@@ -72,6 +73,7 @@ impl WndListener for MyWndListener {
 
 fn main() {
     let wm = pal::WM::global();
+    let style_manager = theming::Manager::global(wm);
 
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);
@@ -90,7 +92,7 @@ fn main() {
 
         view.set_listener(MyViewListener::new(size_traits));
 
-        let mut label = Label::new();
+        let mut label = Label::new(style_manager);
         label.set_text(format!(
             "[{}, {}]",
             size_traits.preferred.x, size_traits.preferred.y

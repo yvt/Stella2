@@ -18,6 +18,8 @@ bitflags! {
         const ACTIVE = 1 << 1;
         /// The element is a button's border.
         const BUTTON = 1 << 2;
+        /// The element is a label.
+        const LABEL = 1 << 3;
     }
 }
 

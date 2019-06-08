@@ -106,7 +106,7 @@ impl WndView {
             let wrapper = HView::new(ViewFlags::default());
             wrapper.set_layout(
                 TableLayout::new(Some((
-                    Label::new().with_text(text).into_view(),
+                    Label::new(style_manager).with_text(text).into_view(),
                     [0, 0],
                     AlignFlags::TOP | AlignFlags::LEFT,
                 )))

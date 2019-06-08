@@ -40,7 +40,7 @@ impl fmt::Debug for Inner {
 
 impl Button {
     pub fn new(style_manager: &'static Manager) -> Self {
-        let label = Label::new();
+        let label = Label::new(style_manager);
 
         let mut styled_box = StyledBox::new(style_manager, ViewFlags::default());
         styled_box.set_subview(Role::Generic, Some(label.view().clone()));
@@ -80,6 +80,11 @@ impl Button {
         let mut styled_box = self.inner.styled_box.borrow_mut();
         styled_box.set_parent_class_path(parent_class_path);
         styled_box.reapply_style();
+
+        self.inner
+            .label
+            .borrow_mut()
+            .set_parent_class_path(Some(styled_box.class_path().clone()));
     }
 
     /// Set the function called when a push button widget is activated.
@@ -125,6 +130,11 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
             ClassSet::BUTTON
         });
         styled_box.reapply_style();
+
+        self.inner
+            .label
+            .borrow_mut()
+            .set_parent_class_path(Some(styled_box.class_path().clone()));
     }
 
     fn activate(&self, wm: pal::WM, _: &HView) {

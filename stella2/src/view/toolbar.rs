@@ -37,7 +37,7 @@ impl ToolbarView {
         go_forward_button.set_caption("Go Forward");
 
         // TODO: Search bar
-        let search_bar = Label::new().with_text("todo: search");
+        let search_bar = Label::new(style_manager).with_text("todo: search");
 
         const MARGIN: f32 = 5.0;
 

@@ -1,7 +1,7 @@
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::{layouts::FillLayout, views::Label},
+    ui::{layouts::FillLayout, theming, views::Label},
     uicore::{HWnd, WndListener},
 };
 
@@ -15,12 +15,13 @@ impl WndListener for MyWndListener {
 
 fn main() {
     let wm = pal::WM::global();
+    let style_manager = theming::Manager::global(wm);
 
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);
     wnd.set_listener(MyWndListener);
 
-    let mut label = Label::new();
+    let mut label = Label::new(style_manager);
     label.set_text("Hello, world! «coi ro do .ui» Saluton! nuqneH");
 
     wnd.content_view()

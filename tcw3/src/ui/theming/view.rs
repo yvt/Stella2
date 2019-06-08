@@ -186,6 +186,8 @@ impl Shared {
 
         let sheet_set = self.style_manager.sheet_set();
 
+        // TODO: `Label` has a similar internal function... Hopefully they could be merged
+
         // Recalculate the active rule set
         if sheet_set_changed {
             // The stylesheet set has changed, so do a full update

@@ -38,7 +38,7 @@ pub mod images {
 
 /// Theming support
 pub mod theming {
-    mod manager;
+    pub(crate) mod manager;
     mod style;
     mod stylesheet;
     mod view;
