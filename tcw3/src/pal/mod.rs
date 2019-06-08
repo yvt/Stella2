@@ -6,6 +6,7 @@ pub mod iface;
 
 /// Re-exports traits from `iface`.
 pub mod prelude {
+    pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
         TextLayout, WndListener, WM,
@@ -100,5 +101,6 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 //
 // Utilities
 //
+#[macro_use]
 mod cells;
 pub use self::cells::{MtLock, MtSticky};
