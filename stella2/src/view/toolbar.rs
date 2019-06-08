@@ -2,6 +2,7 @@ use harmony::Elem;
 use std::{cell::RefCell, rc::Rc};
 use tcw3::{
     ui::layouts::TableLayout,
+    ui::theming,
     ui::views::{Button, Label, Spacer},
     ui::AlignFlags,
     uicore::{HView, ViewFlags},
@@ -18,7 +19,10 @@ pub struct ToolbarView {
 }
 
 impl ToolbarView {
-    pub fn new(wnd_state: Elem<model::WndState>) -> Rc<Self> {
+    pub fn new(
+        wnd_state: Elem<model::WndState>,
+        style_manager: &'static theming::Manager,
+    ) -> Rc<Self> {
         let container = HView::new(ViewFlags::default());
 
         // TODO: Show/hide the sidebar
@@ -26,10 +30,10 @@ impl ToolbarView {
 
         // TODO: Use toolbar button style
         // TODO: Use icons
-        let mut go_back_button = Button::new();
+        let mut go_back_button = Button::new(style_manager);
         go_back_button.set_caption("Go Back");
 
-        let mut go_forward_button = Button::new();
+        let mut go_forward_button = Button::new(style_manager);
         go_forward_button.set_caption("Go Forward");
 
         // TODO: Search bar

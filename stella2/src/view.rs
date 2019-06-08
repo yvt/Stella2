@@ -7,6 +7,7 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::layouts::TableLayout,
+    ui::theming,
     ui::views::{split::SplitDragListener, Label, Split},
     ui::AlignFlags,
     uicore::{HView, HWnd, ViewFlags},
@@ -97,8 +98,9 @@ struct WndView {
 impl WndView {
     pub fn new(wm: pal::WM, wnd_state: Elem<model::WndState>) -> Rc<Self> {
         let hwnd = HWnd::new(wm);
+        let style_manager = theming::Manager::global(wm);
 
-        let toolbar = toolbar::ToolbarView::new(Elem::clone(&wnd_state));
+        let toolbar = toolbar::ToolbarView::new(Elem::clone(&wnd_state), style_manager);
 
         let new_test_view = |text: &str| {
             let wrapper = HView::new(ViewFlags::default());

@@ -1,4 +1,3 @@
-use cggeom::box2;
 use cgmath::Point2;
 use std::{cell::RefCell, fmt, rc::Rc};
 
@@ -7,10 +6,11 @@ use crate::{
     pal::prelude::*,
     ui::{
         layouts::FillLayout,
-        mixins::{ButtonMixin, CanvasMixin},
+        mixins::ButtonMixin,
+        theming::{ClassSet, ElemClassPath, Manager, Role, StyledBox},
         views::Label,
     },
-    uicore::{HView, HWnd, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{HView, ViewFlags, ViewListener},
 };
 
 /// A push button widget.
@@ -22,7 +22,7 @@ pub struct Button {
 
 struct Inner {
     button_mixin: ButtonMixin,
-    canvas_mixin: RefCell<CanvasMixin>,
+    styled_box: RefCell<StyledBox>,
     label: RefCell<Label>,
     activate_handler: RefCell<Box<dyn Fn(pal::WM)>>,
 }
@@ -31,7 +31,7 @@ impl fmt::Debug for Inner {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Inner")
             .field("button_mixin", &self.button_mixin)
-            .field("canvas_mixin", &self.canvas_mixin)
+            .field("styled_box", &self.styled_box)
             .field("label", &self.label)
             .field("activate_handler", &())
             .finish()
@@ -39,17 +39,21 @@ impl fmt::Debug for Inner {
 }
 
 impl Button {
-    pub fn new() -> Self {
-        let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
-
+    pub fn new(style_manager: &'static Manager) -> Self {
         let label = Label::new();
 
-        let margin = 4.0;
-        view.set_layout(FillLayout::new(label.view().clone()).with_uniform_margin(margin));
+        let mut styled_box = StyledBox::new(style_manager, ViewFlags::default());
+        styled_box.set_subview(Role::Generic, Some(label.view().clone()));
+        styled_box.set_class_set(ClassSet::BUTTON);
+        styled_box.reapply_style();
+
+        let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+
+        view.set_layout(FillLayout::new(styled_box.view().clone()));
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
-            canvas_mixin: RefCell::new(CanvasMixin::new()),
+            styled_box: RefCell::new(styled_box),
             label: RefCell::new(label),
             activate_handler: RefCell::new(Box::new(|_| {})),
         });
@@ -71,6 +75,13 @@ impl Button {
         self.inner.label.borrow_mut().set_text(value);
     }
 
+    /// Set the parent class path.
+    pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
+        let mut styled_box = self.inner.styled_box.borrow_mut();
+        styled_box.set_parent_class_path(parent_class_path);
+        styled_box.reapply_style();
+    }
+
     /// Set the function called when a push button widget is activated.
     ///
     /// The function is called via `WM::invoke`, thus allowed to modify
@@ -86,46 +97,6 @@ struct ButtonViewListener {
 }
 
 impl ViewListener for ButtonViewListener {
-    fn mount(&self, wm: pal::WM, view: &HView, wnd: &HWnd) {
-        self.inner.canvas_mixin.borrow_mut().mount(wm, view, wnd);
-    }
-
-    fn unmount(&self, wm: pal::WM, view: &HView) {
-        self.inner.canvas_mixin.borrow_mut().unmount(wm, view);
-    }
-
-    fn position(&self, wm: pal::WM, view: &HView) {
-        self.inner.canvas_mixin.borrow_mut().position(wm, view);
-    }
-
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
-        const RADIUS: f32 = 4.0;
-        let mut canvas_mixin = self.inner.canvas_mixin.borrow_mut();
-
-        canvas_mixin.update_layer_border(wm, view, ctx.hwnd(), RADIUS, |draw_ctx| {
-            let c = &mut draw_ctx.canvas;
-
-            let is_pressed = self.inner.button_mixin.is_pressed();
-            // TODO: Get bg color from system theme or somewhere else
-            let bg_color = if is_pressed {
-                pal::RGBAF32::new(0.2, 0.4, 0.9, 1.0)
-            } else {
-                pal::RGBAF32::new(0.7, 0.7, 0.7, 1.0)
-            };
-            c.set_fill_rgb(bg_color);
-
-            c.rounded_rect(
-                box2! { min: [-RADIUS, -RADIUS], max: [RADIUS, RADIUS] },
-                [[RADIUS - 1.0; 2]; 4],
-            );
-            c.fill();
-        });
-
-        if ctx.layers().len() != 1 {
-            ctx.set_layers(vec![canvas_mixin.layer().unwrap().clone()]);
-        }
-    }
-
     fn mouse_drag(
         &self,
         _: pal::WM,
@@ -146,8 +117,14 @@ struct ButtonMixinListener {
 }
 
 impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
-    fn update(&self, _: pal::WM, view: &HView) {
-        self.inner.canvas_mixin.borrow_mut().pend_draw(view);
+    fn update(&self, _: pal::WM, _: &HView) {
+        let mut styled_box = self.inner.styled_box.borrow_mut();
+        styled_box.set_class_set(if self.inner.button_mixin.is_pressed() {
+            ClassSet::BUTTON | ClassSet::ACTIVE
+        } else {
+            ClassSet::BUTTON
+        });
+        styled_box.reapply_style();
     }
 
     fn activate(&self, wm: pal::WM, _: &HView) {
