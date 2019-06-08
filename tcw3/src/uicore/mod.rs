@@ -164,6 +164,12 @@ pub struct HView {
     view: Rc<View>,
 }
 
+/// A weak view handle type.
+#[derive(Debug, Clone)]
+pub struct WeakHView {
+    view: Weak<View>,
+}
+
 bitflags! {
     pub struct ViewFlags: u8 {
         /// The sublayers are added to the view's associated layer.
@@ -573,6 +579,13 @@ impl HView {
         }
     }
 
+    /// Construct a weak handle.
+    pub fn downgrade(&self) -> WeakHView {
+        WeakHView {
+            view: Rc::downgrade(&self.view),
+        }
+    }
+
     /// Set a new [`ViewListener`].
     ///
     /// It's now allowed to call this method from `ViewListener`'s methods.
@@ -711,6 +724,18 @@ impl PartialEq for HView {
 }
 
 impl Eq for HView {}
+
+impl WeakHView {
+    /// Construct a `WeakHView` that doesn't reference any view.
+    pub fn new() -> Self {
+        Self { view: Weak::new() }
+    }
+
+    /// Attempt to upgrade this weak handle to a `HView`.
+    pub fn upgrade(&self) -> Option<HView> {
+        self.view.upgrade().map(|view| HView { view })
+    }
+}
 
 // =======================================================================
 //                               Dirty flags
