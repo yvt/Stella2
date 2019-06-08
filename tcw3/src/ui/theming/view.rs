@@ -181,7 +181,7 @@ impl Shared {
     ///
     /// This is defined on `Shared` because it may be called when the active
     /// stylesheet set is changed.
-    pub fn reapply_style(&mut self, sheet_set_changed: bool) {
+    fn reapply_style(&mut self, sheet_set_changed: bool) {
         let style_elem = &mut self.style_elem;
 
         let sheet_set = self.style_manager.sheet_set();
