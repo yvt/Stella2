@@ -23,13 +23,13 @@ struct MountState {
 }
 
 #[derive(Debug)]
-pub struct DrawContext<'a> {
+pub struct PaintContext<'a> {
     /// A `BitmapBuilder` object implementing [`Canvas`], with which the client
-    /// should draw the layer contents to a backing store.
+    /// should paint the layer contents to a backing store.
     ///
     /// [`Canvas`]: crate::pal::iface::Canvas
     ///
-    /// When a draw function is called, `canvas` is configured to use the
+    /// When a paint function is called, `canvas` is configured to use the
     /// target view's coordinate space. This means that `(0, 0)` always matches
     /// the top-left corner of the view's frame and the coordinates are
     /// represented by logical pixels and are independent of physical pixel
@@ -99,7 +99,7 @@ impl CanvasMixin {
         self.state.as_ref().map(|s| &s.layer)
     }
 
-    /// Update the backing layer. The caller-supplied draw function is used
+    /// Update the backing layer. The caller-supplied paint function is used
     /// to provide new layer contents if necessary.
     ///
     /// `visual_bounds` is a rectangle specified in the view's coordinate space,
@@ -112,7 +112,7 @@ impl CanvasMixin {
         view: &HView,
         wnd: &HWnd,
         visual_bounds: Box2<f32>,
-        draw: impl FnOnce(&mut DrawContext<'_>),
+        paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
         let state = self.state.as_mut().expect("not mounted");
 
@@ -156,8 +156,8 @@ impl CanvasMixin {
             // Apply DPI scaling
             builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
 
-            // Call the draw function
-            draw(&mut DrawContext {
+            // Call the paint function
+            paint(&mut PaintContext {
                 canvas: &mut builder,
                 size: bmp_pt_size,
                 dpi_scale,
@@ -189,14 +189,14 @@ impl CanvasMixin {
 
     /// Update the backing layer. The layer will use 9-grid scaling to flexibly
     /// resize without re-painting.
-    /// The caller-supplied draw function is used to provide new layer contents
+    /// The caller-supplied paint function is used to provide new layer contents
     /// if necessary.
     ///
     /// The client must choose between `update_layer` and `update_layer_border`
     /// depending on whether the contents is eligible for 9-grid scaling or not.
     /// It's not allowed switch to the other one after calling one.
     ///
-    /// `draw` draws the border image within the region
+    /// `paint` draws the border image within the region
     /// `(-radius, -radius)-(radius, radius)`.
     pub fn update_layer_border(
         &mut self,
@@ -204,7 +204,7 @@ impl CanvasMixin {
         view: &HView,
         wnd: &HWnd,
         radius: f32,
-        draw: impl FnOnce(&mut DrawContext<'_>),
+        paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
         // TODO: Review this API. Perhaps this had better be merged into
         // `update_layer`. The usefulness of this API is questionable because it
@@ -242,8 +242,8 @@ impl CanvasMixin {
             // Apply DPI scaling
             builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
 
-            // Call the draw function
-            draw(&mut DrawContext {
+            // Call the paint function
+            paint(&mut PaintContext {
                 canvas: &mut builder,
                 size: vec2(bmp_pt_size, bmp_pt_size) * 2.0,
                 dpi_scale,
@@ -268,7 +268,7 @@ impl CanvasMixin {
         );
     }
 
-    /// Implements [`ViewListener::update`] using a caller-supplied draw
+    /// Implements [`ViewListener::update`] using a caller-supplied paint
     /// function.
     ///
     /// [`ViewListener::update`]: crate::uicore::ViewListener::update
@@ -284,11 +284,11 @@ impl CanvasMixin {
         wm: pal::WM,
         view: &HView,
         ctx: &mut UpdateCtx<'_>,
-        draw: impl FnOnce(&mut DrawContext<'_>),
+        paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
 
-        self.update_layer(wm, view, ctx.hwnd(), visual_bounds, draw);
+        self.update_layer(wm, view, ctx.hwnd(), visual_bounds, paint);
 
         if ctx.layers().len() != 1 {
             ctx.set_layers(vec![self.layer().unwrap().clone()]);
@@ -298,7 +298,7 @@ impl CanvasMixin {
     /// Pend a redraw.
     ///
     /// This method updates an internal flag and calls [`HView::pend_update`].
-    /// As a result, a caller-supplied draw function will be used to update
+    /// As a result, a caller-supplied paint function will be used to update
     /// the layer contents when `update` is called for the next time.
     ///
     /// [`HView::pend_update`]: crate::uicore::HView::pend_update
