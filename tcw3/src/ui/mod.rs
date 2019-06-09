@@ -32,8 +32,10 @@ pub mod views {
 /// DPI scale values.
 pub mod images {
     mod bitmap;
+    mod canvas;
+    mod figures;
     mod img;
-    pub use self::{bitmap::*, img::*};
+    pub use self::{bitmap::*, canvas::*, figures::*, img::*};
 }
 
 /// Theming support

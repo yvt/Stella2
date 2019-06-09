@@ -15,6 +15,8 @@ impl BitmapImg {
     }
 
     /// Convert `self` to a `HImg`.
+    ///
+    /// This method just calls `HImg::new(self)`.
     pub fn into_hbmp(self) -> HImg {
         HImg::new(self)
     }
