@@ -1,6 +1,6 @@
-use std::{cell::UnsafeCell, fmt, mem::ManuallyDrop};
+use std::{cell::UnsafeCell, fmt, marker::PhantomData, mem::ManuallyDrop};
 
-use super::{iface::WM as _, WM};
+use super::{iface::WM as WMTrait, WM};
 
 /// Main-Thread Sticky — Like [`fragile::Sticky`], allows `!Send` types to be
 /// moved between threads, but there are a few differences:
@@ -11,14 +11,15 @@ use super::{iface::WM as _, WM};
 ///  - Provides additional methods for compile-time thread checking.
 ///
 /// [`fragile::Sticky`]: https://docs.rs/fragile/0.3.0/fragile/struct.Sticky.html
-pub struct MtSticky<T: 'static> {
+pub struct MtSticky<T: 'static, TWM: WMTrait = WM> {
+    _phantom: PhantomData<TWM>,
     cell: ManuallyDrop<UnsafeCell<T>>,
 }
 
-unsafe impl<T: 'static> Send for MtSticky<T> {}
-unsafe impl<T: 'static> Sync for MtSticky<T> {}
+unsafe impl<T: 'static, TWM: WMTrait> Send for MtSticky<T, TWM> {}
+unsafe impl<T: 'static, TWM: WMTrait> Sync for MtSticky<T, TWM> {}
 
-impl<T: 'static + fmt::Debug> fmt::Debug for MtSticky<T> {
+impl<T: 'static + fmt::Debug, TWM: WMTrait> fmt::Debug for MtSticky<T, TWM> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Ok(wm) = WM::try_global() {
             f.debug_tuple("MtSticky")
@@ -31,11 +32,12 @@ impl<T: 'static + fmt::Debug> fmt::Debug for MtSticky<T> {
 }
 
 #[allow(dead_code)]
-impl<T: 'static> MtSticky<T> {
+impl<T: 'static, TWM: WMTrait> MtSticky<T, TWM> {
     /// Construct a `MtSticky` without thread checking.
     #[inline]
     pub const unsafe fn new_unchecked(x: T) -> Self {
         Self {
+            _phantom: PhantomData,
             cell: ManuallyDrop::new(UnsafeCell::new(x)),
         }
     }
@@ -100,7 +102,7 @@ impl<T: 'static> MtSticky<T> {
     }
 }
 
-impl<T: 'static> Drop for MtSticky<T> {
+impl<T: 'static, TWM: WMTrait> Drop for MtSticky<T, TWM> {
     fn drop(&mut self) {
         if std::mem::needs_drop::<T>() {
             struct AssertSend<T>(T);
@@ -118,14 +120,15 @@ impl<T: 'static> Drop for MtSticky<T> {
 }
 
 /// Main-Thread Lock — Like `ReentrantMutex`, but only accessible to the main thread.
-pub struct MtLock<T> {
+pub struct MtLock<T, TWM: WMTrait = WM> {
+    _phantom: PhantomData<TWM>,
     cell: UnsafeCell<T>,
 }
 
-unsafe impl<T: Send> Send for MtLock<T> {}
-unsafe impl<T: Send> Sync for MtLock<T> {}
+unsafe impl<T: Send, TWM: WMTrait> Send for MtLock<T, TWM> {}
+unsafe impl<T: Send, TWM: WMTrait> Sync for MtLock<T, TWM> {}
 
-impl<T: fmt::Debug> fmt::Debug for MtLock<T> {
+impl<T: fmt::Debug, TWM: WMTrait> fmt::Debug for MtLock<T, TWM> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Ok(wm) = WM::try_global() {
             f.debug_tuple("MtLock").field(self.get_with_wm(wm)).finish()
@@ -136,11 +139,12 @@ impl<T: fmt::Debug> fmt::Debug for MtLock<T> {
 }
 
 #[allow(dead_code)]
-impl<T> MtLock<T> {
+impl<T, TWM: WMTrait> MtLock<T, TWM> {
     /// Construct a `MtLock`.
     #[inline]
     pub const fn new(x: T) -> Self {
         Self {
+            _phantom: PhantomData,
             cell: UnsafeCell::new(x),
         }
     }
