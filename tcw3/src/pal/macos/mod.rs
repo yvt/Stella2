@@ -12,7 +12,6 @@ use super::{iface, LayerAttrs, WndAttrs};
 mod bitmap;
 mod drawutils;
 mod layer;
-mod mtlocal;
 mod text;
 mod utils;
 mod window;

@@ -9,17 +9,16 @@ use iterpool::{Pool, PoolPtr};
 use objc::{class, msg_send, sel, sel_impl};
 use std::cell::{Cell, RefCell};
 
-use super::super::{LayerAttrs, LayerFlags};
+use super::super::{LayerAttrs, LayerFlags, MtSticky};
 use super::{
     drawutils::{
         ca_transform_3d_from_matrix4, cg_color_from_rgbaf32, cg_rect_from_box2,
         extend_matrix3_with_identity_z,
     },
-    mtlocal::MtLocal,
     WM,
 };
 
-static LAYER_POOL: MtLocal<RefCell<Pool<Layer>>> = MtLocal::new(RefCell::new(Pool::new()));
+static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>, WM> = MtSticky::new(RefCell::new(Pool::new()));
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
