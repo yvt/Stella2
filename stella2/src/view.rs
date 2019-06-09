@@ -10,7 +10,7 @@ use tcw3::{
     ui::theming,
     ui::views::{split::SplitDragListener, Label, Split},
     ui::AlignFlags,
-    uicore::{HView, HWnd, ViewFlags},
+    uicore::{HView, HWnd, ViewFlags, WndListener},
 };
 
 use crate::model;
@@ -136,6 +136,7 @@ impl WndView {
 
         hwnd.content_view().set_layout(main_layout);
 
+        hwnd.set_listener(WndViewWndListener);
         hwnd.set_visibility(true);
 
         let this = Rc::new(Self {
@@ -205,6 +206,14 @@ impl WndView {
             .set_value(new_wnd_state.sidebar_width);
 
         self.toolbar.poll(new_wnd_state);
+    }
+}
+
+struct WndViewWndListener;
+
+impl WndListener for WndViewWndListener {
+    fn close(&self, wm: pal::WM, _: &HWnd) {
+        wm.terminate();
     }
 }
 
