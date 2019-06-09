@@ -55,8 +55,15 @@ struct Layer {
 
 impl Layer {
     pub fn new(_: WM) -> Self {
+        // `CALayer::new` wraps `[CALayer layer]`, which `autorelease`s itself,
+        // so we have to `retain` the returned `CALayer` to prevent it
+        // from being dealloced prematurely. (This clearly should be done by
+        // `CALayer::new()`, though...)
+        let ca_layer = CALayer::new();
+        let () = unsafe { msg_send![ca_layer.id(), retain] };
+
         Self {
-            ca_layer: CALayer::new(),
+            ca_layer,
             attrs_diff: RefCell::new(LayerAttrs::default()),
             sublayers: RefCell::new(Vec::new()),
             needs_update: Cell::new(false),
