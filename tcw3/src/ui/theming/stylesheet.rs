@@ -185,6 +185,18 @@ macro_rules! prop {
             value: PropValue::Usize($val),
         }
     };
+    (layer_img[$i:expr]: $val:expr) => {
+        RuleProp {
+            prop: Prop::LayerImg($i),
+            value: PropValue::Himg($val),
+        }
+    };
+    (layer_center[$i:expr]: $val:expr) => {
+        RuleProp {
+            prop: Prop::LayerCenter($i),
+            value: PropValue::Box2($val),
+        }
+    };
     (layer_bg_color[$i:expr]: $val:expr) => {
         RuleProp {
             prop: Prop::LayerBgColor($i),
@@ -246,20 +258,26 @@ macro_rules! stylesheet {
     }};
 }
 
-use crate::pal::RGBAF32;
+use crate::{pal::RGBAF32, ui::images::himg_from_rounded_rect};
+use cggeom::box2;
 
 lazy_static! {
     pub(crate) static ref DEFAULT_STYLESHEET: Stylesheet = stylesheet! {
         ([.BUTTON]) (priority = 1) {
             num_layers: 1,
-            layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
+            layer_img[0]: Some(himg_from_rounded_rect(
+                RGBAF32::new(0.7, 0.7, 0.7, 1.0), [[4.0; 2]; 4]
+            )),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
             subview_metrics[Role::Generic]: Metrics {
                 margin: [4.0; 4],
                 .. Metrics::default()
             },
         },
         ([.BUTTON.ACTIVE]) (priority = 100) {
-            layer_bg_color[0]: RGBAF32::new(0.2, 0.4, 0.9, 1.0),
+            layer_img[0]: Some(himg_from_rounded_rect(
+                RGBAF32::new(0.2, 0.4, 0.9, 1.0), [[4.0; 2]; 4]
+            )),
         },
         // Button label
         ([] < [.BUTTON]) (priority = 1) {
