@@ -1,12 +1,11 @@
 use bitflags::bitflags;
-use lazy_static::lazy_static;
 use sorted_diff::{sorted_diff, In};
 use std::{cell::RefCell, fmt};
 use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
 
 use super::{
     style::{ElemClassPath, Prop, PropValue},
-    stylesheet::{Rule, RuleId, Stylesheet, DEFAULT_STYLESHEET},
+    stylesheet::{DefaultStylesheet, RuleId, Stylesheet},
 };
 use crate::{pal, pal::prelude::*};
 
@@ -21,6 +20,7 @@ pub(crate) type ManagerEvtHandler = Box<dyn Fn(pal::WM, &Manager)>;
 /// out a notification via the callback functions registered via
 /// `subscribe_sheet_set_changed`.
 pub struct Manager {
+    sheet_set: SheetSet,
     set_change_handlers: RefCell<SubscriberList<ManagerEvtHandler>>,
 }
 
@@ -41,6 +41,9 @@ mt_lazy_static! {
 impl Manager {
     fn new() -> Self {
         Self {
+            sheet_set: SheetSet {
+                sheets: vec![Box::new(DefaultStylesheet)],
+            },
             set_change_handlers: RefCell::new(SubscriberList::new()),
         }
     }
@@ -60,18 +63,14 @@ impl Manager {
     ///
     /// This may change throughout the application's lifecycle. Use
     /// `subscribe_sheet_set_changed` to get notified when it happens.
-    pub(crate) fn sheet_set(&self) -> impl std::ops::Deref<Target = SheetSet> {
-        lazy_static! {
-            static ref SHEETS: [&'static Stylesheet; 1] = [&*DEFAULT_STYLESHEET];
-            static ref SHEET_SET: SheetSet = SheetSet { sheets: &*SHEETS };
-        }
-        &*SHEET_SET
+    pub(crate) fn sheet_set<'a>(&'a self) -> impl std::ops::Deref<Target = SheetSet> + 'a {
+        &self.sheet_set
     }
 }
 
 /// A stylesheet set.
 pub(crate) struct SheetSet {
-    sheets: &'static [&'static Stylesheet],
+    sheets: Vec<Box<dyn Stylesheet>>,
 }
 
 impl SheetSet {
@@ -81,8 +80,37 @@ impl SheetSet {
         }
     }
 
-    fn get_rule(&self, id: (SheetId, RuleId)) -> Option<&Rule> {
-        self.sheets.get(id.0).and_then(|sheet| sheet.get_rule(id.1))
+    fn get_rule(&self, id: (SheetId, RuleId)) -> Option<Rule<'_>> {
+        self.sheets.get(id.0).and_then(|stylesheet| {
+            if stylesheet.get_rule_priority(id.1).is_some() {
+                Some(Rule {
+                    stylesheet: &**stylesheet,
+                    rule_id: id.1,
+                })
+            } else {
+                None
+            }
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Rule<'a> {
+    stylesheet: &'a dyn Stylesheet,
+    rule_id: RuleId,
+}
+
+impl Rule<'_> {
+    fn priority(&self) -> i32 {
+        self.stylesheet.get_rule_priority(self.rule_id).unwrap()
+    }
+    fn prop_kinds(&self) -> PropKindFlags {
+        self.stylesheet.get_rule_prop_kinds(self.rule_id).unwrap()
+    }
+    fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
+        self.stylesheet
+            .get_rule_prop_value(self.rule_id, prop)
+            .unwrap()
     }
 }
 

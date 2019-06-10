@@ -5,15 +5,39 @@ use super::{
     style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
 };
 
+/// Represents a single stylesheet rule in [`Stylesheet`].
 pub type RuleId = usize;
 
-#[derive(Debug)]
-pub(crate) struct Stylesheet {
-    rules: &'static [Rule],
+pub(crate) trait Stylesheet {
+    /// Enumerate rules that apply to the specifed `ElemClassPath`.
+    ///
+    /// `out_rules` is called with a `RuleId` for each rule that applies to the
+    /// specified `ElemClassPath`. The `RuleId` is specific to `self`.
+    fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleId));
+
+    /// Get the priority of a stylesheet rule in this `Stylesheet`.
+    ///
+    /// Returns `None` if `id` is invalid.
+    fn get_rule_priority(&self, id: RuleId) -> Option<i32>;
+
+    /// Get a `PropKindFlags` representing an approximate set of styling
+    /// properties specified by a stylesheet rule in this `Stylesheet`.
+    ///
+    /// Returns `None` if `id` is invalid.
+    fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags>;
+
+    /// Get a property value for `Prop` specified by a stylesheet rule in this
+    /// `Stylesheet`.
+    fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>>;
 }
 
 #[derive(Debug)]
-pub(crate) struct Rule {
+struct StaticStylesheet {
+    rules: &'static [StaticRule],
+}
+
+#[derive(Debug)]
+struct StaticRule {
     priority: i32,
     prop_kinds: PropKindFlags,
     selector: Selector,
@@ -38,8 +62,8 @@ struct RuleProp {
     value: PropValue,
 }
 
-impl Stylesheet {
-    pub fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleId)) {
+impl Stylesheet for StaticStylesheet {
+    fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleId)) {
         // TODO: optimize the selector matching using target class buckets or
         //       DFA + BDD
         for (i, rule) in self.rules.iter().enumerate() {
@@ -49,21 +73,27 @@ impl Stylesheet {
         }
     }
 
-    pub fn get_rule(&self, id: RuleId) -> Option<&Rule> {
-        self.rules.get(id)
+    fn get_rule_priority(&self, id: RuleId) -> Option<i32> {
+        self.rules.get(id).map(StaticRule::priority)
+    }
+    fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags> {
+        self.rules.get(id).map(StaticRule::prop_kinds)
+    }
+    fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>> {
+        self.rules.get(id).map(|r| r.get_prop_value(prop))
     }
 }
 
-impl Rule {
-    pub fn priority(&self) -> i32 {
+impl StaticRule {
+    fn priority(&self) -> i32 {
         self.priority
     }
 
-    pub fn prop_kinds(&self) -> PropKindFlags {
+    fn prop_kinds(&self) -> PropKindFlags {
         self.prop_kinds
     }
 
-    pub fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
+    fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
         // TODO: Use binary search?
         self.props
             .iter()
@@ -236,7 +266,7 @@ macro_rules! rule {
     ) => {{
         let props = props! { $($props)* };
 
-        Rule {
+        StaticRule {
             priority: $pri,
             prop_kinds: props.iter()
                 .map(|p| p.prop.kind_flags())
@@ -250,11 +280,11 @@ macro_rules! rule {
 macro_rules! stylesheet {
     ($( $( ($( $meta:tt )*) )* { $( $rule:tt )* } ),* $(,)*) => {{
         lazy_static! {
-            static ref RULES: [Rule; count!($({ $($rule)* })*)] = [
+            static ref RULES: [StaticRule; count!($({ $($rule)* })*)] = [
                 $( rule!( $(($($meta)*))* {$($rule)*} ), )*
             ];
         }
-        Stylesheet { rules: &*RULES }
+        StaticStylesheet { rules: &*RULES }
     }};
 }
 
@@ -262,7 +292,7 @@ use crate::{pal::RGBAF32, ui::images::himg_from_rounded_rect};
 use cggeom::box2;
 
 lazy_static! {
-    pub(crate) static ref DEFAULT_STYLESHEET: Stylesheet = stylesheet! {
+    static ref DEFAULT_STYLESHEET: StaticStylesheet = stylesheet! {
         ([.BUTTON]) (priority = 1) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
@@ -287,4 +317,22 @@ lazy_static! {
             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
     };
+}
+
+pub(crate) struct DefaultStylesheet;
+
+impl Stylesheet for DefaultStylesheet {
+    fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleId)) {
+        DEFAULT_STYLESHEET.match_rules(path, out_rules)
+    }
+
+    fn get_rule_priority(&self, id: RuleId) -> Option<i32> {
+        DEFAULT_STYLESHEET.get_rule_priority(id)
+    }
+    fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags> {
+        DEFAULT_STYLESHEET.get_rule_prop_kinds(id)
+    }
+    fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>> {
+        DEFAULT_STYLESHEET.get_rule_prop_value(id, prop)
+    }
 }
