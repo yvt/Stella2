@@ -11,27 +11,27 @@ use crate::{
         manager::{Elem, PropKindFlags},
         ClassSet, ElemClassPath, Manager, Prop, PropValue,
     },
-    uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
 };
 
 /// A widget for displaying a static text.
 #[derive(Debug)]
 pub struct Label {
     view: HView,
-    state: Rc<RefCell<State>>,
+    inner: Rc<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
+    state: RefCell<State>,
+    style_elem: Elem,
 }
 
 #[derive(Debug)]
 struct State {
-    style_manager: &'static Manager,
-    class_path: ElemClassPath,
-    dirty_class_path: bool,
-    sheet_set_change_sub: Option<Sub>,
-
     text: String,
     text_layout_info: Option<TextLayoutInfo>,
     canvas: CanvasMixin,
-    style_elem: Elem,
 }
 
 #[derive(Debug)]
@@ -43,50 +43,36 @@ struct TextLayoutInfo {
 
 impl Label {
     pub fn new(style_manager: &'static Manager) -> Self {
+        let style_elem = Elem::new(style_manager);
+        style_elem.set_class_set(ClassSet::LABEL);
+
         let this = Self {
             view: HView::new(ViewFlags::default()),
-            state: Rc::new(RefCell::new(State {
-                style_manager,
-                class_path: ElemClassPath {
-                    tail: None,
-                    class_set: ClassSet::LABEL,
-                },
-                dirty_class_path: false,
-                sheet_set_change_sub: None,
-                text: String::new(),
-                text_layout_info: None,
-                canvas: CanvasMixin::new(),
-                style_elem: Elem::new(),
-            })),
+            inner: Rc::new(Inner {
+                state: RefCell::new(State {
+                    text: String::new(),
+                    text_layout_info: None,
+                    canvas: CanvasMixin::new(),
+                }),
+                style_elem,
+            }),
         };
 
-        let view_weak = this.view().downgrade();
-        let state_rc = Rc::clone(&this.state);
-        {
-            let mut state = this.state.borrow_mut();
-            let state = &mut *state;
-
-            let sheet_set = state.style_manager.sheet_set();
-
-            state
-                .style_elem
-                .set_class_path(&sheet_set, &state.class_path);
-
-            // Get notified when the sheet set changes
-            let sub = state
-                .style_manager
-                .subscribe_sheet_set_changed(Box::new(move |_, _| {
-                    if let Some(view) = view_weak.upgrade() {
-                        reapply_style(&state_rc, &view, true);
-                    }
-                }));
-            state.sheet_set_change_sub = Some(sub);
-        }
+        // Get notified when a styling property changes
+        let view = this.view().downgrade();
+        let inner = Rc::downgrade(&this.inner);
+        this.inner
+            .style_elem
+            .set_on_change(Box::new(move |_, kind_flags| {
+                if let (Some(inner), Some(view)) = (inner.upgrade(), view.upgrade()) {
+                    reapply_style(&inner, &view, kind_flags);
+                }
+            }));
 
         this.view
-            .set_layout(LabelListener::new(Rc::clone(&this.state)));
+            .set_layout(LabelListener::new(Rc::clone(&this.inner)));
         this.view
-            .set_listener(LabelListener::new(Rc::clone(&this.state)));
+            .set_listener(LabelListener::new(Rc::clone(&this.inner)));
 
         this
     }
@@ -106,7 +92,7 @@ impl Label {
     pub fn set_text(&mut self, value: impl Into<String>) {
         let value = value.into();
         {
-            let mut state = self.state.borrow_mut();
+            let mut state = self.inner.state.borrow_mut();
             if state.text == value {
                 return;
             }
@@ -114,8 +100,10 @@ impl Label {
             state.invalidate_text_layout();
             state.canvas.pend_draw(&self.view);
         }
+
+        // Invalidate the layout, since the label size might be changed
         self.view
-            .set_layout(LabelListener::new(Rc::clone(&self.state)));
+            .set_layout(LabelListener::new(Rc::clone(&self.inner)));
     }
 
     /// Call `set_text`, retuning `self`.
@@ -129,36 +117,14 @@ impl Label {
 
     /// Set the parent class path.
     pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let mut state = self.state.borrow_mut();
-        state.class_path.tail = parent_class_path;
-        state.dirty_class_path = true;
-        drop(state);
-
-        reapply_style(&self.state, &self.view, false);
+        self.inner
+            .style_elem
+            .set_parent_class_path(parent_class_path);
     }
 }
 
-fn reapply_style(state_rc: &Rc<RefCell<State>>, view: &HView, sheet_set_changed: bool) {
-    let mut state = state_rc.borrow_mut();
-    let state = &mut *state; // enable split borrow
-    let style_elem = &mut state.style_elem;
-
-    let sheet_set = state.style_manager.sheet_set();
-
-    // Recalculate the active rule set
-    let kind_flags;
-    if sheet_set_changed {
-        // The stylesheet set has changed, so do a full update
-        style_elem.set_class_path(&sheet_set, &state.class_path);
-        kind_flags = PropKindFlags::all();
-    } else if state.dirty_class_path {
-        // The class path has changed but the stylesheet set didn't change.
-        kind_flags = style_elem.set_and_diff_class_path(&sheet_set, &state.class_path);
-    } else {
-        kind_flags = PropKindFlags::empty();
-    }
-
-    state.dirty_class_path = false;
+fn reapply_style(inner: &Rc<Inner>, view: &HView, kind_flags: PropKindFlags) {
+    let mut state = inner.state.borrow_mut();
 
     if kind_flags.intersects(PropKindFlags::FG_COLOR) {
         state.canvas.pend_draw(view);
@@ -167,15 +133,14 @@ fn reapply_style(state_rc: &Rc<RefCell<State>>, view: &HView, sheet_set_changed:
     if kind_flags.intersects(PropKindFlags::FONT) {
         state.invalidate_text_layout();
         state.canvas.pend_draw(view);
-        view.set_layout(LabelListener::new(Rc::clone(state_rc)));
+        view.set_layout(LabelListener::new(Rc::clone(inner)));
     }
 }
 
 impl State {
-    fn ensure_text_layout(&mut self) {
+    fn ensure_text_layout(&mut self, elem: &Elem) {
         if self.text_layout_info.is_none() {
-            let sheet_set = self.style_manager.sheet_set();
-            let font_type = match self.style_elem.compute_prop(&sheet_set, Prop::Font) {
+            let font_type = match elem.compute_prop(Prop::Font) {
                 PropValue::SysFontType(value) => value,
                 _ => unreachable!(),
             };
@@ -206,22 +171,14 @@ impl State {
     }
 }
 
-impl Drop for State {
-    fn drop(&mut self) {
-        if let Some(sub) = self.sheet_set_change_sub.take() {
-            sub.unsubscribe().unwrap();
-        }
-    }
-}
-
 /// Implements both of `Layout` and `ViewListener`.
 struct LabelListener {
-    state: Rc<RefCell<State>>,
+    inner: Rc<Inner>,
 }
 
 impl LabelListener {
-    fn new(state: Rc<RefCell<State>>) -> Self {
-        Self { state }
+    fn new(inner: Rc<Inner>) -> Self {
+        Self { inner }
     }
 }
 
@@ -231,8 +188,8 @@ impl Layout for LabelListener {
     }
 
     fn size_traits(&self, _: &LayoutCtx<'_>) -> SizeTraits {
-        let mut state = self.state.borrow_mut();
-        state.ensure_text_layout();
+        let mut state = self.inner.state.borrow_mut();
+        state.ensure_text_layout(&self.inner.style_elem);
 
         let size = state
             .text_layout_info
@@ -260,25 +217,24 @@ impl Layout for LabelListener {
 
 impl ViewListener for LabelListener {
     fn mount(&self, wm: pal::WM, view: &HView, wnd: &HWnd) {
-        self.state.borrow_mut().canvas.mount(wm, view, wnd);
+        self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
     }
 
     fn unmount(&self, wm: pal::WM, view: &HView) {
-        self.state.borrow_mut().canvas.unmount(wm, view);
+        self.inner.state.borrow_mut().canvas.unmount(wm, view);
     }
 
     fn position(&self, wm: pal::WM, view: &HView) {
-        self.state.borrow_mut().canvas.position(wm, view);
+        self.inner.state.borrow_mut().canvas.position(wm, view);
     }
 
     fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
-        let mut state = self.state.borrow_mut();
+        let mut state = self.inner.state.borrow_mut();
         let state = &mut *state; // enable split borrow
 
-        state.ensure_text_layout();
+        state.ensure_text_layout(&self.inner.style_elem);
 
-        let sheet_set = state.style_manager.sheet_set();
-        let color = match state.style_elem.compute_prop(&sheet_set, Prop::FgColor) {
+        let color = match self.inner.style_elem.compute_prop(Prop::FgColor) {
             PropValue::Rgbaf32(value) => value,
             _ => unreachable!(),
         };

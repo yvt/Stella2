@@ -45,7 +45,6 @@ impl Button {
         let mut styled_box = StyledBox::new(style_manager, ViewFlags::default());
         styled_box.set_subview(Role::Generic, Some(label.view().clone()));
         styled_box.set_class_set(ClassSet::BUTTON);
-        styled_box.reapply_style();
 
         let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
 
@@ -79,7 +78,6 @@ impl Button {
     pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
         let mut styled_box = self.inner.styled_box.borrow_mut();
         styled_box.set_parent_class_path(parent_class_path);
-        styled_box.reapply_style();
 
         self.inner
             .label
@@ -129,7 +127,6 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
         } else {
             ClassSet::BUTTON
         });
-        styled_box.reapply_style();
 
         self.inner
             .label

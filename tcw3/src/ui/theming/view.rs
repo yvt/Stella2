@@ -3,7 +3,7 @@ use cggeom::box2;
 use cgmath::Vector2;
 use flags_macro::flags;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::{Rc, Weak},
 };
 
@@ -27,108 +27,76 @@ use crate::{
 #[derive(Debug)]
 pub struct StyledBox {
     view: HView,
-    shared: Rc<RefCell<Shared>>,
-    sheet_set_change_sub: Option<Sub>,
+    shared: Rc<Shared>,
 }
 
 #[derive(Debug)]
 struct Shared {
     view: HView,
 
-    style_manager: &'static Manager,
-
-    class_path: Rc<ElemClassPath>,
-    dirty_class_path: bool,
     style_elem: Elem,
-    dirty_kind: PropKindFlags,
+    dirty: Cell<PropKindFlags>,
 
-    subviews: Vec<(Role, HView)>,
+    subviews: RefCell<Vec<(Role, HView)>>,
 
     has_layer_group: bool,
 }
 
 impl StyledBox {
     pub fn new(style_manager: &'static Manager, view_flags: ViewFlags) -> Self {
-        let class_path = Rc::new(ElemClassPath::default());
-
         // Create `Elem` based on the inital properties
-        let mut style_elem = Elem::new();
-        style_elem.set_class_path(&style_manager.sheet_set(), &class_path);
+        let style_elem = Elem::new(style_manager);
 
         // Create the initial `Layout` based on the inital properties
         let subviews = Vec::new();
-        let layout = SbLayout::new(style_manager, &subviews, &style_elem);
+        let layout = SbLayout::new(&subviews, &style_elem);
 
         // Create and set up a `View`
         let view = HView::new(view_flags);
 
-        let shared = Rc::new(RefCell::new(Shared {
+        let shared = Rc::new(Shared {
             view: view.clone(),
-            class_path,
-            dirty_class_path: false,
-            subviews,
-            style_manager,
+            subviews: RefCell::new(subviews),
             style_elem,
             // Already have an up-to-date `Layout`, so exclude it from
             // the dirty flags
-            dirty_kind: PropKindFlags::all() - PropKindFlags::LAYOUT,
+            dirty: Cell::new(PropKindFlags::all() - PropKindFlags::LAYOUT),
             has_layer_group: view_flags.contains(ViewFlags::LAYER_GROUP),
-        }));
+        });
 
         view.set_listener(SbListener::new(Rc::downgrade(&shared)));
         view.set_layout(layout);
 
-        // Get notified when the sheet set changes
-        let sheet_set_change_sub = {
-            let shared = Rc::downgrade(&shared);
-            style_manager.subscribe_sheet_set_changed(Box::new(move |_, _| {
-                if let Some(shared) = shared.upgrade() {
-                    shared.borrow_mut().reapply_style(true);
-                }
-            }))
-        };
-
-        Self {
-            view,
-            shared,
-            sheet_set_change_sub: Some(sheet_set_change_sub),
+        // Get notified when the styling properties change
+        {
+            let shared_weak = Rc::downgrade(&shared);
+            shared
+                .style_elem
+                .set_on_change(Box::new(move |_, kind_flags| {
+                    if let Some(shared) = shared_weak.upgrade() {
+                        shared.set_dirty(kind_flags);
+                    }
+                }));
         }
+
+        Self { view, shared }
     }
 
     /// Set the class set of the styled element.
-    ///
-    /// Update is deferred until `reapply_style` is called.
     pub fn set_class_set(&mut self, class_set: ClassSet) {
-        let mut shared = self.shared.borrow_mut();
-
-        let mut class_path = Rc::make_mut(&mut shared.class_path);
-        class_path.class_set = class_set;
-        drop(class_path);
-
-        // Pend the recalculation of the active rule set
-        shared.dirty_class_path = true;
+        self.shared.style_elem.set_class_set(class_set);
     }
 
     /// Set the parent class path.
-    ///
-    /// Update is deferred until `reapply_style` is called.
     pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let mut shared = self.shared.borrow_mut();
-
-        let mut class_path = Rc::make_mut(&mut shared.class_path);
-        class_path.tail = parent_class_path;
-        drop(class_path);
-
-        // Pend the recalculation of the active rule set
-        shared.dirty_class_path = true;
+        self.shared
+            .style_elem
+            .set_parent_class_path(parent_class_path);
     }
 
     /// Set a subview for the specified `Role`.
-    ///
-    /// Update is deferred until `reapply_style` is called.
     pub fn set_subview(&mut self, role: Role, view: Option<HView>) {
-        let mut shared = self.shared.borrow_mut();
-        let subviews = &mut shared.subviews;
+        let mut subviews = self.shared.subviews.borrow_mut();
 
         if let Some(view) = view {
             // Assign a subview
@@ -144,20 +112,17 @@ impl StyledBox {
             }
         }
 
-        // Pend layout update
-        shared.dirty_kind |= PropKindFlags::LAYOUT;
-    }
+        drop(subviews);
 
-    /// Apply pending changes and recalculate the styling properties.
-    pub fn reapply_style(&mut self) {
-        self.shared.borrow_mut().reapply_style(false);
+        // TODO: Add methods for deferring update
+        self.shared.set_dirty(PropKindFlags::LAYOUT);
     }
 
     /// Get `Rc<ElemClassPath>` representing the class path of the styled
     /// element. The returned value can be set on subviews as a parent class
     /// path.
     pub fn class_path(&self) -> Rc<ElemClassPath> {
-        Rc::clone(&self.shared.borrow().class_path)
+        self.shared.style_elem.class_path()
     }
 
     /// Get the view representing a styled box.
@@ -166,57 +131,20 @@ impl StyledBox {
     }
 }
 
-impl Drop for StyledBox {
-    fn drop(&mut self) {
-        self.sheet_set_change_sub
-            .take()
-            .unwrap()
-            .unsubscribe()
-            .unwrap();
-    }
-}
-
 impl Shared {
-    /// Recalculate the styling properties.
-    ///
-    /// This is defined on `Shared` because it may be called when the active
-    /// stylesheet set is changed.
-    fn reapply_style(&mut self, sheet_set_changed: bool) {
-        let style_elem = &mut self.style_elem;
-
-        let sheet_set = self.style_manager.sheet_set();
-
-        // TODO: `Label` has a similar internal function... Hopefully they could be merged
-
-        // Recalculate the active rule set
-        if sheet_set_changed {
-            // The stylesheet set has changed, so do a full update
-            style_elem.set_class_path(&sheet_set, &self.class_path);
-            self.dirty_kind = PropKindFlags::all();
-        } else if self.dirty_class_path {
-            // The class path has changed but the stylesheet set didn't change.
-            let kind_flags = style_elem.set_and_diff_class_path(&sheet_set, &self.class_path);
-            self.dirty_kind |= kind_flags;
+    /// Dispatch update methods based on a `PropKindFlags`
+    fn set_dirty(&self, diff: PropKindFlags) {
+        if diff.intersects(PropKindFlags::LAYOUT) {
+            self.view
+                .set_layout(SbLayout::new(&self.subviews.borrow(), &self.style_elem));
         }
 
-        self.dirty_class_path = false;
-
-        if self.dirty_kind.intersects(PropKindFlags::LAYOUT) {
-            self.view.set_layout(SbLayout::new(
-                self.style_manager,
-                &self.subviews,
-                &style_elem,
-            ));
-        }
-
-        if self
-            .dirty_kind
-            .intersects(flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}])
-        {
+        if diff.intersects(flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}]) {
             self.view.pend_update();
         }
 
-        self.dirty_kind -= PropKindFlags::LAYOUT;
+        let dirty = &self.dirty;
+        dirty.set((dirty.get() | diff) - PropKindFlags::LAYOUT);
     }
 }
 
@@ -227,21 +155,20 @@ struct SbLayout {
 }
 
 impl SbLayout {
-    fn new(style_manager: &'static Manager, subviews: &Vec<(Role, HView)>, elem: &Elem) -> Self {
+    fn new(subviews: &Vec<(Role, HView)>, elem: &Elem) -> Self {
         // Evaluate the layout properties now
-        let sheet_set = style_manager.sheet_set();
         Self {
             subview_layout: subviews
                 .iter()
                 .map(
-                    |&(role, _)| match elem.compute_prop(&sheet_set, Prop::SubviewMetrics(role)) {
+                    |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
                         PropValue::Metrics(m) => m,
                         _ => unreachable!(),
                     },
                 )
                 .collect(),
             subviews: subviews.iter().map(|x| x.1.clone()).collect(),
-            min_size: match elem.compute_prop(&sheet_set, Prop::MinSize) {
+            min_size: match elem.compute_prop(Prop::MinSize) {
                 PropValue::Vector2(v) => v,
                 _ => unreachable!(),
             },
@@ -318,7 +245,7 @@ impl Layout for SbLayout {
 
 struct SbListener {
     // Use a weak reference to break a cycle
-    shared: Weak<RefCell<Shared>>,
+    shared: Weak<Shared>,
     layers: RefCell<Option<Layers>>,
 }
 
@@ -330,7 +257,7 @@ struct Layers {
 }
 
 impl SbListener {
-    fn new(shared: Weak<RefCell<Shared>>) -> Self {
+    fn new(shared: Weak<Shared>) -> Self {
         Self {
             shared,
             layers: RefCell::new(None),
@@ -344,24 +271,22 @@ impl ViewListener for SbListener {
         assert!(layers.is_none());
 
         if let Some(shared) = self.shared.upgrade() {
-            let mut shared = shared.borrow_mut();
-
-            shared.dirty_kind |= flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}];
+            // Insert fake dirty flags to set the inital layer properties
+            let dirty = &shared.dirty;
+            dirty.set(dirty.get() | flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}]);
 
             // Watch for DPI scale changes
             let sub = {
                 let shared = self.shared.clone();
                 wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
                     if let Some(shared) = shared.upgrade() {
-                        let mut shared = shared.borrow_mut();
-                        shared.dirty_kind |= PropKindFlags::LAYER_IMG;
-
-                        shared.view.pend_update();
+                        shared.set_dirty(PropKindFlags::LAYER_IMG);
                     }
                 }))
             };
 
-            // Create layers. Properties are set later in `update`.
+            // Create layers. Properties are set later in `update` (This happens
+            // because of the fake dirty flags we inserted).
             *layers = Some(Layers {
                 clip: if shared.has_layer_group {
                     Some(wm.new_layer(pal::LayerAttrs {
@@ -394,12 +319,9 @@ impl ViewListener for SbListener {
         }
     }
 
-    fn position(&self, _: pal::WM, view: &HView) {
+    fn position(&self, _: pal::WM, _: &HView) {
         if let Some(shared) = self.shared.upgrade() {
-            let mut shared = shared.borrow_mut();
-            shared.dirty_kind |= PropKindFlags::LAYER_BOUNDS;
-
-            view.pend_update();
+            shared.set_dirty(PropKindFlags::LAYER_BOUNDS);
         }
     }
 
@@ -410,29 +332,28 @@ impl ViewListener for SbListener {
         } else {
             return;
         }
-        let mut shared = shared.borrow_mut();
 
         let mut layers = self.layers.borrow_mut();
         let layers: &mut Layers = layers.as_mut().unwrap();
 
-        let shared: &mut Shared = &mut *shared; // enable split borrow
         let elem = &shared.style_elem;
-        let sheet_set = shared.style_manager.sheet_set();
 
         macro_rules! compute_prop {
             ($prop:expr, PropValue::$type:ident) => {
-                match elem.compute_prop(&sheet_set, $prop) {
+                match elem.compute_prop($prop) {
                     PropValue::$type(v) => v,
                     _ => unreachable!(),
                 }
             };
         }
 
-        let dirty_kind = shared.dirty_kind;
-        shared.dirty_kind -= flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}];
+        let dirty = shared.dirty.get();
+        shared
+            .dirty
+            .set(dirty - flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}]);
 
         // Adjust the layer count
-        if dirty_kind.intersects(PropKindFlags::NUM_LAYERS) {
+        if dirty.intersects(PropKindFlags::NUM_LAYERS) {
             let num_layers = compute_prop!(Prop::NumLayers, PropValue::Usize);
             let styled = &mut layers.styled;
 
@@ -446,18 +367,18 @@ impl ViewListener for SbListener {
 
         // Update layer properties
         let prop_flags = PropKindFlags::LAYER_ALL - PropKindFlags::NUM_LAYERS;
-        if dirty_kind.intersects(prop_flags) {
+        if dirty.intersects(prop_flags) {
             for (i, layer) in layers.styled.iter().enumerate() {
                 let layer_id = i as u32;
                 let mut layer_attrs = pal::LayerAttrs::default();
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_BOUNDS) {
+                if dirty.intersects(PropKindFlags::LAYER_BOUNDS) {
                     let met = compute_prop!(Prop::LayerMetrics(layer_id), PropValue::Metrics);
                     let bounds = met.arrange(container, Vector2::new(0.0, 0.0));
                     layer_attrs.bounds = Some(bounds);
                 }
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_IMG) {
+                if dirty.intersects(PropKindFlags::LAYER_IMG) {
                     let img = compute_prop!(Prop::LayerImg(layer_id), PropValue::Himg);
 
                     if let Some(img) = img {
@@ -470,22 +391,22 @@ impl ViewListener for SbListener {
                     }
                 }
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_BG_COLOR) {
+                if dirty.intersects(PropKindFlags::LAYER_BG_COLOR) {
                     let value = compute_prop!(Prop::LayerBgColor(layer_id), PropValue::Rgbaf32);
                     layer_attrs.bg_color = Some(value);
                 }
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_OPACITY) {
+                if dirty.intersects(PropKindFlags::LAYER_OPACITY) {
                     let value = compute_prop!(Prop::LayerOpacity(layer_id), PropValue::Float);
                     layer_attrs.opacity = Some(value);
                 }
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_CENTER) {
+                if dirty.intersects(PropKindFlags::LAYER_CENTER) {
                     let value = compute_prop!(Prop::LayerCenter(layer_id), PropValue::Box2);
                     layer_attrs.contents_center = Some(value);
                 }
 
-                if dirty_kind.intersects(PropKindFlags::LAYER_XFORM) {
+                if dirty.intersects(PropKindFlags::LAYER_XFORM) {
                     let xform = compute_prop!(Prop::LayerXform(layer_id), PropValue::LayerXform);
 
                     let met = compute_prop!(Prop::LayerMetrics(layer_id), PropValue::Metrics);
@@ -502,7 +423,7 @@ impl ViewListener for SbListener {
 
         // Update the clip layer's properties
         if let Some(clip) = &layers.clip {
-            if dirty_kind.intersects(PropKindFlags::CLIP_LAYER) {
+            if dirty.intersects(PropKindFlags::CLIP_LAYER) {
                 let met = compute_prop!(Prop::ClipMetrics, PropValue::Metrics);
 
                 let bounds = met.arrange(container, Vector2::new(0.0, 0.0));

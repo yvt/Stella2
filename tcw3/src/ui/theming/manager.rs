@@ -1,10 +1,14 @@
 use bitflags::bitflags;
 use sorted_diff::{sorted_diff, In};
-use std::{cell::RefCell, fmt};
+use std::{
+    cell::{Cell, RefCell},
+    fmt,
+    rc::Rc,
+};
 use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
 
 use super::{
-    style::{ElemClassPath, Prop, PropValue},
+    style::{ClassSet, ElemClassPath, Prop, PropValue},
     stylesheet::{DefaultStylesheet, RuleId, Stylesheet},
 };
 use crate::{pal, pal::prelude::*};
@@ -125,7 +129,7 @@ bitflags! {
     /// properties have to be recomputed. It would be inefficient to precisely
     /// track every property, so we categorize the properties into coarse groups
     /// and track changes in this unit.
-    pub(crate) struct PropKindFlags: u16 {
+    pub struct PropKindFlags: u16 {
         const NUM_LAYERS = 1 << 0;
         const LAYER_IMG = 1 << 1;
         const LAYER_BOUNDS = 1 << 2;
@@ -149,7 +153,7 @@ bitflags! {
 }
 
 impl Prop {
-    pub(crate) fn kind_flags(&self) -> PropKindFlags {
+    pub fn kind_flags(&self) -> PropKindFlags {
         match *self {
             Prop::NumLayers => PropKindFlags::LAYER_ALL,
             Prop::LayerImg(_) => PropKindFlags::LAYER_IMG,
@@ -167,89 +171,162 @@ impl Prop {
     }
 }
 
-// TODO: Flesh out the interface of `Elem` and make it `pub`
-
 /// Represents a styled element.
 ///
-/// This type tracks the currently-active rule set of a styled element.
+/// This type tracks the currently-active rule set of a styled element. It
+/// subscribes to [`Manager`]'s sheet set change handler and automatically
+/// updates the active rule set whenever the sheet set is changed. It tracks
+/// changes in properties, and calls the provided [`ElemChangeHandler`] whenever
+/// styling properties of the corresponding styled element are updated.
 #[derive(Debug)]
-pub(crate) struct Elem {
+pub struct Elem {
+    inner: Rc<ElemInner>,
+}
+
+pub type ElemChangeHandler = Box<dyn Fn(pal::WM, PropKindFlags)>;
+
+struct ElemInner {
+    sub: Cell<Option<Sub>>,
+    style_manager: &'static Manager,
+    rules: RefCell<ElemRules>,
+    /// The function called when property values might have changed.
+    change_handler: RefCell<ElemChangeHandler>,
+}
+
+#[derive(Debug)]
+struct ElemRules {
+    class_path: Rc<ElemClassPath>,
     // Currently-active rules, sorted by a lexicographical order.
-    rules: Vec<(SheetId, RuleId)>,
+    rules_by_ord: Vec<(SheetId, RuleId)>,
     // Currently-active rules, sorted by an ascending order of priority.
     rules_by_prio: Vec<(SheetId, RuleId)>,
 }
 
+impl fmt::Debug for ElemInner {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ElemInner")
+            .field("sub", &())
+            .field("style_manager", &self.style_manager)
+            .field("rules", &self.rules)
+            .field("change_handler", &((&self.change_handler) as *const _))
+            .finish()
+    }
+}
+
+impl Drop for Elem {
+    fn drop(&mut self) {
+        if let Some(sub) = self.inner.sub.take().take() {
+            sub.unsubscribe().unwrap();
+        }
+    }
+}
+
 impl Elem {
     /// Construct an `Elem`.
-    pub(crate) fn new() -> Self {
-        Self {
-            rules: Vec::new(),
-            rules_by_prio: Vec::new(),
-        }
+    pub fn new(style_manager: &'static Manager) -> Self {
+        let this = Self {
+            inner: Rc::new(ElemInner {
+                sub: Cell::new(None),
+                style_manager,
+                rules: RefCell::new(ElemRules {
+                    class_path: Rc::default(),
+                    rules_by_ord: Vec::new(),
+                    rules_by_prio: Vec::new(),
+                }),
+                change_handler: RefCell::new(Box::new(|_, _| {})),
+            }),
+        };
+
+        // Watch for stylesheet set changes
+        let inner = Rc::clone(&this.inner);
+        let sub = style_manager.subscribe_sheet_set_changed(Box::new(move |wm, _| {
+            // `sheet_set` was changed, update the ative rule set
+            let manager = inner.style_manager;
+            let sheet_set = manager.sheet_set();
+            inner
+                .rules
+                .borrow_mut()
+                .invalidate_rules_and_update(&sheet_set);
+
+            // Notify that any of the properties might have changed
+            inner.change_handler.borrow()(wm, PropKindFlags::all());
+        }));
+        this.inner.sub.set(Some(sub));
+
+        this
     }
 
-    /// Assign a new `ElemClassPath` and recalculate the active rule set.
-    pub(crate) fn set_class_path(&mut self, sheet_set: &SheetSet, new_class_path: &ElemClassPath) {
-        self.rules.clear();
-        sheet_set.match_rules(new_class_path, &mut |sheet_id, rule_id| {
-            self.rules.push((sheet_id, rule_id));
-        });
-        self.rules.sort_unstable();
-        self.update_rules_by_prio(sheet_set);
-    }
-
-    /// Assign a new `ElemClassPath` and recalculate the active rule set.
-    ///
-    /// This method assumes that the stylesheet set haven't changed since the
-    /// last time the active rule set was calculated. If it has changed,
-    /// `set_class_path` must be used instead.
-    ///
-    /// Returns `PropKindFlags` indicating which property might have been
-    /// changed.
-    pub(crate) fn set_and_diff_class_path(
-        &mut self,
-        sheet_set: &SheetSet,
-        new_class_path: &ElemClassPath,
-    ) -> PropKindFlags {
-        let mut new_rules = Vec::with_capacity(self.rules.len());
-        sheet_set.match_rules(new_class_path, &mut |sheet_id, rule_id| {
-            new_rules.push((sheet_id, rule_id));
-        });
-        new_rules.sort_unstable();
-
-        // Calculate `PropKindFlags`
-        let mut flags = PropKindFlags::empty();
-        for diff in sorted_diff(self.rules.iter(), new_rules.iter()) {
-            match diff {
-                In::Left(&id) | In::Right(&id) => {
-                    flags |= sheet_set.get_rule(id).unwrap().prop_kinds();
-                }
-                In::Both(_, _) => {}
-            }
-        }
-
-        if flags.is_empty() {
-            // No changes
-            return flags;
-        }
-
-        self.rules = new_rules;
-        self.update_rules_by_prio(sheet_set);
-
-        flags
-    }
-
-    /// Update `self.rules_by_prio`.
-    fn update_rules_by_prio(&mut self, sheet_set: &SheetSet) {
-        self.rules_by_prio.clear();
-        self.rules_by_prio.extend(self.rules.iter().cloned());
-        self.rules_by_prio
-            .sort_unstable_by_key(|id| sheet_set.get_rule(*id).unwrap().priority());
+    /// Set a function called when property values might have changed.
+    pub fn set_on_change(&self, handler: ElemChangeHandler) {
+        *self.inner.change_handler.borrow_mut() = handler;
     }
 
     /// Get the computed value of the specified styling property.
-    pub(crate) fn compute_prop(&self, sheet_set: &SheetSet, prop: Prop) -> PropValue {
+    pub fn compute_prop(&self, prop: Prop) -> PropValue {
+        let manager = self.inner.style_manager;
+        let sheet_set = manager.sheet_set();
+        self.inner.rules.borrow().compute_prop(&sheet_set, prop)
+    }
+
+    /// Assign a new `ElemClassPath` and update the active rule set.
+    ///
+    /// This might internally call the `ElemChangeHandler` registered by
+    /// `set_on_change`.
+    pub fn set_class_path(&self, new_class_path: Rc<ElemClassPath>) {
+        self.update_class_path_with(|class_path| {
+            *class_path = new_class_path;
+        });
+    }
+
+    /// Set the class set and update the active rule set.
+    ///
+    /// This might internally call the `ElemChangeHandler` registered by
+    /// `set_on_change`.
+    pub fn set_class_set(&self, class_set: ClassSet) {
+        self.update_class_path_with(|class_path| {
+            let class_path = Rc::make_mut(class_path);
+            class_path.class_set = class_set;
+        });
+    }
+
+    /// Set the parent class path and update the active rule set.
+    ///
+    /// This might internally call the `ElemChangeHandler` registered by
+    /// `set_on_change`.
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
+        self.update_class_path_with(|class_path| {
+            let class_path = Rc::make_mut(class_path);
+            class_path.tail = parent_class_path;
+        });
+    }
+
+    /// Get the class path.
+    pub fn class_path(&self) -> Rc<ElemClassPath> {
+        Rc::clone(&self.inner.rules.borrow().class_path)
+    }
+
+    /// Update the target `ElemClassPath` and update the active rule set.
+    fn update_class_path_with(&self, f: impl FnOnce(&mut Rc<ElemClassPath>)) {
+        let manager = self.inner.style_manager;
+        let sheet_set = manager.sheet_set();
+
+        // Update the active rule set
+        let diff = {
+            let mut rules = self.inner.rules.borrow_mut();
+            f(&mut rules.class_path);
+            rules.update(&sheet_set)
+        };
+
+        // Notify the change
+        if !diff.is_empty() {
+            self.inner.change_handler.borrow()(manager.wm, diff);
+        }
+    }
+}
+
+impl ElemRules {
+    /// Get the computed value of the specified styling property.
+    fn compute_prop(&self, sheet_set: &SheetSet, prop: Prop) -> PropValue {
         let mut computed_value = PropValue::default_for_prop(&prop);
         let kind = prop.kind_flags();
 
@@ -263,5 +340,64 @@ impl Elem {
         }
 
         computed_value
+    }
+
+    /// Recalculate the active rule set assuming the existing `rules_by_ord` is
+    /// invalid.
+    fn invalidate_rules_and_update(&mut self, sheet_set: &SheetSet) {
+        // Replace all rules
+        let rules_by_ord = &mut self.rules_by_ord;
+        rules_by_ord.clear();
+        sheet_set.match_rules(&self.class_path, &mut |sheet_id, rule_id| {
+            rules_by_ord.push((sheet_id, rule_id));
+        });
+
+        rules_by_ord.sort_unstable();
+        self.update_rules_by_prio(sheet_set);
+    }
+
+    /// Recalculate the active rule set.
+    ///
+    /// This method assumes that the stylesheet set haven't changed since the
+    /// last time the active rule set was calculated. If it has changed,
+    /// `set_class_path` must be used instead.
+    ///
+    /// Returns `PropKindFlags` indicating which property might have been
+    /// changed.
+    fn update(&mut self, sheet_set: &SheetSet) -> PropKindFlags {
+        let mut new_rules = Vec::with_capacity(self.rules_by_ord.len());
+        sheet_set.match_rules(&self.class_path, &mut |sheet_id, rule_id| {
+            new_rules.push((sheet_id, rule_id));
+        });
+        new_rules.sort_unstable();
+
+        // Calculate `PropKindFlags`
+        let mut flags = PropKindFlags::empty();
+        for diff in sorted_diff(self.rules_by_ord.iter(), new_rules.iter()) {
+            match diff {
+                In::Left(&id) | In::Right(&id) => {
+                    flags |= sheet_set.get_rule(id).unwrap().prop_kinds();
+                }
+                In::Both(_, _) => {}
+            }
+        }
+
+        if flags.is_empty() {
+            // No changes
+            return flags;
+        }
+
+        self.rules_by_ord = new_rules;
+        self.update_rules_by_prio(sheet_set);
+
+        flags
+    }
+
+    /// Update `self.rules_by_prio` based on `self.rules_by_ord`.
+    fn update_rules_by_prio(&mut self, sheet_set: &SheetSet) {
+        self.rules_by_prio.clear();
+        self.rules_by_prio.extend(self.rules_by_ord.iter().cloned());
+        self.rules_by_prio
+            .sort_unstable_by_key(|id| sheet_set.get_rule(*id).unwrap().priority());
     }
 }
