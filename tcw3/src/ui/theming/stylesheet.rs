@@ -168,6 +168,9 @@ impl ElemCriteria {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! elem_pos {
+    (#$id:tt $($rest:tt)*) => {
+        ($id).bits() | $crate::elem_pos!($($rest)*)
+    };
     (.$cls:ident $($rest:tt)*) => {
         $crate::ui::theming::ClassSet::$cls.bits() | $crate::elem_pos!($($rest)*)
     };
@@ -182,6 +185,9 @@ macro_rules! elem_pos {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! elem_neg {
+    (#$id:tt $($rest:tt)*) => {
+        ($crate::ui::theming::ClassSet::ID_MASK.bits() ^ ($id).bits()) | $crate::elem_pos!($($rest)*)
+    };
     (:not(.$cls:ident) $($rest:tt)*) => {
         $crate::ui::theming::ClassSet::$cls.bits() | $crate::elem_neg!($($rest)*)
     };
@@ -363,10 +369,16 @@ macro_rules! ruleprops {
 ///
 /// # Examples
 ///
-///     use tcw3::{stylesheet, pal::RGBAF32};
+///     use tcw3::{stylesheet, pal::RGBAF32, ui::theming::ClassSet};
+///
+///     const CUSTOM_ID: ClassSet = ClassSet::id(42);
 ///
 ///     let stylesheet = stylesheet! {
-///         ([.LABEL] < [.BUTTON.ACTIVE]) (priority = 100) {
+///         // Selector are similar to CSS, but use predefined symbols instead.
+///         //  - ID values (`CUSTOM_ID`) are constant expressions. They must be
+///         //    a single token tree.
+///         //  - Class bits (`LABEL``, etc.) are bare identifiers in `ClassSet`.
+///         ([#CUSTOM_ID.LABEL] < [.BUTTON.ACTIVE]) (priority = 100) {
 ///             // Arbitrary expressions are permitted only as property values
 ///             // like the following:
 ///             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),

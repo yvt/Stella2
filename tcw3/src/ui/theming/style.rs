@@ -7,7 +7,7 @@ use crate::pal::{SysFontType, RGBAF32};
 
 bitflags! {
     /// A set of styling classes.
-    pub struct ClassSet: u8 {
+    pub struct ClassSet: u32 {
         /// The mouse pointer inside the element.
         ///
         /// Be aware that this is a normal styling class like other ones. This
@@ -20,6 +20,44 @@ bitflags! {
         const BUTTON = 1 << 2;
         /// The element is a label.
         const LABEL = 1 << 3;
+
+        /// The bit mask for ID values. See [`ClassSet::id`] for more.
+        const ID_MASK = 0xffff0000;
+    }
+}
+
+impl ClassSet {
+    /// Construct an ID value.
+    ///
+    /// For design purposes, we want to identify every specific element on
+    /// a window, but doing so by allocating a single bit for every element
+    /// won't scale well. The solution is to reserve the upper bits for element
+    /// ID.
+    ///
+    /// `ID_MASK` represents the set of bits allocated for ID values. This
+    /// function creates a bit pattern representing an ID value using a subset
+    /// of `ID_MASK`.
+    ///
+    /// How ID values are assigned is completely up to the application.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tcw3::ui::theming::ClassSet;
+    ///
+    /// const GO_BACK: ClassSet = ClassSet::id(0);
+    /// const GO_FORWARD: ClassSet = ClassSet::id(1);
+    ///
+    /// let class1 = ClassSet::BUTTON | GO_BACK;
+    /// let class2 = ClassSet::BUTTON | GO_FORWARD;
+    ///
+    /// assert_eq!(class1 & ClassSet::ID_MASK, GO_BACK);
+    ///
+    /// // Don't do this - the resulting bit pattern does not make sense:
+    /// let bad = ClassSet::BUTTON | GO_BACK | GO_FORWARD;
+    /// ```
+    pub const fn id(id: u16) -> Self {
+        Self::from_bits_truncate((id as u32) << 16)
     }
 }
 
