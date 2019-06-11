@@ -40,12 +40,12 @@ pub mod images {
 
 /// Theming support
 pub mod theming {
-    pub(crate) mod manager;
+    mod manager;
     mod style;
     mod stylesheet;
     mod view;
     pub use self::{
-        manager::{Elem, ElemChangeHandler, Manager},
+        manager::{Elem, ElemChangeHandler, Manager, PropKindFlags},
         style::{ClassSet, ElemClassPath, Prop, PropValue, Role},
         view::StyledBox,
     };

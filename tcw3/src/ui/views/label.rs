@@ -7,10 +7,7 @@ use crate::{
     pal,
     pal::prelude::*,
     ui::mixins::CanvasMixin,
-    ui::theming::{
-        manager::{Elem, PropKindFlags},
-        ClassSet, ElemClassPath, Manager, Prop, PropValue,
-    },
+    ui::theming::{ClassSet, Elem, ElemClassPath, Manager, Prop, PropKindFlags, PropValue},
     uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
 };
 
