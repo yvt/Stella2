@@ -52,4 +52,4 @@ pub mod theming {
 }
 
 mod types;
-pub use self::types::AlignFlags;
+pub use self::types::{AlignFlags, Suspend, SuspendFlag, SuspendGuard};

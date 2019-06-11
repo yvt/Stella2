@@ -1,6 +1,7 @@
 use alt_fp::FloatOrd;
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
+use std::{cell::Cell, fmt};
 
 use crate::uicore::SizeTraits;
 
@@ -107,5 +108,127 @@ impl AlignFlags {
         }
 
         child
+    }
+}
+
+/// Provides a counter, which is used to temporarily prevent updates when the
+/// current value is greater than zero.
+///
+/// # Examples
+///
+/// ```
+/// use {std::cell::Cell, tcw3::ui::{SuspendFlag, Suspend}};
+/// #[derive(Default)]
+/// struct Component {
+///     dirty: Cell<bool>,
+///     suspend_flag: SuspendFlag,
+/// }
+///
+/// impl Component {
+///     fn set_something(&self) {
+///         // do something...
+///         self.dirty.set(true);
+///         self.flush_changes();
+///     }
+///
+///     fn flush_changes(&self) {
+///         if !self.suspend_flag.is_suspended() {
+///             // do expensive things...
+///             self.dirty.set(false);
+///         }
+///     }
+///
+///     fn suspend_update<'a>(&'a self) -> impl Suspend + 'a {
+///         self.suspend_flag.suspend(move || { self.flush_changes(); })
+///     }
+/// }
+/// let comp = Component::default();
+///
+/// // This immediately causes update:
+/// comp.set_something();
+/// assert_eq!(comp.dirty.get(), false);
+///
+/// // This defers update:
+/// {
+///     let _guard = comp.suspend_update();
+///     comp.set_something();
+///     assert_eq!(comp.dirty.get(), true);
+/// };
+/// assert_eq!(comp.dirty.get(), false);
+/// ```
+#[derive(Debug)]
+pub struct SuspendFlag {
+    count: Cell<usize>,
+}
+
+impl Default for SuspendFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SuspendFlag {
+    /// Construct a `SuspendFlag`.
+    pub fn new() -> Self {
+        Self {
+            count: Cell::new(0),
+        }
+    }
+
+    /// Returns `true` if the current value is not zero.
+    pub fn is_suspended(&self) -> bool {
+        self.count.get() > 0
+    }
+
+    /// Increase the counter. Returns an RAII guard, which decrements the
+    /// counter when dropped. When the value returns to zero, the specified
+    /// function `resume` is called.
+    pub fn suspend<F: FnOnce()>(&self, resume: F) -> SuspendGuard<'_, F> {
+        self.count.set(self.count.get() + 1);
+        SuspendGuard {
+            flag: self,
+            resume: Some(resume),
+        }
+    }
+}
+
+/// The marker trait for [`SuspendGuard`].
+///
+/// [`SuspendFlag::suspend`] returns a `SuspendGuard` with an indescribable
+/// generic parameter. However, `impl` requires you to specify at least one
+/// trait. The solution is this trait, which directly leads to here on the API
+/// documentation.
+///
+/// Do not implement this trait for other types as doing so defeats the purpose
+/// of the trait.
+///
+/// See [`SuspendFlag`] for the usage.
+pub trait Suspend: fmt::Debug {}
+
+/// A RAII guard for [`SuspendFlag`], which automatically decrements the counter
+/// when dropped.
+pub struct SuspendGuard<'a, T: FnOnce()> {
+    flag: &'a SuspendFlag,
+    resume: Option<T>,
+}
+
+impl<T: FnOnce()> Suspend for SuspendGuard<'_, T> {}
+
+impl<T: FnOnce()> fmt::Debug for SuspendGuard<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("SuspendGuard")
+            .field("flag", &self.flag)
+            .field("resume", &())
+            .finish()
+    }
+}
+
+impl<T: FnOnce()> Drop for SuspendGuard<'_, T> {
+    fn drop(&mut self) {
+        let count = self.flag.count.get();
+        self.flag.count.set(count - 1);
+        if count == 1 {
+            self.resume.take().unwrap()();
+        }
     }
 }
