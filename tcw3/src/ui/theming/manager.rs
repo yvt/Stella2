@@ -154,6 +154,9 @@ bitflags! {
 
 impl Prop {
     pub fn kind_flags(&self) -> PropKindFlags {
+        // Make sure to synchronize these with the `prop!` macro - This is a
+        // temporary restriction until `match` inside `const fn` is implemented:
+        // <https://github.com/rust-lang/rust/issues/49146>
         match *self {
             Prop::NumLayers => PropKindFlags::LAYER_ALL,
             Prop::LayerImg(_) => PropKindFlags::LAYER_IMG,

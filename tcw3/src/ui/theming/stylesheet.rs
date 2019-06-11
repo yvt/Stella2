@@ -8,7 +8,7 @@ use super::{
 /// Represents a single stylesheet rule in [`Stylesheet`].
 pub type RuleId = usize;
 
-pub(crate) trait Stylesheet {
+pub trait Stylesheet {
     /// Enumerate rules that apply to the specifed `ElemClassPath`.
     ///
     /// `out_rules` is called with a `RuleId` for each rule that applies to the
@@ -31,38 +31,49 @@ pub(crate) trait Stylesheet {
     fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>>;
 }
 
+// The following types are constructred by the `stylesheet!` marcro. However,
+// they are implemntation details and I'd prefer not to expose them.
+
+#[doc(hidden)]
 #[derive(Debug)]
-struct StaticStylesheet {
-    rules: &'static [StaticRule],
+pub struct StylesheetMacroOutput {
+    /// The static part (everything other than prop values) of the stylesheet.
+    pub rules: &'static [Rule],
+    /// The runtime part (prop values) of the stylesheet.
+    /// Each element corresponds an element in `rules` with an identical index.
+    pub ruleprops: Vec<RuleProps>,
 }
 
+/// The properties specified by a rule.
+#[doc(hidden)]
 #[derive(Debug)]
-struct StaticRule {
-    priority: i32,
-    prop_kinds: PropKindFlags,
-    selector: Selector,
-    props: &'static [RuleProp],
+pub struct RuleProps {
+    pub props: Vec<(Prop, PropValue)>,
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
-struct Selector {
-    target: ElemCriteria,
-    ancestors: &'static [(bool, ElemCriteria)],
+pub struct Rule {
+    pub priority: i32,
+    pub prop_kinds: PropKindFlags,
+    pub selector: Selector,
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
-struct ElemCriteria {
-    pos: ClassSet,
-    neg: ClassSet,
+pub struct Selector {
+    pub target: ElemCriteria,
+    pub ancestors: &'static [(bool, ElemCriteria)],
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
-struct RuleProp {
-    prop: Prop,
-    value: PropValue,
+pub struct ElemCriteria {
+    pub pos: ClassSet,
+    pub neg: ClassSet,
 }
 
-impl Stylesheet for StaticStylesheet {
+impl Stylesheet for StylesheetMacroOutput {
     fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleId)) {
         // TODO: optimize the selector matching using target class buckets or
         //       DFA + BDD
@@ -74,17 +85,17 @@ impl Stylesheet for StaticStylesheet {
     }
 
     fn get_rule_priority(&self, id: RuleId) -> Option<i32> {
-        self.rules.get(id).map(StaticRule::priority)
+        self.rules.get(id).map(Rule::priority)
     }
     fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags> {
-        self.rules.get(id).map(StaticRule::prop_kinds)
+        self.rules.get(id).map(Rule::prop_kinds)
     }
     fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>> {
-        self.rules.get(id).map(|r| r.get_prop_value(prop))
+        self.ruleprops.get(id).map(|r| r.get_prop_value(prop))
     }
 }
 
-impl StaticRule {
+impl Rule {
     fn priority(&self) -> i32 {
         self.priority
     }
@@ -92,13 +103,16 @@ impl StaticRule {
     fn prop_kinds(&self) -> PropKindFlags {
         self.prop_kinds
     }
+}
+
+impl RuleProps {
+    pub fn new(items: Vec<(Prop, PropValue)>) -> Self {
+        Self { props: items }
+    }
 
     fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
         // TODO: Use binary search?
-        self.props
-            .iter()
-            .find(|p| p.prop == *prop)
-            .map(|p| &p.value)
+        self.props.iter().find(|p| p.0 == *prop).map(|p| &p.1)
     }
 }
 
@@ -147,152 +161,243 @@ impl ElemCriteria {
 }
 
 // -----------------------------------------------------------------------------
-//  Default stylesheet definition
-//
-// TODO: Make it dynamic (based on the operating system's configuration)
+//  Stylesheet definition macro
+
+// Extract positive criterias of class names, and output them as the raw
+// representation of `ClassSet`.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! elem_pos {
     (.$cls:ident $($rest:tt)*) => {
-        ClassSet::$cls | elem_pos!($($rest)*)
+        $crate::ui::theming::ClassSet::$cls.bits() | $crate::elem_pos!($($rest)*)
     };
     (:not(.$cls:ident) $($rest:tt)*) => {
-        elem_pos!($($rest)*)
+        $crate::elem_pos!($($rest)*)
     };
-    () => {
-        ClassSet::empty()
-    };
+    () => { 0 };
 }
 
+// Extract negative criterias of class names, and output them as the raw
+// representation of `ClassSet`.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! elem_neg {
     (:not(.$cls:ident) $($rest:tt)*) => {
-        ClassSet::$cls | elem_neg!($($rest)*)
+        $crate::ui::theming::ClassSet::$cls.bits() | $crate::elem_neg!($($rest)*)
     };
     (.$cls:ident $($rest:tt)*) => {
-        elem_neg!($($rest)*)
+        $crate::elem_neg!($($rest)*)
     };
-    () => {
-        ClassSet::empty()
-    };
+    () => { 0 };
 }
 
+/// Construct a `ElemCriteria`. Called inside a `static` statement.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! elem {
-    ($($classes:tt)*) => {ElemCriteria {
-        pos: elem_pos!($($classes)*),
-        neg: elem_neg!($($classes)*),
-    }};
+    ($($classes:tt)*) => {
+        $crate::ui::theming::ElemCriteria {
+            pos: $crate::ui::theming::ClassSet::from_bits_truncate($crate::elem_pos!($($classes)*)),
+            neg: $crate::ui::theming::ClassSet::from_bits_truncate($crate::elem_neg!($($classes)*)),
+        }
+    };
 }
 
+#[doc(hidden)]
+#[macro_export]
 macro_rules! sel_ancestor {
-    (< $($rest:tt)*) => {(true, elem!($($rest)*))};
-    (.. $($rest:tt)*) => {(false, elem!($($rest)*))};
+    (< $($rest:tt)*) => {(true, $crate::elem!($($rest)*))};
+    (.. $($rest:tt)*) => {(false, $crate::elem!($($rest)*))};
 }
 
-macro_rules! count {
-    ($e:tt $($rest:tt)*) => {1 + count!($($rest)*)};
-    () => {0};
-}
-
+#[doc(hidden)]
+#[macro_export]
 macro_rules! sel {
     (
         [$($cur:tt)*]
         $( $mode:tt [ $($ancestor:tt)* ] )*
     ) => {{
-        lazy_static! {
-            static ref ANCESTORS: [(bool, ElemCriteria); count!($($mode)*)] = [
-                $( sel_ancestor!( $mode $($ancestor)* ) ),*
-            ];
-        }
-        Selector {
-            target: elem!($($cur)*),
-            ancestors: &*ANCESTORS,
+        $crate::ui::theming::Selector {
+            target: $crate::elem!($($cur)*),
+            ancestors: &[
+                $( $crate::sel_ancestor!( $mode $($ancestor)* ) ),*
+            ],
         }
     }};
 }
 
+/// This macro is used for two purposes:
+///  - To create `PropKindFlags`.
+///    (`Prop` and `Prop::kind_flags` would be better for normalization, but
+///     `match` does not work inside a `const fn` yet...
+///     <https://github.com/rust-lang/rfcs/pull/2342>)
+///  - To create `(Prop, PropValue)`.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! prop {
+    (@kind num_layers) => {
+        $crate::ui::theming::PropKindFlags::LAYER_ALL
+    };
     (num_layers: $val:expr) => {
-        RuleProp {
-            prop: Prop::NumLayers,
-            value: PropValue::Usize($val),
-        }
+        (
+            $crate::ui::theming::Prop::NumLayers,
+            $crate::ui::theming::PropValue::Usize($val),
+        )
+    };
+
+    (@kind layer_img[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYER_IMG
     };
     (layer_img[$i:expr]: $val:expr) => {
-        RuleProp {
-            prop: Prop::LayerImg($i),
-            value: PropValue::Himg($val),
-        }
+        (
+            $crate::ui::theming::Prop::LayerImg($i),
+            $crate::ui::theming::PropValue::Himg($val),
+        )
+    };
+
+    (@kind layer_center[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYER_CENTER
     };
     (layer_center[$i:expr]: $val:expr) => {
-        RuleProp {
-            prop: Prop::LayerCenter($i),
-            value: PropValue::Box2($val),
-        }
+        (
+            $crate::ui::theming::Prop::LayerCenter($i),
+            $crate::ui::theming::PropValue::Box2($val),
+        )
+    };
+
+    (@kind layer_bg_color[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYER_BG_COLOR
     };
     (layer_bg_color[$i:expr]: $val:expr) => {
-        RuleProp {
-            prop: Prop::LayerBgColor($i),
-            value: PropValue::Rgbaf32($val),
-        }
+        (
+            $crate::ui::theming::Prop::LayerBgColor($i),
+            $crate::ui::theming::PropValue::Rgbaf32($val),
+        )
+    };
+
+    (@kind subview_metrics[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYOUT
     };
     (subview_metrics[$i:expr]: $val:expr) => {
-        RuleProp {
-            prop: Prop::SubviewMetrics($i),
-            value: PropValue::Metrics($val),
-        }
+        (
+            $crate::ui::theming::Prop::SubviewMetrics($i),
+            $crate::ui::theming::PropValue::Metrics($val),
+        )
+    };
+
+    (@kind fg_color) => {
+        $crate::ui::theming::PropKindFlags::FG_COLOR
     };
     (fg_color: $val:expr) => {
-        RuleProp {
-            prop: Prop::FgColor,
-            value: PropValue::Rgbaf32($val),
-        }
+        (
+            $crate::ui::theming::Prop::FgColor,
+            $crate::ui::theming::PropValue::Rgbaf32($val),
+        )
     };
 }
 
+/// Construct a `Vec<(Prop, PropValue)>`.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! props {
-    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {{
-        lazy_static! {
-            static ref PROPS: [RuleProp; count!($( $name )*)] = [
-                $( prop!($name $([$param])* : $value ), )*
-            ];
-        }
-        &*PROPS
-    }};
+    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
+        vec![
+            $( $crate::prop!($name $([$param])* : $value ), )*
+        ]
+    };
 }
 
+/// Accepts the same syntax as `props`, but produces `PropKindFlags` instead.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! prop_kinds {
+    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
+        $crate::ui::theming::PropKindFlags::from_bits_truncate(
+            // 0 | x | y | z | ...
+            0
+            $(
+                |
+                $crate::prop!(@kind $name $([$param])*).bits()
+            )*
+        )
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! rule {
     (
         ($($sel:tt)*) (priority = $pri:expr) {
             $($props:tt)*
         }
-    ) => {{
-        let props = props! { $($props)* };
-
-        StaticRule {
+    ) => {
+        $crate::ui::theming::Rule {
             priority: $pri,
-            prop_kinds: props.iter()
-                .map(|p| p.prop.kind_flags())
-                .fold(PropKindFlags::empty(), |x, y| x | y),
-            selector: sel!($($sel)*),
-            props,
+            prop_kinds: $crate::prop_kinds! { $($props)* },
+            selector: $crate::sel!($($sel)*),
+        }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! ruleprops {
+    (
+        ($($sel:tt)*) (priority = $pri:expr) {
+            $($props:tt)*
+        }
+    ) => {{
+        $crate::ui::theming::RuleProps {
+            props: $crate::props! { $($props)* },
         }
     }};
 }
 
+/// Construct an `impl `[`Stylesheet`]` + 'static`.
+///
+/// [`Stylesheet`]: crate::ui::theming::Stylesheet
+///
+/// The produced expression is not a constant expression because it has to
+/// support property values which are determined at runtime. However,
+/// it utilizes `static` as much as possible for the constant part of the data.
+///
+/// # Examples
+///
+///     use tcw3::{stylesheet, pal::RGBAF32};
+///
+///     let stylesheet = stylesheet! {
+///         ([.LABEL] < [.BUTTON.ACTIVE]) (priority = 100) {
+///             // Arbitrary expressions are permitted only as property values
+///             // like the following:
+///             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
+///         },
+///     };
+///
+#[macro_export]
 macro_rules! stylesheet {
     ($( $( ($( $meta:tt )*) )* { $( $rule:tt )* } ),* $(,)*) => {{
-        lazy_static! {
-            static ref RULES: [StaticRule; count!($({ $($rule)* })*)] = [
-                $( rule!( $(($($meta)*))* {$($rule)*} ), )*
-            ];
+        static RULES: &[$crate::ui::theming::Rule] = &[
+            $( $crate::rule!( $(($($meta)*))* {$($rule)*} ), )*
+        ];
+        $crate::ui::theming::StylesheetMacroOutput {
+            rules: RULES,
+            ruleprops: std::vec![
+                $( $crate::ruleprops!( $(($($meta)*))* {$($rule)*} ), )*
+            ],
         }
-        StaticStylesheet { rules: &*RULES }
     }};
 }
 
+// -----------------------------------------------------------------------------
+//  Default  stylesheet definition
+//
+// TODO: Make it dynamic (based on the operating system's configuration)
+//
 use crate::{pal::RGBAF32, ui::images::himg_from_rounded_rect};
 use cggeom::box2;
 
 lazy_static! {
-    static ref DEFAULT_STYLESHEET: StaticStylesheet = stylesheet! {
+    static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 1) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(

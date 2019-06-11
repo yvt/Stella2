@@ -47,6 +47,7 @@ pub mod theming {
     pub use self::{
         manager::{Elem, ElemChangeHandler, Manager, PropKindFlags},
         style::{ClassSet, ElemClassPath, Prop, PropValue, Role},
+        stylesheet::*,
         view::StyledBox,
     };
 }
