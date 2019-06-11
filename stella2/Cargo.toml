@@ -11,3 +11,7 @@ harmony = { path = "../harmony" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2.3"
+cocoa = "0.18.4"
