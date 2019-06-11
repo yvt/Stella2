@@ -14,6 +14,7 @@ use super::{
 use crate::{
     pal,
     pal::prelude::*,
+    ui::{Suspend, SuspendFlag},
     uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener},
 };
 
@@ -39,6 +40,8 @@ struct Shared {
 
     subviews: RefCell<Vec<(Role, HView)>>,
 
+    suspend_flag: SuspendFlag,
+
     has_layer_group: bool,
 }
 
@@ -62,6 +65,7 @@ impl StyledBox {
             // the dirty flags
             dirty: Cell::new(PropKindFlags::all() - PropKindFlags::LAYOUT),
             has_layer_group: view_flags.contains(ViewFlags::LAYER_GROUP),
+            suspend_flag: SuspendFlag::new(),
         });
 
         view.set_listener(SbListener::new(Rc::downgrade(&shared)));
@@ -82,20 +86,27 @@ impl StyledBox {
         Self { view, shared }
     }
 
+    /// Temporarily suspend updates until the returned RAII guard is dropped.
+    pub fn suspend_update<'a>(&'a self) -> impl Suspend + 'a {
+        self.shared.suspend_flag.suspend(move || {
+            self.shared.set_dirty(PropKindFlags::empty());
+        })
+    }
+
     /// Set the class set of the styled element.
-    pub fn set_class_set(&mut self, class_set: ClassSet) {
+    pub fn set_class_set(&self, class_set: ClassSet) {
         self.shared.style_elem.set_class_set(class_set);
     }
 
     /// Set the parent class path.
-    pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
         self.shared
             .style_elem
             .set_parent_class_path(parent_class_path);
     }
 
     /// Set a subview for the specified `Role`.
-    pub fn set_subview(&mut self, role: Role, view: Option<HView>) {
+    pub fn set_subview(&self, role: Role, view: Option<HView>) {
         let mut subviews = self.shared.subviews.borrow_mut();
 
         if let Some(view) = view {
@@ -114,7 +125,6 @@ impl StyledBox {
 
         drop(subviews);
 
-        // TODO: Add methods for deferring update
         self.shared.set_dirty(PropKindFlags::LAYOUT);
     }
 
@@ -133,7 +143,15 @@ impl StyledBox {
 
 impl Shared {
     /// Dispatch update methods based on a `PropKindFlags`
-    fn set_dirty(&self, diff: PropKindFlags) {
+    fn set_dirty(&self, mut diff: PropKindFlags) {
+        let dirty = &self.dirty;
+        diff |= dirty.get();
+
+        if self.suspend_flag.is_suspended() {
+            dirty.set(diff);
+            return;
+        }
+
         if diff.intersects(PropKindFlags::LAYOUT) {
             self.view
                 .set_layout(SbLayout::new(&self.subviews.borrow(), &self.style_elem));
@@ -143,8 +161,7 @@ impl Shared {
             self.view.pend_update();
         }
 
-        let dirty = &self.dirty;
-        dirty.set((dirty.get() | diff) - PropKindFlags::LAYOUT);
+        dirty.set(diff - PropKindFlags::LAYOUT);
     }
 }
 

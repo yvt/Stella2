@@ -42,9 +42,12 @@ impl Button {
     pub fn new(style_manager: &'static Manager) -> Self {
         let label = Label::new(style_manager);
 
-        let mut styled_box = StyledBox::new(style_manager, ViewFlags::default());
-        styled_box.set_subview(Role::Generic, Some(label.view().clone()));
-        styled_box.set_class_set(ClassSet::BUTTON);
+        let styled_box = StyledBox::new(style_manager, ViewFlags::default());
+        {
+            let _guard = styled_box.suspend_update();
+            styled_box.set_subview(Role::Generic, Some(label.view().clone()));
+            styled_box.set_class_set(ClassSet::BUTTON);
+        }
 
         let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
 
@@ -76,7 +79,7 @@ impl Button {
 
     /// Set the parent class path.
     pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let mut styled_box = self.inner.styled_box.borrow_mut();
+        let styled_box = self.inner.styled_box.borrow_mut();
         styled_box.set_parent_class_path(parent_class_path);
 
         self.inner
@@ -121,7 +124,7 @@ struct ButtonMixinListener {
 
 impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
     fn update(&self, _: pal::WM, _: &HView) {
-        let mut styled_box = self.inner.styled_box.borrow_mut();
+        let styled_box = self.inner.styled_box.borrow_mut();
         styled_box.set_class_set(if self.inner.button_mixin.is_pressed() {
             ClassSet::BUTTON | ClassSet::ACTIVE
         } else {
