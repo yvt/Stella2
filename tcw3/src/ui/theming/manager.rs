@@ -20,6 +20,7 @@ pub(crate) type ManagerEvtHandler = Box<dyn Fn(pal::WM, &Manager)>;
 /// out a notification via the callback functions registered via
 /// `subscribe_sheet_set_changed`.
 pub struct Manager {
+    wm: pal::WM,
     sheet_set: SheetSet,
     set_change_handlers: RefCell<SubscriberList<ManagerEvtHandler>>,
 }
@@ -27,6 +28,8 @@ pub struct Manager {
 impl fmt::Debug for Manager {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Manager")
+            .field("wm", &self.wm)
+            .field("sheet_set", &())
             .field("set_change_handlers", &())
             .finish()
     }
@@ -35,12 +38,13 @@ impl fmt::Debug for Manager {
 // TODO: Call `set_change_handlers` when `sheet_set` is updated
 
 mt_lazy_static! {
-    static ref GLOBAL_MANAGER: Manager => |_| Manager::new();
+    static ref GLOBAL_MANAGER: Manager => Manager::new;
 }
 
 impl Manager {
-    fn new() -> Self {
+    fn new(wm: pal::WM) -> Self {
         Self {
+            wm,
             sheet_set: SheetSet {
                 sheets: vec![Box::new(DefaultStylesheet)],
             },
