@@ -15,7 +15,7 @@ use crate::{pal, pal::prelude::*};
 
 pub(crate) type SheetId = usize;
 
-pub(crate) type ManagerEvtHandler = Box<dyn Fn(pal::WM, &Manager)>;
+pub(crate) type ManagerCb = Box<dyn Fn(pal::WM, &Manager)>;
 
 /// The center of the theming system.
 ///
@@ -26,7 +26,7 @@ pub(crate) type ManagerEvtHandler = Box<dyn Fn(pal::WM, &Manager)>;
 pub struct Manager {
     wm: pal::WM,
     sheet_set: SheetSet,
-    set_change_handlers: RefCell<SubscriberList<ManagerEvtHandler>>,
+    set_change_handlers: RefCell<SubscriberList<ManagerCb>>,
 }
 
 impl fmt::Debug for Manager {
@@ -63,7 +63,7 @@ impl Manager {
 
     /// Register a handler function called when `sheet_set()` is updated with a
     /// new sheet set.
-    pub(crate) fn subscribe_sheet_set_changed(&self, cb: ManagerEvtHandler) -> Sub {
+    pub(crate) fn subscribe_sheet_set_changed(&self, cb: ManagerCb) -> Sub {
         self.set_change_handlers.borrow_mut().insert(cb).untype()
     }
 
@@ -179,21 +179,21 @@ impl Prop {
 /// This type tracks the currently-active rule set of a styled element. It
 /// subscribes to [`Manager`]'s sheet set change handler and automatically
 /// updates the active rule set whenever the sheet set is changed. It tracks
-/// changes in properties, and calls the provided [`ElemChangeHandler`] whenever
+/// changes in properties, and calls the provided [`ElemChangeCb`] whenever
 /// styling properties of the corresponding styled element are updated.
 #[derive(Debug)]
 pub struct Elem {
     inner: Rc<ElemInner>,
 }
 
-pub type ElemChangeHandler = Box<dyn Fn(pal::WM, PropKindFlags)>;
+pub type ElemChangeCb = Box<dyn Fn(pal::WM, PropKindFlags)>;
 
 struct ElemInner {
     sub: Cell<Option<Sub>>,
     style_manager: &'static Manager,
     rules: RefCell<ElemRules>,
     /// The function called when property values might have changed.
-    change_handler: RefCell<ElemChangeHandler>,
+    change_handler: RefCell<ElemChangeCb>,
 }
 
 #[derive(Debug)]
@@ -259,8 +259,8 @@ impl Elem {
         this
     }
 
-    /// Set a function called when property values might have changed.
-    pub fn set_on_change(&self, handler: ElemChangeHandler) {
+    /// Set a callback function called when property values might have changed.
+    pub fn set_on_change(&self, handler: ElemChangeCb) {
         *self.inner.change_handler.borrow_mut() = handler;
     }
 
@@ -273,7 +273,7 @@ impl Elem {
 
     /// Assign a new `ElemClassPath` and update the active rule set.
     ///
-    /// This might internally call the `ElemChangeHandler` registered by
+    /// This might internally call the `ElemChangeCb` registered by
     /// `set_on_change`.
     pub fn set_class_path(&self, new_class_path: Rc<ElemClassPath>) {
         self.update_class_path_with(|class_path| {
@@ -283,7 +283,7 @@ impl Elem {
 
     /// Set the class set and update the active rule set.
     ///
-    /// This might internally call the `ElemChangeHandler` registered by
+    /// This might internally call the `ElemChangeCb` registered by
     /// `set_on_change`.
     pub fn set_class_set(&self, class_set: ClassSet) {
         self.update_class_path_with(|class_path| {
@@ -294,7 +294,7 @@ impl Elem {
 
     /// Set the parent class path and update the active rule set.
     ///
-    /// This might internally call the `ElemChangeHandler` registered by
+    /// This might internally call the `ElemChangeCb` registered by
     /// `set_on_change`.
     pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
         self.update_class_path_with(|class_path| {

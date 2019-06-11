@@ -70,8 +70,8 @@ impl<T: WndListener + 'static> From<T> for Box<dyn WndListener> {
     }
 }
 
-/// The boxed function type for window events with no extra parameters.
-pub type WndEvtHandler = Box<dyn Fn(WM, &HWnd)>;
+/// The boxed function type for window callbacks with no extra parameters.
+pub type WndCb = Box<dyn Fn(WM, &HWnd)>;
 
 /// Represents an event subscription.
 ///
@@ -104,7 +104,7 @@ struct Wnd {
     content_view: RefCell<Option<HView>>,
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
-    dpi_scale_changed_handlers: RefCell<SubscriberList<WndEvtHandler>>,
+    dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
@@ -438,7 +438,7 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_dpi_scale_changed(&self, cb: WndEvtHandler) -> Sub {
+    pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {
         self.wnd
             .dpi_scale_changed_handlers
             .borrow_mut()
