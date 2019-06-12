@@ -8,7 +8,7 @@ use tcw3::{
     uicore::{HView, ViewFlags},
 };
 
-use crate::model;
+use crate::{model, stylesheet::elem_id};
 
 pub struct ToolbarView {
     container: HView,
@@ -31,10 +31,10 @@ impl ToolbarView {
         // TODO: Use toolbar button style
         // TODO: Use icons
         let mut go_back_button = Button::new(style_manager);
-        go_back_button.set_caption("Go Back");
+        go_back_button.set_class_set(theming::ClassSet::BUTTON | elem_id::GO_BACK);
 
         let mut go_forward_button = Button::new(style_manager);
-        go_forward_button.set_caption("Go Forward");
+        go_forward_button.set_class_set(theming::ClassSet::BUTTON | elem_id::GO_FORWARD);
 
         // TODO: Search bar
         let search_bar = Label::new(style_manager).with_text("todo: search");

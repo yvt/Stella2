@@ -8,9 +8,11 @@ license = "GPL-3.0-or-later"
 [dependencies]
 tcw3 = { path = "../tcw3" }
 harmony = { path = "../harmony" }
+stella2_assets = { path = "../stella2_assets" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"
+stvg_tcw3 = { path = "../stvg/tcw3" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.3"
