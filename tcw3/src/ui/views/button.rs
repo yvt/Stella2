@@ -106,6 +106,11 @@ impl Button {
             .set_parent_class_path(Some(styled_box.class_path().clone()));
     }
 
+    /// Get the class set of the inner `StyledBox`.
+    pub fn class_set(&mut self) -> ClassSet {
+        self.inner.styled_box.borrow().class_set()
+    }
+
     /// Set the function called when a push button widget is activated.
     ///
     /// The function is called via `WM::invoke`, thus allowed to modify
