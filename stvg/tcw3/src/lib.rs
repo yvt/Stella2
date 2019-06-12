@@ -29,7 +29,7 @@ impl<'a> Options<'a> {
     }
 
     /// Set the color transformation function.
-    pub fn with_color_xfrom(self, value: &'a dyn Fn(RGBAF32) -> RGBAF32) -> Self {
+    pub fn with_color_xform(self, value: &'a dyn Fn(RGBAF32) -> RGBAF32) -> Self {
         Self { color_xform: value }
     }
 }
@@ -134,7 +134,7 @@ where
 
                 let c = &mut draw_ctx.canvas;
                 c.mult_transform(Matrix3::from_scale_2d(self.scale));
-                c.draw_stellavg(bytes, &Options::new().with_color_xfrom(color_xform));
+                c.draw_stellavg(bytes, &Options::new().with_color_xform(color_xform));
             },
         )
     }
