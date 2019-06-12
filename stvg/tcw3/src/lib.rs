@@ -1,6 +1,11 @@
 //! The TCW3 binding for StellaVG
+use cggeom::prelude::*;
+use cgmath::Matrix3;
 use stvg_io::{Cmd, CmdDecoder};
-use tcw3::pal::{iface::Canvas, RGBAF32};
+use tcw3::{
+    pal::{iface::Canvas, RGBAF32},
+    ui::images::{himg_from_paint_fn, HImg},
+};
 
 /// An extension trait for `Canvas` that provides methods for drawing
 /// StellaVG images.
@@ -62,4 +67,102 @@ impl<T: Canvas + ?Sized> CanvasStvgExt for T {
         }
         self.restore();
     }
+}
+
+/// The builder of `HImg` for StellaVG images.
+#[derive(Debug, Clone, Copy)]
+pub struct StvgImg<TBytes, TColorXform> {
+    bytes: TBytes,
+    size: [f32; 2],
+    scale: f32,
+    color_xform: TColorXform,
+}
+
+impl<TBytes> StvgImg<TBytes, fn(RGBAF32) -> RGBAF32> {
+    /// Construct a `StvgImg` from StellaVG-encoded data and the size.
+    pub fn new(data: (TBytes, [f32; 2])) -> Self {
+        Self {
+            bytes: data.0,
+            size: data.1,
+            scale: 1.0,
+            color_xform: |x| x,
+        }
+    }
+}
+
+impl<TBytes, TColorXform> StvgImg<TBytes, TColorXform> {
+    /// Assign `scale`, returning a new `StvgImg`.
+    pub fn with_scale(self, scale: f32) -> Self {
+        Self { scale, ..self }
+    }
+
+    /// Assign `color_xform`, returning a new `StvgImg`.
+    pub fn with_color_xform<T>(self, color_xform: T) -> StvgImg<TBytes, T> {
+        StvgImg {
+            bytes: self.bytes,
+            size: self.size,
+            scale: self.scale,
+            color_xform,
+        }
+    }
+}
+
+impl<TBytes, TColorXform> StvgImg<TBytes, TColorXform>
+where
+    TBytes: std::borrow::Borrow<[u8]> + Send + Sync + 'static,
+    TColorXform: Fn(RGBAF32) -> RGBAF32 + Send + Sync + 'static,
+{
+    /// Construct a `HImg` from `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(proc_macro_hygiene)]
+    /// static STVG_IMAGE: (&[u8], [f32; 2]) =
+    ///     stvg_macro::include_stvg!("../tests/tiger.svgz");
+    ///
+    /// use stvg_tcw3::StvgImg;
+    ///
+    /// let himg = StvgImg::new(STVG_IMAGE).into_himg();
+    /// ```
+    pub fn into_himg(self) -> HImg {
+        himg_from_paint_fn(
+            [self.size[0] * self.scale, self.size[0] * self.scale].into(),
+            move |draw_ctx| {
+                let bytes = self.bytes.borrow();
+                let color_xform = &self.color_xform;
+
+                let c = &mut draw_ctx.canvas;
+                c.mult_transform(Matrix3::from_scale_2d(self.scale));
+                c.draw_stellavg(bytes, &Options::new().with_color_xfrom(color_xform));
+            },
+        )
+    }
+}
+
+/// Create a `Fn(RGBAF32) -> RGBAF32` that replaces the color with `new_color`,
+/// only preserving the original alpha value.
+///
+/// `new_color`'s alpha value used to modulate the input alpha value. Specify
+/// `1.0` to only modify the color components.
+///
+/// This function is useful for recoloring StellaVG artwork via
+/// [`Options::with_color_xform`] or [`StvgImg::with_color_xform`].
+///
+/// # Examples
+///
+/// ```
+/// #![feature(proc_macro_hygiene)]
+/// static STVG_IMAGE: (&[u8], [f32; 2]) =
+///     stvg_macro::include_stvg!("../tests/tiger.svgz");
+///
+/// use stvg_tcw3::{StvgImg, replace_color};
+///
+/// let himg = StvgImg::new(STVG_IMAGE)
+///     .with_color_xform(replace_color([0.4, 0.5, 0.6, 1.0]))
+///     .into_himg();
+/// ```
+pub fn replace_color(new_color: impl Into<RGBAF32>) -> impl Fn(RGBAF32) -> RGBAF32 {
+    let orig = new_color.into();
+    move |color| RGBAF32::new(orig.r, orig.g, orig.b, color.a * orig.a)
 }
