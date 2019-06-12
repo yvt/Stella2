@@ -43,6 +43,9 @@ impl<'a> Default for Options<'a> {
 impl<T: Canvas + ?Sized> CanvasStvgExt for T {
     fn draw_stellavg(&mut self, bytes: &[u8], options: &Options<'_>) {
         self.save();
+        self.mult_transform(Matrix3::from_scale_2d(
+            1.0 / (1 << stvg_io::FRAC_BITS) as f32,
+        ));
         for cmd in CmdDecoder::from_bytes(bytes) {
             match cmd {
                 Cmd::BeginPath => self.begin_path(),

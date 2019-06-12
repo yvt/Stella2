@@ -37,6 +37,14 @@ mod op {
 const BYTES_PER_POINT: usize = 4;
 const CONTOUR_HDR_SIZE: usize = BYTES_PER_POINT + size_of::<u16>();
 
+/// The number of fractional bits included in fixed-point numbers used by
+/// StellaVG.
+///
+/// Coordinates are represented by fixed-point numbers of type `i16`. Since
+/// four bits (= this constant) are allocated for fractional digits, the maximum
+/// representable range is circa `[-2048, 2048]`.
+pub const FRAC_BITS: u32 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cmd {
     BeginPath,

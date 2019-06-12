@@ -22,6 +22,9 @@ use syn::{parse_macro_input, spanned::Spanned, Lit, LitByteStr};
 /// Include the specified SVG file as StellaVG data (`[u8; _]`).
 ///
 /// The path is relative to `$CARGO_MANIFEST_DIR`.
+///
+/// Be aware that the range of coordinates are limited by the internal
+/// representation used by StellaVG. See [`stvg_io::FRAC_BITS`].
 #[proc_macro]
 pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let path_lit: Lit = parse_macro_input!(params);
@@ -68,19 +71,23 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
             size = svg.size;
             let viewbox = &svg.view_box;
 
+            // Shift the coordinates by `FRAC_BITS`
+            const FRAC_SCALE: f64 = (1 << stvg_io::FRAC_BITS) as f64;
+            let size = [size.width * FRAC_SCALE, size.height * FRAC_SCALE];
+
             // Calculate the root transform. Scale the viewbox to maximally
             // fill the size box ([0, 0]–`size`), and align the viewbox at the
             // center of the size box.
             let mut xform =
                 usvg::Transform::new_translate(-viewbox.rect.left(), -viewbox.rect.top());
 
-            let scale = (size.width / viewbox.rect.width).min(size.height / viewbox.rect.height);
+            let scale = (size[0] / viewbox.rect.width).min(size[1] / viewbox.rect.height);
             let scaled_viewbox_size = [viewbox.rect.width * scale, viewbox.rect.height * scale];
 
             xform.scale(scale, scale);
             xform.translate(
-                (size.width - scaled_viewbox_size[0]) * 0.5,
-                (size.height - scaled_viewbox_size[1]) * 0.5,
+                (size[0] - scaled_viewbox_size[0]) * 0.5,
+                (size[1] - scaled_viewbox_size[1]) * 0.5,
             );
 
             for child in svg_root.children() {
