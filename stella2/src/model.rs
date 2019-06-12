@@ -11,6 +11,7 @@ pub struct WndState {
     // it here instead so that it can be intercepted by a persistence middleware
     pub sidebar_width: f32,
     pub editor_height: f32,
+    pub sidebar_visible: bool,
 }
 
 impl AppState {
@@ -20,6 +21,7 @@ impl AppState {
             main_wnd: Elem::new(WndState {
                 sidebar_width: 200.0,
                 editor_height: 50.0,
+                sidebar_visible: true,
             }),
         }
     }
@@ -34,6 +36,7 @@ pub enum AppAction {
 pub enum WndAction {
     SetSidebarWidth(f32),
     SetEditorHeight(f32),
+    ToggleSidebar(bool),
 }
 
 impl AppState {
@@ -56,6 +59,10 @@ impl WndState {
             },
             WndAction::SetEditorHeight(x) => set_field! {
                 editor_height: *x,
+                ..this
+            },
+            WndAction::ToggleSidebar(x) => set_field! {
+                sidebar_visible: *x,
                 ..this
             },
         }

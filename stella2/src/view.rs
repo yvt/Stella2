@@ -123,6 +123,7 @@ impl WndView {
         split_editor.set_value(wnd_state.editor_height);
         split_editor.set_subviews([log_view, editor_view]);
 
+        // TODO: Toogle sidebar based on `WndState::sidebar_visible`
         let sidebar_view = new_test_view("sidebar: todo!");
 
         let mut split_side = Split::new(false, Some(0));
@@ -195,6 +196,8 @@ impl WndView {
         if Elem::ptr_eq(&wnd_state, new_wnd_state) {
             return;
         }
+
+        dbg!(new_wnd_state);
 
         *wnd_state = Elem::clone(new_wnd_state);
 
