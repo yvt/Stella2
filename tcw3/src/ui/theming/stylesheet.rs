@@ -281,6 +281,16 @@ macro_rules! prop {
         )
     };
 
+    (@kind layer_metrics[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYER_BOUNDS
+    };
+    (layer_metrics[$i:expr]: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::LayerMetrics($i),
+            $crate::ui::theming::PropValue::Metrics($val),
+        )
+    };
+
     (@kind subview_metrics[$i:expr]) => {
         $crate::ui::theming::PropKindFlags::LAYOUT
     };
@@ -288,6 +298,16 @@ macro_rules! prop {
         (
             $crate::ui::theming::Prop::SubviewMetrics($i),
             $crate::ui::theming::PropValue::Metrics($val),
+        )
+    };
+
+    (@kind min_size) => {
+        $crate::ui::theming::PropKindFlags::LAYOUT
+    };
+    (min_size: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::MinSize,
+            $crate::ui::theming::PropValue::Vector2($val),
         )
     };
 
