@@ -31,27 +31,29 @@ use std::mem::transmute;
 /// They handle NaN differently from `<f32>::{min, max}`:
 ///
 ///     # use alt_fp::FloatOrd;
-///     assert!(<f32>::from_bits(0x7f801234).is_nan());
-///     assert!(<f32>::from_bits(0x7f804321).is_nan());
+///     assert!(<f32>::from_bits(0x7f801234).is_nan() == true);
+///     assert!(<f32>::from_bits(0x40000000).is_nan() == false);
 ///
 ///     assert_eq!(<f32>::from_bits(0x7f801234)
-///         .fmin(<f32>::from_bits(0x7f804321)).to_bits(), 0x7f804321);
-///     assert_eq!(<f32>::from_bits(0x7f801234)
-///         .fmax(<f32>::from_bits(0x7f804321)).to_bits(), 0x7f804321);
+///         .fmin(<f32>::from_bits(0x40000000)).to_bits(), 0x40000000);
+///     assert_eq!(<f32>::from_bits(0x40000000)
+///         .fmax(<f32>::from_bits(0x7f801234)).to_bits(), 0x7f801234);
 ///
 ///     // Compare the above with:
-///     assert_ne!(<f32>::from_bits(0x7f801234)
-///         .min(<f32>::from_bits(0x7f804321)).to_bits(), 0x7f804321);
+///     assert_eq!(<f32>::from_bits(0x7f801234)
+///         .min(<f32>::from_bits(0x40000000)).to_bits(), 0x40000000);
+///     assert_eq!(<f32>::from_bits(0x40000000)
+///         .max(<f32>::from_bits(0x7f801234)).to_bits(), 0x40000000);
 ///
 pub trait FloatOrd {
-    /// Compute the minimum value of `self` and `x`. Returns `x` if `self`
-    /// is NaN.
+    /// Compute the minimum value of `self` and `x`. Returns `x` if any of the
+    /// operands are NaN.
     fn fmin(self, x: Self) -> Self
     where
         Self: Sized;
 
-    /// Compute the maximum value of `self` and `x`. Returns `x` if `self`
-    /// is NaN.
+    /// Compute the maximum value of `self` and `x`. Returns `x` if any of the
+    /// operands are NaN.
     fn fmax(self, x: Self) -> Self
     where
         Self: Sized;
