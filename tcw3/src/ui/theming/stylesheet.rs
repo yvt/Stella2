@@ -430,7 +430,7 @@ use cggeom::box2;
 
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
-        ([.BUTTON]) (priority = 1) {
+        ([.BUTTON]) (priority = 100) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
                 RGBAF32::new(0.7, 0.7, 0.7, 1.0), [[4.0; 2]; 4]
@@ -441,16 +441,16 @@ lazy_static! {
                 .. Metrics::default()
             },
         },
-        ([.BUTTON.ACTIVE]) (priority = 100) {
+        ([.BUTTON.ACTIVE]) (priority = 200) {
             layer_img[0]: Some(himg_from_rounded_rect(
                 RGBAF32::new(0.2, 0.4, 0.9, 1.0), [[4.0; 2]; 4]
             )),
         },
         // Button label
-        ([] < [.BUTTON]) (priority = 1) {
+        ([] < [.BUTTON]) (priority = 100) {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
         },
-        ([] < [.BUTTON.ACTIVE]) (priority = 100) {
+        ([] < [.BUTTON.ACTIVE]) (priority = 200) {
             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
     };
