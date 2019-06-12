@@ -127,7 +127,7 @@ where
     /// ```
     pub fn into_himg(self) -> HImg {
         himg_from_paint_fn(
-            [self.size[0] * self.scale, self.size[0] * self.scale].into(),
+            [self.size[0] * self.scale, self.size[1] * self.scale].into(),
             move |draw_ctx| {
                 let bytes = self.bytes.borrow();
                 let color_xform = &self.color_xform;
