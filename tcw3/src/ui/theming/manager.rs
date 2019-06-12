@@ -17,6 +17,8 @@ pub(crate) type SheetId = usize;
 
 pub(crate) type ManagerCb = Box<dyn Fn(pal::WM, &Manager)>;
 
+pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::WM, &Manager, &mut NewSheetSetCtx<'_>)>;
+
 /// The center of the theming system.
 ///
 /// `Manager` stores the currently active stylesheet set ([`SheetSet`]), which
@@ -25,8 +27,9 @@ pub(crate) type ManagerCb = Box<dyn Fn(pal::WM, &Manager)>;
 /// `subscribe_sheet_set_changed`.
 pub struct Manager {
     wm: pal::WM,
-    sheet_set: SheetSet,
+    sheet_set: RefCell<SheetSet>,
     set_change_handlers: RefCell<SubscriberList<ManagerCb>>,
+    new_set_handlers: RefCell<SubscriberList<ManagerNewSheetSetCb>>,
 }
 
 impl fmt::Debug for Manager {
@@ -35,11 +38,10 @@ impl fmt::Debug for Manager {
             .field("wm", &self.wm)
             .field("sheet_set", &())
             .field("set_change_handlers", &())
+            .field("new_set_handlers", &())
             .finish()
     }
 }
-
-// TODO: Call `set_change_handlers` when `sheet_set` is updated
 
 mt_lazy_static! {
     static ref GLOBAL_MANAGER: Manager => Manager::new;
@@ -47,13 +49,18 @@ mt_lazy_static! {
 
 impl Manager {
     fn new(wm: pal::WM) -> Self {
-        Self {
+        let this = Self {
             wm,
-            sheet_set: SheetSet {
-                sheets: vec![Box::new(DefaultStylesheet)],
-            },
+            sheet_set: RefCell::new(SheetSet { sheets: Vec::new() }),
             set_change_handlers: RefCell::new(SubscriberList::new()),
-        }
+            new_set_handlers: RefCell::new(SubscriberList::new()),
+        };
+
+        // Create the first `SheetSet`
+        let sheet_set = this.new_sheet_set();
+        *this.sheet_set.borrow_mut() = sheet_set;
+
+        this
     }
 
     /// Get a global instance of `Manager`.
@@ -67,12 +74,65 @@ impl Manager {
         self.set_change_handlers.borrow_mut().insert(cb).untype()
     }
 
+    /// Register a callback function called when a new stylesheet set is being
+    /// created.
+    ///
+    /// The specified function is called when the stylesheet is updated for the
+    /// next time, i.e., when the operating system's apperance setting is
+    /// updated or `update_sheet_set` is called.
+    pub fn subscribe_new_sheet_set(&self, cb: ManagerNewSheetSetCb) -> Sub {
+        self.new_set_handlers.borrow_mut().insert(cb).untype()
+    }
+
+    /// Force the recreation the stylesheet set.
+    pub fn update_sheet_set(&self) {
+        let sheet_set = self.new_sheet_set();
+        *self.sheet_set.borrow_mut() = sheet_set;
+
+        // Notify the change
+        for handler in self.set_change_handlers.borrow().iter() {
+            handler(self.wm, self);
+        }
+    }
+
+    /// Construct a new `SheetSet` using the default stylesheet and
+    /// `new_set_handlers`.
+    fn new_sheet_set(&self) -> SheetSet {
+        let mut sheet_set = SheetSet {
+            sheets: vec![Box::new(DefaultStylesheet)],
+        };
+
+        for handler in self.new_set_handlers.borrow().iter() {
+            handler(
+                self.wm,
+                self,
+                &mut NewSheetSetCtx {
+                    sheet_set: &mut sheet_set,
+                },
+            );
+        }
+
+        sheet_set
+    }
+
     /// Get the currently active sheet set.
     ///
     /// This may change throughout the application's lifecycle. Use
     /// `subscribe_sheet_set_changed` to get notified when it happens.
     pub(crate) fn sheet_set<'a>(&'a self) -> impl std::ops::Deref<Target = SheetSet> + 'a {
-        &self.sheet_set
+        self.sheet_set.borrow()
+    }
+}
+
+/// The context type passed to callback functions of type [`ManagerNewSheetSetCb`].
+pub struct NewSheetSetCtx<'a> {
+    sheet_set: &'a mut SheetSet,
+}
+
+impl NewSheetSetCtx<'_> {
+    /// Insert a new `Stylesheet`.
+    pub fn insert_stylesheet(&mut self, stylesheet: impl Stylesheet + 'static) {
+        self.sheet_set.sheets.push(Box::new(stylesheet));
     }
 }
 
