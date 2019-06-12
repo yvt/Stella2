@@ -20,6 +20,8 @@ use stvg_io::CmdEncoder;
 use syn::{parse_macro_input, spanned::Spanned, Lit, LitByteStr};
 
 /// Include the specified SVG file as StellaVG data (`[u8; _]`).
+///
+/// The path is relative to `$CARGO_MANIFEST_DIR`.
 #[proc_macro]
 pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let path_lit: Lit = parse_macro_input!(params);
@@ -32,10 +34,13 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
             .into();
     };
 
+    let base_path = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFESRT_DIR is not set");
+    let path = Path::new(&base_path).join(path);
+
     let svg_text = match usvg::load_svg_file(&Path::new(&path)) {
         Ok(text) => text,
         Err(e) => {
-            return syn::Error::new_spanned(path_lit, format!("could not load: {}", e))
+            return syn::Error::new_spanned(path_lit, format!("could not load {:?}: {}", path, e))
                 .to_compile_error()
                 .into();
         }
@@ -44,7 +49,7 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
     let svg_tree = match usvg::Tree::from_str(&svg_text, &usvg::Options::default()) {
         Ok(text) => text,
         Err(e) => {
-            return syn::Error::new_spanned(path_lit, format!("could not load: {}", e))
+            return syn::Error::new_spanned(path_lit, format!("could not load {:?}: {}", path, e))
                 .to_compile_error()
                 .into();
         }

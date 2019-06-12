@@ -13,7 +13,7 @@ use tcw3::{
     uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
-static STVG_IMAGE: (&[u8], [f32; 2]) = stvg_macro::include_stvg!("./stvg/tests/horse.svgz");
+static STVG_IMAGE: (&[u8], [f32; 2]) = stvg_macro::include_stvg!("../tests/horse.svgz");
 
 struct MyViewListener {
     canvas: RefCell<CanvasMixin>,

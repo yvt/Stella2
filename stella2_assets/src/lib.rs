@@ -12,8 +12,8 @@ macro_rules! stvg {
 pub mod toolbar {
     use super::*;
 
-    pub static SIDEBAR_HIDE: Stvg = stvg!("stella2_assets/src/toolbar/sidebar_hide.svg");
-    pub static SIDEBAR_SHOW: Stvg = stvg!("stella2_assets/src/toolbar/sidebar_show.svg");
-    pub static GO_BACK: Stvg = stvg!("stella2_assets/src/toolbar/go_back.svg");
-    pub static GO_FORWARD: Stvg = stvg!("stella2_assets/src/toolbar/go_forward.svg");
+    pub static SIDEBAR_HIDE: Stvg = stvg!("src/toolbar/sidebar_hide.svg");
+    pub static SIDEBAR_SHOW: Stvg = stvg!("src/toolbar/sidebar_show.svg");
+    pub static GO_BACK: Stvg = stvg!("src/toolbar/go_back.svg");
+    pub static GO_FORWARD: Stvg = stvg!("src/toolbar/go_forward.svg");
 }
