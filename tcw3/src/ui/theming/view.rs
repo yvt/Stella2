@@ -128,6 +128,11 @@ impl StyledBox {
         self.shared.set_dirty(PropKindFlags::LAYOUT);
     }
 
+    /// Get the class set of the styled element.
+    pub fn class_set(&self) -> ClassSet {
+        self.shared.style_elem.class_set()
+    }
+
     /// Get `Rc<ElemClassPath>` representing the class path of the styled
     /// element. The returned value can be set on subviews as a parent class
     /// path.

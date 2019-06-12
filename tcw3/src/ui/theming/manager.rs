@@ -363,6 +363,11 @@ impl Elem {
         });
     }
 
+    /// Get the class set.
+    pub fn class_set(&self) -> ClassSet {
+        self.inner.rules.borrow().class_path.class_set
+    }
+
     /// Get the class path.
     pub fn class_path(&self) -> Rc<ElemClassPath> {
         Rc::clone(&self.inner.rules.borrow().class_path)
