@@ -186,7 +186,7 @@ macro_rules! elem_pos {
 #[macro_export]
 macro_rules! elem_neg {
     (#$id:tt $($rest:tt)*) => {
-        ($crate::ui::theming::ClassSet::ID_MASK.bits() ^ ($id).bits()) | $crate::elem_pos!($($rest)*)
+        ($crate::ui::theming::ClassSet::ID_MASK.bits() ^ ($id).bits()) | $crate::elem_neg!($($rest)*)
     };
     (:not(.$cls:ident) $($rest:tt)*) => {
         $crate::ui::theming::ClassSet::$cls.bits() | $crate::elem_neg!($($rest)*)
