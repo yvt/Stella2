@@ -26,10 +26,11 @@ impl ToolbarView {
         let container = HView::new(ViewFlags::default());
 
         // TODO: Show/hide the sidebar
+        let mut toggle_sidebar_button = Button::new(style_manager);
+        toggle_sidebar_button.set_class_set(theming::ClassSet::BUTTON | elem_id::SIDEBAR_HIDE);
         // TODO: Display a dropdown list when the sidebar is hidden
 
         // TODO: Use toolbar button style
-        // TODO: Use icons
         let mut go_back_button = Button::new(style_manager);
         go_back_button.set_class_set(theming::ClassSet::BUTTON | elem_id::GO_BACK);
 
@@ -42,6 +43,11 @@ impl ToolbarView {
         const MARGIN: f32 = 5.0;
 
         let main_layout = TableLayout::stack_horz(vec![
+            (toggle_sidebar_button.view().clone(), AlignFlags::JUSTIFY),
+            (
+                Spacer::new().with_fixed([MARGIN * 2.0, 0.0]).into_view(),
+                AlignFlags::HORZ_JUSTIFY,
+            ),
             (go_back_button.view().clone(), AlignFlags::JUSTIFY),
             (
                 Spacer::new().with_fixed([MARGIN, 0.0]).into_view(),
