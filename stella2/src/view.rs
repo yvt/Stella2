@@ -60,7 +60,7 @@ impl AppView {
 
         pending_actions.push(action);
 
-        if pending_actions.len() == 0 {
+        if pending_actions.len() == 1 {
             // Schedule polling
             let this = Rc::clone(this);
             this.wm.invoke(move |_| this.poll());
