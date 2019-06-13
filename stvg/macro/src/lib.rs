@@ -19,7 +19,7 @@ use std::path::Path;
 use stvg_io::CmdEncoder;
 use syn::{parse_macro_input, spanned::Spanned, Lit, LitByteStr};
 
-/// Include the specified SVG file as StellaVG data (`[u8; _]`).
+/// Include the specified SVG file as StellaVG data (`([u8; _], [f32; 2])`).
 ///
 /// The path is relative to `$CARGO_MANIFEST_DIR`.
 ///
