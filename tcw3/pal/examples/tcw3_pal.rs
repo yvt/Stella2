@@ -1,6 +1,6 @@
 use cggeom::{box2, prelude::*};
 use cgmath::Point2;
-use tcw3::pal::{self, prelude::*};
+use tcw3_pal::{self as pal, prelude::*};
 
 struct Listener {
     flex_layer: pal::HLayer,

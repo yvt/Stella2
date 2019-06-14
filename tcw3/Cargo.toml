@@ -6,9 +6,7 @@ edition = "2018"
 license = "MIT"
 
 [dependencies]
-cfg-if = "0.1.7"
 cgmath = "0.17.0"
-rgb = "0.8.13"
 bitflags = "1.1.0"
 cggeom = { path = "../support/cggeom" }
 flags-macro = "0.1.3"
@@ -17,27 +15,17 @@ subscriber_list = { path = "../support/subscriber_list" }
 as_any = { path = "../support/as_any" }
 alt_fp = { path = "../support/alt_fp" }
 array = "0.0.1"
-packed_simd = "0.3.0"
 svgbobdoc = "0.2"
 quick-error2 = "2.0.1"
 iterpool = { path = "../support/iterpool" }
 sorted_diff = { path = "../support/sorted_diff" }
+lazy_static = "1"
+
+tcw3_pal = { path = "pal" }
 
 [dependencies.momo]
 git = "https://github.com/llogiq/momo.git"
 rev = "3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-objc = "0.2.3"
-cocoa = "0.18.4"
-core-foundation = "0.6"
-core-graphics = "0.17.3"
-core-text = "13.2.0"
-dispatch = "0.1.4"
-lazy_static = "1"
-
-[build-dependencies]
-cc = "1.0.35"
 
 [dev-dependencies]
 lipsum = "0.6.0"

@@ -6,6 +6,7 @@ use std::{
     rc::Rc,
 };
 use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
+use tcw3_pal::mt_lazy_static;
 
 use super::{
     style::{ClassSet, ElemClassPath, Prop, PropValue},

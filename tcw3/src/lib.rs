@@ -8,10 +8,9 @@
 #![feature(weak_ptr_eq)]
 #![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
-#![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(const_vec_new)] // `Vec::new()` in a constant context
 
-#[macro_use]
-pub mod pal;
+pub use tcw3_pal as pal;
+
 pub mod ui;
 pub mod uicore;

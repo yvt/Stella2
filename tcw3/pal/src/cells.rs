@@ -199,13 +199,13 @@ pub trait MtLazyStatic {
 /// Like `lazy_static!`, but only accessible by the main thread. Can be used
 /// for `!Send + !Sync` types. The defined variable implements [`MtLazyStatic`].
 ///
-/// [`MtLazyStatic`]: crate::pal::cells::MtLazyStatic
+/// [`MtLazyStatic`]: crate::cells::MtLazyStatic
 ///
 /// # Examples
 ///
 /// ```
-/// use tcw3::{mt_lazy_static, pal::{prelude::*, LayerAttrs, HLayer}};
-/// # fn hoge(wm: tcw3::pal::WM) {
+/// use tcw3_pal::{mt_lazy_static, prelude::*, LayerAttrs, HLayer};
+/// # fn hoge(wm: tcw3_pal::WM) {
 /// mt_lazy_static! {
 ///     static ref LAYER: HLayer => |wm| wm.new_layer(LayerAttrs::default());
 /// }
@@ -231,11 +231,11 @@ macro_rules! mt_lazy_static {
 
         impl $name {
             #[cold]
-            fn __init_cell(wm: $crate::pal::WM) -> &'static $type {
+            fn __init_cell(wm: $crate::WM) -> &'static $type {
                 assert!(!$name.initing.get(), "recursion detected while lazily initializing a global variable");
                 $name.initing.set(true);
 
-                let initer: fn($crate::pal::WM) -> $type = $init;
+                let initer: fn($crate::WM) -> $type = $init;
 
                 let value = initer(wm);
 
@@ -246,11 +246,11 @@ macro_rules! mt_lazy_static {
             }
         }
 
-        impl $crate::pal::prelude::MtLazyStatic for $name {
+        impl $crate::prelude::MtLazyStatic for $name {
             type Target = $type;
 
             #[inline]
-            fn get_with_wm(&self, wm: $crate::pal::WM) -> &$type {
+            fn get_with_wm(&self, wm: $crate::WM) -> &$type {
                 unsafe {
                     if let Some(inner) = (*self.cell.get()).as_ref() {
                         inner

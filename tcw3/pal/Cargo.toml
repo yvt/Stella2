@@ -1,0 +1,31 @@
+[package]
+name = "tcw3_pal"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+alt_fp = { path = "../../support/alt_fp" }
+array = "0.0.1"
+bitflags = "1.1.0"
+cfg-if = "0.1.7"
+cggeom = { path = "../../support/cggeom" }
+cgmath = "0.17.0"
+iterpool = { path = "../../support/iterpool" }
+packed_simd = "0.3.0"
+rgb = "0.8.13"
+svgbobdoc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.18.4"
+core-foundation = "0.6"
+core-graphics = "0.17.3"
+core-text = "13.2.0"
+dispatch = "0.1.4"
+lazy_static = "1"
+objc = "0.2.3"
+
+[build-dependencies]
+cc = "1.0.35"
+

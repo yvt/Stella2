@@ -1,4 +1,8 @@
-//! Platform abstraction layer
+//! TCW3 Platform abstraction layer
+//!
+//! This crate is reexported by TCW3 as `tcw3::pal`.
+#![feature(const_fn)] // `'static` bounds on `const fn` parameters
+#![feature(doc_cfg)] // `cfg(rustdoc)`
 use cfg_if::cfg_if;
 
 mod canvas;

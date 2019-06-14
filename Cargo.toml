@@ -3,6 +3,7 @@ members = [
     "stella2",
     "stella2_assets",
     "tcw3",
+    "tcw3/pal",
     "harmony",
     "stvg/io",
     "stvg/macro",

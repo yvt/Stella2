@@ -335,7 +335,7 @@ pub trait MouseDragListener<T: WM> {
     /// A brand new `MouseDragListener` will be created via
     /// [`WndListener::mouse_drag`] next time a mouse button is pressed.
     ///
-    /// [`WndListener::mouse_drag`]: crate::pal::iface::WndListener::mouse_drag
+    /// [`WndListener::mouse_drag`]: crate::iface::WndListener::mouse_drag
     fn mouse_up(&self, _: T, _: &T::HWnd, _loc: Point2<f32>, _button: u8) {}
 
     /// A mouse drag gesture was cancelled.
@@ -394,7 +394,7 @@ pub trait Canvas: Debug {
     ///
     /// ```
     /// # use cggeom::box2;
-    /// # use tcw3::pal::iface::Canvas;
+    /// # use tcw3_pal::iface::Canvas;
     /// # fn test(canvas: &mut impl Canvas) {
     /// let bx = box2! { min: [0.0, 0.0], max: [50.0, 40.0] };
     /// // Rounded rectangle with a uniform radius
