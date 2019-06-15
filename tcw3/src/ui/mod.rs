@@ -27,17 +27,6 @@ pub mod views {
     };
 }
 
-/// Manages DPI-independent images. Provides an application-global image
-/// manager that automatically rasterizes and caches images for requested
-/// DPI scale values.
-pub mod images {
-    mod bitmap;
-    mod canvas;
-    mod figures;
-    mod img;
-    pub use self::{bitmap::*, canvas::*, figures::*, img::*};
-}
-
 /// Theming support
 pub mod theming {
     mod manager;

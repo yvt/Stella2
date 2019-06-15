@@ -1,11 +1,7 @@
 use iterpool::{intrusive_list, Pool, PoolPtr};
 use quick_error2::quick_error;
 use std::{cell::RefCell, fmt, sync::Arc};
-
-use crate::{
-    pal::{iface::WM as _, Bitmap, MtLock, MtSticky, WM},
-    uicore::HWnd,
-};
+use tcw3_pal::{self as pal, iface::WM as _, Bitmap, MtLock, MtSticky, WM};
 
 /// A bitmap created by rasterizing [`Img`]. The second value represents the
 /// actual DPI scale value of the bitmap, which may or may not match the
@@ -128,55 +124,28 @@ impl<T: ?Sized> fmt::Debug for ImgInner<T> {
     }
 }
 
-/// This function is called by `uicore` to update the list of known DPI scale
-/// values based on open windows.
+/// Increment the use count of the specified DPI scale value.
 ///
-/// This isn't a good practice from a modular design point of view since
-/// it creates a circular dependency between `ui` and `uicore`. That being said,
-/// I think it's better justified than ending up with boilerplate code in the
-/// application.
-pub(crate) fn handle_new_wnd(hwnd: &HWnd) {
-    use std::cell::Cell;
-
-    struct ListenerState {
-        wm: WM,
-        dpi_scale: Cell<DpiScale>,
-    }
-
-    impl Drop for ListenerState {
-        fn drop(&mut self) {
-            // This method is called when the window is destroyed.
-            // Use `invoke` because we don't know the state of the call stack
-            // when `drop` is called.
-            let dpi_scale = self.dpi_scale.get();
-            self.wm.invoke(move |wm| {
-                CACHE
-                    .get_with_wm(wm)
-                    .borrow_mut()
-                    .dpi_scale_release(dpi_scale);
-            });
-        }
-    }
-
-    let state = ListenerState {
-        wm: hwnd.wm(),
-        dpi_scale: Cell::new(DpiScale::new(hwnd.dpi_scale()).unwrap()),
-    };
+/// `HImg` caches generated bitmaps for known DPI values. The bitmaps are
+/// released when the originating `Himg` is dropped or the target DPI scale is
+/// no longer used.
+///
+/// [`dpi_scale_release`] decrements the use count.
+pub fn dpi_scale_add_ref(wm: pal::WM, dpi_scale: f32) {
     CACHE
-        .get_with_wm(hwnd.wm())
+        .get_with_wm(wm)
         .borrow_mut()
-        .dpi_scale_add_ref(state.dpi_scale.get());
+        .dpi_scale_add_ref(DpiScale::new(dpi_scale).unwrap());
+}
 
-    hwnd.subscribe_dpi_scale_changed(Box::new(move |wm, hwnd| {
-        let state = &state;
-        let new_dpi_scale = DpiScale::new(hwnd.dpi_scale()).unwrap();
-        if new_dpi_scale != state.dpi_scale.get() {
-            let mut cache = CACHE.get_with_wm(wm).borrow_mut();
-            cache.dpi_scale_add_ref(new_dpi_scale);
-            cache.dpi_scale_release(state.dpi_scale.get());
-            state.dpi_scale.set(new_dpi_scale);
-        }
-    }));
+/// Decrement the use count of the specified DPI scale value.
+///
+/// See [`dpi_scale_add_ref`] for more.
+pub fn dpi_scale_release(wm: pal::WM, dpi_scale: f32) {
+    CACHE
+        .get_with_wm(wm)
+        .borrow_mut()
+        .dpi_scale_release(DpiScale::new(dpi_scale).unwrap());
 }
 
 static CACHE: MtLock<RefCell<Cache>> = MtLock::new(RefCell::new(Cache::new()));
@@ -450,7 +419,7 @@ impl fmt::Debug for DpiScale {
 mod tests {
     use super::super::BitmapImg;
     use super::*;
-    use crate::pal::prelude::*;
+    use tcw3_pal::prelude::*;
 
     #[test]
     fn dpi_scales() {
@@ -498,7 +467,7 @@ mod tests {
     fn imgs() {
         let mut cache = Cache::new();
 
-        let bmp = crate::pal::BitmapBuilder::new([1, 1]).into_bitmap();
+        let bmp = tcw3_pal::BitmapBuilder::new([1, 1]).into_bitmap();
         let bmp = BitmapImg::new(bmp, 1.0);
 
         let scale1 = DpiScale::new(1.0).unwrap();

@@ -2,9 +2,9 @@
 use alt_fp::FloatOrdSet;
 use array::Array4;
 use cggeom::box2;
+use tcw3_pal::{prelude::*, RGBAF32};
 
 use super::{himg_from_paint_fn, HImg};
-use crate::pal::{prelude::*, RGBAF32};
 
 /// Construct a `HImg` containing a filled rounded rectangle.
 pub fn himg_from_rounded_rect(color: RGBAF32, radii: [[f32; 2]; 4]) -> HImg {

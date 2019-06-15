@@ -425,7 +425,7 @@ macro_rules! stylesheet {
 //
 // TODO: Make it dynamic (based on the operating system's configuration)
 //
-use crate::{pal::RGBAF32, ui::images::himg_from_rounded_rect};
+use crate::{images::himg_from_rounded_rect, pal::RGBAF32};
 use cggeom::box2;
 
 lazy_static! {

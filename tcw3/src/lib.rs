@@ -8,8 +8,8 @@
 #![feature(weak_ptr_eq)]
 #![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
-#![feature(const_vec_new)] // `Vec::new()` in a constant context
 
+pub use tcw3_images as images;
 pub use tcw3_pal as pal;
 
 pub mod ui;

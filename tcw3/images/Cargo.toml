@@ -1,0 +1,16 @@
+[package]
+name = "tcw3_images"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+alt_fp = { path = "../../support/alt_fp" }
+array = "0.0.1"
+cggeom = { path = "../../support/cggeom" }
+cgmath = "0.17.0"
+iterpool = { path = "../../support/iterpool" }
+quick-error2 = "2.0.1"
+
+tcw3_pal = { path = "../pal" }

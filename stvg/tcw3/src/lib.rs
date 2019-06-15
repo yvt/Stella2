@@ -3,8 +3,8 @@ use cggeom::prelude::*;
 use cgmath::Matrix3;
 use stvg_io::{Cmd, CmdDecoder};
 use tcw3::{
+    images::{himg_from_paint_fn, HImg},
     pal::{iface::Canvas, RGBAF32},
-    ui::images::{himg_from_paint_fn, HImg},
 };
 
 /// An extension trait for `Canvas` that provides methods for drawing

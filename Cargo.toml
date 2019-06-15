@@ -4,6 +4,7 @@ members = [
     "stella2_assets",
     "tcw3",
     "tcw3/pal",
+    "tcw3/images",
     "harmony",
     "stvg/io",
     "stvg/macro",

@@ -28,6 +28,7 @@ use subscriber_list::{SubscriberList, UntypedSubscription};
 
 use crate::pal::{self, prelude::WM as _, WM};
 
+mod images;
 mod layer;
 mod layout;
 mod mount;
@@ -405,8 +406,8 @@ impl HWnd {
             .superview
             .borrow_mut() = Superview::Window(Rc::downgrade(&hwnd.wnd));
 
-        // `ui::images` wants to know DPI scale values.
-        crate::ui::images::handle_new_wnd(&hwnd);
+        // `tcw3_images` wants to know DPI scale values.
+        images::handle_new_wnd(&hwnd);
 
         hwnd
     }

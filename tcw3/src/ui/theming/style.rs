@@ -98,7 +98,7 @@ pub enum Prop {
 
     /// The [`HImg`] of the `n`-th layer.
     ///
-    /// [`HImg`]: crate::ui::images::HImg
+    /// [`HImg`]: crate::images::HImg
     LayerImg(u32),
 
     /// The background color ([`RGBAF32`]) of the `n`-th layer.
@@ -138,7 +138,7 @@ pub enum Prop {
 pub enum PropValue {
     Float(f32),
     Usize(usize),
-    Himg(Option<crate::ui::images::HImg>),
+    Himg(Option<crate::images::HImg>),
     Rgbaf32(RGBAF32),
     Metrics(Metrics),
     Vector2(Vector2<f32>),

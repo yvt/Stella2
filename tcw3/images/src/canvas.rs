@@ -2,9 +2,9 @@
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::{Matrix3, Vector2};
+use tcw3_pal::{self as pal, prelude::*};
 
 use super::{Bmp, HImg, Img};
-use crate::{pal, pal::prelude::*};
 
 /// `Img` based on custom drawing code provided via `T: `[`Paint`].
 #[derive(Debug, Clone, Copy)]
@@ -12,7 +12,28 @@ struct CanvasImg<T: ?Sized> {
     paint: T,
 }
 
-pub use crate::ui::mixins::canvas::PaintContext;
+#[derive(Debug)]
+pub struct PaintContext<'a> {
+    /// A `BitmapBuilder` object implementing [`Canvas`], with which the client
+    /// should paint the image contents to a backing store.
+    ///
+    /// [`Canvas`]: tcw3_pal::iface::Canvas
+    ///
+    /// When a paint function is called, `canvas` is configured to use the
+    /// the coordinate space where coordinates are represented by logical pixels
+    /// and are independent of physical pixel density.
+    pub canvas: &'a mut pal::BitmapBuilder,
+
+    /// The size of the backing store measured in points (virtual pixels).
+    pub size: Vector2<f32>,
+
+    /// The target DPI scaling ratio.
+    pub dpi_scale: f32,
+
+    /// The actual DPI scaling ratio, which might differ from `dpi_scale` due to
+    /// rounding of the backing store size.
+    pub actual_dpi_scale: Vector2<f32>,
+}
 
 /// Represents an object that can paint the contents of [`CanvasImg`].
 pub trait Paint: Send + Sync + 'static {
@@ -98,6 +119,7 @@ impl CanvasImg<dyn Paint> {
             canvas: &mut bmp_builder,
             size,
             dpi_scale,
+            actual_dpi_scale: actual_dpi_scale.into(),
         });
 
         // Construct a `Bmp` and return it

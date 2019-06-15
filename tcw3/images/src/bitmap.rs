@@ -1,5 +1,6 @@
+use tcw3_pal::Bitmap;
+
 use super::{Bmp, HImg, Img};
-use crate::pal::Bitmap;
 
 /// [`Img`] that provides a specified `Bitmap`.
 #[derive(Debug, Clone)]
