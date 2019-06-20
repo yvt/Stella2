@@ -217,9 +217,16 @@ mod tests {
 
     #[test]
     fn empty() {
-        let rope: Rope<String> = Rope::new();
+        let mut rope: Rope<String> = Rope::new();
         dbg!(&rope.root);
         rope.validate();
+
+        assert!(rope.is_empty());
+        assert_eq!(rope.first(), None);
+        assert_eq!(rope.last(), None);
+        assert_eq!(rope.pop_back(), None);
+        assert_eq!(rope.pop_front(), None);
+        assert_eq!(rope.offset_len(), 0);
     }
 
     #[test]
