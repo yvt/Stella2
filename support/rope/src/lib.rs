@@ -191,6 +191,24 @@ where
             Some(self.remove_at(self.begin()))
         }
     }
+
+    /// Get the first element if it exists.
+    pub fn first(&self) -> Option<&T> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.get_at(self.begin()))
+        }
+    }
+
+    /// Get the last element if it exists.
+    pub fn last(&self) -> Option<&T> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.get_at(self.last_cursor()))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -266,5 +284,15 @@ mod tests {
         }
 
         assert!(rope.is_empty());
+    }
+
+    #[test]
+    fn first_last() {
+        let mut rope: Rope<String> = Rope::new();
+        for i in 0..200 {
+            rope.push_back(i.to_string());
+        }
+        assert_eq!(rope.first().map(String::as_str), Some("0"));
+        assert_eq!(rope.last().map(String::as_str), Some("199"));
     }
 }

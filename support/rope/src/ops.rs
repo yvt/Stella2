@@ -66,6 +66,28 @@ where
         cursor
     }
 
+    /// Get the reference to the element specified by `at`.
+    ///
+    /// `at` must be a valid `Cursor` pointing at an element.
+    pub(crate) fn get_at(&self, at: Cursor) -> &T {
+        let mut it = at.indices.iter();
+        let mut cur = &self.root;
+        loop {
+            // `Cursor::indices` contains a path to an element. The iterator
+            // should return a value until we reach a leaf node.
+            let i = *it.next().unwrap() as usize;
+            match cur {
+                NodeRef::Internal(inode) => {
+                    cur = &inode.children[i];
+                }
+                NodeRef::Leaf(elements) => {
+                    return &elements[i];
+                }
+                NodeRef::Invalid => unreachable!(),
+            }
+        }
+    }
+
     /// Insert `x` before the element specified by `at`.
     pub(crate) fn insert(&mut self, x: T, at: Cursor) {
         let len = x.to_offset();
