@@ -602,6 +602,13 @@ version = "0.8.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rope"
+version = "0.1.0"
+dependencies = [
+ "arrayvec 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "roxmltree"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

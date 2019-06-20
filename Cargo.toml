@@ -13,6 +13,7 @@ members = [
     "support/as_any",
     "support/cggeom",
     "support/iterpool",
+    "support/rope",
     "support/subscriber_list",
     "support/sorted_diff",
 ]
