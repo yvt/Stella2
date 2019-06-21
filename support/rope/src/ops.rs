@@ -94,8 +94,8 @@ where
     ///
     /// ```text
     ///  Elements:  [    0    ] [    1    ] [     2     ]
-    ///            |  |  |  |  |  |  |  |  |  |  |  |  |  |
-    ///  Result:   x  0  0  0  0  1  1  1  1  2  2  2  2  3
+    ///            |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+    ///  Result:   x  0  0  0  0  1  1  1  1  2  2  2  2  2  3
     /// ```
     pub(crate) fn inclusive_upper_bound_by(
         &self,
@@ -691,6 +691,11 @@ mod tests {
 
             i += 1;
         }
+
+        assert_eq!(
+            rope.inclusive_lower_bound_by(|probe| probe.cmp(&i)),
+            Some((rope.end(), rope.offset_len()))
+        );
     }
 
     #[test]
@@ -722,5 +727,11 @@ mod tests {
             assert_eq!(rope.get_at(cursor), s);
             assert_eq!(offset, expected_offset);
         }
+
+        i += 1;
+        assert_eq!(
+            rope.inclusive_lower_bound_by(|probe| probe.cmp(&i)),
+            Some((rope.end(), rope.offset_len()))
+        );
     }
 }
