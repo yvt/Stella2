@@ -17,6 +17,7 @@
 //! It does not support indexing like normal arrays. However, it can be added
 //! by combining an existing `Offset` with [`IndexOffset`].
 use arrayvec::ArrayVec;
+use std::cmp::Ordering;
 
 mod iter;
 mod misc;
@@ -209,6 +210,113 @@ where
         } else {
             Some(self.get_at(self.last_cursor()))
         }
+    }
+
+    /// Get the reference to an element.
+    pub fn get(&self, one: One<impl FnMut(&O) -> Ordering>) -> Option<&T> {
+        self.find_one(one).map(|(cursor, _)| self.get_at(cursor))
+    }
+
+    /// Get the reference to an element and the element's position relative to
+    /// the front of the rope.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rope::{Rope, by_ord, One::{FirstAfter, LastBefore}};
+    /// let rope: Rope<String> = [
+    ///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
+    /// ].iter().map(|x|x.to_string()).collect();
+    ///
+    /// // Using endpoint values:
+    /// let (elem, offset) = rope.get_with_offset(FirstAfter(by_ord(7))).unwrap();
+    /// assert_eq!((elem.as_str(), offset), ("ipsum ", 5));
+    ///
+    /// let (elem, offset) = rope.get_with_offset(LastBefore(by_ord(17))).unwrap();
+    /// assert_eq!((elem.as_str(), offset), ("dolor ", 11));
+    ///
+    /// // Using a comparator:
+    /// let (elem, offset) = rope
+    ///     .get_with_offset(FirstAfter(|probe: &isize| probe.cmp(&7)))
+    ///     .unwrap();
+    /// assert_eq!((elem.as_str(), offset), ("ipsum ", 5));
+    /// ```
+    pub fn get_with_offset(&self, one: One<impl FnMut(&O) -> Ordering>) -> Option<(&T, O)> {
+        self.find_one(one)
+            .map(|(cursor, offset)| (self.get_at(cursor), offset))
+    }
+
+    /// Get the mutable reference to an element.
+    ///
+    /// This is more efficient than `update_with`, but does not allow changing
+    /// the element's length (`<T as ToOffset<O>>::to_offset`).
+    pub fn get_mut(&mut self, one: One<impl FnMut(&O) -> Ordering>) -> Option<&mut T> {
+        self.find_one(one)
+            .map(move |(cursor, _)| self.get_mut_at(cursor))
+    }
+
+    /// Get the mutable reference to an element and the element's position
+    /// relative to the front of the rope.
+    ///
+    /// This is more efficient than `update_with`, but does not allow changing
+    /// the element's length (`<T as ToOffset<O>>::to_offset`).
+    pub fn get_mut_with_offset(
+        &mut self,
+        one: One<impl FnMut(&O) -> Ordering>,
+    ) -> Option<(&mut T, O)> {
+        self.find_one(one)
+            .map(move |(cursor, offset)| (self.get_mut_at(cursor), offset))
+    }
+
+    /// Update an element using a given function, possibly changing its length
+    /// (`<T as ToOffset<O>>::to_offset`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rope::{Rope, by_ord, One::FirstAfter};
+    /// let mut rope: Rope<String> = ["Pony", " ", "ipsum"]
+    ///     .iter().map(|x|x.to_string()).collect();
+    ///
+    /// assert_eq!(rope.get_with_offset(FirstAfter(by_ord(8))).unwrap().1, 5);
+    ///
+    /// // Replace the first element
+    /// rope.update_with(FirstAfter(by_ord(0)), |e, _| *e = "Lorem".to_string())
+    ///     .unwrap();
+    ///
+    /// // The subsequent elements are moved accordingly
+    /// assert_eq!(rope.get_with_offset(FirstAfter(by_ord(8))).unwrap().1, 6);
+    /// ```
+    pub fn update_with<R>(
+        &mut self,
+        one: One<impl FnMut(&O) -> Ordering>,
+        with: impl FnOnce(&mut T, O) -> R,
+    ) -> Option<R> {
+        self.find_one(one)
+            .map(|(cursor, offset)| self.update_at_with(cursor, move |e| with(e, offset)))
+    }
+
+    /// Remove an element and return it along with its original element position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rope::{Rope, by_ord, One::FirstAfter};
+    /// let mut rope: Rope<String> = ["Pony", " ", "ipsum"]
+    ///     .iter().map(|x|x.to_string()).collect();
+    ///
+    /// assert_eq!(rope.get_with_offset(FirstAfter(by_ord(8))).unwrap().1, 5);
+    ///
+    /// // Remove the first element
+    /// let (elem, offset) = rope.remove(FirstAfter(by_ord(0))).unwrap();
+    /// assert_eq!((elem.as_str(), offset), ("Pony", 0));
+    ///
+    /// // The subsequent elements are moved accordingly
+    /// assert_eq!(rope.get_with_offset(FirstAfter(by_ord(4))).unwrap().1, 1);
+    /// ```
+    pub fn remove(&mut self, one: One<impl FnMut(&O) -> Ordering>) -> Option<(T, O)> {
+        self.find_one(one)
+            .map(|(cursor, offset)| (self.remove_at(cursor), offset))
     }
 }
 
@@ -407,6 +515,124 @@ mod tests {
                     let expected_elems: Vec<&String> = expected_list.iter().rev().collect();
                     assert_eq!(elems, expected_elems);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn get() {
+        const COUNT: usize = ORDER * 4 + 7;
+
+        let list: Vec<String> = (0..COUNT).map(|x| x.to_string()).collect();
+        let total_len: usize = list.iter().map(|s| s.len()).sum();
+
+        let rope: Rope<_> = list.iter().cloned().collect();
+
+        assert_eq!(rope.get_with_offset(One::FirstAfter(by_ord(-1))), None);
+
+        let mut i = 0;
+        for e in list.iter() {
+            let expected = Some((e, i as isize));
+            assert_eq!(rope.get_with_offset(One::FirstAfter(by_ord(i))), expected);
+
+            if e.len() > 1 {
+                assert_eq!(
+                    rope.get_with_offset(One::FirstAfter(by_ord(i + 1))),
+                    expected
+                );
+                assert_eq!(
+                    rope.get_with_offset(One::LastBefore(by_ord(i + 1))),
+                    expected
+                );
+
+                assert_eq!(
+                    rope.get_with_offset(One::FirstAfter(by_ord(i + e.len() as isize - 1))),
+                    expected
+                );
+                assert_eq!(
+                    rope.get_with_offset(One::LastBefore(by_ord(i + e.len() as isize - 1))),
+                    expected
+                );
+            }
+
+            assert_eq!(
+                rope.get_with_offset(One::LastBefore(by_ord(i + e.len() as isize))),
+                expected
+            );
+
+            i += e.len() as isize;
+        }
+
+        assert_eq!(
+            rope.get_with_offset(One::FirstAfter(by_ord(total_len as isize))),
+            None
+        );
+
+        assert_eq!(
+            rope.get_with_offset(One::FirstAfter(by_ord(total_len as isize + 1))),
+            None
+        );
+        assert_eq!(
+            rope.get_with_offset(One::LastBefore(by_ord(total_len as isize + 1))),
+            None
+        );
+    }
+
+    #[test]
+    fn remove() {
+        const COUNT: usize = ORDER * 4 + 7;
+
+        let list: Vec<String> = (0..COUNT).map(|x| x.to_string()).collect();
+
+        for i in 0..list.len() {
+            let mut rope: Rope<_, Index> = list.iter().cloned().collect();
+
+            let one = One::FirstAfter(by_key(|key: &Index| key.0, i as isize));
+
+            assert_eq!(rope.remove(one).unwrap().0, list[i],);
+
+            rope.validate();
+
+            // See if subsequent elements are shifted as expected
+            for k in i + 1..list.len() {
+                let one = One::FirstAfter(by_key(|key: &Index| key.0, k as isize - 1));
+                assert_eq!(
+                    rope.get_with_offset(one).unwrap(),
+                    (&list[k], IndexOffset(k as isize - 1, NullOffset)),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn update_with() {
+        const COUNT: usize = ORDER * 4 + 7;
+
+        // All elements are one element long `Vec`s. So, their offset values
+        // are like `Index`, until we change the length of one of them.
+        let list: Vec<Vec<usize>> = (0..COUNT).map(|x| vec![x]).collect();
+
+        for i in 0..list.len() {
+            let mut rope: Rope<_> = list.iter().cloned().collect();
+
+            let one = One::FirstAfter(by_ord(i as isize));
+
+            // Change a `Vec`'s length to zero
+            rope.update_with(one, |e, offset| {
+                e.clear();
+                assert_eq!(offset, i as isize);
+            })
+            .unwrap();
+
+            rope.validate();
+
+            // See if subsequent elements are shifted as expected
+            for k in i + 1..list.len() {
+                let one = One::FirstAfter(by_ord(k as isize - 1));
+                assert_eq!(
+                    rope.get_with_offset(one).unwrap(),
+                    (&list[k], k as isize - 1),
+                );
             }
         }
     }

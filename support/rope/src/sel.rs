@@ -339,3 +339,57 @@ where
         },
     }
 }
+
+/// Specifies one element using a reference value (usually represented by a
+/// comparator function implementing `FnMut(&O) -> Ordering`).
+///
+/// It specifies an element using in form "the first/last element after/before
+/// a reference value". Note that it assumes that there's an infinitely large
+/// empty place next to each endpoint of the rope, and it represents no elements
+/// (thus APIs using `One` does nothing and/or return `None`) if it points one
+/// of those empty places.
+///
+/// [`by_key`] and [`by_ord`] are high-order functions returning comparator
+/// functions.
+///
+/// See [`Rope::get_with_offset`] for examples.
+///
+/// [`Rope::get_with_offset`]: crate::Rope::get_with_offset
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum One<T> {
+    /// The first element after a reference value.
+    FirstAfter(T),
+    /// The last element before a reference value.
+    LastBefore(T),
+}
+
+/// Create a comparison function from a key extraction function and a
+/// reference value.
+///
+/// # Examples
+///
+/// ```
+/// use rope::{Rope, by_key, Index, One::FirstAfter};
+/// let rope: Rope<String, Index> = [
+///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
+/// ].iter().map(|x|x.to_string()).collect();
+///
+/// // Extract indices from `Index` and use them as key
+/// let elem = rope.get(FirstAfter(by_key(|i: &Index| i.0, 1))).unwrap();
+/// assert_eq!(elem, "ipsum ");
+/// ```
+pub fn by_key<KF, K, O>(extract_key: KF, x: K) -> impl Fn(&O) -> Ordering
+where
+    KF: Fn(&O) -> K,
+    K: Ord,
+{
+    move |probe| extract_key(probe).cmp(&x)
+}
+
+/// Create a comparison function from a reference value.
+pub fn by_ord<O>(x: O) -> impl Fn(&O) -> Ordering
+where
+    O: Ord,
+{
+    move |probe| probe.cmp(&x)
+}

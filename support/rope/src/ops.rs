@@ -2,7 +2,7 @@
 use arrayvec::ArrayVec;
 use std::cmp::Ordering;
 
-use super::{Cursor, INode, NodeRef, Offset, Rope, ToOffset, ORDER};
+use super::{Cursor, INode, NodeRef, Offset, One, Rope, ToOffset, ORDER};
 
 impl<T, O> Rope<T, O>
 where
@@ -68,6 +68,26 @@ where
         }
 
         cursor
+    }
+
+    /// Find an element (not including one-past-end one, only a real one) using
+    /// `One`.
+    pub(crate) fn find_one(&self, one: One<impl FnMut(&O) -> Ordering>) -> Option<(Cursor, O)> {
+        let co = match one {
+            One::FirstAfter(f) => self.inclusive_lower_bound_by(f),
+            One::LastBefore(f) => self.inclusive_upper_bound_by(f),
+        };
+
+        if let Some((c, o)) = co {
+            // TODO: This is utterly inefficient
+            if c == self.end() {
+                None
+            } else {
+                Some((c, o))
+            }
+        } else {
+            None
+        }
     }
 
     /// Get the `Cursor` representing the first element that overlaps with
@@ -177,6 +197,28 @@ where
                 }
                 NodeRef::Leaf(elements) => {
                     return &elements[i];
+                }
+                NodeRef::Invalid => unreachable!(),
+            }
+        }
+    }
+
+    /// Get the mutable reference to the element specified by `at`.
+    ///
+    /// `at` must be a valid `Cursor` pointing at an element.
+    pub(crate) fn get_mut_at(&mut self, at: Cursor) -> &mut T {
+        let mut it = at.indices.iter();
+        let mut cur = &mut self.root;
+        loop {
+            // `Cursor::indices` contains a path to an element. The iterator
+            // should return a value until we reach a leaf node.
+            let i = *it.next().unwrap() as usize;
+            match cur {
+                NodeRef::Internal(inode) => {
+                    cur = &mut inode.children[i];
+                }
+                NodeRef::Leaf(elements) => {
+                    return &mut elements[i];
                 }
                 NodeRef::Invalid => unreachable!(),
             }
@@ -365,8 +407,9 @@ where
     } // fn insert_sub
 
     /// Update the element specified by `at` using the function `f`.
-    pub(crate) fn update_with(&mut self, at: Cursor, f: impl FnOnce(&mut T)) {
+    pub(crate) fn update_at_with<R>(&mut self, at: Cursor, f: impl FnOnce(&mut T) -> R) -> R {
         let delta: O;
+        let result;
 
         let mut it = at.indices.iter();
         let mut cur = &mut self.root;
@@ -383,7 +426,7 @@ where
                     let old_len = (*elem).to_offset();
 
                     // Update the element
-                    f(elem);
+                    result = f(elem);
 
                     // Compute the length delta
                     delta = (*elem).to_offset() + -old_len;
@@ -412,6 +455,8 @@ where
                 NodeRef::Invalid => unreachable!(),
             }
         }
+
+        result
     }
 
     /// Remove the element specified by `at`.
