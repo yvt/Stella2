@@ -73,6 +73,28 @@ impl<T> ToOffset<NullOffset> for T {
 ///
 /// [`ToOffset`]`<IndexOffset<T>>` is automatically implemented for types
 /// that implement `ToOffset<T>`.
+///
+/// # Examples
+///
+/// ```
+/// use rope::{IndexOffset, ToOffset};
+/// let len: isize = "derp".to_string().to_offset();
+/// assert_eq!(len, 4); // length
+///
+/// // `String` implements `ToOffset<isize>`, so it automatically
+/// // implements `ToOffset<IndexOffset<isize>>`:
+/// let len_with_count: IndexOffset<isize> = "derp".to_string().to_offset();
+/// assert_eq!(len_with_count.0, 1); // element count - always `1`
+/// assert_eq!(len_with_count.1, 4); // length (inherited)
+///
+/// // Usage with `Rope`:
+/// use rope::Rope;
+/// let rope: Rope<String, IndexOffset<isize>> = [
+///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
+/// ].iter().map(|x|x.to_string()).collect();
+///
+/// assert_eq!(rope.offset_len(), IndexOffset(6, 29));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndexOffset<T>(pub isize, pub T);
 

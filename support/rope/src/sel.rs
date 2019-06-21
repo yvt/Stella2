@@ -242,7 +242,26 @@ where
 /// `Included(x)` and `Excluded(x)` is considered.
 /// (E.g., `Floor(4)..Floor(6)` and `Floor(4)..=Floor(6)` are treated
 /// identically.)
-pub fn range_by_key<KF, K>(extract_key: KF, range: &impl RangeBounds<Edge<K>>) -> RangeByKey<'_, KF, K> {
+///
+/// # Examples
+///
+/// ```
+/// use rope::{Rope, range_by_key, Index, Edge::Floor};
+/// let rope: Rope<String, Index> = [
+///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
+/// ].iter().map(|x|x.to_string()).collect();
+///
+/// // Extract indices from `Index` and use them as key
+/// let (iter, _) = rope.range(range_by_key(|i: &Index| i.0, &(Floor(1)..Floor(3))));
+/// assert_eq!(
+///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
+///     &["ipsum ", "dolor "],
+/// );
+/// ```
+pub fn range_by_key<KF, K>(
+    extract_key: KF,
+    range: &impl RangeBounds<Edge<K>>,
+) -> RangeByKey<'_, KF, K> {
     RangeByKey {
         extract_key,
         start: match range.start_bound() {
@@ -290,6 +309,21 @@ where
 /// `Included(x)` and `Excluded(x)` is considered.
 /// (E.g., `Floor(4)..Floor(6)` and `Floor(4)..=Floor(6)` are treated
 /// identically.)
+///
+/// # Examples
+///
+/// ```
+/// use rope::{Rope, range_by_ord, Edge::Floor};
+/// let rope: Rope<String> = [
+///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
+/// ].iter().map(|x|x.to_string()).collect();
+///
+/// let (iter, _) = rope.range(range_by_ord(&(Floor(7)..Floor(17))));
+/// assert_eq!(
+///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
+///     &["ipsum ", "dolor "],
+/// );
+/// ```
 pub fn range_by_ord<O>(range: &impl RangeBounds<Edge<O>>) -> RangeByOrd<'_, O>
 where
     O: Ord + Clone,
