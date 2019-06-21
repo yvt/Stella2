@@ -1,5 +1,6 @@
 //! Rope operations (mostly private)
 use arrayvec::ArrayVec;
+use std::cmp::Ordering;
 
 use super::{Cursor, INode, NodeRef, Offset, Rope, ToOffset, ORDER};
 
@@ -16,6 +17,9 @@ where
     }
 
     /// Get a `Cursor` representing the one-past-end position.
+    ///
+    /// The one-past-end `Cursor` is created from the `Cursor` representing
+    /// the last element, by moving the leaf index past the boundary.
     pub(crate) fn end(&self) -> Cursor {
         self.end_generic(true)
     }
@@ -64,6 +68,97 @@ where
         }
 
         cursor
+    }
+
+    /// Get the `Cursor` representing the first element that overlaps with
+    /// range `(x, +∞]`. The boundary is specified using a comparator function.
+    /// This function also returns the offset of the element relative to the
+    /// front of the rope.
+    ///
+    /// ```text
+    ///  Elements:     [    0    ] [    1    ] [     2     ]
+    ///            |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+    ///  Result:   x  0  0  0  0  1  1  1  1  2  2  2  2  2  3
+    /// ```
+    pub(crate) fn inclusive_lower_bound_by(
+        &self,
+        mut f: impl FnMut(&O) -> Ordering,
+    ) -> Option<(Cursor, O)> {
+        self.search_by(|offset| f(offset) == Ordering::Greater)
+    }
+
+    /// Get the `Cursor` representing the last element that overlaps with
+    /// range `[-∞, x)`. The boundary is specified using a comparator function.
+    /// This function also returns the offset of the element relative to the
+    /// front of the rope.
+    ///
+    /// ```text
+    ///  Elements:  [    0    ] [    1    ] [     2     ]
+    ///            |  |  |  |  |  |  |  |  |  |  |  |  |  |
+    ///  Result:   x  0  0  0  0  1  1  1  1  2  2  2  2  3
+    /// ```
+    pub(crate) fn inclusive_upper_bound_by(
+        &self,
+        mut f: impl FnMut(&O) -> Ordering,
+    ) -> Option<(Cursor, O)> {
+        self.search_by(|offset| f(offset) != Ordering::Less)
+    }
+
+    /// Search for an element.
+    ///
+    /// The elements are iterated through from front to back. For each element
+    /// having range `[a, b]`, `f(&b)` is evaluated. The algorithm terminates
+    /// and returns the element when it evaluates to `true`.
+    /// `f` must be a monotonically increasing function.
+    ///
+    /// The both ends of the rope are capped by two imaginary elements:
+    /// `None` and `Some((self.end(), self.offset_len()))`.
+    fn search_by(&self, mut f: impl FnMut(&O) -> bool) -> Option<(Cursor, O)> {
+        if f(&O::zero()) {
+            return None;
+        }
+        if !f(&self.len) {
+            return Some((self.end(), self.len.clone()));
+        }
+
+        let mut cursor = Cursor::default();
+        let mut offset = O::zero();
+
+        let mut node = &self.root;
+        loop {
+            let mut i = 0;
+            match node {
+                NodeRef::Internal(inode) => {
+                    let mut next_offset = offset.clone();
+                    while i < inode.offsets.len() {
+                        let next_child_offset = offset.clone() + inode.offsets[i].clone();
+                        if f(&next_child_offset) {
+                            break;
+                        }
+                        next_offset = next_child_offset;
+                        i += 1;
+                    }
+                    offset = next_offset;
+                    cursor.indices.push(i as _);
+                    node = &inode.children[i];
+                }
+                NodeRef::Leaf(elements) => {
+                    while i + 1 < elements.len() {
+                        let next_offset = offset.clone() + elements[i].to_offset();
+                        if f(&next_offset) {
+                            break;
+                        }
+                        offset = next_offset;
+                        i += 1;
+                    }
+                    cursor.indices.push(i as _);
+                    break;
+                }
+                NodeRef::Invalid => unreachable!(),
+            }
+        }
+
+        Some((cursor, offset))
     }
 
     /// Get the reference to the element specified by `at`.
@@ -559,6 +654,73 @@ where
                 }
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inclusive_lower_bound() {
+        let strs: Vec<String> = (0..200).map(|s| s.to_string()).collect();
+
+        let rope: Rope<String> = strs.iter().cloned().collect();
+        dbg!(&rope.root);
+
+        assert_eq!(rope.inclusive_lower_bound_by(|probe| probe.cmp(&-1)), None);
+
+        let mut i = 0;
+        for s in strs.iter() {
+            let expected_offset = i;
+
+            let (cursor, offset) = rope
+                .inclusive_lower_bound_by(|probe| probe.cmp(&i))
+                .unwrap();
+            assert_eq!(rope.get_at(cursor), s);
+            assert_eq!(offset, expected_offset);
+
+            i += s.len() as isize - 1;
+
+            let (cursor, offset) = rope
+                .inclusive_lower_bound_by(|probe| probe.cmp(&i))
+                .unwrap();
+            assert_eq!(rope.get_at(cursor), s);
+            assert_eq!(offset, expected_offset);
+
+            i += 1;
+        }
+    }
+
+    #[test]
+    fn inclusive_upper_bound() {
+        let strs: Vec<String> = (0..200).map(|s| s.to_string()).collect();
+
+        let rope: Rope<String> = strs.iter().cloned().collect();
+        dbg!(&rope.root);
+
+        assert_eq!(rope.inclusive_upper_bound_by(|probe| probe.cmp(&0)), None);
+
+        let mut i = 0;
+        for s in strs.iter() {
+            let expected_offset = i;
+
+            i += 1;
+
+            let (cursor, offset) = rope
+                .inclusive_upper_bound_by(|probe| probe.cmp(&i))
+                .unwrap();
+            assert_eq!(rope.get_at(cursor), s);
+            assert_eq!(offset, expected_offset);
+
+            i += s.len() as isize - 1;
+
+            let (cursor, offset) = rope
+                .inclusive_upper_bound_by(|probe| probe.cmp(&i))
+                .unwrap();
+            assert_eq!(rope.get_at(cursor), s);
+            assert_eq!(offset, expected_offset);
         }
     }
 }

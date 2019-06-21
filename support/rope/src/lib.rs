@@ -22,7 +22,8 @@ mod iter;
 mod misc;
 mod offset;
 mod ops;
-pub use self::{iter::*, offset::*};
+mod sel;
+pub use self::{iter::*, offset::*, sel::*};
 
 /// Represents a rope.
 ///
@@ -119,7 +120,7 @@ struct INode<T, O> {
 /// `std::mem::size_of::<usize>() * 8 / ORDER_SHIFT as usize + 1`.
 const CURSOR_LEN: usize = 16;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 struct Cursor {
     /// Each element represents an index into `INode::children` or
     /// `NodeRef::Leaf` at the corresponding level.
@@ -301,5 +302,112 @@ mod tests {
         }
         assert_eq!(rope.first().map(String::as_str), Some("0"));
         assert_eq!(rope.last().map(String::as_str), Some("199"));
+    }
+
+    #[test]
+    fn iter() {
+        let mut rope: Rope<String> = Rope::new();
+        for i in 0..200 {
+            rope.push_back(i.to_string());
+        }
+
+        dbg!(&rope.root);
+        rope.validate();
+
+        let elems: Vec<u32> = rope.iter().map(|x| x.parse().unwrap()).collect();
+        assert_eq!(elems, (0..200).collect::<Vec<u32>>());
+
+        let elems: Vec<u32> = rope.iter().rev().map(|x| x.parse().unwrap()).collect();
+        assert_eq!(elems, (0..200).rev().collect::<Vec<u32>>());
+    }
+
+    #[test]
+    fn range() {
+        const COUNT: usize = ORDER * 4 + 7;
+
+        let list: Vec<String> = (0..COUNT).map(|x| x.to_string()).collect();
+
+        let rope: Rope<String> = list.iter().cloned().collect();
+        dbg!(&rope.root);
+        rope.validate();
+
+        let len = rope.offset_len() as usize;
+        // Create a table of the correct endpoint positions
+        // for character indices `-1..=len + 1`
+        let mut floor_idx = vec![0; len + 3];
+        let mut ceil_idx = vec![0; len + 3];
+        let mut off = 0;
+        for (i, s) in rope.iter().enumerate() {
+            floor_idx[1..][off..off + s.len()]
+                .iter_mut()
+                .for_each(|x| *x = i);
+            ceil_idx[1..][off] = i;
+            ceil_idx[1..][off + 1..off + s.len()]
+                .iter_mut()
+                .for_each(|x| *x = i + 1);
+            off += s.len();
+        }
+        // i = `-1`
+        floor_idx[0] = 0;
+        ceil_idx[0] = 0;
+        // i = `len`
+        floor_idx[len + 1] = COUNT;
+        ceil_idx[len + 1] = COUNT;
+        // i = `len + 1`
+        floor_idx[len + 2] = COUNT;
+        ceil_idx[len + 2] = COUNT;
+
+        // Positions of elements
+        let mut off = 0;
+        let mut off_table = vec![0];
+        off_table.extend(rope.iter().map(|s| {
+            off += s.len();
+            off as isize
+        }));
+
+        // Try every possible range in a certain range
+        for start in -1..=len as isize + 1 {
+            for end in -1..=len as isize + 1 {
+                for ty in 0..4 {
+                    let (start_edge, start_expected_i) = if (ty & 1) != 0 {
+                        (Edge::Floor(start as isize), floor_idx[(start + 1) as usize])
+                    } else {
+                        (Edge::Ceil(start as isize), ceil_idx[(start + 1) as usize])
+                    };
+                    let (end_edge, end_expected_i) = if (ty & 1) != 0 {
+                        (Edge::Floor(end as isize), floor_idx[(end + 1) as usize])
+                    } else {
+                        (Edge::Ceil(end as isize), ceil_idx[(end + 1) as usize])
+                    };
+
+                    // If `end` < `start`, clamp `end`
+                    let end_expected_i = std::cmp::max(start_expected_i, end_expected_i);
+
+                    let range = start_edge..end_edge;
+                    dbg!(&range);
+                    let range = by_key(|o: &isize| *o, &range);
+
+                    let expected_list = if start_expected_i >= end_expected_i {
+                        &[]
+                    } else {
+                        &list[start_expected_i..end_expected_i]
+                    };
+
+                    let (iter, offset_range) = rope.range(range.clone());
+                    let elems: Vec<&String> = iter.collect();
+                    let expected_elems: Vec<&String> = expected_list.iter().collect();
+                    assert_eq!(elems, expected_elems);
+
+                    let expected_offset_range =
+                        off_table[start_expected_i]..off_table[end_expected_i];
+                    assert_eq!(offset_range, expected_offset_range);
+
+                    let (iter, _) = rope.range(range.clone());
+                    let elems: Vec<&String> = iter.rev().collect();
+                    let expected_elems: Vec<&String> = expected_list.iter().rev().collect();
+                    assert_eq!(elems, expected_elems);
+                }
+            }
+        }
     }
 }
