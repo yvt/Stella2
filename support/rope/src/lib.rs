@@ -385,7 +385,7 @@ mod tests {
 
                     let range = start_edge..end_edge;
                     dbg!(&range);
-                    let range = by_key(|o: &isize| *o, &range);
+                    let range = range_by_key(|o: &isize| *o, &range);
 
                     let expected_list = if start_expected_i >= end_expected_i {
                         &[]

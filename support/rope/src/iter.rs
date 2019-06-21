@@ -123,7 +123,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use rope::{Rope, by_ord, Edge::{Floor, Ceil}};
+    /// use rope::{Rope, range_by_ord, Edge::{Floor, Ceil}};
     /// let rope: Rope<String> = [
     ///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
     /// ].iter().map(|x|x.to_string()).collect();
@@ -136,14 +136,14 @@ where
     /// //  └──────────────┴─────────────────┴─────────────────┴───────────┘
     ///
     /// // Using endpoint values:
-    /// let (iter, range) = rope.range(by_ord(&(Floor(7)..Floor(17))));
+    /// let (iter, range) = rope.range(range_by_ord(&(Floor(7)..Floor(17))));
     /// assert_eq!(
     ///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
     ///     &["ipsum ", "dolor "],
     /// );
     /// assert_eq!(range, 5..17);
     ///
-    /// let (iter, range) = rope.range(by_ord(&(Ceil(7)..Floor(17))));
+    /// let (iter, range) = rope.range(range_by_ord(&(Ceil(7)..Floor(17))));
     /// assert_eq!(
     ///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
     ///     &["dolor "],

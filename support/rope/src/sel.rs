@@ -208,13 +208,13 @@ where
 /// `RopeRangeBounds` based on a key extraction function and endpoints, which are
 /// compared using `Ord::cmp`.
 #[derive(Debug, Clone, Copy)]
-pub struct ByKey<'a, KF, K> {
+pub struct RangeByKey<'a, KF, K> {
     pub extract_key: KF,
     pub start: Option<Edge<&'a K>>,
     pub end: Option<Edge<&'a K>>,
 }
 
-impl<O, KF, K> RopeRangeBounds<O> for ByKey<'_, KF, K>
+impl<O, KF, K> RopeRangeBounds<O> for RangeByKey<'_, KF, K>
 where
     KF: FnMut(&O) -> K,
     K: Ord,
@@ -235,15 +235,15 @@ where
     }
 }
 
-/// Construct a [`ByKey`] from a key extraction function and a range
+/// Construct a [`RangeByKey`] from a key extraction function and a range
 /// implementing `std::ops::RangeBounds`.
 ///
 /// For `range.start_bound()` and `range.end_bound()`, only the value inside the
 /// `Included(x)` and `Excluded(x)` is considered.
 /// (E.g., `Floor(4)..Floor(6)` and `Floor(4)..=Floor(6)` are treated
 /// identically.)
-pub fn by_key<KF, K>(extract_key: KF, range: &impl RangeBounds<Edge<K>>) -> ByKey<'_, KF, K> {
-    ByKey {
+pub fn range_by_key<KF, K>(extract_key: KF, range: &impl RangeBounds<Edge<K>>) -> RangeByKey<'_, KF, K> {
+    RangeByKey {
         extract_key,
         start: match range.start_bound() {
             Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
@@ -259,12 +259,12 @@ pub fn by_key<KF, K>(extract_key: KF, range: &impl RangeBounds<Edge<K>>) -> ByKe
 /// `RopeRangeBounds` based on endpoints of type `O`, which are compared using
 /// `O::cmp`.
 #[derive(Debug, Clone, Copy)]
-pub struct ByOrd<'a, O> {
+pub struct RangeByOrd<'a, O> {
     pub start: Option<Edge<&'a O>>,
     pub end: Option<Edge<&'a O>>,
 }
 
-impl<O> RopeRangeBounds<O> for ByOrd<'_, O>
+impl<O> RopeRangeBounds<O> for RangeByOrd<'_, O>
 where
     O: Ord,
 {
@@ -284,17 +284,17 @@ where
     }
 }
 
-/// Construct a [`ByOrd`] from a range implementing `std::ops::RangeBounds`.
+/// Construct a [`RangeByOrd`] from a range implementing `std::ops::RangeBounds`.
 ///
 /// For `range.start_bound()` and `range.end_bound()`, only the value inside the
 /// `Included(x)` and `Excluded(x)` is considered.
 /// (E.g., `Floor(4)..Floor(6)` and `Floor(4)..=Floor(6)` are treated
 /// identically.)
-pub fn by_ord<O>(range: &impl RangeBounds<Edge<O>>) -> ByOrd<'_, O>
+pub fn range_by_ord<O>(range: &impl RangeBounds<Edge<O>>) -> RangeByOrd<'_, O>
 where
     O: Ord + Clone,
 {
-    ByOrd {
+    RangeByOrd {
         start: match range.start_bound() {
             Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
             Bound::Unbounded => None,
