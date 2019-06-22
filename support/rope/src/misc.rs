@@ -74,7 +74,6 @@ where
                     .map(ToOffset::to_offset)
                     .fold(O::zero(), |x, y| x + y)
             }
-            NodeRef::Invalid => unreachable!(),
         }
     } // fn validate_sub
 }

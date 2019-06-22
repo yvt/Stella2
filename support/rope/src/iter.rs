@@ -291,7 +291,6 @@ fn iter_cursor_move_forward<T, O>(path: &mut Path<'_, T, O>, indices: &mut [u8; 
                     NodeRef::Leaf(_) => {
                         break;
                     }
-                    NodeRef::Invalid => unreachable!(),
                 }
             }
             break;
@@ -347,7 +346,6 @@ fn iter_cursor_move_backward<'a, T, O>(path: &mut Path<'a, T, O>, indices: &mut 
                         indices[level] = (elements.len() - 1) as u8;
                         break;
                     }
-                    NodeRef::Invalid => unreachable!(),
                 }
             }
             break;

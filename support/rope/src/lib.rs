@@ -68,7 +68,6 @@ enum NodeRef<T, O> {
     /// (min..=ORDER * 2).contains(&array_vec.len())
     /// ```
     Leaf(Box<ArrayVec<[T; ORDER * 2]>>),
-    Invalid,
 }
 
 impl<T, O> NodeRef<T, O> {
@@ -77,7 +76,6 @@ impl<T, O> NodeRef<T, O> {
         match self {
             NodeRef::Internal(inode) => inode.children.len(),
             NodeRef::Leaf(elements) => elements.len(),
-            NodeRef::Invalid => unreachable!(),
         }
     }
 

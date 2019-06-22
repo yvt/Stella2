@@ -42,7 +42,6 @@ where
                         .push((leaf.len() - (!past_end) as usize) as _);
                     break;
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
 
@@ -63,7 +62,6 @@ where
                 NodeRef::Leaf(_) => {
                     break;
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
 
@@ -174,7 +172,6 @@ where
                     cursor.indices.push(i as _);
                     break;
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
 
@@ -198,7 +195,6 @@ where
                 NodeRef::Leaf(elements) => {
                     return &elements[i];
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
     }
@@ -220,7 +216,6 @@ where
                 NodeRef::Leaf(elements) => {
                     return &mut elements[i];
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
     }
@@ -231,20 +226,26 @@ where
 
         if let Some((new_sibling, new_len)) = Self::insert_sub(&at.indices, &mut self.root, x, &len)
         {
-            // Create a new root
-            let old_root = std::mem::replace(&mut self.root, NodeRef::Invalid);
+            // Remove the current root, filling the place with a brand new
+            // internal root node.
+            let old_root = std::mem::replace(
+                &mut self.root,
+                NodeRef::Internal(Box::new(INode {
+                    children: ArrayVec::new(),
+                    offsets: ArrayVec::new(),
+                })),
+            );
 
-            let mut new_inode = Box::new(INode {
-                children: ArrayVec::new(),
-                offsets: ArrayVec::new(),
-            });
+            let new_inode = match &mut self.root {
+                NodeRef::Internal(inode) => inode,
+                _ => unreachable!(),
+            };
 
+            // Add the former-root node and the new sibling node to it.
             new_inode.children.push(old_root);
             new_inode.children.push(new_sibling);
 
             new_inode.offsets.push(new_len);
-
-            self.root = NodeRef::Internal(new_inode);
         }
 
         self.len += len;
@@ -276,7 +277,6 @@ where
             let elements = match node {
                 NodeRef::Internal(_) => unreachable!(),
                 NodeRef::Leaf(elements) => elements,
-                NodeRef::Invalid => unreachable!(),
             };
             if elements.len() == elements.capacity() {
                 // Full; split the leaf into two
@@ -316,7 +316,6 @@ where
             let inode = match node {
                 NodeRef::Internal(inode) => inode,
                 NodeRef::Leaf(_) => unreachable!(),
-                NodeRef::Invalid => unreachable!(),
             };
 
             for offset in inode.offsets[i..].iter_mut() {
@@ -432,7 +431,6 @@ where
                     delta = (*elem).to_offset() + -old_len;
                     break;
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
 
@@ -452,7 +450,6 @@ where
                 NodeRef::Leaf(_) => {
                     break;
                 }
-                NodeRef::Invalid => unreachable!(),
             }
         }
 
@@ -498,7 +495,6 @@ where
             NodeRef::Leaf(_) => {
                 return;
             }
-            NodeRef::Invalid => unreachable!(),
         }
 
         // Move the only child to the top-level
@@ -527,7 +523,6 @@ where
             let elements = match node {
                 NodeRef::Internal(_) => unreachable!(),
                 NodeRef::Leaf(elements) => elements,
-                NodeRef::Invalid => unreachable!(),
             };
 
             // Remove an element
@@ -539,7 +534,6 @@ where
             let inode = match node {
                 NodeRef::Internal(inode) => inode,
                 NodeRef::Leaf(_) => unreachable!(),
-                NodeRef::Invalid => unreachable!(),
             };
 
             let (elem, len, mut underflow) = Self::remove_sub(&at[1..], &mut inode.children[i]);
