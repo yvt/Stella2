@@ -6,13 +6,27 @@
 //!
 //! Logically, it can be modeled as a sequence of elements, each having a value
 //! representing the length of type implementing [`Offset`] (calculated by
-//! `<T as ToOffset<O>>::to_offset`).
+//! `<T as ToOffset<O>>::to_offset`). The offset value of an element is
+//! calculated as a sum of all preceding elements' length.
+//!
+//! Offset values can have multiple aspects like byte offset and grapheme
+//! cluster count. Aspects can be combined using the type system, as exemplified
+//! by [`IndexOffset`]`<T>`, which adds an element index to an existing `Offset`.
+//! To do a search operation, one of aspects must be chosen.
+//!
+//! ```text
+//! bytes:    0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21
+//!           ┌──────────────┬─────────────────┬─────────────────┬───────────┐
+//!           │P ┊o ┊n ┊y ┊  │i ┊p ┊s ┊u ┊m ┊  │d ┊o ┊l ┊o ┊r ┊  │s ┊i ┊t ┊  │
+//!           └──────────────┴─────────────────┴─────────────────┴───────────┘
+//! elements: 0              1                 2                 3           4
+//! ```
+//!
 //! It supports the following operations:
 //!
 //!  - O(log n) insertion at an arbitrary location.
 //!  - O(log n) removal of an arbitrary location.
-//!  - O(log n) search by an offset value relative to the start or end of the
-//!    sequence.
+//!  - O(log n) search by an offset comparison function.
 //!
 //! It does not support indexing like normal arrays. However, it can be added
 //! by combining an existing `Offset` with [`IndexOffset`].
