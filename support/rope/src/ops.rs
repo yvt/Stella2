@@ -456,6 +456,8 @@ where
             }
         }
 
+        self.len += delta;
+
         result
     }
 
