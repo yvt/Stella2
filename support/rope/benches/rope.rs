@@ -15,7 +15,6 @@ impl Xorshift32 {
 
 fn bench_iter(b: &mut Bencher, count: usize) {
     let rope: Rope<_> = (0..count).map(|x| x.to_string()).collect();
-    let len = rope.offset_len();
 
     let mut it = rope.iter();
 
