@@ -205,38 +205,9 @@ where
     }
 }
 
-/// `RopeRangeBounds` based on a key extraction function and endpoints, which are
-/// compared using `Ord::cmp`.
-#[derive(Debug, Clone, Copy)]
-pub struct RangeByKey<'a, KF, K> {
-    pub extract_key: KF,
-    pub start: Option<Edge<&'a K>>,
-    pub end: Option<Edge<&'a K>>,
-}
-
-impl<O, KF, K> RopeRangeBounds<O> for RangeByKey<'_, KF, K>
-where
-    KF: FnMut(&O) -> K,
-    K: Ord,
-{
-    fn start_ty(&self) -> Option<EdgeType> {
-        self.start.as_ref().map(Edge::ty)
-    }
-    fn end_ty(&self) -> Option<EdgeType> {
-        self.end.as_ref().map(Edge::ty)
-    }
-    fn start_cmp(&mut self, probe: &O) -> Ordering {
-        let ep = self.start.as_ref().expect("unbounded").value_ref();
-        (self.extract_key)(probe).cmp(ep)
-    }
-    fn end_cmp(&mut self, probe: &O) -> Ordering {
-        let ep = self.end.as_ref().expect("unbounded").value_ref();
-        (self.extract_key)(probe).cmp(ep)
-    }
-}
-
-/// Construct a [`RangeByKey`] from a key extraction function and a range
-/// implementing `std::ops::RangeBounds`.
+/// `RopeRangeBounds<O>` based on a key extraction function (which converts
+/// from `O` to `K`) and  `RangeBounds<Edge<K>>`, which are compared against
+/// keys using `K::cmp`.
 ///
 /// For `range.start_bound()` and `range.end_bound()`, only the value inside the
 /// `Included(x)` and `Excluded(x)` is considered.
@@ -252,58 +223,59 @@ where
 /// ].iter().map(|x|x.to_string()).collect();
 ///
 /// // Extract indices from `Index` and use them as key
-/// let (iter, _) = rope.range(range_by_key(|i: &Index| i.0, &(Floor(1)..Floor(3))));
+/// let (iter, _) = rope.range(range_by_key(|i: &Index| i.0, Floor(1)..Floor(3)));
 /// assert_eq!(
 ///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
 ///     &["ipsum ", "dolor "],
 /// );
 /// ```
-pub fn range_by_key<KF, K>(
-    extract_key: KF,
-    range: &impl RangeBounds<Edge<K>>,
-) -> RangeByKey<'_, KF, K> {
-    RangeByKey {
-        extract_key,
-        start: match range.start_bound() {
-            Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
-            Bound::Unbounded => None,
-        },
-        end: match range.end_bound() {
-            Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
-            Bound::Unbounded => None,
-        },
-    }
-}
-
-/// `RopeRangeBounds` based on endpoints of type `O`, which are compared using
-/// `O::cmp`.
 #[derive(Debug, Clone, Copy)]
-pub struct RangeByOrd<'a, O> {
-    pub start: Option<Edge<&'a O>>,
-    pub end: Option<Edge<&'a O>>,
+pub struct RangeByKey<KF, R> {
+    pub extract_key: KF,
+    pub range: R,
 }
 
-impl<O> RopeRangeBounds<O> for RangeByOrd<'_, O>
+impl<O, KF, K, R> RopeRangeBounds<O> for RangeByKey<KF, R>
 where
-    O: Ord,
+    KF: FnMut(&O) -> K,
+    K: Ord,
+    R: RangeBounds<Edge<K>>,
 {
     fn start_ty(&self) -> Option<EdgeType> {
-        self.start.as_ref().map(Edge::ty)
+        match self.range.start_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => Some(x.ty()),
+            Bound::Unbounded => None,
+        }
     }
     fn end_ty(&self) -> Option<EdgeType> {
-        self.end.as_ref().map(Edge::ty)
+        match self.range.end_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => Some(x.ty()),
+            Bound::Unbounded => None,
+        }
     }
     fn start_cmp(&mut self, probe: &O) -> Ordering {
-        let ep = self.start.as_ref().expect("unbounded").value_ref();
-        probe.cmp(ep)
+        let ep = match self.range.start_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => x,
+            Bound::Unbounded => panic!("unbounded"),
+        };
+        (self.extract_key)(probe).cmp(ep.value_ref())
     }
     fn end_cmp(&mut self, probe: &O) -> Ordering {
-        let ep = self.end.as_ref().expect("unbounded").value_ref();
-        probe.cmp(ep)
+        let ep = match self.range.end_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => x,
+            Bound::Unbounded => panic!("unbounded"),
+        };
+        (self.extract_key)(probe).cmp(ep.value_ref())
     }
 }
 
-/// Construct a [`RangeByOrd`] from a range implementing `std::ops::RangeBounds`.
+/// A shorthand function for constructing `RangeByKey`.
+pub fn range_by_key<KF, R>(extract_key: KF, range: R) -> RangeByKey<KF, R> {
+    RangeByKey { extract_key, range }
+}
+
+/// `RopeRangeBounds<O>` based on `RangeBounds<Edge<O>>`. Endpoints are
+/// compared using `O::cmp`.
 ///
 /// For `range.start_bound()` and `range.end_bound()`, only the value inside the
 /// `Included(x)` and `Excluded(x)` is considered.
@@ -318,26 +290,53 @@ where
 ///     "Pony ", "ipsum ", "dolor ", "sit ", "amet ", "ms ",
 /// ].iter().map(|x|x.to_string()).collect();
 ///
-/// let (iter, _) = rope.range(range_by_ord(&(Floor(7)..Floor(17))));
+/// let (iter, _) = rope.range(range_by_ord(Floor(7)..Floor(17)));
 /// assert_eq!(
 ///     iter.map(String::as_str).collect::<Vec<_>>().as_slice(),
 ///     &["ipsum ", "dolor "],
 /// );
 /// ```
-pub fn range_by_ord<O>(range: &impl RangeBounds<Edge<O>>) -> RangeByOrd<'_, O>
+#[derive(Debug, Clone, Copy)]
+pub struct RangeByOrd<R> {
+    pub range: R,
+}
+
+impl<O, R> RopeRangeBounds<O> for RangeByOrd<R>
 where
-    O: Ord + Clone,
+    O: Ord,
+    R: RangeBounds<Edge<O>>,
 {
-    RangeByOrd {
-        start: match range.start_bound() {
-            Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
+    fn start_ty(&self) -> Option<EdgeType> {
+        match self.range.start_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => Some(x.ty()),
             Bound::Unbounded => None,
-        },
-        end: match range.end_bound() {
-            Bound::Included(x) | Bound::Excluded(x) => Some(x.as_ref()),
-            Bound::Unbounded => None,
-        },
+        }
     }
+    fn end_ty(&self) -> Option<EdgeType> {
+        match self.range.end_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => Some(x.ty()),
+            Bound::Unbounded => None,
+        }
+    }
+    fn start_cmp(&mut self, probe: &O) -> Ordering {
+        let ep = match self.range.start_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => x,
+            Bound::Unbounded => panic!("unbounded"),
+        };
+        probe.cmp(ep.value_ref())
+    }
+    fn end_cmp(&mut self, probe: &O) -> Ordering {
+        let ep = match self.range.end_bound() {
+            Bound::Included(x) | Bound::Excluded(x) => x,
+            Bound::Unbounded => panic!("unbounded"),
+        };
+        probe.cmp(ep.value_ref())
+    }
+}
+
+/// A shorthand function for constructing `RangeByOrd`.
+pub fn range_by_ord<R>(range: R) -> RangeByOrd<R> {
+    RangeByOrd { range }
 }
 
 /// Specifies one element using a reference value (usually represented by a
