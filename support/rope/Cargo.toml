@@ -7,3 +7,10 @@ license = "MIT/Apache-2.0"
 
 [dependencies]
 arrayvec = "0.4.10"
+
+[dev-dependencies]
+bencher = "0.1.5"
+
+[[bench]]
+name = "rope"
+harness = false
