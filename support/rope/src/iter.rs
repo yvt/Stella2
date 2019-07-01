@@ -118,7 +118,7 @@ where
     /// offset values of the sub-range.
     ///
     /// This method performs a search operation, whose time complexity is
-    /// O(log n), for each unbounded endpoint.
+    /// O(log n), for each bounded endpoint.
     ///
     /// # Examples
     ///
