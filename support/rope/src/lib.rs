@@ -334,7 +334,7 @@ where
     /// Insert an element before an existing element.
     ///
     /// Returns `Ok(offset)` if the element was inserted at `offset`; `Err(x)`
-    /// of `one` does not correspond to any elements.
+    /// if `one` does not correspond to any elements.
     ///
     /// # Examples
     ///
