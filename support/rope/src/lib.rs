@@ -330,6 +330,40 @@ where
         self.find_one(one)
             .map(|(cursor, offset)| (self.remove_at(cursor), offset))
     }
+
+    /// Insert an element before an existing element.
+    ///
+    /// Returns `Ok(offset)` if the element was inserted at `offset`; `Err(x)`
+    /// of `one` does not correspond to any elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rope::{Rope, by_ord, One::FirstAfter};
+    /// let mut rope: Rope<String> = ["Pony", " ", "ipsum"]
+    ///     .iter().map(|x|x.to_string()).collect();
+    ///
+    /// assert_eq!(rope.get_with_offset(FirstAfter(by_ord(8))).unwrap().1, 5);
+    ///
+    /// // Insert " yeehaw" after "Pony"
+    /// let result = rope.insert_before(" yeehaw".to_string(), FirstAfter(by_ord(4)));
+    /// assert_eq!(result, Ok(4));
+    /// assert_eq!(rope.iter().nth(1).unwrap(), " yeehaw");
+    ///
+    /// // The subsequent elements are moved accordingly
+    /// assert_eq!(
+    ///     rope.get_with_offset(FirstAfter(by_ord(12))).unwrap(),
+    ///     (&"ipsum".to_string(), 12),
+    /// );
+    /// ```
+    pub fn insert_before(&mut self, x: T, one: One<impl FnMut(&O) -> Ordering>) -> Result<O, T> {
+        if let Some((cursor, offset)) = self.find_one(one) {
+            self.insert(x, cursor);
+            Ok(offset)
+        } else {
+            Err(x)
+        }
+    }
 }
 
 #[cfg(test)]
