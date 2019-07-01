@@ -14,6 +14,7 @@ derive_more = "0.14.0"
 subscriber_list = { path = "../support/subscriber_list" }
 as_any = { path = "../support/as_any" }
 alt_fp = { path = "../support/alt_fp" }
+rope = { path = "../support/rope" }
 svgbobdoc = "0.2"
 sorted_diff = { path = "../support/sorted_diff" }
 lazy_static = "1"
