@@ -64,6 +64,12 @@ struct LineOff {
     pos: Size,
 }
 
+impl LineOff {
+    fn index(&self) -> Index {
+        self.index
+    }
+}
+
 impl rope::Offset for LineOff {
     fn zero() -> Self {
         Self { index: 0, pos: 0 }
@@ -173,10 +179,9 @@ impl Lineset {
         // Find the line group the new lines are inserted to
         use rope::{by_key, range_by_key, Edge::Floor, One::FirstAfter, ToOffset};
         let (line_gr, line_gr_off) = {
-            let (mut iter, range) = self.line_grs.range(range_by_key(
-                |off: &LineOff| off.index,
-                Floor(range.start)..,
-            ));
+            let (mut iter, range) = self
+                .line_grs
+                .range(range_by_key(LineOff::index, Floor(range.start)..));
             (iter.nth(0).unwrap().clone(), range.start)
         };
 
@@ -198,7 +203,7 @@ impl Lineset {
             if *lod_size_range.end() - line_gr.num_lines >= num_lines {
                 // Insert the new lines to the existing line group.
                 self.line_grs.update_with(
-                    FirstAfter(by_key(|off: &LineOff| off.index, line_gr_start)),
+                    FirstAfter(by_key(LineOff::index, line_gr_start)),
                     |line_gr, _| {
                         line_gr.num_lines += num_lines;
                         line_gr.size += size;
@@ -263,7 +268,7 @@ impl Lineset {
                 // `line_gr` will be the second half
                 self.line_grs
                     .update_with(
-                        FirstAfter(by_key(|off: &LineOff| off.index, line_gr_start)),
+                        FirstAfter(by_key(LineOff::index, line_gr_start)),
                         |line_gr, _| {
                             line_gr.num_lines = line_gr_end + num_lines - new_gr_mid;
                             line_gr.size = halve_sizes_new[1];
@@ -278,7 +283,7 @@ impl Lineset {
                             num_lines: new_gr_mid - line_gr_start,
                             size: halve_sizes_new[0],
                         },
-                        FirstAfter(by_key(|off: &LineOff| off.index, line_gr_start)),
+                        FirstAfter(by_key(LineOff::index, line_gr_start)),
                     )
                     .unwrap();
 
@@ -341,7 +346,7 @@ impl Lineset {
                 // `line_gr` will be the second half
                 self.line_grs
                     .update_with(
-                        FirstAfter(by_key(|off: &LineOff| off.index, line_gr_start)),
+                        FirstAfter(by_key(LineOff::index, line_gr_start)),
                         |line_gr, _| {
                             line_gr.num_lines = line_gr_end - range.start + adj_num_lines[1];
                             line_gr.size = halve_sizes_postadj[1];
@@ -356,7 +361,7 @@ impl Lineset {
                             num_lines: range.start - line_gr_start + adj_num_lines[0],
                             size: halve_sizes_postadj[0],
                         },
-                        FirstAfter(by_key(|off: &LineOff| off.index, line_gr_start)),
+                        FirstAfter(by_key(LineOff::index, line_gr_start)),
                     )
                     .unwrap();
 
@@ -406,10 +411,7 @@ impl Lineset {
                 self.line_grs.push_back(line_gr);
             } else {
                 self.line_grs
-                    .insert_before(
-                        line_gr,
-                        FirstAfter(by_key(|off: &LineOff| off.index, range2.start)),
-                    )
+                    .insert_before(line_gr, FirstAfter(by_key(LineOff::index, range2.start)))
                     .unwrap();
             }
 
@@ -501,10 +503,9 @@ impl Lineset {
                 end
             );
 
-            let (iter, range) = self.line_grs.range(range_by_key(
-                |off: &LineOff| off.index,
-                Floor(start)..Floor(end),
-            ));
+            let (iter, range) = self
+                .line_grs
+                .range(range_by_key(LineOff::index, Floor(start)..Floor(end)));
 
             // LOD groups must completely contain line groups
             assert_eq!(range.start.index, start);
