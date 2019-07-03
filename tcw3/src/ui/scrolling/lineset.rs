@@ -994,9 +994,13 @@ mod tests {
                 for &count in &[1, 2, 3, 4, 10] {
                     dbg!(pos..pos + count);
                     let mut lineset = lineset.clone();
+                    let len = lineset.line_grs.offset_len().index;
+
                     lineset.insert(&TestModel, pos..pos + count);
                     dbg!(&lineset);
+
                     lineset.validate();
+                    assert_eq!(lineset.line_grs.offset_len().index, len + count);
                 }
             }
         }
@@ -1020,9 +1024,13 @@ mod tests {
                 for pos2 in pos1..=lineset.line_grs.offset_len().index {
                     dbg!(pos1..pos2);
                     let mut lineset = lineset.clone();
+                    let len = lineset.line_grs.offset_len().index;
+
                     lineset.remove(&TestModel, pos1..pos2);
                     dbg!(&lineset);
+
                     lineset.validate();
+                    assert_eq!(lineset.line_grs.offset_len().index, len - (pos2 - pos1));
                 }
             }
         }
