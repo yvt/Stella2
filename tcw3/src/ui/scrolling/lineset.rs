@@ -177,7 +177,7 @@ impl Lineset {
         let lod_size_range = lod_size_range(lod);
 
         // Find the line group the new lines are inserted to
-        use rope::{by_key, range_by_key, Edge::Floor, One::FirstAfter, ToOffset};
+        use rope::{by_key, range_by_key, Edge::Floor, One::FirstAfter};
         let (line_gr, line_gr_off) = {
             let (mut iter, range) = self
                 .line_grs
@@ -190,6 +190,8 @@ impl Lineset {
         let line_gr_end = line_gr_start + line_gr.num_lines;
 
         let next;
+
+        // TODO: Maybe delegate this complexity to `regroup`?
 
         if range.start != line_gr_start || num_lines < *lod_size_range.start() {
             debug_assert!(lod > 0);
@@ -459,10 +461,333 @@ impl Lineset {
         }
     }
 
-    /// Synchronize the structure after lines are removed from the underlying
+    /// Synchronize the structure *before* lines are removed from the underlying
     /// model (`LinesetModel`).
     pub fn remove(&mut self, model: &dyn LinesetModel, range: Range<Index>) {
-        unimplemented!()
+        if range.end <= range.start {
+            return;
+        }
+        assert!(range.end <= self.line_grs.offset_len().index);
+        assert!(range.start >= 0);
+
+        use rope::{
+            by_key, range_by_key,
+            Edge::{Ceil, Floor},
+            One::FirstAfter,
+        };
+
+        let num_lines = range.end - range.start;
+
+        // Find the LOD group `range.start` belong to
+        let lod_gr_i1 = match self.lod_grs.binary_search_by_key(&range.start, |g| g.index) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        let lod1 = self.lod_grs[lod_gr_i1].lod;
+        let lod_size_range1 = lod_size_range(lod1);
+
+        // Find line groups overlapping with `range`
+        let (mut line_gr_iter, line_gr_range) = self.line_grs.range(range_by_key(
+            |off: &LineOff| off.index,
+            Floor(range.start)..Ceil(range.end),
+        ));
+
+        debug_assert!(line_gr_range.start.index <= range.start);
+        debug_assert!(line_gr_range.end.index >= range.end);
+
+        // Line groups of respective endpoints. `line_gr2` is `None` iff the
+        // range contains only one line group.
+        //
+        //     Line grs:        [gr1               ] [          ]
+        //     line_gr_range:   [                  ]
+        //     range:               [           ]
+        //
+        //     Line grs:        [gr1    ] [        ] [gr2       ]
+        //     line_gr_range:   [                               ]
+        //     range:               [                    ]
+        //
+        //     Line grs:        [gr1    ] [        ] [gr2       ]
+        //     line_gr_range:   [                               ]
+        //     range:           [                               ]
+        //
+        let line_gr1: LineGr = line_gr_iter.next().cloned().unwrap();
+        let line_gr2: Option<LineGr> = line_gr_iter.next_back().cloned();
+        drop(line_gr_iter);
+
+        if line_gr2.is_none()
+            && (range.start != line_gr_range.start.index || range.end != line_gr_range.end.index)
+        {
+            // - `range` overlaps with exactly one line group.
+            // -  And, `range` partially (not fully) overlaps the line group.
+            //
+            //     Line grs:        [gr1                            ]
+            //     line_gr_range:   [                               ]
+            //     range:               [                    ]
+            //
+
+            // The end of this LOD group (`lod_gr_i1`)
+            let lod_gr_end = if let Some(lod_gr) = self.lod_grs.get(lod_gr_i1 + 1) {
+                lod_gr.index
+            } else {
+                self.line_grs.offset_len().index
+            };
+
+            debug_assert!(lod1 > 0);
+
+            let remaining_num_lines = line_gr1.num_lines - num_lines;
+            if remaining_num_lines < *lod_size_range1.start()
+                && line_gr_range.end.index < lod_gr_end
+            {
+                // It'll violate the size invariant unless it's the last
+                // line group in a LOD group. So make it the last group
+                // (temporarily).
+                self.lod_grs.insert(
+                    lod_gr_i1 + 1,
+                    LodGr {
+                        index: line_gr_range.end.index,
+                        lod: lod1,
+                    },
+                );
+            }
+
+            // Estimate the size of the removed part
+            let size1 = model.line_total_size(line_gr_range.start.index..range.start, lod1 > 0);
+            let size2 = model.line_total_size(range.clone(), lod1 > 0);
+            let size3 = model.line_total_size(range.end..line_gr_range.end.index, lod1 > 0);
+            let [_, remaining_size] = divide_size(line_gr1.size, [size2, size1 + size3]);
+
+            // Remove `range` from the line group
+            self.line_grs
+                .update_with(
+                    FirstAfter(by_key(LineOff::index, range.start)),
+                    |line_gr, _| {
+                        line_gr.size = remaining_size;
+                        line_gr.num_lines = remaining_num_lines;
+                    },
+                )
+                .unwrap();
+
+            // Update the following LOD groups' starting indices
+            for lod_gr in self.lod_grs[lod_gr_i1 + 1..].iter_mut() {
+                lod_gr.index -= num_lines;
+            }
+
+            return;
+        }
+
+        // Find the LOD group `range.end` belong to
+        let lod_gr_i2 = match self.lod_grs.binary_search_by_key(&range.end, |g| g.index) {
+            Ok(i) => i - 1,
+            Err(i) => i - 1,
+        };
+        let lod2 = self.lod_grs[lod_gr_i2].lod;
+        let lod_size_range2 = lod_size_range(lod2);
+
+        // The range of the LOD group `lod_gr_i2`
+        let lod_gr2_start = self.lod_grs[lod_gr_i2].index;
+        let lod_gr2_end = if let Some(lod_gr) = self.lod_grs.get(lod_gr_i2 + 1) {
+            lod_gr.index
+        } else {
+            self.line_grs.offset_len().index
+        };
+
+        debug_assert!(lod_gr2_start < range.end);
+        debug_assert!(lod_gr2_end >= range.end);
+
+        // The first LOD group `lod_gr` such that `lod_g.index >= bulk_delete_end`
+        let lod_bulk_delete_end;
+
+        // Process the ending point first to minimize the number of invalidated
+        // indices.
+        if range.end < line_gr_range.end.index {
+            // `range.end` is in the middle of `line_gr2`. `line_gr2` remains,
+            // but some of its lines in its front are removed.
+            let line_gr2 = line_gr2.unwrap();
+
+            debug_assert!(lod2 > 0);
+
+            let line_gr2_start = line_gr_range.end.index - line_gr2.num_lines;
+            let line_gr2_end = line_gr_range.end.index;
+
+            let remaining_num_lines = line_gr2_end - range.end;
+            if remaining_num_lines < *lod_size_range2.start()
+                && line_gr_range.end.index < lod_gr2_end
+            {
+                // It'll violate the size invariant unless it's the last
+                // line group in a LOD group. So make it the last group
+                // (temporarily).
+                self.lod_grs.insert(
+                    lod_gr_i2 + 1,
+                    LodGr {
+                        index: line_gr_range.end.index,
+                        lod: lod2,
+                    },
+                );
+            }
+
+            // Estimate the size of the removed part
+            let size1 = model.line_total_size(line_gr2_start..range.end, lod2 > 0);
+            let size2 = model.line_total_size(range.end..line_gr2_end, lod2 > 0);
+            let [_, remaining_size] = divide_size(line_gr2.size, [size1, size2]);
+
+            // Remove a partial range from `line_gr2`
+            self.line_grs
+                .update_with(
+                    FirstAfter(by_key(LineOff::index, range.end)),
+                    |line_gr, _| {
+                        line_gr.size = remaining_size;
+                        line_gr.num_lines = remaining_num_lines;
+                    },
+                )
+                .unwrap();
+
+            if lod_gr2_start < line_gr2_start {
+                // Split the LOD group at `range.end` because the portion
+                // before `range.start` might belong to a different LOD group.
+                //
+                //     Line grs:     [      ] [     ] [      ]
+                //     LOD grs:      [1       [2
+                //       (after):    [1       [2           [2
+                //       (post-bulk-deletion):
+                //                   [1                    [2
+                //     range:          [                  ]
+                //
+                self.lod_grs.insert(
+                    lod_gr_i2 + 1,
+                    LodGr {
+                        index: range.end,
+                        lod: lod2,
+                    },
+                );
+                lod_bulk_delete_end = lod_gr_i2 + 1;
+            } else {
+                //
+                //     Line grs:     [      ] [     ] [      ]
+                //     LOD grs:      [1               [2
+                //       (after):    [1                    [2
+                //       (post-bulk-deletion):
+                //                   [1                    [2
+                //     range:           [                 ]
+                //
+                debug_assert_eq!(lod_gr2_start, line_gr2_start);
+                self.lod_grs[lod_gr_i2].index = range.end;
+                lod_bulk_delete_end = lod_gr_i2;
+            }
+        } else {
+            // `range.end` is right after `line_gr2.unwrap_or(line_gr1)`.
+            if lod_gr2_end > range.end {
+                // Split the LOD group after `line_gr2` because `line_gr1` might
+                // belong to a different LOD group.
+                //
+                //     Line grs:     [      ] [     ] [      ]
+                //     LOD grs:      [1       [2
+                //       (after):    [1       [2      [2
+                //       (post-bulk-deletion):
+                //                   [1               [2
+                //     range:           [           ]
+                //
+                self.lod_grs.insert(
+                    lod_gr_i2 + 1,
+                    LodGr {
+                        index: range.end,
+                        lod: lod2,
+                    },
+                )
+            } else {
+                //
+                //     Line grs:     [      ] [     ] [      ]
+                //     LOD grs:      [1       [2      [3
+                //       (post-bulk-deletion):
+                //                   [1               [3
+                //     range:           [           ]
+                //
+                debug_assert_eq!(lod_gr2_end, range.end);
+            }
+            lod_bulk_delete_end = lod_gr_i2 + 1;
+        }
+
+        // The range of the LOD group `lod_gr_i1`
+        let lod_gr1_start = self.lod_grs[lod_gr_i1].index;
+
+        debug_assert!(lod_gr1_start <= range.start);
+
+        // Remove full line groups (we call this step "bulk removal")
+        let bulk_delete_start = if range.start > line_gr_range.start.index {
+            line_gr_range.start.index + line_gr1.num_lines
+        } else {
+            line_gr_range.start.index
+        };
+        let bulk_delete_end = if range.end < line_gr_range.end.index {
+            line_gr_range.end.index - line_gr2.unwrap().num_lines
+        } else {
+            line_gr_range.end.index
+        };
+
+        let mut num_bulk_deleted_lines = bulk_delete_end - bulk_delete_start;
+
+        while num_bulk_deleted_lines > 0 {
+            let (line_gr, _) = self
+                .line_grs
+                .remove(FirstAfter(by_key(LineOff::index, bulk_delete_start)))
+                .unwrap();
+            num_bulk_deleted_lines -= line_gr.num_lines;
+            debug_assert!(num_bulk_deleted_lines >= 0);
+        }
+
+        // Delete starting points of LOD groups in
+        // `[bulk_delete_start, bulk_delete_end)`
+        debug_assert!(bulk_delete_start >= lod_gr1_start);
+        let lod_bulk_delete_start = if lod_gr1_start == bulk_delete_start {
+            lod_gr_i1
+        } else {
+            lod_gr_i1 + 1
+        };
+        vec_remove_range(
+            &mut self.lod_grs,
+            lod_bulk_delete_start..lod_bulk_delete_end,
+        );
+
+        if range.start > line_gr_range.start.index {
+            // `range.start` is in the middle of `line_gr1`.  `line_gr1` remains,
+            // but some of its lines in its front are removed.
+            debug_assert!(lod1 > 0);
+
+            let line_gr1_start = line_gr_range.start.index;
+            let line_gr1_end = line_gr_range.start.index + line_gr1.num_lines;
+
+            let remaining_num_lines = range.start - line_gr1_start;
+            // It's okay for `remaining_num_lines` to go under
+            // `lod_size_range1.start()` because we made sure that `line_gr1`
+            // was the last line group in the LOD group.
+            debug_assert!(
+                if let Some(lod_gr) = self.lod_grs.get(lod_bulk_delete_start) {
+                    lod_gr.index == range.end
+                } else {
+                    true
+                }
+            );
+
+            // Estimate the size of the removed part
+            let size1 = model.line_total_size(line_gr1_start..range.start, lod1 > 0);
+            let size2 = model.line_total_size(range.start..line_gr1_end, lod1 > 0);
+            let [remaining_size, _] = divide_size(line_gr1.size, [size1, size2]);
+
+            // Remove a partial range from `line_gr1`
+            self.line_grs
+                .update_with(
+                    FirstAfter(by_key(LineOff::index, range.start)),
+                    |line_gr, _| {
+                        line_gr.size = remaining_size;
+                        line_gr.num_lines = remaining_num_lines;
+                    },
+                )
+                .unwrap();
+        }
+
+        // Adjust the starting point of the LOD groups following `range`
+        for lod_gr in self.lod_grs[lod_bulk_delete_start..].iter_mut() {
+            lod_gr.index -= num_lines;
+        }
     }
 
     /// Synchronize the structure after lines are resized.
@@ -541,6 +866,17 @@ impl Lineset {
     // TODO: query
 }
 
+fn vec_remove_range(v: &mut Vec<impl Clone>, range: Range<usize>) {
+    if range.len() == 0 {
+        return;
+    }
+
+    for i in range.start..v.len() - range.len() {
+        v[i] = v[i + range.len()].clone();
+    }
+    v.truncate(v.len() - range.len());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -602,6 +938,42 @@ mod tests {
         fn next_range(&mut self, range: Range<u32>) -> u32 {
             (self.next() - 1) % (range.end - range.start) + range.start
         }
+
+        /// Create a `Lineset` for testing.
+        fn next_lineset(&mut self, lod: u8) -> Lineset {
+            let mut lineset = Lineset::new();
+
+            // Prepare the initial state
+            let size_range = lod_size_range(lod);
+            for _ in 0..4 {
+                lineset.lod_grs.push(LodGr {
+                    index: lineset.line_grs.offset_len().index,
+                    lod,
+                });
+
+                let num_line_grs = self.next_range(0..3);
+                for _ in 0..num_line_grs {
+                    let line_gr_len = self
+                        .next_range(*size_range.start() as u32..*size_range.end() as u32 + 1)
+                        as _;
+                    lineset.line_grs.push_back(LineGr {
+                        num_lines: line_gr_len,
+                        size: 1,
+                    });
+                }
+
+                let line_gr_len = self.next_range(1..*size_range.end() as u32 + 1) as _;
+                lineset.line_grs.push_back(LineGr {
+                    num_lines: line_gr_len,
+                    size: 1,
+                });
+            }
+
+            dbg!(&lineset);
+            lineset.validate();
+
+            lineset
+        }
     }
 
     #[test]
@@ -615,36 +987,7 @@ mod tests {
         for lod in [0, 2].iter().flat_map(|&i| std::iter::repeat(i).take(4)) {
             dbg!(lod);
 
-            let mut lineset = Lineset::new();
-
-            // Prepare the initial state
-            let size_range = lod_size_range(lod);
-            for _ in 0..4 {
-                lineset.lod_grs.push(LodGr {
-                    index: lineset.line_grs.offset_len().index,
-                    lod,
-                });
-
-                let num_line_grs = rng.next_range(0..3);
-                for _ in 0..num_line_grs {
-                    let line_gr_len = rng
-                        .next_range(*size_range.start() as u32..*size_range.end() as u32 + 1)
-                        as _;
-                    lineset.line_grs.push_back(LineGr {
-                        num_lines: line_gr_len,
-                        size: 1,
-                    });
-                }
-
-                let line_gr_len = rng.next_range(1..*size_range.end() as u32 + 1) as _;
-                lineset.line_grs.push_back(LineGr {
-                    num_lines: line_gr_len,
-                    size: 1,
-                });
-            }
-
-            dbg!(&lineset);
-            lineset.validate();
+            let lineset = rng.next_lineset(lod);
 
             // Try insertion
             for pos in 0..=lineset.line_grs.offset_len().index {
@@ -652,6 +995,32 @@ mod tests {
                     dbg!(pos..pos + count);
                     let mut lineset = lineset.clone();
                     lineset.insert(&TestModel, pos..pos + count);
+                    dbg!(&lineset);
+                    lineset.validate();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn remove() {
+        let mut rng = Xorshift32(0xdeadbeef);
+
+        for _ in 0..100 {
+            rng.next();
+        }
+
+        for lod in [0, 2].iter().flat_map(|&i| std::iter::repeat(i).take(4)) {
+            dbg!(lod);
+
+            let lineset = rng.next_lineset(lod);
+
+            // Try removal
+            for pos1 in 0..=lineset.line_grs.offset_len().index {
+                for pos2 in pos1..=lineset.line_grs.offset_len().index {
+                    dbg!(pos1..pos2);
+                    let mut lineset = lineset.clone();
+                    lineset.remove(&TestModel, pos1..pos2);
                     dbg!(&lineset);
                     lineset.validate();
                 }
