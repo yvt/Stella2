@@ -1313,7 +1313,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lod_grs_from_vps() {
+    fn test_lod_grs_from_vps_small() {
         for len in 1..10 {
             for i1 in 0..=len {
                 for i2 in i1..=len {
@@ -1399,6 +1399,24 @@ mod tests {
             };
 
             assert!(gr_end >= vp.end);
+        }
+
+        // Regions outside the viewports must have LOD level > 0.
+        let min: Index = viewports.iter().map(|vp| vp.start).min().unwrap();
+        let max: Index = viewports.iter().map(|vp| vp.end).max().unwrap();
+        if min > 0 {
+            let gr_i = match out.binary_search_by_key(&min, |gr| gr.index) {
+                Ok(i) => i - 1,
+                Err(i) => i - 1,
+            };
+            assert_ne!(out[gr_i].lod, 0);
+        }
+        if max < len {
+            let gr_i = match out.binary_search_by_key(&max, |gr| gr.index) {
+                Ok(i) => i,
+                Err(i) => i - 1,
+            };
+            assert_ne!(out[gr_i].lod, 0);
         }
     }
 }
