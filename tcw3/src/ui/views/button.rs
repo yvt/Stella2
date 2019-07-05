@@ -117,7 +117,7 @@ impl Button {
     /// view hierarchy and view attributes. However, it's not allowed to call
     /// `set_on_activate` on the activated `Button`.
     pub fn set_on_activate(&mut self, cb: impl Fn(pal::WM) + 'static) {
-        self.inner.activate_handler.replace(Box::new(cb));
+        *self.inner.activate_handler.borrow_mut() = Box::new(cb);
     }
 }
 
