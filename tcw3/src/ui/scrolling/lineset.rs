@@ -1,9 +1,12 @@
 use derive_more::{Add, AddAssign, Neg};
 use rope::{self, Rope};
 use std::{
-    cmp::max,
+    cmp::{max, Ordering},
+    collections::BinaryHeap,
     ops::{Range, RangeInclusive},
 };
+
+mod multiset;
 
 /// The type for representing line sizes and positions.
 ///
@@ -103,7 +106,7 @@ impl rope::ToOffset<LineOff> for LineGr {
 ///  '------------+----+----+----+----+----++--+--+--++++++--+--+--+----+----+---'
 ///
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct LodGr {
     index: Index,
     lod: u8,
@@ -796,11 +799,254 @@ impl Lineset {
     }
 
     /// Reorganize LOD groups.
-    pub fn regroup(&mut self, model: &dyn LinesetModel) {
+    pub fn regroup(&mut self, model: &dyn LinesetModel, viewports: &[Range<Size>]) {
         // TODO: Get the visible portion from somewhere
         unimplemented!()
     }
+}
 
+/// Get how many lines outside a viewport are included in the LOD level `lod`
+/// and below.
+fn lod_coverage(lod: u8, scale: Index) -> Index {
+    debug_assert!(scale >= 0);
+    if lod > 0 {
+        scale << (lod - 1)
+    } else {
+        0
+    }
+}
+
+/// Get the smallest `lod` such that `lod_coverage(lod, scale) >= i`.
+fn inverse_lod_coverage(i: Index, scale: Index) -> u8 {
+    debug_assert!(scale >= 0);
+    debug_assert!(i >= 0);
+    if i == 0 {
+        0
+    } else {
+        let i2: Index = (i + scale - 1) / scale - 1;
+        ((0 as Index).leading_zeros() - i2.leading_zeros()) as u8 + 1
+    }
+}
+
+/// Create a desired partition of a lineset containing `len` lines based on the
+/// viewports specified by `vps`.
+///
+/// `cap` is used as the initial capacity of the returned `Vec`.
+///
+/// Each viewport produces a list of LOD groups like the following:
+///
+/// ```text
+/// LOD groups 1:                                   viewport
+///                                                   <-->
+///  ,------------+-------------------------+--------+----+--------+-------------,
+///  | 3          | 2                       | 1      | 0  | 1      | 2           |
+///  '------------+-------------------------+--------+----+--------+-------------'
+/// ```
+///
+/// This function calculates it for each supplied viewport, and combines the
+/// lists by calculating the minimum LOD for each continuous range.
+///
+/// ```text
+/// LOD groups 2: viewport
+///                 <-->
+///  ,----+--------+----+--------+-------------+---------------------------------,
+///  | 2  | 1      | 0  | 1      | 2           | 3                               |
+///  '----+--------+----+--------+-------------+---------------------------------'
+///
+/// LOD groups (combined):
+///                 <-->                              <-->
+///  ,----+--------+----+--------+----------+--------+----+--------+-------------,
+///  | 2  | 1      | 0  | 1      | 2        | 1      | 0  | 1      | 2           |
+///  '----+--------+----+--------+----------+--------+----+--------+-------------'
+/// ```
+///
+/// `vps.len()` is restricted to a certain range (see assertions inside).
+fn lod_grs_from_vps(
+    len: Index,
+    cap: usize,
+    vps: impl Iterator<Item = Range<Index>> + ExactSizeIterator,
+) -> Vec<LodGr> {
+    if len == 0 {
+        return Vec::new();
+    }
+
+    /// The properties of a viewport.
+    struct Vp {
+        scale: Index,
+        range: [Index; 2],
+        _pad: Index,
+    }
+
+    /// An upcoming endpoint.
+    struct Ep {
+        /// The location of the endpoint. This value is calculated as:
+        ///  - `vp.range[0] - lod_coverage(lod, vp.scale)` if `past == false`
+        ///  - `vp.range[1] + lod_coverage(lod, vp.scale)` if `past == true`
+        index: Index,
+        vp_i: u8,
+        /// The LOD level after the endpoint.
+        lod: u8,
+        past: bool,
+    }
+
+    impl PartialEq for Ep {
+        fn eq(&self, other: &Self) -> bool {
+            self.index == other.index
+        }
+    }
+    impl Eq for Ep {}
+    impl PartialOrd for Ep {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            self.index.partial_cmp(&other.index).map(Ordering::reverse)
+        }
+    }
+    impl Ord for Ep {
+        fn cmp(&self, other: &Self) -> Ordering {
+            // `BinaryHeap` is max-heap, but we want `Ep` with the minimum
+            // `index`, so reverse the ordering
+            self.index.cmp(&other.index).reverse()
+        }
+    }
+
+    // Limitation of `Minimultiset` and `vp_i`.
+    assert!(vps.len() <= 255, "too many viewports: {}", vps.len());
+
+    // There must be at least one viewport
+    assert!(vps.len() > 0, "too few viewports: {}", vps.len());
+
+    // Upcoming boundaries where the LOD level required by a viewport changes.
+    let mut eps = BinaryHeap::with_capacity(vps.len());
+
+    // The multiset of LOD levels required by their respective viewports.
+    let mut lods = multiset::Minimultiset::new();
+
+    let vps: Vec<_> = vps
+        .enumerate()
+        .map(|(vp_i, range)| {
+            debug_assert!(range.start >= 0);
+            debug_assert!(range.end <= len);
+
+            // Decide `scale` used for the viewport. The choice is kinda arbitrary.
+            let scale = max(4, (range.end - range.start) / 2);
+
+            // Get the required LOD level at index `0`.
+            // (This locates the endpoint at `i` where `i <= 0`.)
+            let lod = inverse_lod_coverage(range.start, scale);
+            lods.insert(lod);
+
+            // Find the next endpoint.
+            let vp_i = vp_i as u8;
+            let ep = if lod == 0 {
+                Ep {
+                    index: range.end,
+                    vp_i,
+                    lod: 1,
+                    past: true,
+                }
+            } else {
+                Ep {
+                    index: range.start - lod_coverage(lod - 1, scale),
+                    vp_i,
+                    lod: lod - 1,
+                    past: false,
+                }
+            };
+            debug_assert!(ep.index >= 0);
+            eps.push(ep);
+
+            Vp {
+                scale,
+                range: [range.start, range.end],
+                _pad: 0,
+            }
+        })
+        .collect();
+    let vps = &vps[..];
+
+    let mut lod_grs = Vec::with_capacity(cap);
+    let mut last_index = 0;
+    let mut last_lod = 255; // impossible LOD value
+
+    loop {
+        let ep = eps.pop().unwrap();
+
+        // There might be more than one `Ep`s at a single location (`last_index`)
+        // and the LOD level must incorporate all of such `Ep`s before
+        // finalizing a `LodGr`. So check if we are moving forward. If we are,
+        // finalize and add `LodGr` for `last_index`.
+        if ep.index > last_index {
+            let lod = lods.min();
+
+            // Do not emit redundant endpoints
+            if lod != last_lod {
+                lod_grs.push(LodGr {
+                    index: last_index,
+                    lod,
+                });
+                last_lod = lod;
+            }
+
+            last_index = ep.index;
+        }
+
+        // Reached the end of the lineset?
+        if ep.index >= len {
+            break;
+        }
+
+        let vp = &vps[ep.vp_i as usize];
+
+        // Update `lods`
+        let past_flag_to_delta = |f: bool| (f as i8) * 2 - 1;
+        let lod_delta = past_flag_to_delta(ep.past);
+        let old_lod = ep.lod.wrapping_sub(lod_delta as u8);
+
+        lods.remove(old_lod);
+        lods.insert(ep.lod);
+
+        // Find the next endpoint
+        let next_past = if ep.lod == 0 {
+            debug_assert_eq!(ep.past, false);
+            true
+        } else {
+            ep.past
+        };
+
+        let next_lod_delta = past_flag_to_delta(next_past);
+        let next_lod = ep.lod.wrapping_add(next_lod_delta as u8);
+
+        // if next_past: index = vp.range[1] + lod_coverage(lod - 1)
+        //           range      lod_coverage
+        //     .................. ........
+        //     [ 0              ] [ 1    ] [ 2     ]
+        //                                ^
+        //                        past = true, lod = 2
+        //
+        // otherwise: index = vp.range[0] - lod_coverage(lod)
+        //             lod_coverage     range
+        //               ........ ..................
+        //     [ 2     ] [ 1    ] [ 0              ]
+        //              ^
+        //      past = false, lod = 1
+        let coverage = lod_coverage(next_lod - next_past as u8, vp.scale);
+        let next_index = vp.range[next_past as usize] + coverage * next_lod_delta as Index;
+
+        let next_ep = Ep {
+            index: next_index,
+            vp_i: ep.vp_i,
+            lod: next_lod,
+            past: next_past,
+        };
+
+        eps.push(next_ep);
+    }
+
+    debug_assert_eq!(lod_grs.is_empty(), false);
+
+    lod_grs
+}
+
+impl Lineset {
     /// Validate the integrity of the structure.
     #[cfg(test)]
     fn validate(&self) {
@@ -899,6 +1145,19 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_lod_coverage() {
+        const SCALE: Index = 3;
+        for i in 0..1000 {
+            dbg!(i);
+            let lod = dbg!(inverse_lod_coverage(i, SCALE));
+            assert!(dbg!(lod_coverage(lod, SCALE)) >= i);
+            if lod > 0 {
+                assert!(dbg!(lod_coverage(lod - 1, SCALE)) < i);
+            }
+        }
+    }
+
     struct TestModel;
 
     impl TestModel {
@@ -937,6 +1196,11 @@ mod tests {
         }
         fn next_range(&mut self, range: Range<u32>) -> u32 {
             (self.next() - 1) % (range.end - range.start) + range.start
+        }
+
+        fn next_range_u64(&mut self, range: Range<u64>) -> u64 {
+            let x = self.next() as u64 | ((self.next() as u64) << 32);
+            (x - 1) % (range.end - range.start) + range.start
         }
 
         /// Create a `Lineset` for testing.
@@ -1033,6 +1297,108 @@ mod tests {
                     assert_eq!(lineset.line_grs.offset_len().index, len - (pos2 - pos1));
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_lod_grs_from_vps_empty() {
+        let out = lod_grs_from_vps(0, 8, [].iter().cloned());
+        assert_eq!(out, Vec::new());
+
+        let out = lod_grs_from_vps(0, 8, [0..0].iter().cloned());
+        assert_eq!(out, Vec::new());
+
+        let out = lod_grs_from_vps(0, 8, [0..0, 0..0].iter().cloned());
+        assert_eq!(out, Vec::new());
+    }
+
+    #[test]
+    fn test_lod_grs_from_vps() {
+        for len in 1..10 {
+            for i1 in 0..=len {
+                for i2 in i1..=len {
+                    test_lod_grs_from_vps_one(len, &[i1..i2]);
+                    for i3 in 0..=len {
+                        for i4 in i3..=len {
+                            test_lod_grs_from_vps_one(len, &[i1..i2, i3..i4]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_lod_grs_from_vps_longer() {
+        const SCALE: Index = 1 << 59;
+        for len in 1..8 {
+            for i1 in 0..=len {
+                for i2 in i1..=len {
+                    test_lod_grs_from_vps_one(len * SCALE, &[i1 * SCALE..i2 * SCALE]);
+                    for i3 in 0..=len {
+                        for i4 in i3..=len {
+                            test_lod_grs_from_vps_one(
+                                len * SCALE,
+                                &[i1 * SCALE..i2 * SCALE, i3 * SCALE..i4 * SCALE],
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_lod_grs_from_vps_many_vps() {
+        let mut rng = Xorshift32(1000000);
+        for &len in &[10000000000000] {
+            for _ in 0..100 {
+                let vps: Vec<_> = (0..255)
+                    .map(|_| {
+                        let start = rng.next_range_u64(0..len as u64 + 1);
+                        let end = rng.next_range_u64(start..len as u64 + 1);
+                        start as Index..end as Index
+                    })
+                    .collect();
+
+                test_lod_grs_from_vps_one(len, &vps);
+            }
+        }
+    }
+
+    fn test_lod_grs_from_vps_one(len: Index, viewports: &[Range<Index>]) {
+        dbg!((len, viewports));
+        let out = lod_grs_from_vps(len, 8, viewports.iter().cloned());
+        dbg!(&out);
+
+        assert_eq!(out.is_empty(), false);
+        assert_eq!(out[0].index, 0);
+
+        for win in out.windows(2) {
+            assert!(win[0].index < win[1].index);
+        }
+
+        for vp in viewports.iter() {
+            if vp.start == vp.end {
+                continue;
+            }
+
+            let i = max(vp.start, 0);
+            let gr_i = match out.binary_search_by_key(&i, |gr| gr.index) {
+                Ok(i) => i,
+                Err(i) => i - 1,
+            };
+
+            // LOD groups in `vp` must have LOD level 0
+            assert_eq!(out[gr_i].lod, 0);
+
+            let gr_end = if let Some(gr) = out.get(gr_i + 1) {
+                gr.index
+            } else {
+                len
+            };
+
+            assert!(gr_end >= vp.end);
         }
     }
 }
