@@ -1,8 +1,9 @@
 use derive_more::{Add, AddAssign, Neg};
 use rope::{self, Rope};
 use std::{
-    cmp::{max, Ordering},
+    cmp::{max, min, Ordering},
     collections::BinaryHeap,
+    iter::Peekable,
     ops::{Range, RangeInclusive},
 };
 
@@ -70,6 +71,10 @@ struct LineOff {
 impl LineOff {
     fn index(&self) -> Index {
         self.index
+    }
+
+    fn pos(&self) -> Size {
+        self.pos
     }
 }
 
@@ -800,9 +805,247 @@ impl Lineset {
 
     /// Reorganize LOD groups.
     pub fn regroup(&mut self, model: &dyn LinesetModel, viewports: &[Range<Size>]) {
-        // TODO: Get the visible portion from somewhere
-        unimplemented!()
+        use rope::{
+            range_by_key,
+            Edge::{Ceil, Floor},
+        };
+
+        // TODO: Add "displacement handler"
+
+        // Convert `Range<Size>`s to `Range<Index>`s
+        let viewports_by_idx = viewports.iter().map(|pos_range| {
+            let (_, range) = self.line_grs.range(range_by_key(
+                LineOff::pos,
+                Floor(pos_range.start)..Ceil(pos_range.end),
+            ));
+
+            range.start.index..range.end.index
+        });
+
+        let num_lines = self.line_grs.offset_len().index;
+
+        // Create the goal LOD group list
+        // `O(num_lod_grs * log(viewports.len()))`
+        let goal_lod_grs = lod_grs_from_vps(num_lines, self.lod_grs.len() * 2, viewports_by_idx);
+
+        // Split line groups to lower their LOD levels
+        // -----------------------------------------------------------------
+        let mut lod_grs2 = Vec::with_capacity(max(self.lod_grs.len(), goal_lod_grs.len()) * 2);
+
+        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
+
+        // For each existing LOD group...
+        for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
+            check_split(
+                &mut lod_grs2,
+                lod_gr.lod,
+                lod_gr.index..lod_gr_end,
+                &mut goal_lod_gr_it,
+                &mut self.line_grs,
+                model,
+            );
+        }
+
+        // Generates a LOD-`lod` group covering `range`. Before doing so,
+        // `goal_lod_gr_it` is examined for `range` and if it contains a
+        // lower-level LOD group, subdivide a portion of the LOD-`lod` group and
+        // recursively call `check_split` to generate a lower-level LOD group
+        // for that portion.
+        fn check_split(
+            out_lod_grs: &mut Vec<LodGr>,
+            lod: u8,
+            range: Range<Index>,
+            goal_lod_gr_it: &mut Peekable<IterLodGrWithEnd<'_>>,
+            line_grs: &mut Rope<LineGr, LineOff>,
+            model: &dyn LinesetModel,
+        ) {
+            debug_assert!(goal_lod_gr_it.peek().unwrap().1 > range.start);
+
+            // The starting position of the next LOD-`lod` group
+            let mut i = range.start;
+
+            loop {
+                let mut cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
+                if cur_goal_lod_gr.0.lod < lod {
+                    let mut sub_goal_lod_gr_it = goal_lod_gr_it.clone();
+
+                    // A subdivided portion starts here. Search for the ending
+                    // position.
+                    let sub_start_unrounded = cur_goal_lod_gr.0.index;
+                    let mut sub_end_unrounded = cur_goal_lod_gr.1;
+                    loop {
+                        if cur_goal_lod_gr.0.lod >= lod {
+                            break;
+                        }
+                        sub_end_unrounded = cur_goal_lod_gr.1;
+                        if cur_goal_lod_gr.1 <= range.end {
+                            goal_lod_gr_it.next();
+                        }
+                        if cur_goal_lod_gr.1 >= range.end {
+                            break;
+                        }
+                        cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
+                    }
+
+                    sub_end_unrounded = min(sub_end_unrounded, range.end);
+
+                    // Subdivide the portion
+                    let sub_range = line_gr_lower_lod_incl(
+                        line_grs,
+                        lod - 1,
+                        sub_start_unrounded..sub_end_unrounded,
+                        model,
+                    );
+                    debug_assert!(sub_range.start <= sub_start_unrounded);
+                    debug_assert!(sub_range.end >= sub_end_unrounded);
+                    debug_assert!(sub_range.start >= range.start);
+                    debug_assert!(sub_range.end <= range.end);
+
+                    if sub_range.start > i {
+                        out_lod_grs.push(LodGr { index: i, lod });
+                    }
+
+                    // Recursively process the portion
+                    check_split(
+                        out_lod_grs,
+                        lod - 1,
+                        sub_range.clone(),
+                        &mut sub_goal_lod_gr_it,
+                        line_grs,
+                        model,
+                    );
+
+                    i = sub_range.end;
+                } else {
+                    if cur_goal_lod_gr.1 <= range.end {
+                        goal_lod_gr_it.next();
+                    }
+                }
+                if cur_goal_lod_gr.1 >= range.end {
+                    break;
+                }
+            }
+
+            if i < range.end {
+                out_lod_grs.push(LodGr { index: i, lod });
+            }
+        }
+
+        // Merge line groups to raise their LOD levels
+        // -----------------------------------------------------------------
+        // TODO
+
+        // Merge adjacent LOD groups with identical LOD levels
+        // -----------------------------------------------------------------
+        // TODO
+
+        self.lod_grs = lod_grs2;
     }
+}
+
+/// Lower the LOD level of `range` in a line group list.
+///
+/// `range` is “rounded” to the nearest line group boundaries so that
+/// it includes `range`. Returns the rounded range.
+fn line_gr_lower_lod_incl(
+    line_grs: &mut Rope<LineGr, LineOff>,
+    new_lod: u8,
+    range: Range<Index>,
+    model: &dyn LinesetModel,
+) -> Range<Index> {
+    use rope::{by_key, One::FirstAfter};
+
+    debug_assert!(range.start < line_grs.offset_len().index);
+    debug_assert!(range.start < range.end, "{:?}", range);
+
+    let approx = new_lod > 0;
+    let new_lod_min_size = *lod_size_range(new_lod).start();
+
+    // Process `line_gr`. If `line_gr.num_lines >= 2`, it's split into two
+    // `LineGr`s. `line_gr` is replaced with the second half, while returning
+    // the first half. Otherwise, returns `None`, indicating subdivision did
+    // not occur. Even in this case, `line_gr.size` is recalculated if
+    // `new_lod == 0`.
+    let try_split = |line_gr: &mut LineGr, line_off: LineOff| {
+        let num_lines1 = (line_gr.num_lines + 1) >> 1;
+        let num_lines2 = line_gr.num_lines - num_lines1;
+
+        let new_line_gr;
+
+        if num_lines2 < new_lod_min_size {
+            // Can't split - this happens when `new_lod == 0` or
+            // `line_gr` is the last line group of a LOD group
+            new_line_gr = None;
+
+            // Recalculate the size if we are turning them into LOD 0
+            if !approx {
+                debug_assert_eq!(line_gr.num_lines, 1);
+                line_gr.size = model.line_total_size(line_off.index..line_off.index + 1, approx);
+            }
+        } else {
+            let indices = [
+                line_off.index,
+                line_off.index + num_lines1,
+                line_off.index + line_gr.num_lines,
+            ];
+            let mut sizes = [
+                model.line_total_size(indices[0]..indices[1], approx),
+                model.line_total_size(indices[1]..indices[2], approx),
+            ];
+
+            // Do not change the total size unless we are turning them into
+            // LOD 0
+            if approx {
+                sizes = divide_size(line_gr.size, sizes);
+            }
+
+            new_line_gr = Some(LineGr {
+                num_lines: num_lines1,
+                size: sizes[0],
+            });
+
+            *line_gr = LineGr {
+                num_lines: num_lines2,
+                size: sizes[1],
+            };
+        }
+
+        new_line_gr
+    };
+
+    let update_fn = |line_gr: &mut LineGr, line_off: LineOff| {
+        let next_index = line_off.index + line_gr.num_lines;
+        let new_line_gr = try_split(line_gr, line_off);
+        (line_off.index, new_line_gr, next_index)
+    };
+
+    // Process the first line group that overlaps with `range`
+    let (start, new_line_gr, mut next_index) = line_grs
+        .update_with(FirstAfter(by_key(LineOff::index, range.start)), update_fn)
+        .unwrap();
+
+    if let Some(new_line_gr) = new_line_gr {
+        line_grs
+            .insert_before(new_line_gr, FirstAfter(by_key(LineOff::index, range.start)))
+            .unwrap();
+    }
+
+    // Process other line groups that follow
+    while next_index < range.end {
+        let (_, new_line_gr, i) = line_grs
+            .update_with(FirstAfter(by_key(LineOff::index, next_index)), update_fn)
+            .unwrap();
+
+        if let Some(new_line_gr) = new_line_gr {
+            line_grs
+                .insert_before(new_line_gr, FirstAfter(by_key(LineOff::index, next_index)))
+                .unwrap();
+        }
+
+        next_index = i;
+    }
+
+    start..next_index
 }
 
 /// Get how many lines outside a viewport are included in the LOD level `lod`
@@ -1044,6 +1287,29 @@ fn lod_grs_from_vps(
     debug_assert_eq!(lod_grs.is_empty(), false);
 
     lod_grs
+}
+
+/// Create an iterator over a list of `LodGr`s. In addition to `LodGr`s, it
+/// also returns their respective ending points (`LodGr` itself only stores
+/// the starting point).
+fn iter_lod_gr_with_end<'a>(len: Index, lod_grs: &'a [LodGr]) -> IterLodGrWithEnd<'a> {
+    IterLodGrWithEnd(lod_grs.iter().peekable(), len)
+}
+
+#[derive(Clone)]
+struct IterLodGrWithEnd<'a>(Peekable<std::slice::Iter<'a, LodGr>>, Index);
+
+impl<'a> Iterator for IterLodGrWithEnd<'a> {
+    type Item = (LodGr, Index);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|&gr1| {
+            if let Some(gr2) = self.0.peek() {
+                (gr1, gr2.index)
+            } else {
+                (gr1, self.1)
+            }
+        })
+    }
 }
 
 impl Lineset {
@@ -1418,5 +1684,79 @@ mod tests {
             };
             assert_ne!(out[gr_i].lod, 0);
         }
+    }
+
+    #[test]
+    fn test_regroup_empty() {
+        let mut lineset = Lineset::new();
+        lineset.regroup(&TestModel, &[0..0]);
+    }
+
+    #[test]
+    fn test_regroup1() {
+        const NUM_LINES: Index = 100;
+
+        let mut lineset = Lineset::new();
+
+        lineset.insert(&TestModel, 0..NUM_LINES);
+        dbg!(&lineset);
+
+        let len = lineset.line_grs.offset_len().pos;
+
+        for i in 0..=100 {
+            let pos = len * i / 100;
+            let mut lineset = lineset.clone();
+
+            let vp = pos..pos + 1;
+            println!("Regrouping using viewport = {:?}", vp);
+
+            lineset.regroup(&TestModel, &[vp]);
+            dbg!(&lineset);
+
+            lineset.validate();
+            assert!(lineset.lod_grs.len() > 3); // we expect to see a few LOD groups
+            assert_eq!(lineset.line_grs.offset_len().index, NUM_LINES);
+        }
+    }
+
+    #[test]
+    fn test_regroup2() {
+        const NUM_LINES: Index = 100;
+
+        let mut lineset = Lineset::new();
+        lineset.insert(&TestModel, 0..NUM_LINES);
+        dbg!(&lineset);
+
+        let mut rng = Xorshift32(100000);
+
+        for i in 0..=1000 {
+            let len = lineset.line_grs.offset_len().pos;
+            let num_vps = if i == 1000 {
+                // Make sure the viewports do not cover entire the lineset,
+                // so that the last assertion makes sense
+                1
+            } else {
+                rng.next_range(1..4)
+            };
+            let vps: Vec<_> = (0..num_vps)
+                .map(|_| {
+                    let start = rng.next_range_u64(0..len as u64 + 1);
+                    let end = rng.next_range_u64(start..len as u64 + 1);
+                    let end = start + (end - start) / 4;
+                    start as Index..end as Index
+                })
+                .collect();
+
+            println!("Regrouping using viewports = {:?}", vps);
+
+            lineset.regroup(&TestModel, &vps);
+            dbg!(&lineset);
+            lineset.validate();
+            // TODO: check other properties
+
+            assert_eq!(lineset.line_grs.offset_len().index, NUM_LINES);
+        }
+
+        assert!(lineset.lod_grs.len() > 0);
     }
 }
