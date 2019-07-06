@@ -127,6 +127,15 @@ fn lod_size_range(lod: u8) -> RangeInclusive<Index> {
     (1 << shift1)..=(1 << shift2)
 }
 
+/// Get a flag indicating whether line group sizes can use approximation for
+/// the specified LOD level or not.
+///
+/// The returned flag is intended to be used as a parameter value of
+/// `LinesetModel::line_total_size`.
+fn lod_approx(lod: u8) -> bool {
+    lod > 0
+}
+
 /// Get the minimum LOD that can contain the specified line group size.
 fn min_lod_for_size(size: Index) -> u8 {
     debug_assert!(size >= 1);
@@ -203,7 +212,7 @@ impl Lineset {
                 index: self.line_grs.offset_len().index,
                 lod,
             });
-            let size = model.line_total_size(range, lod > 0);
+            let size = model.line_total_size(range, lod_approx(lod));
             let at = self.line_grs.offset_len().pos;
             self.line_grs.push_back(LineGr { num_lines, size });
             return Some(at..at + size);
@@ -241,7 +250,7 @@ impl Lineset {
             debug_assert!(lod > 0);
 
             // The total size of the new lines
-            let size = model.line_total_size(range.clone(), lod > 0);
+            let size = model.line_total_size(range.clone(), lod_approx(lod));
 
             // The new lines fall in the middle of an existing line group.
             // Or, the new lines are so few that they cannot constitute a line
@@ -262,8 +271,8 @@ impl Lineset {
                 inserted_pos = divide_size(
                     line_gr.size,
                     [
-                        model.line_total_size(line_gr_start..range.start, lod > 0),
-                        model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                        model.line_total_size(line_gr_start..range.start, lod_approx(lod)),
+                        model.line_total_size(range.end..line_gr_end + num_lines, lod_approx(lod)),
                     ],
                 )[0] + line_gr_off.pos;
                 inserted_size = size;
@@ -279,9 +288,12 @@ impl Lineset {
                     let halve_sizes_old = divide_size3(
                         line_gr.size,
                         [
-                            model.line_total_size(line_gr_start..new_gr_mid, lod > 0),
-                            model.line_total_size(new_gr_mid..range.start, lod > 0),
-                            model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                            model.line_total_size(line_gr_start..new_gr_mid, lod_approx(lod)),
+                            model.line_total_size(new_gr_mid..range.start, lod_approx(lod)),
+                            model.line_total_size(
+                                range.end..line_gr_end + num_lines,
+                                lod_approx(lod),
+                            ),
                         ],
                     );
 
@@ -298,15 +310,18 @@ impl Lineset {
                     let halve_sizes_old = divide_size(
                         line_gr.size,
                         [
-                            model.line_total_size(line_gr_start..range.start, lod > 0),
-                            model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                            model.line_total_size(line_gr_start..range.start, lod_approx(lod)),
+                            model.line_total_size(
+                                range.end..line_gr_end + num_lines,
+                                lod_approx(lod),
+                            ),
                         ],
                     );
 
                     // The new lines are split into both halves
                     let size2 = [
-                        model.line_total_size(range.start..new_gr_mid, lod > 0),
-                        model.line_total_size(new_gr_mid..range.end, lod > 0),
+                        model.line_total_size(range.start..new_gr_mid, lod_approx(lod)),
+                        model.line_total_size(new_gr_mid..range.end, lod_approx(lod)),
                     ];
                     halve_sizes_new =
                         [halve_sizes_old[0] + size2[0], halve_sizes_old[1] + size2[1]];
@@ -318,9 +333,12 @@ impl Lineset {
                     let halve_sizes_old = divide_size3(
                         line_gr.size,
                         [
-                            model.line_total_size(line_gr_start..range.start, lod > 0),
-                            model.line_total_size(range.end..new_gr_mid, lod > 0),
-                            model.line_total_size(new_gr_mid..line_gr_end + num_lines, lod > 0),
+                            model.line_total_size(line_gr_start..range.start, lod_approx(lod)),
+                            model.line_total_size(range.end..new_gr_mid, lod_approx(lod)),
+                            model.line_total_size(
+                                new_gr_mid..line_gr_end + num_lines,
+                                lod_approx(lod),
+                            ),
                         ],
                     );
 
@@ -401,15 +419,17 @@ impl Lineset {
                 let halve_sizes = divide_size(
                     line_gr.size,
                     [
-                        model.line_total_size(line_gr_start..range.start, lod > 0),
-                        model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                        model.line_total_size(line_gr_start..range.start, lod_approx(lod)),
+                        model.line_total_size(range.end..line_gr_end + num_lines, lod_approx(lod)),
                     ],
                 );
 
                 // Apply the adjustment to `halve_sizes`
                 let halve_sizes_postadj = [
-                    halve_sizes[0] + model.line_total_size(range.start..new_range.start, lod > 0),
-                    halve_sizes[1] + model.line_total_size(new_range.end..range.end, lod > 0),
+                    halve_sizes[0]
+                        + model.line_total_size(range.start..new_range.start, lod_approx(lod)),
+                    halve_sizes[1]
+                        + model.line_total_size(new_range.end..range.end, lod_approx(lod)),
                 ];
 
                 // `line_gr` will be the second half
@@ -435,7 +455,7 @@ impl Lineset {
                     .unwrap();
 
                 // The total size of `new_range`
-                let new_size = model.line_total_size(new_range.clone(), lod > 0);
+                let new_size = model.line_total_size(new_range.clone(), lod_approx(lod));
 
                 // Update the following LOD groups' starting indices
                 // (This could be merged with the last `for` statement, but that
@@ -474,7 +494,8 @@ impl Lineset {
             let lod2 = max(lod, min_lod_for_size(range2.end - range2.start));
 
             // The total size of `range2`
-            let size2 = size2.unwrap_or_else(|| model.line_total_size(range2.clone(), lod2 > 0));
+            let size2 =
+                size2.unwrap_or_else(|| model.line_total_size(range2.clone(), lod_approx(lod2)));
 
             let former_len = self.line_grs.offset_len().index;
 
@@ -625,9 +646,10 @@ impl Lineset {
             }
 
             // Estimate the size of the removed part
-            let size1 = model.line_total_size(line_gr_range.start.index..range.start, lod1 > 0);
-            let size2 = model.line_total_size(range.clone(), lod1 > 0);
-            let size3 = model.line_total_size(range.end..line_gr_range.end.index, lod1 > 0);
+            let size1 =
+                model.line_total_size(line_gr_range.start.index..range.start, lod_approx(lod1));
+            let size2 = model.line_total_size(range.clone(), lod_approx(lod1));
+            let size3 = model.line_total_size(range.end..line_gr_range.end.index, lod_approx(lod1));
             let [size1, size2, size3] = divide_size3(line_gr1.size, [size1, size2, size3]);
             let remaining_size = size1 + size3;
 
@@ -703,8 +725,8 @@ impl Lineset {
             }
 
             // Estimate the size of the removed part
-            let size1 = model.line_total_size(line_gr2_start..range.end, lod2 > 0);
-            let size2 = model.line_total_size(range.end..line_gr2_end, lod2 > 0);
+            let size1 = model.line_total_size(line_gr2_start..range.end, lod_approx(lod2));
+            let size2 = model.line_total_size(range.end..line_gr2_end, lod_approx(lod2));
             let [cut_size, remaining_size] = divide_size(line_gr2.size, [size1, size2]);
 
             // Remove a partial range from `line_gr2`
@@ -851,8 +873,8 @@ impl Lineset {
             );
 
             // Estimate the size of the removed part
-            let size1 = model.line_total_size(line_gr1_start..range.start, lod1 > 0);
-            let size2 = model.line_total_size(range.start..line_gr1_end, lod1 > 0);
+            let size1 = model.line_total_size(line_gr1_start..range.start, lod_approx(lod1));
+            let size2 = model.line_total_size(range.start..line_gr1_end, lod_approx(lod1));
             let [remaining_size, cut_size] = divide_size(line_gr1.size, [size1, size2]);
 
             // Remove a partial range from `line_gr1`
@@ -1420,7 +1442,7 @@ fn line_gr_subdiv_incl(
     debug_assert!(range.start < line_grs.offset_len().index);
     debug_assert!(range.start < range.end, "{:?}", range);
 
-    let approx = new_lod > 0;
+    let approx = lod_approx(new_lod);
     let new_lod_min_size = *lod_size_range(new_lod).start();
 
     // Process `line_gr`. If `line_gr.num_lines >= 2`, it's split into two
