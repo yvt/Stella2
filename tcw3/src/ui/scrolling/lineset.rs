@@ -117,6 +117,9 @@ struct LodGr {
     lod: u8,
 }
 
+/// An impossible LOD value.
+const BAD_LOD: u8 = 255;
+
 /// Get the valid line group size range for the specified LOD.
 fn lod_size_range(lod: u8) -> RangeInclusive<Index> {
     let shift1 = lod as u32 - (lod > 0) as u32; // max(lod - 1, 0)
@@ -798,8 +801,9 @@ impl Lineset {
     /// Reorganize LOD groups.
     pub fn regroup(&mut self, model: &dyn LinesetModel, viewports: &[Range<Size>]) {
         use rope::{
-            range_by_key,
+            by_key, range_by_key,
             Edge::{Ceil, Floor},
+            One::{FirstAfter, LastBefore},
         };
 
         // TODO: Add "displacement handler"
@@ -1105,7 +1109,97 @@ impl Lineset {
 
         // Merge adjacent LOD groups with identical LOD levels
         // -----------------------------------------------------------------
-        // TODO
+        let mut old_i = 0;
+        let mut new_i = 0;
+        let mut last_lod = BAD_LOD; // impossible LOD value
+
+        let lod_grs = &mut lod_grs2[..];
+
+        while old_i < lod_grs.len() {
+            let lod_gr = lod_grs[old_i];
+            old_i += 1;
+
+            if lod_gr.lod == last_lod {
+                // Has the same LOD level as the last one - merge!
+                let lod_size_range = lod_size_range(lod_gr.lod);
+                let last_line_gr = self
+                    .line_grs
+                    .get(LastBefore(by_key(LineOff::index, lod_gr.index)))
+                    .unwrap()
+                    .clone();
+
+                if last_line_gr.num_lines >= *lod_size_range.start() {
+                    // Already has a sufficient number of lines for it to be a
+                    // non-last line group in a LOD group - just remove the
+                    // LOD group boundary.
+                    continue;
+                }
+
+                debug_assert!(lod_gr.lod > 0);
+
+                // Move some or all of the lines of `FirstAfter(lod_gr.index)`
+                // to `last_line_gr`.
+                let (merge, moved_num_lines, moved_size) = self
+                    .line_grs
+                    .update_with(
+                        FirstAfter(by_key(LineOff::index, lod_gr.index)),
+                        |first_line_gr, off| {
+                            let total_num_lines = last_line_gr.num_lines + first_line_gr.num_lines;
+
+                            debug_assert!(total_num_lines >= *lod_size_range.start());
+
+                            if total_num_lines <= *lod_size_range.end() {
+                                // Move all of the lines (deletes `first_line_gr`)
+                                (true, first_line_gr.num_lines, first_line_gr.size)
+                            } else {
+                                // Distribte the lines evenly
+                                let moved_num_lines =
+                                    (first_line_gr.num_lines - last_line_gr.num_lines + 1) >> 1;
+
+                                let i = off.index;
+                                let [moved_size, remaining_size] = divide_size(
+                                    first_line_gr.size,
+                                    [
+                                        model.line_total_size(i..i + moved_num_lines, true),
+                                        model.line_total_size(
+                                            i + moved_num_lines..i + first_line_gr.num_lines,
+                                            true,
+                                        ),
+                                    ],
+                                );
+
+                                first_line_gr.num_lines -= moved_num_lines;
+                                first_line_gr.size = remaining_size;
+
+                                (false, moved_num_lines, moved_size)
+                            }
+                        },
+                    )
+                    .unwrap();
+
+                if merge {
+                    self.line_grs
+                        .remove(FirstAfter(by_key(LineOff::index, lod_gr.index)))
+                        .unwrap();
+                }
+
+                self.line_grs
+                    .update_with(
+                        LastBefore(by_key(LineOff::index, lod_gr.index)),
+                        |last_line_gr, _| {
+                            last_line_gr.num_lines += moved_num_lines;
+                            last_line_gr.size += moved_size;
+                        },
+                    )
+                    .unwrap();
+            } else {
+                last_lod = lod_gr.lod;
+                lod_grs[new_i] = lod_gr;
+                new_i += 1;
+            }
+        }
+
+        lod_grs2.truncate(new_i);
 
         self.lod_grs = lod_grs2;
     }
@@ -1376,7 +1470,7 @@ fn lod_grs_from_vps(
 
     let mut lod_grs = Vec::with_capacity(cap);
     let mut last_index = 0;
-    let mut last_lod = 255; // impossible LOD value
+    let mut last_lod = BAD_LOD; // impossible LOD value
 
     loop {
         let ep = eps.pop().unwrap();
