@@ -428,11 +428,7 @@ impl Lineset {
             if lod2 > lod {
                 // Create a higher-LOD group containing `range2`
                 let lod_gr_start = self.lod_grs[lod_gr_i].index;
-                let lod_gr_end = if let Some(gr) = self.lod_grs.get(lod_gr_i + 1) {
-                    gr.index
-                } else {
-                    former_len
-                };
+                let lod_gr_end = lod_gr_end(former_len, &self.lod_grs, lod_gr_i);
 
                 debug_assert!(range2.start >= lod_gr_start);
                 debug_assert!(range2.start < lod_gr_end);
@@ -534,11 +530,7 @@ impl Lineset {
             //
 
             // The end of this LOD group (`lod_gr_i1`)
-            let lod_gr_end = if let Some(lod_gr) = self.lod_grs.get(lod_gr_i1 + 1) {
-                lod_gr.index
-            } else {
-                self.line_grs.offset_len().index
-            };
+            let lod_gr_end = lod_gr_end(self.line_grs.offset_len().index, &self.lod_grs, lod_gr_i1);
 
             debug_assert!(lod1 > 0);
 
@@ -864,11 +856,7 @@ impl Lineset {
             lod_grs2.extend(self.lod_grs[..lod_gr1_i].iter().cloned());
             for i in lod_gr1_i..lod_gr2_i {
                 let lod_gr_start = self.lod_grs[i].index;
-                let lod_gr_end = if let Some(gr) = self.lod_grs.get(i + 1) {
-                    gr.index
-                } else {
-                    num_lines
-                };
+                let lod_gr_end = lod_gr_end(num_lines, &self.lod_grs, i);
 
                 let vp_range = max(vp_by_idx.start, lod_gr_start)..min(vp_by_idx.end, lod_gr_end);
 
@@ -1489,6 +1477,15 @@ impl<'a> Iterator for IterLodGrWithEnd<'a> {
                 (gr1, self.1)
             }
         })
+    }
+}
+
+/// Get the ending point of the LOD group `lod_grs[i]`.
+fn lod_gr_end(len: Index, lod_grs: &[LodGr], i: usize) -> Index {
+    if let Some(gr) = lod_grs.get(i + 1) {
+        gr.index
+    } else {
+        len
     }
 }
 
