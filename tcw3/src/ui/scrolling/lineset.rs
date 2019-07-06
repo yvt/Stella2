@@ -996,28 +996,73 @@ impl Lineset {
 
         // For each existing LOD group...
         for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
-            check_split(
+            check_split_merge(
                 &mut lod_grs2,
                 lod_gr.lod,
                 lod_gr.index..lod_gr_end,
                 &mut goal_lod_gr_it,
                 &mut self.line_grs,
-                model,
+                &Split { model },
             );
+        }
+
+        struct Split<'a> {
+            model: &'a dyn LinesetModel,
+        }
+
+        impl SplitMerge for Split<'_> {
+            fn should_process_lod(&self, lod: u8, goal: u8) -> bool {
+                lod > goal
+            }
+            fn process_range(
+                &self,
+                lod: u8,
+                range: Range<Index>,
+                line_grs: &mut Rope<LineGr, LineOff>,
+            ) -> Option<(Range<Index>, u8)> {
+                Some((
+                    line_gr_lower_lod_incl(line_grs, lod - 1, range, self.model),
+                    lod - 1,
+                ))
+            }
+        }
+
+        // Merge line groups to raise their LOD levels until the goal is reached
+        // -----------------------------------------------------------------
+        // TODO
+
+        // The common routine used by the previous two steps
+        // -----------------------------------------------------------------
+
+        /// Controls the behavior of `check_split_merge`.
+        trait SplitMerge {
+            /// Get a flag indicating whether line groups of LOD level `lod`
+            /// need to be sudivided or merged, or not.
+            fn should_process_lod(&self, lod: u8, goal: u8) -> bool;
+            /// Perform a subdivision or merge operation on the specified
+            /// portion. If the operation was performed, it returns the
+            /// affected range and its new LOD level.
+            fn process_range(
+                &self,
+                lod: u8,
+                range: Range<Index>,
+                line_grs: &mut Rope<LineGr, LineOff>,
+            ) -> Option<(Range<Index>, u8)>;
         }
 
         // Generates a LOD-`lod` group covering `range`. Before doing so,
         // `goal_lod_gr_it` is examined for `range` and if it contains a
-        // lower-level LOD group, subdivide a portion of the LOD-`lod` group and
-        // recursively call `check_split` to generate a lower-level LOD group
-        // for that portion.
-        fn check_split(
+        // lower/upper-level (depending on `split_merge`) LOD group,
+        // adjust the LOD level of the corresponding portion of the LOD-`lod`
+        // group and recursively call `check_split_merge` to generate a
+        // LOD group with an appropriate LOD level for that portion.
+        fn check_split_merge(
             out_lod_grs: &mut Vec<LodGr>,
             lod: u8,
             range: Range<Index>,
             goal_lod_gr_it: &mut Peekable<IterLodGrWithEnd<'_>>,
             line_grs: &mut Rope<LineGr, LineOff>,
-            model: &dyn LinesetModel,
+            split_merge: &impl SplitMerge,
         ) {
             debug_assert!(goal_lod_gr_it.peek().unwrap().1 > range.start);
 
@@ -1026,7 +1071,7 @@ impl Lineset {
 
             loop {
                 let mut cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
-                if cur_goal_lod_gr.0.lod < lod {
+                if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
                     let mut sub_goal_lod_gr_it = goal_lod_gr_it.clone();
 
                     // A subdivided portion starts here. Search for the ending
@@ -1034,9 +1079,9 @@ impl Lineset {
                     let sub_start_unrounded = cur_goal_lod_gr.0.index;
                     let mut sub_end_unrounded = cur_goal_lod_gr.1;
                     loop {
-                        // If `cur_goal_lod_gr` has a greater-or-equal LOD,
-                        // stop there.
-                        if cur_goal_lod_gr.0.lod >= lod {
+                        // If `cur_goal_lod_gr` has a greater-or-equal (when
+                        // subdividing) LOD, stop there.
+                        if !split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
                             break;
                         }
                         sub_end_unrounded = cur_goal_lod_gr.1;
@@ -1058,13 +1103,26 @@ impl Lineset {
                     let sub_start_unrounded = max(sub_start_unrounded, range.start);
                     let sub_end_unrounded = min(sub_end_unrounded, range.end);
 
-                    // Subdivide the portion
-                    let sub_range = line_gr_lower_lod_incl(
-                        line_grs,
-                        lod - 1,
+                    // Subdivide/merge the portion
+                    let result = split_merge.process_range(
+                        lod,
                         sub_start_unrounded..sub_end_unrounded,
-                        model,
+                        line_grs,
                     );
+
+                    let (sub_range, new_lod) = if let Some((sub_range, new_lod)) = result {
+                        (sub_range, new_lod)
+                    } else {
+                        // A merge operation did not occur because the subrange
+                        // was too small
+                        if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod)
+                            && cur_goal_lod_gr.1 >= range.end
+                        {
+                            break;
+                        }
+                        continue;
+                    };
+
                     debug_assert!(sub_range.start <= sub_start_unrounded);
                     debug_assert!(sub_range.end >= sub_end_unrounded);
                     debug_assert!(sub_range.start >= range.start);
@@ -1075,17 +1133,19 @@ impl Lineset {
                     }
 
                     // Recursively process the portion
-                    check_split(
+                    check_split_merge(
                         out_lod_grs,
-                        lod - 1,
+                        new_lod,
                         sub_range.clone(),
                         &mut sub_goal_lod_gr_it,
                         line_grs,
-                        model,
+                        split_merge,
                     );
 
                     i = sub_range.end;
-                    if cur_goal_lod_gr.0.lod < lod && cur_goal_lod_gr.1 >= range.end {
+                    if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod)
+                        && cur_goal_lod_gr.1 >= range.end
+                    {
                         break;
                     }
                 } else {
@@ -1102,10 +1162,6 @@ impl Lineset {
                 out_lod_grs.push(LodGr { index: i, lod });
             }
         }
-
-        // Merge line groups to raise their LOD levels until the goal is reached
-        // -----------------------------------------------------------------
-        // TODO
 
         // Merge adjacent LOD groups with identical LOD levels
         // -----------------------------------------------------------------
