@@ -990,7 +990,7 @@ impl Lineset {
         // `O(num_lod_grs * log(viewports.len()))`
         let goal_lod_grs = lod_grs_from_vps(num_lines, self.lod_grs.len() * 2, viewports_by_idx);
 
-        // Split line groups to lower their LOD levels until the goal is reached
+        // Subdivide line groups to lower their LOD levels until the goal is reached
         // -----------------------------------------------------------------
         let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
 
