@@ -941,7 +941,7 @@ impl Lineset {
             }
 
             // Subdivide the line groups covering `vp_range` (exactly)
-            let sub_range = line_gr_lower_lod_incl(line_grs, lod - 1, vp_range.clone(), model);
+            let sub_range = line_gr_subdiv_incl(line_grs, lod - 1, vp_range.clone(), model);
             debug_assert_eq!(sub_range, vp_range);
 
             // Now we can get a more accurate `vp_range`
@@ -996,21 +996,21 @@ impl Lineset {
 
         // For each existing LOD group...
         for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
-            check_split_merge(
+            check_subdiv_decim(
                 &mut lod_grs2,
                 lod_gr.lod,
                 lod_gr.index..lod_gr_end,
                 &mut goal_lod_gr_it,
                 &mut self.line_grs,
-                &Split { model },
+                &Subdiv { model },
             );
         }
 
-        struct Split<'a> {
+        struct Subdiv<'a> {
             model: &'a dyn LinesetModel,
         }
 
-        impl SplitMerge for Split<'_> {
+        impl SubdivDecim for Subdiv<'_> {
             fn should_process_lod(&self, lod: u8, goal: u8) -> bool {
                 lod > goal
             }
@@ -1021,27 +1021,27 @@ impl Lineset {
                 line_grs: &mut Rope<LineGr, LineOff>,
             ) -> Option<(Range<Index>, u8)> {
                 Some((
-                    line_gr_lower_lod_incl(line_grs, lod - 1, range, self.model),
+                    line_gr_subdiv_incl(line_grs, lod - 1, range, self.model),
                     lod - 1,
                 ))
             }
         }
 
-        // Merge line groups to raise their LOD levels until the goal is reached
+        // Decimate line groups to raise their LOD levels until the goal is reached
         // -----------------------------------------------------------------
         // TODO
 
         // The common routine used by the previous two steps
         // -----------------------------------------------------------------
 
-        /// Controls the behavior of `check_split_merge`.
-        trait SplitMerge {
+        /// Controls the behavior of `check_subdiv_decim`.
+        trait SubdivDecim {
             /// Get a flag indicating whether line groups of LOD level `lod`
-            /// need to be sudivided or merged, or not.
+            /// need to be sudivided or decimated, or not.
             fn should_process_lod(&self, lod: u8, goal: u8) -> bool;
-            /// Perform a subdivision or merge operation on the specified
-            /// portion. If the operation was performed, it returns the
-            /// affected range and its new LOD level.
+            /// Subdivide or decimate the specified portion. If the operation
+            /// was performed, it returns the actual affected range and its new
+            /// LOD level.
             fn process_range(
                 &self,
                 lod: u8,
@@ -1052,17 +1052,19 @@ impl Lineset {
 
         // Generates a LOD-`lod` group covering `range`. Before doing so,
         // `goal_lod_gr_it` is examined for `range` and if it contains a
-        // lower/upper-level (depending on `split_merge`) LOD group,
-        // adjust the LOD level of the corresponding portion of the LOD-`lod`
-        // group and recursively call `check_split_merge` to generate a
-        // LOD group with an appropriate LOD level for that portion.
-        fn check_split_merge(
+        // lower/upper-level (whichever defined by
+        // `SubdivDecim::should_process_lod`) LOD group, subdivide/decimate the
+        // corresponding portion of the LOD-`lod` group (using
+        // `SubdivDecim::process_range`) and recursively call
+        // `check_subdiv_decim` to generate a LOD group with an appropriate LOD
+        // level for that portion.
+        fn check_subdiv_decim(
             out_lod_grs: &mut Vec<LodGr>,
             lod: u8,
             range: Range<Index>,
             goal_lod_gr_it: &mut Peekable<IterLodGrWithEnd<'_>>,
             line_grs: &mut Rope<LineGr, LineOff>,
-            split_merge: &impl SplitMerge,
+            subdiv_decim: &impl SubdivDecim,
         ) {
             debug_assert!(goal_lod_gr_it.peek().unwrap().1 > range.start);
 
@@ -1071,7 +1073,7 @@ impl Lineset {
 
             loop {
                 let mut cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
-                if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
+                if subdiv_decim.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
                     let mut sub_goal_lod_gr_it = goal_lod_gr_it.clone();
 
                     // A subdivided portion starts here. Search for the ending
@@ -1081,7 +1083,7 @@ impl Lineset {
                     loop {
                         // If `cur_goal_lod_gr` has a greater-or-equal (when
                         // subdividing) LOD, stop there.
-                        if !split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
+                        if !subdiv_decim.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
                             break;
                         }
                         sub_end_unrounded = cur_goal_lod_gr.1;
@@ -1103,8 +1105,8 @@ impl Lineset {
                     let sub_start_unrounded = max(sub_start_unrounded, range.start);
                     let sub_end_unrounded = min(sub_end_unrounded, range.end);
 
-                    // Subdivide/merge the portion
-                    let result = split_merge.process_range(
+                    // Subdivide/decimate the portion
+                    let result = subdiv_decim.process_range(
                         lod,
                         sub_start_unrounded..sub_end_unrounded,
                         line_grs,
@@ -1113,9 +1115,9 @@ impl Lineset {
                     let (sub_range, new_lod) = if let Some((sub_range, new_lod)) = result {
                         (sub_range, new_lod)
                     } else {
-                        // A merge operation did not occur because the subrange
+                        // A decimate operation did not occur because the subrange
                         // was too small
-                        if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod)
+                        if subdiv_decim.should_process_lod(lod, cur_goal_lod_gr.0.lod)
                             && cur_goal_lod_gr.1 >= range.end
                         {
                             break;
@@ -1133,17 +1135,17 @@ impl Lineset {
                     }
 
                     // Recursively process the portion
-                    check_split_merge(
+                    check_subdiv_decim(
                         out_lod_grs,
                         new_lod,
                         sub_range.clone(),
                         &mut sub_goal_lod_gr_it,
                         line_grs,
-                        split_merge,
+                        subdiv_decim,
                     );
 
                     i = sub_range.end;
-                    if split_merge.should_process_lod(lod, cur_goal_lod_gr.0.lod)
+                    if subdiv_decim.should_process_lod(lod, cur_goal_lod_gr.0.lod)
                         && cur_goal_lod_gr.1 >= range.end
                     {
                         break;
@@ -1261,11 +1263,11 @@ impl Lineset {
     }
 }
 
-/// Lower the LOD level of `range` in a line group list.
+/// Subdivide `range` from a line group list to lower the LOD level.
 ///
 /// `range` is “rounded” to the nearest line group boundaries so that
 /// it includes `range`. Returns the rounded range.
-fn line_gr_lower_lod_incl(
+fn line_gr_subdiv_incl(
     line_grs: &mut Rope<LineGr, LineOff>,
     new_lod: u8,
     range: Range<Index>,
