@@ -812,7 +812,178 @@ impl Lineset {
 
         // TODO: Add "displacement handler"
 
-        // Convert `Range<Size>`s to `Range<Index>`s
+        let num_lines = self.line_grs.offset_len().index;
+
+        if num_lines == 0 {
+            return;
+        }
+
+        // Split line groups to lower their LOD levels (up to LOD 1)
+        // -----------------------------------------------------------------
+        // The goal of this step is to reduce the conservativeness of the
+        // conversion from `Range<Size>` to `Range<Index>`.
+        // Do not go further than LOD 1 as doing so would resize lines.
+        // (`viewports` would be invalidated if lines were resized.)
+        let mut lod_grs2 = Vec::with_capacity(self.lod_grs.len() * 2);
+
+        for vp_by_pos in viewports.iter() {
+            // Convert `Range<Size>` to `Range<Index>`. This might be
+            // overconservative if they cross large line groups.
+            let vp_by_idx = {
+                let (_, range) = self.line_grs.range(range_by_key(
+                    LineOff::pos,
+                    Floor(vp_by_pos.start)..Ceil(vp_by_pos.end),
+                ));
+
+                range.start.index..range.end.index
+            };
+
+            let lod_gr1_i = match self
+                .lod_grs
+                .binary_search_by_key(&vp_by_idx.start, |g| g.index)
+            {
+                Ok(i) => i,
+                Err(i) => i - 1,
+            };
+            let lod_gr2_i = match self
+                .lod_grs
+                .binary_search_by_key(&vp_by_idx.end, |g| g.index)
+            {
+                Ok(i) => i,
+                Err(i) => i,
+            };
+
+            // Do we have to do this?
+            let skip = self.lod_grs[lod_gr1_i..lod_gr2_i]
+                .iter()
+                .all(|gr| gr.lod <= 1);
+            if skip {
+                continue;
+            }
+
+            lod_grs2.extend(self.lod_grs[..lod_gr1_i].iter().cloned());
+            for i in lod_gr1_i..lod_gr2_i {
+                let lod_gr_start = self.lod_grs[i].index;
+                let lod_gr_end = if let Some(gr) = self.lod_grs.get(i + 1) {
+                    gr.index
+                } else {
+                    num_lines
+                };
+
+                let vp_range = max(vp_by_idx.start, lod_gr_start)..min(vp_by_idx.end, lod_gr_end);
+
+                check_presplit(
+                    &mut lod_grs2,
+                    self.lod_grs[i].lod,
+                    lod_gr_start..lod_gr_end,
+                    vp_range,
+                    vp_by_pos.clone(),
+                    &mut self.line_grs,
+                    model,
+                );
+            }
+            lod_grs2.extend(self.lod_grs[lod_gr2_i..].iter().cloned());
+
+            std::mem::swap(&mut self.lod_grs, &mut lod_grs2);
+            lod_grs2.clear();
+        }
+
+        // Generates a LOD-`lod` group covering `range`. Before doing so,
+        // subdivide a portion of the LOD-`lod` group that includes
+        // `vp_pos_range` and recursively call `check_presplit` to generate a
+        // lower-level LOD group for that portion.
+        //
+        // `vp_pos_range` is the desired portion to be subdivided, `vp_range`
+        // is its approximation, aligned to line group boundaries. After the
+        // function call, we can get more accurate `vp_range`.
+        //
+        // `vp_range` must be a non-strict subset of `range`.
+        //
+        //     (before)
+        //                               vp_pos_range (by line coordinates)
+        //                                 vvvvvvvvvvvvvvvvvvv
+        //     line grs: [        ] [        ] [        ] [        ] [        ]
+        //                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        //                            vp_range (by indices)
+        //     LOD grs:  [ 2                                                  ]
+        //               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        //                range (by indices)
+        //
+        //     (in progress - after `line_gr_lower_lod_incl`)
+        //
+        //                                 vvvvvvvvvvvvvvvvvvv
+        //     line grs: [        ] [   ] [  ] [   ] [  ] [   ] [  ] [        ]
+        //                                ^^^^^^^^^^^^^^^^^^^^^
+        //                                 vp_range2
+        //     LOD grs:  [ 2      ] [ 1                            ] [ 2      ]
+        //
+        fn check_presplit(
+            out_lod_grs: &mut Vec<LodGr>,
+            lod: u8,
+            range: Range<Index>,
+            vp_range: Range<Size>,
+            vp_pos_range: Range<Size>,
+            line_grs: &mut Rope<LineGr, LineOff>,
+            model: &dyn LinesetModel,
+        ) {
+            debug_assert!(vp_range.start >= range.start);
+            debug_assert!(vp_range.end <= range.end);
+
+            let noop =
+                // Sufficiently fine-grained?
+                lod <= 1 ||
+                // If `vp_range` is empty, that means `vp_pos_range` is also
+                // empty and exactly points a line group boundary. Thus
+                // subdivision is not necessary.
+                vp_range.start == vp_range.end;
+
+            if noop || vp_range.start > range.start {
+                out_lod_grs.push(LodGr {
+                    index: range.start,
+                    lod,
+                });
+            }
+
+            if noop {
+                return;
+            }
+
+            // Subdivide the line groups covering `vp_range` (exactly)
+            let sub_range = line_gr_lower_lod_incl(line_grs, lod - 1, vp_range.clone(), model);
+            debug_assert_eq!(sub_range, vp_range);
+
+            // Now we can get a more accurate `vp_range`
+            let vp_range2 = {
+                let (_, range) = line_grs.range(range_by_key(
+                    LineOff::pos,
+                    Floor(vp_pos_range.start)..Ceil(vp_pos_range.end),
+                ));
+
+                range.start.index..range.end.index
+            };
+            let vp_range2 = max(vp_range2.start, vp_range.start)..min(vp_range2.end, vp_range.end);
+
+            // Recursively process the portion `vp_range`
+            check_presplit(
+                out_lod_grs,
+                lod - 1,
+                vp_range.clone(),  // `range` (where a LOD group is generated)
+                vp_range2.clone(), // `vp_range` (the portion we want to be subdivided)
+                vp_pos_range.clone(),
+                line_grs,
+                model,
+            );
+
+            if vp_range.end < range.end {
+                out_lod_grs.push(LodGr {
+                    index: vp_range.end,
+                    lod,
+                });
+            }
+        }
+
+        // Convert `Range<Size>`s to `Range<Index>`s again, based on the new
+        // subdivision.
         let viewports_by_idx = viewports.iter().map(|pos_range| {
             let (_, range) = self.line_grs.range(range_by_key(
                 LineOff::pos,
@@ -822,16 +993,13 @@ impl Lineset {
             range.start.index..range.end.index
         });
 
-        let num_lines = self.line_grs.offset_len().index;
-
         // Create the goal LOD group list
+        // -----------------------------------------------------------------
         // `O(num_lod_grs * log(viewports.len()))`
         let goal_lod_grs = lod_grs_from_vps(num_lines, self.lod_grs.len() * 2, viewports_by_idx);
 
-        // Split line groups to lower their LOD levels
+        // Split line groups to lower their LOD levels until the goal is reached
         // -----------------------------------------------------------------
-        let mut lod_grs2 = Vec::with_capacity(max(self.lod_grs.len(), goal_lod_grs.len()) * 2);
-
         let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
 
         // For each existing LOD group...
@@ -874,20 +1042,29 @@ impl Lineset {
                     let sub_start_unrounded = cur_goal_lod_gr.0.index;
                     let mut sub_end_unrounded = cur_goal_lod_gr.1;
                     loop {
+                        // If `cur_goal_lod_gr` has a greater-or-equal LOD,
+                        // stop there.
                         if cur_goal_lod_gr.0.lod >= lod {
                             break;
                         }
                         sub_end_unrounded = cur_goal_lod_gr.1;
+                        // <:  The cases where the loops proceeds
+                        // ==: The loop'll be terminated by the next `if`. To
+                        //     satisfy the postcondition, move `goal_lod_gr_it`
+                        //     forward.
                         if cur_goal_lod_gr.1 <= range.end {
                             goal_lod_gr_it.next();
                         }
+                        // If `cur_goal_lod_gr` fills the rest of `range`, stop
+                        // at the end of `cur_goal_lod_gr`.
                         if cur_goal_lod_gr.1 >= range.end {
                             break;
                         }
                         cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
                     }
 
-                    sub_end_unrounded = min(sub_end_unrounded, range.end);
+                    let sub_start_unrounded = max(sub_start_unrounded, range.start);
+                    let sub_end_unrounded = min(sub_end_unrounded, range.end);
 
                     // Subdivide the portion
                     let sub_range = line_gr_lower_lod_incl(
@@ -916,13 +1093,16 @@ impl Lineset {
                     );
 
                     i = sub_range.end;
+                    if cur_goal_lod_gr.0.lod < lod && cur_goal_lod_gr.1 >= range.end {
+                        break;
+                    }
                 } else {
                     if cur_goal_lod_gr.1 <= range.end {
                         goal_lod_gr_it.next();
                     }
-                }
-                if cur_goal_lod_gr.1 >= range.end {
-                    break;
+                    if cur_goal_lod_gr.1 >= range.end {
+                        break;
+                    }
                 }
             }
 
@@ -931,7 +1111,7 @@ impl Lineset {
             }
         }
 
-        // Merge line groups to raise their LOD levels
+        // Merge line groups to raise their LOD levels until the goal is reached
         // -----------------------------------------------------------------
         // TODO
 
