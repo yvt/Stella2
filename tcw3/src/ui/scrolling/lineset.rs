@@ -1155,15 +1155,19 @@ impl Lineset {
                         cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
                     }
 
-                    let sub_start_unrounded = max(sub_start_unrounded, range.start);
+                    let sub_start_unrounded = max(sub_start_unrounded, i);
                     let sub_end_unrounded = min(sub_end_unrounded, range.end);
 
                     // Subdivide/decimate the portion
-                    let result = subdiv_decim.process_range(
-                        lod,
-                        sub_start_unrounded..sub_end_unrounded,
-                        line_grs,
-                    );
+                    let result = if sub_start_unrounded >= sub_end_unrounded {
+                        None
+                    } else {
+                        subdiv_decim.process_range(
+                            lod,
+                            sub_start_unrounded..sub_end_unrounded,
+                            line_grs,
+                        )
+                    };
 
                     let (sub_range, new_lod) = if let Some((sub_range, new_lod)) = result {
                         (sub_range, new_lod)
@@ -1180,6 +1184,8 @@ impl Lineset {
 
                     debug_assert!(sub_range.start >= range.start);
                     debug_assert!(sub_range.end <= range.end);
+                    debug_assert!(sub_range.start < sub_range.end);
+                    debug_assert!(sub_range.start >= i);
 
                     if sub_range.start > i {
                         out_lod_grs.push(LodGr { index: i, lod });
@@ -1395,7 +1401,7 @@ fn line_gr_subdiv_incl(
 
     if let Some(new_line_gr) = new_line_gr {
         line_grs
-            .insert_before(new_line_gr, FirstAfter(by_key(LineOff::index, range.start)))
+            .insert_before(new_line_gr, FirstAfter(by_key(LineOff::index, start)))
             .unwrap();
     }
 
