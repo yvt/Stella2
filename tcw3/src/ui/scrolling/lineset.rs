@@ -1040,10 +1040,6 @@ impl Lineset {
         std::mem::swap(&mut self.lod_grs, &mut lod_grs2);
         lod_grs2.clear();
 
-        dbg!(&self);
-        #[cfg(test)]
-        self.validate();
-
         let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
 
         // For each existing LOD group...
