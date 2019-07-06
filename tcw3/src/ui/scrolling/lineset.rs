@@ -173,7 +173,7 @@ impl Lineset {
             });
             self.line_grs.push_back(LineGr {
                 num_lines,
-                size: model.line_total_size(range, lod == 0),
+                size: model.line_total_size(range, lod > 0),
             });
             return;
         }
