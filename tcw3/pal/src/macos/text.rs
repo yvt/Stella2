@@ -27,6 +27,7 @@ use core_text::{
 use lazy_static::lazy_static;
 use std::{
     f32::{INFINITY, NEG_INFINITY},
+    mem::MaybeUninit,
     os::raw::c_void,
 };
 
@@ -296,15 +297,15 @@ fn ctframesetter_suggest_frame_size(
     constraints: CGSize,
 ) -> (CGSize, CFRange) {
     unsafe {
-        let mut fit_range: CFRange = std::mem::uninitialized();
+        let mut fit_range = MaybeUninit::<CFRange>::uninit();
         let size = CTFramesetterSuggestFrameSizeWithConstraints(
             this.as_concrete_TypeRef(),
             string_range,
             std::ptr::null(),
             constraints,
-            &mut fit_range,
+            fit_range.as_mut_ptr(),
         );
-        (size, fit_range)
+        (size, fit_range.assume_init())
     }
 }
 
