@@ -1153,7 +1153,7 @@ impl Lineset {
                 range: Range<Index>,
                 line_grs: &mut Rope<LineGr, LineOff>,
             ) -> Option<(Range<Index>, u8)> {
-                line_gr_decim_excl(line_grs, lod + 1, range.clone()).map(|actual_range| {
+                line_gr_decim_excl(line_grs, range.clone()).map(|actual_range| {
                     // This is what `excl` means
                     debug_assert!(
                         actual_range.start >= range.start && actual_range.end <= range.end,
@@ -1516,7 +1516,6 @@ fn line_gr_subdiv_incl(
 /// it is covered by `range`. Returns the rounded range (if any).
 fn line_gr_decim_excl(
     line_grs: &mut Rope<LineGr, LineOff>,
-    new_lod: u8,
     range: Range<Index>,
 ) -> Option<Range<Index>> {
     use rope::{by_key, One::FirstAfter};
