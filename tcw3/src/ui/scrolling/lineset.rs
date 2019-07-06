@@ -1020,16 +1020,69 @@ impl Lineset {
                 range: Range<Index>,
                 line_grs: &mut Rope<LineGr, LineOff>,
             ) -> Option<(Range<Index>, u8)> {
-                Some((
-                    line_gr_subdiv_incl(line_grs, lod - 1, range, self.model),
-                    lod - 1,
-                ))
+                let actual_range =
+                    line_gr_subdiv_incl(line_grs, lod - 1, range.clone(), self.model);
+
+                // This is what `incl` means
+                debug_assert!(
+                    actual_range.start <= range.start && actual_range.end >= range.end,
+                    "{:?} ⊇ {:?}",
+                    &actual_range,
+                    &range,
+                );
+
+                Some((actual_range, lod - 1))
             }
         }
 
         // Decimate line groups to raise their LOD levels until the goal is reached
         // -----------------------------------------------------------------
-        // TODO
+        std::mem::swap(&mut self.lod_grs, &mut lod_grs2);
+        lod_grs2.clear();
+
+        dbg!(&self);
+        #[cfg(test)]
+        self.validate();
+
+        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
+
+        // For each existing LOD group...
+        for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
+            check_subdiv_decim(
+                &mut lod_grs2,
+                lod_gr.lod,
+                lod_gr.index..lod_gr_end,
+                &mut goal_lod_gr_it,
+                &mut self.line_grs,
+                &Decim,
+            );
+        }
+
+        struct Decim;
+
+        impl SubdivDecim for Decim {
+            fn should_process_lod(&self, lod: u8, goal: u8) -> bool {
+                lod < goal
+            }
+            fn process_range(
+                &self,
+                lod: u8,
+                range: Range<Index>,
+                line_grs: &mut Rope<LineGr, LineOff>,
+            ) -> Option<(Range<Index>, u8)> {
+                line_gr_decim_excl(line_grs, lod + 1, range.clone()).map(|actual_range| {
+                    // This is what `excl` means
+                    debug_assert!(
+                        actual_range.start >= range.start && actual_range.end <= range.end,
+                        "{:?} ⊆ {:?}",
+                        &actual_range,
+                        &range,
+                    );
+
+                    (actual_range, lod + 1)
+                })
+            }
+        }
 
         // The common routine used by the previous two steps
         // -----------------------------------------------------------------
@@ -1066,7 +1119,11 @@ impl Lineset {
             line_grs: &mut Rope<LineGr, LineOff>,
             subdiv_decim: &impl SubdivDecim,
         ) {
-            debug_assert!(goal_lod_gr_it.peek().unwrap().1 > range.start);
+            debug_assert!(range.start < range.end, "{:?}", range);
+
+            while goal_lod_gr_it.peek().unwrap().1 <= range.start {
+                goal_lod_gr_it.next().unwrap();
+            }
 
             // The starting position of the next LOD-`lod` group
             let mut i = range.start;
@@ -1125,8 +1182,6 @@ impl Lineset {
                         continue;
                     };
 
-                    debug_assert!(sub_range.start <= sub_start_unrounded);
-                    debug_assert!(sub_range.end >= sub_end_unrounded);
                     debug_assert!(sub_range.start >= range.start);
                     debug_assert!(sub_range.end <= range.end);
 
@@ -1204,8 +1259,6 @@ impl Lineset {
                         |first_line_gr, off| {
                             let total_num_lines = last_line_gr.num_lines + first_line_gr.num_lines;
 
-                            debug_assert!(total_num_lines >= *lod_size_range.start());
-
                             if total_num_lines <= *lod_size_range.end() {
                                 // Move all of the lines (deletes `first_line_gr`)
                                 (true, first_line_gr.num_lines, first_line_gr.size)
@@ -1263,10 +1316,10 @@ impl Lineset {
     }
 }
 
-/// Subdivide `range` from a line group list to lower the LOD level.
+/// Subdivide `range` from a line group list in order to lower the LOD level.
 ///
 /// `range` is “rounded” to the nearest line group boundaries so that
-/// it includes `range`. Returns the rounded range.
+/// it covers `range`. Returns the rounded range.
 fn line_gr_subdiv_incl(
     line_grs: &mut Rope<LineGr, LineOff>,
     new_lod: u8,
@@ -1366,6 +1419,103 @@ fn line_gr_subdiv_incl(
     }
 
     start..next_index
+}
+
+/// Decimate `range` from a line group list in order to raise the LOD level.
+///
+/// `range` is “rounded” to the nearest line group boundaries so that
+/// it is covered by `range`. Returns the rounded range (if any).
+fn line_gr_decim_excl(
+    line_grs: &mut Rope<LineGr, LineOff>,
+    new_lod: u8,
+    range: Range<Index>,
+) -> Option<Range<Index>> {
+    use rope::{by_key, One::FirstAfter};
+
+    debug_assert!(range.start < line_grs.offset_len().index);
+    debug_assert!(range.start < range.end, "{:?}", range);
+
+    fn clone_first<T1: Clone, T2>((x1, x2): (&T1, T2)) -> (T1, T2) {
+        (x1.clone(), x2)
+    }
+
+    // Choose the first line group
+    let mut cur = clone_first(
+        line_grs
+            .get_with_offset(FirstAfter(by_key(LineOff::index, range.start)))
+            .unwrap(),
+    );
+
+    if cur.1.index < range.start {
+        // This line group started before `range.start` - ignore this one and
+        // choose the next line group
+        let cur_end = cur.1.index + cur.0.num_lines;
+        cur = clone_first(line_grs.get_with_offset(FirstAfter(by_key(LineOff::index, cur_end)))?);
+    }
+
+    if cur.1.index + cur.0.num_lines > range.end {
+        return None;
+    }
+
+    let start = cur.1.index;
+
+    loop {
+        let cur_end = cur.1.index + cur.0.num_lines;
+        if cur_end > range.end {
+            // `cur` is outside `range`
+            debug_assert_ne!(cur.1.index, start);
+            return Some(start..cur.1.index);
+        } else if cur_end >= range.end {
+            // There's no way `cur2` could fit in `range`
+            debug_assert_ne!(cur_end, start);
+            return Some(start..cur_end);
+        }
+
+        // Pair up two line groups (`cur` and the next one - `cur2`).
+        let result = line_grs
+            .update_with(
+                FirstAfter(by_key(LineOff::index, cur_end)),
+                |cur2, cur2_off| {
+                    debug_assert_eq!(cur2_off.index, cur_end);
+
+                    let cur2_end = cur2_off.index + cur2.num_lines;
+                    if cur2_end > range.end {
+                        return None;
+                    }
+
+                    // Both are completely inside `range`, so merge them
+                    cur2.num_lines += cur.0.num_lines;
+                    cur2.size += cur.0.size;
+
+                    Some(cur2_end)
+                },
+            )
+            .unwrap();
+
+        if let Some(i) = result {
+            // Delete `cur`
+            line_grs
+                .remove(FirstAfter(by_key(LineOff::index, cur.1.index)))
+                .unwrap();
+
+            // Move on
+            debug_assert!(i <= range.end);
+            if i >= range.end {
+                debug_assert_ne!(i, start);
+                return Some(start..i);
+            }
+
+            cur = clone_first(
+                line_grs
+                    .get_with_offset(FirstAfter(by_key(LineOff::index, i)))
+                    .unwrap(),
+            );
+        } else {
+            // Couldn't merge because `cur2` was outside `range`.
+            debug_assert_ne!(cur_end, start);
+            return Some(start..cur_end);
+        }
+    }
 }
 
 /// Get how many lines outside a viewport are included in the LOD level `lod`
