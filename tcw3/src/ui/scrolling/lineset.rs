@@ -140,6 +140,35 @@ fn divide_size(size: Size, ratio: [Size; 2]) -> [Size; 2] {
     [size1, size - size1]
 }
 
+/// Divide a size into three. This function ensures that the total size remains
+/// unchanged.
+fn divide_size3(size: Size, ratio: [Size; 3]) -> [Size; 3] {
+    let sum = ratio[0] as f64 + ratio[1] as f64 + ratio[2] as f64;
+    let mut size1 = (size as f64 * ratio[0] as f64 / sum + 0.5) as Size;
+    let mut size2 = (size as f64 * ratio[1] as f64 / sum + 0.5) as Size;
+    let mut size3 = size - size1 - size2;
+
+    while size3 < 0 {
+        if size1 > 0 {
+            size1 -= 1;
+            size3 += 1;
+        } else if size2 > 0 {
+            size2 -= 1;
+            size3 += 1;
+        } else {
+            break;
+        }
+    }
+
+    debug_assert!(
+        size1 >= 0 && size2 >= 0 && size3 >= 0,
+        "{:?}",
+        (size, ratio, size1, size2, size3)
+    );
+
+    [size1, size2, size3]
+}
+
 impl Lineset {
     pub fn new() -> Self {
         Self {
@@ -153,9 +182,12 @@ impl Lineset {
     ///
     /// The time complexity of this operation is logarithmic, provided that
     /// `regroup` is called after each operation.
-    pub fn insert(&mut self, model: &dyn LinesetModel, range: Range<Index>) {
+    ///
+    /// Returns an approximate line coordinate range representing the location
+    /// of the new lines, or `None` if no lines are inserted.
+    pub fn insert(&mut self, model: &dyn LinesetModel, range: Range<Index>) -> Option<Range<Size>> {
         if range.end <= range.start {
-            return;
+            return None;
         }
         assert!(range.start <= self.line_grs.offset_len().index);
         assert!(range.start >= 0);
@@ -171,11 +203,10 @@ impl Lineset {
                 index: self.line_grs.offset_len().index,
                 lod,
             });
-            self.line_grs.push_back(LineGr {
-                num_lines,
-                size: model.line_total_size(range, lod > 0),
-            });
-            return;
+            let size = model.line_total_size(range, lod > 0);
+            let at = self.line_grs.offset_len().pos;
+            self.line_grs.push_back(LineGr { num_lines, size });
+            return Some(at..at + size);
         }
 
         // Find the LOD group the new lines belong to
@@ -202,6 +233,8 @@ impl Lineset {
 
         let next;
 
+        let (inserted_pos, mut inserted_size);
+
         // TODO: Maybe delegate this complexity to `regroup`?
 
         if range.start != line_gr_start || num_lines < *lod_size_range.start() {
@@ -225,6 +258,15 @@ impl Lineset {
 
                 // `range` was completely assimilated
                 next = None;
+
+                inserted_pos = divide_size(
+                    line_gr.size,
+                    [
+                        model.line_total_size(line_gr_start..range.start, lod > 0),
+                        model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                    ],
+                )[0] + line_gr_off.pos;
+                inserted_size = size;
             } else if *lod_size_range.end() * 2 - line_gr.num_lines >= num_lines {
                 // Insert the new lines to the existing line group, and then
                 // divide it into two to satisfy the invariant.
@@ -234,18 +276,23 @@ impl Lineset {
                 let halve_sizes_new;
                 if range.start > new_gr_mid {
                     // Divide `line_gr` at `new_gr_mid`.
-                    let halve_sizes_old = divide_size(
+                    let halve_sizes_old = divide_size3(
                         line_gr.size,
                         [
                             model.line_total_size(line_gr_start..new_gr_mid, lod > 0),
-                            model.line_total_size(new_gr_mid..range.start, lod > 0)
-                                + model
-                                    .line_total_size(range.end..line_gr_end + num_lines, lod > 0),
+                            model.line_total_size(new_gr_mid..range.start, lod > 0),
+                            model.line_total_size(range.end..line_gr_end + num_lines, lod > 0),
                         ],
                     );
 
                     // The new lines belongs to the second half
-                    halve_sizes_new = [halve_sizes_old[0], halve_sizes_old[1] + size];
+                    halve_sizes_new = [
+                        halve_sizes_old[0],
+                        halve_sizes_old[1] + size + halve_sizes_old[2],
+                    ];
+
+                    inserted_pos = halve_sizes_old[0] + halve_sizes_old[1] + line_gr_off.pos;
+                    inserted_size = size;
                 } else if range.end > new_gr_mid {
                     // Divide `line_gr` at `new_gr_mid`.
                     let halve_sizes_old = divide_size(
@@ -263,19 +310,28 @@ impl Lineset {
                     ];
                     halve_sizes_new =
                         [halve_sizes_old[0] + size2[0], halve_sizes_old[1] + size2[1]];
+
+                    inserted_pos = halve_sizes_old[0] + line_gr_off.pos;
+                    inserted_size = size2[0] + size2[1];
                 } else {
                     // Divide `line_gr` at `new_gr_mid`.
-                    let halve_sizes_old = divide_size(
+                    let halve_sizes_old = divide_size3(
                         line_gr.size,
                         [
-                            model.line_total_size(line_gr_start..range.start, lod > 0)
-                                + model.line_total_size(range.end..new_gr_mid, lod > 0),
+                            model.line_total_size(line_gr_start..range.start, lod > 0),
+                            model.line_total_size(range.end..new_gr_mid, lod > 0),
                             model.line_total_size(new_gr_mid..line_gr_end + num_lines, lod > 0),
                         ],
                     );
 
                     // The new lines belongs to the first half
-                    halve_sizes_new = [halve_sizes_old[0] + size, halve_sizes_old[1]];
+                    halve_sizes_new = [
+                        halve_sizes_old[0] + size + halve_sizes_old[1],
+                        halve_sizes_old[2],
+                    ];
+
+                    inserted_pos = halve_sizes_old[0] + line_gr_off.pos;
+                    inserted_size = size;
                 }
 
                 // `line_gr` will be the second half
@@ -393,9 +449,17 @@ impl Lineset {
                 num_lines -= incr;
 
                 next = Some((new_range, Some(new_size)));
+
+                inserted_pos = halve_sizes[0] + line_gr_off.pos;
+                inserted_size = halve_sizes_postadj[0] + halve_sizes_postadj[1]
+                    - halve_sizes[0]
+                    - halve_sizes[1];
             }
         } else {
             next = Some((range, None));
+
+            inserted_pos = line_gr_off.pos;
+            inserted_size = 0;
         }
 
         let mut lod_gr_i2 = lod_gr_i;
@@ -460,19 +524,26 @@ impl Lineset {
                     );
                 }
             }
+
+            inserted_size += size2;
         }
 
         // Update the following LOD groups' starting indices
         for lod_gr in self.lod_grs[lod_gr_i2 + 1..].iter_mut() {
             lod_gr.index += num_lines;
         }
+
+        Some(inserted_pos..inserted_pos + inserted_size)
     }
 
     /// Synchronize the structure *before* lines are removed from the underlying
     /// model (`LinesetModel`).
-    pub fn remove(&mut self, model: &dyn LinesetModel, range: Range<Index>) {
+    ///
+    /// Returns an approximate line coordinate range representing the original
+    /// location of the removed lines, or `None` if no lines are removed.
+    pub fn remove(&mut self, model: &dyn LinesetModel, range: Range<Index>) -> Option<Range<Size>> {
         if range.end <= range.start {
-            return;
+            return None;
         }
         assert!(range.end <= self.line_grs.offset_len().index);
         assert!(range.start >= 0);
@@ -557,7 +628,8 @@ impl Lineset {
             let size1 = model.line_total_size(line_gr_range.start.index..range.start, lod1 > 0);
             let size2 = model.line_total_size(range.clone(), lod1 > 0);
             let size3 = model.line_total_size(range.end..line_gr_range.end.index, lod1 > 0);
-            let [_, remaining_size] = divide_size(line_gr1.size, [size2, size1 + size3]);
+            let [size1, size2, size3] = divide_size3(line_gr1.size, [size1, size2, size3]);
+            let remaining_size = size1 + size3;
 
             // Remove `range` from the line group
             self.line_grs
@@ -575,7 +647,7 @@ impl Lineset {
                 lod_gr.index -= num_lines;
             }
 
-            return;
+            return Some(line_gr_range.start.pos + size1..line_gr_range.start.pos + size1 + size2);
         }
 
         // Find the LOD group `range.end` belong to
@@ -596,6 +668,8 @@ impl Lineset {
 
         debug_assert!(lod_gr2_start < range.end);
         debug_assert!(lod_gr2_end >= range.end);
+
+        let mut removed_size = 0;
 
         // The first LOD group `lod_gr` such that `lod_g.index >= bulk_delete_end`
         let lod_bulk_delete_end;
@@ -631,7 +705,7 @@ impl Lineset {
             // Estimate the size of the removed part
             let size1 = model.line_total_size(line_gr2_start..range.end, lod2 > 0);
             let size2 = model.line_total_size(range.end..line_gr2_end, lod2 > 0);
-            let [_, remaining_size] = divide_size(line_gr2.size, [size1, size2]);
+            let [cut_size, remaining_size] = divide_size(line_gr2.size, [size1, size2]);
 
             // Remove a partial range from `line_gr2`
             self.line_grs
@@ -643,6 +717,8 @@ impl Lineset {
                     },
                 )
                 .unwrap();
+
+            removed_size += cut_size;
 
             if lod_gr2_start < line_gr2_start {
                 // Split the LOD group at `range.end` because the portion
@@ -735,6 +811,8 @@ impl Lineset {
                 .unwrap();
             num_bulk_deleted_lines -= line_gr.num_lines;
             debug_assert!(num_bulk_deleted_lines >= 0);
+
+            removed_size += line_gr.size;
         }
 
         // Delete starting points of LOD groups in
@@ -749,6 +827,8 @@ impl Lineset {
             &mut self.lod_grs,
             lod_bulk_delete_start..lod_bulk_delete_end,
         );
+
+        let removed_pos;
 
         if range.start > line_gr_range.start.index {
             // `range.start` is in the middle of `line_gr1`.  `line_gr1` remains,
@@ -773,7 +853,7 @@ impl Lineset {
             // Estimate the size of the removed part
             let size1 = model.line_total_size(line_gr1_start..range.start, lod1 > 0);
             let size2 = model.line_total_size(range.start..line_gr1_end, lod1 > 0);
-            let [remaining_size, _] = divide_size(line_gr1.size, [size1, size2]);
+            let [remaining_size, cut_size] = divide_size(line_gr1.size, [size1, size2]);
 
             // Remove a partial range from `line_gr1`
             self.line_grs
@@ -785,12 +865,19 @@ impl Lineset {
                     },
                 )
                 .unwrap();
+
+            removed_pos = line_gr_range.start.pos + remaining_size;
+            removed_size += cut_size;
+        } else {
+            removed_pos = line_gr_range.start.pos;
         }
 
         // Adjust the starting point of the LOD groups following `range`
         for lod_gr in self.lod_grs[lod_bulk_delete_start..].iter_mut() {
             lod_gr.index -= num_lines;
         }
+
+        Some(removed_pos..removed_pos + removed_size)
     }
 
     /// Synchronize the structure after lines are resized.
@@ -1926,9 +2013,15 @@ mod tests {
             let mut lineset = Lineset::new();
             lineset.validate();
 
-            lineset.insert(&TestModel, 0..i);
+            let range = dbg!(lineset.insert(&TestModel, 0..i));
             dbg!(&lineset);
             lineset.validate();
+
+            if i == 0 {
+                assert_eq!(range, None);
+            } else {
+                assert_eq!(range, Some(0..TestModel.line_total_size(0..i, false)));
+            }
         }
     }
 
@@ -2006,12 +2099,17 @@ mod tests {
                     dbg!(pos..pos + count);
                     let mut lineset = lineset.clone();
                     let len = lineset.line_grs.offset_len().index;
+                    let size = lineset.line_grs.offset_len().pos;
 
-                    lineset.insert(&TestModel, pos..pos + count);
+                    let range = dbg!(lineset.insert(&TestModel, pos..pos + count));
                     dbg!(&lineset);
 
                     lineset.validate();
                     assert_eq!(lineset.line_grs.offset_len().index, len + count);
+
+                    let range = range.unwrap();
+                    let inserted_size = range.end - range.start;
+                    assert_eq!(lineset.line_grs.offset_len().pos, size + inserted_size);
                 }
             }
         }
@@ -2036,12 +2134,20 @@ mod tests {
                     dbg!(pos1..pos2);
                     let mut lineset = lineset.clone();
                     let len = lineset.line_grs.offset_len().index;
+                    let size = lineset.line_grs.offset_len().pos;
 
-                    lineset.remove(&TestModel, pos1..pos2);
+                    let range = dbg!(lineset.remove(&TestModel, pos1..pos2));
                     dbg!(&lineset);
 
                     lineset.validate();
                     assert_eq!(lineset.line_grs.offset_len().index, len - (pos2 - pos1));
+
+                    let removed_size = if let Some(range) = range {
+                        range.end - range.start
+                    } else {
+                        0
+                    };
+                    assert_eq!(lineset.line_grs.offset_len().pos, size - removed_size);
                 }
             }
         }
