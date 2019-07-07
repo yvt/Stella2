@@ -928,8 +928,64 @@ impl Lineset {
     }
 
     /// Synchronize the structure after lines are resized.
-    pub fn recalculate_size(&mut self, model: &dyn LinesetModel, range: Range<Index>) {
-        unimplemented!()
+    ///
+    /// This method recalculates the sizes of line groups overlapping with
+    /// `range`. If their sizes change, it's reported back via `disp_cb`
+    /// so that the caller can make amendments to viewport positions.
+    ///
+    /// Non-zero LOD levels are ignored if `skip_approx == true`.
+    pub fn recalculate_size(
+        &mut self,
+        model: &dyn LinesetModel,
+        range: Range<Index>,
+        skip_approx: bool,
+        disp_cb: &mut dyn DispCb,
+    ) {
+        use rope::{by_key, One::FirstAfter};
+
+        let num_lines = self.line_grs.offset_len().index;
+        let range = max(range.start, 0)..min(range.end, num_lines);
+        if range.start >= range.end {
+            return;
+        }
+
+        let lod_gr1_i = match self.lod_grs.binary_search_by_key(&range.start, |g| g.index) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+
+        for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs[lod_gr1_i..])
+            .take_while(|lod_gr| lod_gr.0.index < range.end)
+        {
+            let approx = lod_approx(lod_gr.lod);
+
+            if skip_approx && approx {
+                continue;
+            }
+
+            let mut next = max(lod_gr.index, range.start);
+
+            while next < min(lod_gr_end, range.end) {
+                // TODO: This is utterly inefficient (O(n log n))
+                //       Maybe add something like `update_range_with` to `Rope`?
+                self.line_grs.update_with(
+                    FirstAfter(by_key(LineOff::index, next)),
+                    |line_gr, line_off| {
+                        let gr_range = line_off.index..line_off.index + line_gr.num_lines;
+                        let new_size = model.line_total_size(gr_range.clone(), approx);
+                        if new_size != line_gr.size {
+                            disp_cb.line_resized(
+                                gr_range.clone(),
+                                line_off.pos..line_off.pos + line_gr.size,
+                                line_off.pos..line_off.pos + new_size,
+                            );
+                            line_gr.size = new_size;
+                        }
+                        next = gr_range.end;
+                    },
+                );
+            }
+        }
     }
 
     /// Reorganize LOD groups.
@@ -2494,5 +2550,85 @@ mod tests {
         }
 
         assert!(lineset.lod_grs.len() > 0);
+    }
+
+    #[test]
+    fn test_recalculate_size_empty() {
+        let mut lineset = Lineset::new();
+
+        for i1 in -5..=5 {
+            for i2 in -5..=5 {
+                for &skip_approx in [false, true].iter() {
+                    lineset.recalculate_size(
+                        &TestModel,
+                        i1..i2,
+                        skip_approx,
+                        &mut |_: Range<Index>, _: Range<Size>, _: Range<Size>| {
+                            unreachable!();
+                        },
+                    );
+                    lineset.validate();
+                }
+            }
+        }
+    }
+
+    struct TestModel2;
+
+    impl LinesetModel for TestModel2 {
+        fn line_total_size(&self, range: Range<Index>, approx: bool) -> Size {
+            (TestModel.line_total_size(range, approx) + 1) * 100000
+        }
+    }
+
+    #[test]
+    fn test_recalculate_size1() {
+        const LEN: Index = 20;
+
+        let mut lineset = Lineset::new();
+        lineset.insert(&TestModel, 0..LEN);
+        lineset.regroup(&TestModel, &[0..5], &mut ());
+
+        dbg!(&lineset);
+        lineset.validate();
+
+        for i1 in 0..=LEN {
+            for i2 in i1 + 1..=LEN {
+                dbg!(i1..i2);
+                let mut lineset = lineset.clone();
+                let size = lineset.line_grs.offset_len().pos;
+                let mut expected_size = size;
+
+                lineset.recalculate_size(
+                    &TestModel2,
+                    i1..i2,
+                    false,
+                    &mut |range: Range<Index>,
+                          old_pos_range: Range<Size>,
+                          new_pos_range: Range<Size>| {
+                        dbg!((&range, &old_pos_range, &new_pos_range));
+                        expected_size += new_pos_range.end - new_pos_range.start;
+                        expected_size -= old_pos_range.end - old_pos_range.start;
+                    },
+                );
+
+                dbg!(&lineset);
+                lineset.validate();
+
+                assert_eq!(lineset.line_grs.offset_len().index, LEN);
+                assert_eq!(lineset.line_grs.offset_len().pos, expected_size);
+
+                // `TestModel2` returns much larger values, so the affected
+                // range is clearly distinguishable
+                let mut i = 0;
+                for line_gr in lineset.line_grs.iter() {
+                    let affected = i < i2 && i + line_gr.num_lines > i1;
+
+                    assert_eq!(affected, line_gr.size > 10000);
+
+                    i += line_gr.num_lines;
+                }
+            }
+        }
     }
 }
