@@ -2023,8 +2023,8 @@ mod tests {
     }
 
     impl LinesetModel for TestModel {
-        fn line_total_size(&self, range: Range<Index>, _approx: bool) -> Size {
-            self.pos(range.end) - self.pos(range.start)
+        fn line_total_size(&self, range: Range<Index>, approx: bool) -> Size {
+            self.pos(range.end) - self.pos(range.start) + (approx as Size * 9)
         }
     }
 
@@ -2041,7 +2041,10 @@ mod tests {
             if i == 0 {
                 assert_eq!(range, None);
             } else {
-                assert_eq!(range, Some(0..TestModel.line_total_size(0..i, false)));
+                assert!(
+                    range == Some(0..TestModel.line_total_size(0..i, false))
+                        || range == Some(0..TestModel.line_total_size(0..i, true))
+                );
             }
         }
     }
