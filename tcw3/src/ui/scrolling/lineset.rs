@@ -52,6 +52,31 @@ pub trait LinesetModel {
     fn line_total_size(&self, range: Range<Index>, approx: bool) -> Size;
 }
 
+/// The displacement handler.
+///
+/// The line coordinates start at 0, irregardless of the scroll position. When
+/// lines are inserted, removed, or resized, subsequent lines are moved to
+/// accommodate to these changes. The client should specify whether each
+/// viewport should follow or not and adjust them appropriately by implementing
+/// `DispCb`.
+///
+/// This trait is used only for resizing. For insertion and removal, the client
+/// should take an appropriate action based on the return value of their
+/// respective methods.
+pub trait DispCb {
+    /// Called when line groups are resized.
+    fn line_resized(&mut self, _range: Range<Index>, _old_pos: Range<Size>, _new_pos: Range<Size>) {
+    }
+}
+
+impl DispCb for () {}
+
+impl<T: FnMut(Range<Index>, Range<Size>, Range<Size>)> DispCb for T {
+    fn line_resized(&mut self, range: Range<Index>, old_pos: Range<Size>, new_pos: Range<Size>) {
+        self(range, old_pos, new_pos);
+    }
+}
+
 /// Represents a line group.
 #[derive(Debug, Clone, Copy)]
 struct LineGr {
@@ -908,14 +933,28 @@ impl Lineset {
     }
 
     /// Reorganize LOD groups.
-    pub fn regroup(&mut self, model: &dyn LinesetModel, viewports: &[Range<Size>]) {
+    ///
+    /// The regroup operation subdivides and/or decimates LOD groups to make
+    /// the region specified by `viewports` more detailed, while others less
+    /// detailed. It tries to preserve the total size of a set of lines, except
+    /// when it subdivides a line group producing a LOD-0 line group. LOD-0 line
+    /// groups have accurate sizes (calculated by specifying `false` as a
+    /// `approx` parameter), so their sizes must be updated when they are
+    /// created from LOD-1 line groups. This displaces all subsequent lines,
+    /// thus some viewports have to be moved as well. To make this possible,
+    /// this method calls `disp_cb.line_resized` whenever line groups are
+    /// resized.
+    pub fn regroup(
+        &mut self,
+        model: &dyn LinesetModel,
+        viewports: &[Range<Size>],
+        disp_cb: &mut dyn DispCb,
+    ) {
         use rope::{
             by_key, range_by_key,
             Edge::{Ceil, Floor},
             One::{FirstAfter, LastBefore},
         };
-
-        // TODO: Add "displacement handler"
 
         let num_lines = self.line_grs.offset_len().index;
 
@@ -1050,7 +1089,10 @@ impl Lineset {
             }
 
             // Subdivide the line groups covering `vp_range` (exactly)
-            let sub_range = line_gr_subdiv_incl(line_grs, lod - 1, vp_range.clone(), model);
+            let SubdivResult {
+                subdived_range: sub_range,
+                ..
+            } = line_gr_subdiv_incl(line_grs, lod - 1, vp_range.clone(), model);
             debug_assert_eq!(sub_range, vp_range);
 
             // Now we can get a more accurate `vp_range`
@@ -1111,12 +1153,13 @@ impl Lineset {
                 lod_gr.index..lod_gr_end,
                 &mut goal_lod_gr_it,
                 &mut self.line_grs,
-                &Subdiv { model },
+                &mut Subdiv { model, disp_cb },
             );
         }
 
         struct Subdiv<'a> {
             model: &'a dyn LinesetModel,
+            disp_cb: &'a mut dyn DispCb,
         }
 
         impl SubdivDecim for Subdiv<'_> {
@@ -1124,23 +1167,35 @@ impl Lineset {
                 lod > goal
             }
             fn process_range(
-                &self,
+                &mut self,
                 lod: u8,
                 range: Range<Index>,
                 line_grs: &mut Rope<LineGr, LineOff>,
             ) -> Option<(Range<Index>, u8)> {
-                let actual_range =
-                    line_gr_subdiv_incl(line_grs, lod - 1, range.clone(), self.model);
+                let SubdivResult {
+                    subdived_range,
+                    pos,
+                    old_size,
+                    new_size,
+                } = line_gr_subdiv_incl(line_grs, lod - 1, range.clone(), self.model);
 
                 // This is what `incl` means
                 debug_assert!(
-                    actual_range.start <= range.start && actual_range.end >= range.end,
+                    subdived_range.start <= range.start && subdived_range.end >= range.end,
                     "{:?} ⊇ {:?}",
-                    &actual_range,
+                    &subdived_range,
                     &range,
                 );
 
-                Some((actual_range, lod - 1))
+                if old_size != new_size {
+                    self.disp_cb.line_resized(
+                        subdived_range.clone(),
+                        pos..pos + old_size,
+                        pos..pos + new_size,
+                    );
+                }
+
+                Some((subdived_range, lod - 1))
             }
         }
 
@@ -1159,7 +1214,7 @@ impl Lineset {
                 lod_gr.index..lod_gr_end,
                 &mut goal_lod_gr_it,
                 &mut self.line_grs,
-                &Decim,
+                &mut Decim,
             );
         }
 
@@ -1170,7 +1225,7 @@ impl Lineset {
                 lod < goal
             }
             fn process_range(
-                &self,
+                &mut self,
                 lod: u8,
                 range: Range<Index>,
                 line_grs: &mut Rope<LineGr, LineOff>,
@@ -1201,7 +1256,7 @@ impl Lineset {
             /// was performed, it returns the actual affected range and its new
             /// LOD level.
             fn process_range(
-                &self,
+                &mut self,
                 lod: u8,
                 range: Range<Index>,
                 line_grs: &mut Rope<LineGr, LineOff>,
@@ -1222,7 +1277,7 @@ impl Lineset {
             range: Range<Index>,
             goal_lod_gr_it: &mut Peekable<IterLodGrWithEnd<'_>>,
             line_grs: &mut Rope<LineGr, LineOff>,
-            subdiv_decim: &impl SubdivDecim,
+            subdiv_decim: &mut impl SubdivDecim,
         ) {
             debug_assert!(range.start < range.end, "{:?}", range);
 
@@ -1427,16 +1482,33 @@ impl Lineset {
     }
 }
 
+/// Represents the result of `line_gr_subdiv_incl`.
+#[derive(Debug, Clone)]
+struct SubdivResult {
+    /// The subdivided index range.
+    subdived_range: Range<Index>,
+    /// The starting line coordinate of the subdivided range. This point does
+    /// not move during subdivision.
+    pos: Size,
+    /// The total size of the subdivided range before subdivision. The line
+    /// coordinate range can be calculated as `pos..pos + old_size`.
+    old_size: Size,
+    /// The total size of the subdivided range after subdivision. The line
+    /// coordinate range can be calculated as `pos..pos + new_size`.
+    new_size: Size,
+}
+
 /// Subdivide `range` from a line group list in order to lower the LOD level.
 ///
 /// `range` is “rounded” to the nearest line group boundaries so that
-/// it covers `range`. Returns the rounded range.
+/// it covers `range`. Returns the rounded range as
+/// `SubdivResult::subdived_range`.
 fn line_gr_subdiv_incl(
     line_grs: &mut Rope<LineGr, LineOff>,
     new_lod: u8,
     range: Range<Index>,
     model: &dyn LinesetModel,
-) -> Range<Index> {
+) -> SubdivResult {
     use rope::{by_key, One::FirstAfter};
 
     debug_assert!(range.start < line_grs.offset_len().index);
@@ -1445,12 +1517,16 @@ fn line_gr_subdiv_incl(
     let approx = lod_approx(new_lod);
     let new_lod_min_size = *lod_size_range(new_lod).start();
 
+    // The size of the subdivided range before/after subdivision
+    let mut old_size = 0;
+    let mut new_size = 0;
+
     // Process `line_gr`. If `line_gr.num_lines >= 2`, it's split into two
     // `LineGr`s. `line_gr` is replaced with the second half, while returning
     // the first half. Otherwise, returns `None`, indicating subdivision did
     // not occur. Even in this case, `line_gr.size` is recalculated if
     // `new_lod == 0`.
-    let try_split = |line_gr: &mut LineGr, line_off: LineOff| {
+    let mut try_split = |line_gr: &mut LineGr, line_off: LineOff| {
         let num_lines1 = (line_gr.num_lines + 1) >> 1;
         let num_lines2 = line_gr.num_lines - num_lines1;
 
@@ -1462,10 +1538,12 @@ fn line_gr_subdiv_incl(
             new_line_gr = None;
 
             // Recalculate the size if we are turning them into LOD 0
+            old_size += line_gr.size;
             if !approx {
                 debug_assert_eq!(line_gr.num_lines, 1);
                 line_gr.size = model.line_total_size(line_off.index..line_off.index + 1, approx);
             }
+            new_size += line_gr.size;
         } else {
             let indices = [
                 line_off.index,
@@ -1477,11 +1555,15 @@ fn line_gr_subdiv_incl(
                 model.line_total_size(indices[1]..indices[2], approx),
             ];
 
+            old_size += line_gr.size;
+
             // Do not change the total size unless we are turning them into
             // LOD 0
             if approx {
                 sizes = divide_size(line_gr.size, sizes);
             }
+
+            new_size += sizes[0] + sizes[1];
 
             new_line_gr = Some(LineGr {
                 num_lines: num_lines1,
@@ -1497,15 +1579,18 @@ fn line_gr_subdiv_incl(
         new_line_gr
     };
 
-    let update_fn = |line_gr: &mut LineGr, line_off: LineOff| {
+    let mut update_fn = |line_gr: &mut LineGr, line_off: LineOff| {
         let next_index = line_off.index + line_gr.num_lines;
         let new_line_gr = try_split(line_gr, line_off);
-        (line_off.index, new_line_gr, next_index)
+        (line_off.index, line_off.pos, new_line_gr, next_index)
     };
 
     // Process the first line group that overlaps with `range`
-    let (start, new_line_gr, mut next_index) = line_grs
-        .update_with(FirstAfter(by_key(LineOff::index, range.start)), update_fn)
+    let (start, start_pos, new_line_gr, mut next_index) = line_grs
+        .update_with(
+            FirstAfter(by_key(LineOff::index, range.start)),
+            &mut update_fn,
+        )
         .unwrap();
 
     if let Some(new_line_gr) = new_line_gr {
@@ -1516,8 +1601,11 @@ fn line_gr_subdiv_incl(
 
     // Process other line groups that follow
     while next_index < range.end {
-        let (_, new_line_gr, i) = line_grs
-            .update_with(FirstAfter(by_key(LineOff::index, next_index)), update_fn)
+        let (_, _, new_line_gr, i) = line_grs
+            .update_with(
+                FirstAfter(by_key(LineOff::index, next_index)),
+                &mut update_fn,
+            )
             .unwrap();
 
         if let Some(new_line_gr) = new_line_gr {
@@ -1529,7 +1617,16 @@ fn line_gr_subdiv_incl(
         next_index = i;
     }
 
-    start..next_index
+    if lod_approx(new_lod) {
+        debug_assert_eq!(old_size, new_size);
+    }
+
+    SubdivResult {
+        subdived_range: start..next_index,
+        pos: start_pos,
+        old_size,
+        new_size,
+    }
 }
 
 /// Decimate `range` from a line group list in order to raise the LOD level.
@@ -2300,7 +2397,7 @@ mod tests {
     #[test]
     fn test_regroup_empty() {
         let mut lineset = Lineset::new();
-        lineset.regroup(&TestModel, &[0..0]);
+        lineset.regroup(&TestModel, &[0..0], &mut ());
     }
 
     #[test]
@@ -2318,10 +2415,23 @@ mod tests {
             let pos = len * i / 100;
             let mut lineset = lineset.clone();
 
+            let size = lineset.line_grs.offset_len().pos;
+            let mut expected_size = size;
+
             let vp = pos..pos + 1;
             println!("Regrouping using viewport = {:?}", vp);
 
-            lineset.regroup(&TestModel, &[vp]);
+            lineset.regroup(
+                &TestModel,
+                &[vp],
+                &mut |range: Range<Index>,
+                      old_pos_range: Range<Size>,
+                      new_pos_range: Range<Size>| {
+                    dbg!((&range, &old_pos_range, &new_pos_range));
+                    expected_size += new_pos_range.end - new_pos_range.start;
+                    expected_size -= old_pos_range.end - old_pos_range.start;
+                },
+            );
             dbg!(&lineset);
 
             lineset.validate();
@@ -2360,12 +2470,27 @@ mod tests {
 
             println!("Regrouping using viewports = {:?}", vps);
 
-            lineset.regroup(&TestModel, &vps);
+            let mut expected_size = len;
+
+            lineset.regroup(
+                &TestModel,
+                &vps,
+                &mut |range: Range<Index>,
+                      old_pos_range: Range<Size>,
+                      new_pos_range: Range<Size>| {
+                    dbg!((&range, &old_pos_range, &new_pos_range));
+                    expected_size += new_pos_range.end - new_pos_range.start;
+                    expected_size -= old_pos_range.end - old_pos_range.start;
+                },
+            );
             dbg!(&lineset);
             lineset.validate();
-            // TODO: check other properties
+            // TODO: check other properties, e.g.:
+            //       - Does not resize lines in the intersection of old and new
+            //         visible portions
 
             assert_eq!(lineset.line_grs.offset_len().index, NUM_LINES);
+            assert_eq!(lineset.line_grs.offset_len().pos, expected_size);
         }
 
         assert!(lineset.lod_grs.len() > 0);
