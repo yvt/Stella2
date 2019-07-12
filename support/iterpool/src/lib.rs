@@ -16,7 +16,7 @@
 //!
 //! It also comes with a sacrifice. It is impossible to return a free space to
 //! the global heap without destroying entire the pool.
-use std::{mem, ops};
+use std::{mem, num::NonZeroUsize, ops};
 
 pub mod intrusive_list;
 
@@ -24,7 +24,7 @@ pub mod intrusive_list;
 #[derive(Debug, Clone)]
 pub struct Pool<T> {
     storage: Vec<Entry<T>>,
-    first_free: Option<usize>,
+    first_free: Option<PoolPtr>,
 }
 
 /// High-performance non-thread safe object pool with an ability to iterate
@@ -32,32 +32,35 @@ pub struct Pool<T> {
 #[derive(Debug, Clone)]
 pub struct IterablePool<T> {
     storage: Vec<ItEntry<T>>,
-    first_free: Option<usize>,
-    first_used: Option<usize>,
+    first_free: Option<PoolPtr>,
+    first_used: Option<PoolPtr>,
 }
 
 /// A (potentially invalid) pointer to an object in `Pool`, but without
 /// information about which specific `Pool` this is associated with.
+///
+/// `Pool` uses zero-based indices, but when stored in `PoolPtr`, they are
+/// one-based to meet the requirement of `NonZeroUsize`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct PoolPtr(pub usize);
+pub struct PoolPtr(pub NonZeroUsize);
 
 #[derive(Debug, Clone)]
 enum Entry<T> {
     Used(T),
 
     /// This entry is free. Points the next free entry.
-    Free(Option<usize>),
+    Free(Option<PoolPtr>),
 }
 
 #[derive(Debug, Clone)]
 enum ItEntry<T> {
     /// This entry if occupied. Points the next and previous occupied entry
     /// (this forms a circular doubly-linked list).
-    Used(T, (usize, usize)),
+    Used(T, (PoolPtr, PoolPtr)),
 
     /// This entry is free. Points the next free entry (forms a
     /// singly-linked list).
-    Free(Option<usize>),
+    Free(Option<PoolPtr>),
 }
 
 impl PoolPtr {
@@ -74,7 +77,15 @@ impl PoolPtr {
     /// or pool associated with it in a meaningful way.
     #[inline]
     pub fn uninitialized() -> Self {
-        PoolPtr(0)
+        PoolPtr(NonZeroUsize::new(1).unwrap())
+    }
+
+    fn new(x: usize) -> Self {
+        PoolPtr(NonZeroUsize::new(x + 1).expect("count overflow"))
+    }
+
+    fn get(&self) -> usize {
+        self.0.get() - 1
     }
 }
 
@@ -91,7 +102,7 @@ impl<T> Entry<T> {
             &mut Entry::Free(_) => None,
         }
     }
-    fn next_free_index(&self) -> Option<usize> {
+    fn next_free_index(&self) -> Option<PoolPtr> {
         match self {
             &Entry::Used(_) => unreachable!(),
             &Entry::Free(i) => i,
@@ -112,19 +123,19 @@ impl<T> ItEntry<T> {
             &mut ItEntry::Free(_) => None,
         }
     }
-    fn next_previous_used_index(&self) -> (usize, usize) {
+    fn next_previous_used_index(&self) -> (PoolPtr, PoolPtr) {
         match self {
             &ItEntry::Used(_, (prev, next)) => (prev, next),
             &ItEntry::Free(_) => unreachable!(),
         }
     }
-    fn next_previous_used_index_mut(&mut self) -> &mut (usize, usize) {
+    fn next_previous_used_index_mut(&mut self) -> &mut (PoolPtr, PoolPtr) {
         match self {
             &mut ItEntry::Used(_, ref mut pn) => pn,
             &mut ItEntry::Free(_) => unreachable!(),
         }
     }
-    fn next_free_index(&self) -> Option<usize> {
+    fn next_free_index(&self) -> Option<PoolPtr> {
         match self {
             &ItEntry::Used(_, _) => unreachable!(),
             &ItEntry::Free(i) => i,
@@ -146,10 +157,10 @@ impl<T> Pool<T> {
         };
         if capacity > 0 {
             for i in 0..capacity - 1 {
-                pool.storage.push(Entry::Free(Some(i + 1)));
+                pool.storage.push(Entry::Free(Some(PoolPtr::new(i + 1))));
             }
             pool.storage.push(Entry::Free(None));
-            pool.first_free = Some(0);
+            pool.first_free = Some(PoolPtr::new(0));
         }
         pool
     }
@@ -173,19 +184,20 @@ impl<T> Pool<T> {
         match self.first_free {
             None => {
                 self.storage.push(Entry::Used(x));
-                PoolPtr(self.storage.len() - 1)
+                PoolPtr::new(self.storage.len() - 1)
             }
             Some(i) => {
+                let i = i.get();
                 let next_free = self.storage[i].next_free_index();
                 self.first_free = next_free;
                 self.storage[i] = Entry::Used(x);
-                PoolPtr(i)
+                PoolPtr::new(i)
             }
         }
     }
     pub fn deallocate<S: Into<PoolPtr>>(&mut self, i: S) -> Option<T> {
-        let i = i.into().0;
-        let ref mut e = self.storage[i];
+        let i = i.into();
+        let ref mut e = self.storage[i.get()];
         match e {
             &mut Entry::Used(_) => {}
             &mut Entry::Free(_) => {
@@ -200,10 +212,10 @@ impl<T> Pool<T> {
         Some(x)
     }
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
-        self.storage[fp.0].as_ref()
+        self.storage[fp.get()].as_ref()
     }
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
-        self.storage[fp.0].as_mut()
+        self.storage[fp.get()].as_mut()
     }
     /// Iterate over objects. Unlike `IterablePool`, `Pool` can't skip free
     /// space, so this might be less efficient.
@@ -239,10 +251,10 @@ impl<T> IterablePool<T> {
         };
         if capacity > 0 {
             for i in 0..capacity - 1 {
-                pool.storage.push(ItEntry::Free(Some(i + 1)));
+                pool.storage.push(ItEntry::Free(Some(PoolPtr::new(i + 1))));
             }
             pool.storage.push(ItEntry::Free(None));
-            pool.first_free = Some(0);
+            pool.first_free = Some(PoolPtr::new(0));
         }
         pool
     }
@@ -267,7 +279,7 @@ impl<T> IterablePool<T> {
 
         if self.first_free.is_none() {
             self.storage.push(ItEntry::Free(None));
-            self.first_free = Some(self.storage.len() - 1);
+            self.first_free = Some(PoolPtr::new(self.storage.len() - 1));
         }
 
         let i = self.first_free.unwrap();
@@ -275,25 +287,25 @@ impl<T> IterablePool<T> {
         let next_prev = if let Some(first_used) = self.first_used {
             // Insert after the `self.first_used`
             let next = {
-                let next_prev = self.storage[first_used].next_previous_used_index_mut();
+                let next_prev = self.storage[first_used.get()].next_previous_used_index_mut();
                 replace(&mut next_prev.0, i)
             };
-            self.storage[next].next_previous_used_index_mut().1 = i;
+            self.storage[next.get()].next_previous_used_index_mut().1 = i;
 
             (next, first_used)
         } else {
             (i, i)
         };
 
-        self.first_free = self.storage[i].next_free_index();
-        self.storage[i] = ItEntry::Used(x, next_prev);
+        self.first_free = self.storage[i.get()].next_free_index();
+        self.storage[i.get()] = ItEntry::Used(x, next_prev);
         self.first_used = Some(i);
 
-        PoolPtr(i)
+        i
     }
     pub fn deallocate<S: Into<PoolPtr>>(&mut self, i: S) -> Option<T> {
-        let i = i.into().0;
-        let x = match mem::replace(&mut self.storage[i], ItEntry::Free(self.first_free)) {
+        let i = i.into();
+        let x = match mem::replace(&mut self.storage[i.get()], ItEntry::Free(self.first_free)) {
             ItEntry::Used(x, (next, prev)) => {
                 if next == i {
                     assert_eq!(self.first_used, Some(i));
@@ -303,8 +315,8 @@ impl<T> IterablePool<T> {
                     if self.first_used == Some(i) {
                         self.first_used = Some(next);
                     }
-                    self.storage[next].next_previous_used_index_mut().1 = prev;
-                    self.storage[prev].next_previous_used_index_mut().0 = next;
+                    self.storage[next.get()].next_previous_used_index_mut().1 = prev;
+                    self.storage[prev.get()].next_previous_used_index_mut().0 = next;
                 }
                 x
             }
@@ -314,10 +326,10 @@ impl<T> IterablePool<T> {
         Some(x)
     }
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
-        self.storage[fp.0].as_ref()
+        self.storage[fp.get()].as_ref()
     }
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
-        self.storage[fp.0].as_mut()
+        self.storage[fp.get()].as_mut()
     }
     pub fn iter(&self) -> Iter<T> {
         Iter {
@@ -365,7 +377,7 @@ impl<T> ops::IndexMut<PoolPtr> for IterablePool<T> {
 #[derive(Debug, Clone)]
 pub struct Iter<'a, T: 'a> {
     pool: &'a IterablePool<T>,
-    cur: Option<usize>,
+    cur: Option<PoolPtr>,
 }
 
 impl<'a, T: 'a> Iterator for Iter<'a, T> {
@@ -373,7 +385,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
-            let ref entry = self.pool.storage[cur];
+            let ref entry = self.pool.storage[cur.get()];
             self.cur = Some(entry.next_previous_used_index().0);
             if self.cur == self.pool.first_used {
                 // Reached the end
@@ -390,7 +402,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
 #[derive(Debug)]
 pub struct IterMut<'a, T: 'a> {
     pool: &'a mut IterablePool<T>,
-    cur: Option<usize>,
+    cur: Option<PoolPtr>,
 }
 
 impl<'a, T: 'a> Iterator for IterMut<'a, T> {
@@ -400,7 +412,7 @@ impl<'a, T: 'a> Iterator for IterMut<'a, T> {
         use std::mem::transmute;
         if let Some(cur) = self.cur {
             // extend the lifetime of the mutable reference
-            let entry: &mut ItEntry<_> = unsafe { transmute(&mut self.pool.storage[cur]) };
+            let entry: &mut ItEntry<_> = unsafe { transmute(&mut self.pool.storage[cur.get()]) };
             self.cur = Some(entry.next_previous_used_index().0);
             if self.cur == self.pool.first_used {
                 // Reached the end
