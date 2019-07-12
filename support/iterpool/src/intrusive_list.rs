@@ -1,7 +1,7 @@
 //! Intrusive doubly linked list for `Pool`s and `IterablePool`s.
 use std::mem::transmute;
 use std::ops;
-use PoolPtr;
+use crate::PoolPtr;
 
 /// Circualr linked list header.
 #[derive(Debug, Default, Copy, Clone)]
@@ -411,7 +411,7 @@ where
 
 #[test]
 fn basic_mut() {
-    use Pool;
+    use crate::Pool;
     let mut pool = Pool::new();
     let mut head = ListHead::new();
     let mut accessor = head.accessor_mut(&mut pool, |&mut (_, ref mut link)| link);
@@ -445,7 +445,7 @@ fn basic_mut() {
 
 #[test]
 fn drain() {
-    use Pool;
+    use crate::Pool;
     let mut pool = Pool::new();
     let mut head = ListHead::new();
     let mut accessor = head.accessor_mut(&mut pool, |&mut (_, ref mut link)| link);
@@ -467,7 +467,7 @@ fn drain() {
 
 #[test]
 fn basic() {
-    use Pool;
+    use crate::Pool;
     let mut pool = Pool::new();
     let mut head = ListHead::new();
     let (_, ptr2, ptr3) = {

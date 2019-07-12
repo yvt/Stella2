@@ -375,12 +375,12 @@ impl<T> ops::IndexMut<PoolPtr> for IterablePool<T> {
 
 /// An iterator over the elements of a `IterablePool`.
 #[derive(Debug, Clone)]
-pub struct Iter<'a, T: 'a> {
+pub struct Iter<'a, T> {
     pool: &'a IterablePool<T>,
     cur: Option<PoolPtr>,
 }
 
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
+impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -400,12 +400,12 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
 
 /// A mutable iterator over the elements of a `IterablePool`.
 #[derive(Debug)]
-pub struct IterMut<'a, T: 'a> {
+pub struct IterMut<'a, T> {
     pool: &'a mut IterablePool<T>,
     cur: Option<PoolPtr>,
 }
 
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
+impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
