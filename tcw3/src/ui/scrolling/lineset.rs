@@ -1001,6 +1001,14 @@ impl Lineset {
     /// thus some viewports have to be moved as well. To make this possible,
     /// this method calls `disp_cb.line_resized` whenever line groups are
     /// resized.
+    ///
+    /// A lineset is said to be *well-grouped* for a set of line coordinates `P`
+    /// after being `regroup`ed for a set of viewports covering `P`. If a
+    /// lineset is well-grouped for `P₁` before being `regroup`ed for `P₂`, the
+    /// regrouping process does not touch any lines touching `P₁ ∩ P₂`.
+    ///
+    /// Note that regrouping might shrink some line groups, even those
+    /// previously overlapping with `viewports`.
     pub fn regroup(
         &mut self,
         model: &dyn LinesetModel,
@@ -2118,7 +2126,37 @@ impl Lineset {
         }
     }
 
-    // TODO: query
+    /// Find a set of consecutive line groups included in the specified
+    /// viewport.
+    ///
+    /// Specifically, it returns an iterator producing `(line_size, num_lines)`,
+    /// the index range, and the line coordinate range.
+    ///
+    /// If the lineset is well-grouped for `vp`, the produced `num_lines` is
+    /// always `1`, thus every returned line group represents a single line.
+    pub fn range(
+        &self,
+        vp: Range<Size>,
+    ) -> (
+        impl Iterator<Item = (Size, Index)> + DoubleEndedIterator + '_,
+        Range<Index>,
+        Range<Size>,
+    ) {
+        use rope::{
+            range_by_key,
+            Edge::{Ceil, Floor},
+        };
+
+        let (iter, range) = self
+            .line_grs
+            .range(range_by_key(LineOff::pos, Floor(vp.start)..Ceil(vp.end)));
+
+        (
+            iter.map(|line_gr| (line_gr.size, line_gr.num_lines)),
+            range.start.index..range.end.index,
+            range.start.pos..range.end.pos,
+        )
+    }
 }
 
 fn vec_remove_range(v: &mut Vec<impl Clone>, range: Range<usize>) {
@@ -2451,6 +2489,14 @@ mod tests {
         }
     }
 
+    fn displace_vp(i: &mut Size, old_pos_range: &Range<Size>, new_pos_range: &Range<Size>) {
+        if old_pos_range.end <= *i {
+            *i += new_pos_range.end - old_pos_range.end;
+        } else if new_pos_range.end <= *i {
+            *i = new_pos_range.end;
+        }
+    }
+
     #[test]
     fn test_regroup_empty() {
         let mut lineset = Lineset::new();
@@ -2478,22 +2524,33 @@ mod tests {
             let vp = pos..pos + 1;
             println!("Regrouping using viewport = {:?}", vp);
 
-            lineset.regroup(
-                &TestModel,
-                &[vp],
-                &mut |range: Range<Index>,
-                      old_pos_range: Range<Size>,
-                      new_pos_range: Range<Size>| {
-                    dbg!((&range, &old_pos_range, &new_pos_range));
-                    expected_size += new_pos_range.end - new_pos_range.start;
-                    expected_size -= old_pos_range.end - old_pos_range.start;
-                },
-            );
+            let mut vp_displaced = vp.clone();
+
+            lineset.regroup(&TestModel, &[vp.clone()], &mut |range: Range<Index>,
+                                                             old_pos_range: Range<
+                Size,
+            >,
+                                                             new_pos_range: Range<
+                Size,
+            >| {
+                dbg!((&range, &old_pos_range, &new_pos_range));
+                expected_size += new_pos_range.end - new_pos_range.start;
+                expected_size -= old_pos_range.end - old_pos_range.start;
+                displace_vp(&mut vp_displaced.start, &old_pos_range, &new_pos_range);
+                displace_vp(&mut vp_displaced.end, &old_pos_range, &new_pos_range);
+            });
             dbg!(&lineset);
 
             lineset.validate();
             assert!(lineset.lod_grs.len() > 3); // we expect to see a few LOD groups
             assert_eq!(lineset.line_grs.offset_len().index, NUM_LINES);
+
+            let (lines_in_view, index_range, pos_range) = lineset.range(vp_displaced.clone());
+            dbg!((&vp_displaced, index_range, pos_range));
+            assert!(
+                { lines_in_view }.all(|(_size, num_lines)| num_lines == 1),
+                "found a non-precise line group in view"
+            );
         }
     }
 
@@ -2527,6 +2584,7 @@ mod tests {
 
             println!("Regrouping using viewports = {:?}", vps);
 
+            let mut vps_displaced = vps.clone();
             let mut expected_size = len;
 
             lineset.regroup(
@@ -2538,6 +2596,11 @@ mod tests {
                     dbg!((&range, &old_pos_range, &new_pos_range));
                     expected_size += new_pos_range.end - new_pos_range.start;
                     expected_size -= old_pos_range.end - old_pos_range.start;
+
+                    for vp in vps_displaced.iter_mut() {
+                        displace_vp(&mut vp.start, &old_pos_range, &new_pos_range);
+                        displace_vp(&mut vp.end, &old_pos_range, &new_pos_range);
+                    }
                 },
             );
             dbg!(&lineset);
@@ -2548,6 +2611,15 @@ mod tests {
 
             assert_eq!(lineset.line_grs.offset_len().index, NUM_LINES);
             assert_eq!(lineset.line_grs.offset_len().pos, expected_size);
+
+            for vp in vps_displaced.iter() {
+                let (lines_in_view, index_range, pos_range) = lineset.range(vp.clone());
+                dbg!((vp, index_range, pos_range));
+                assert!(
+                    { lines_in_view }.all(|(_size, num_lines)| num_lines == 1),
+                    "found a non-precise line group in view"
+                );
+            }
         }
 
         assert!(lineset.lod_grs.len() > 0);
