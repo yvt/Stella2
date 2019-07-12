@@ -18,6 +18,7 @@ rope = { path = "../support/rope" }
 svgbobdoc = "0.2"
 sorted_diff = { path = "../support/sorted_diff" }
 lazy_static = "1"
+itertools = "0.8.0"
 
 tcw3_images = { path = "images" }
 tcw3_pal = { path = "pal" }

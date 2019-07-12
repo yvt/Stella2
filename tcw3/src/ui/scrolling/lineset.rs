@@ -7,6 +7,7 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+mod debug;
 mod multiset;
 
 /// The type for representing line sizes and positions.
@@ -31,7 +32,7 @@ pub type Index = i64;
 /// (called *line group*), increasing in size as they get distant from the
 /// visible portion. Lines inside the visible portion are tracked at the full,
 /// per-line granularity.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Lineset {
     /// A list of line groups, each comprising of one or more lines.
     line_grs: Rope<LineGr, LineOff>,
