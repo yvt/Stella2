@@ -46,4 +46,5 @@ pub use self::types::{AlignFlags, Suspend, SuspendFlag, SuspendGuard};
 
 mod scrolling {
     mod lineset;
+    mod piecewise;
 }
