@@ -212,6 +212,11 @@ impl Lineset {
         }
     }
 
+    /// Get the number of lines in a lineset.
+    pub fn num_lines(&self) -> Index {
+        self.line_grs.offset_len().index
+    }
+
     /// Synchronize the structure after new lines are inserted to the underlying
     /// model (`LinesetModel`).
     ///
@@ -935,6 +940,8 @@ impl Lineset {
     /// so that the caller can make amendments to viewport positions.
     ///
     /// Non-zero LOD levels are ignored if `skip_approx == true`.
+    ///
+    /// TODO: What is the purpose of `skip_approx`?
     pub fn recalculate_size(
         &mut self,
         model: &dyn LinesetModel,

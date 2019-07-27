@@ -181,6 +181,14 @@ impl LineIdxMap {
         }
     }
 
+    pub fn renew(&mut self, range: Range<i64>) {
+        for line_idx in self.new_line_idx.iter_mut() {
+            if range.contains(line_idx) {
+                *line_idx = NONE;
+            }
+        }
+    }
+
     /// Construct an inverse map.
     ///
     /// The `i`-th element of the returned iterator tells the original list
@@ -376,6 +384,11 @@ mod tests {
                 insert(&mut rng, &mut model.rows, &mut row_line_idx_map, range);
                 let range = dbg!(rand_ins_range(&mut rng, model.cols.len() as i64));
                 insert(&mut rng, &mut model.cols, &mut col_line_idx_map, range);
+
+                let range = dbg!(rand_ins_range(&mut rng, model.rows.len() as i64));
+                row_line_idx_map.renew(range);
+                let range = dbg!(rand_ins_range(&mut rng, model.cols.len() as i64));
+                col_line_idx_map.renew(range);
 
                 // Choose a new viewport
                 model.row_vp = rand_rem_range(&mut rng, model.rows.len() as i64);

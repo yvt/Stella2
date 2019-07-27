@@ -19,6 +19,7 @@ pub mod views {
     mod label;
     mod spacer;
     pub mod split;
+    pub mod table;
     pub use self::{
         button::Button,
         label::Label,
@@ -45,7 +46,7 @@ mod types;
 pub use self::types::{AlignFlags, Suspend, SuspendFlag, SuspendGuard};
 
 mod scrolling {
-    mod lineset;
-    mod piecewise;
-    mod tableremap;
+    pub mod lineset;
+    pub mod piecewise;
+    pub mod tableremap;
 }
