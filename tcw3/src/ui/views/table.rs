@@ -241,6 +241,8 @@ pub trait TableModelEdit {
 
     /// Set a new `TableModelQuery` object.
     ///
+    /// See also: [`TableModelEditExt::set_model`].
+    ///
     /// This simply replaces the current `TableModelQuery` object, thus calling
     /// this method alone does not modify or remove any lines associated with
     /// the old `TableModelQuery`. The following example shows how to replace
@@ -257,14 +259,14 @@ pub trait TableModelEdit {
     ///     edit.remove(LineTy::Col, 0..old_model_cols);
     ///
     ///     // Swap the `TableModelQuery` object
-    ///     edit.set_model(Box::new(new_model));
+    ///     edit.set_model(new_model);
     ///
     ///     // Insert all rows from the new model
     ///     edit.insert(LineTy::Row, 0..new_model_rows);
     ///     edit.insert(LineTy::Col, 0..new_model_cols);
     ///     # }
     ///
-    fn set_model(&mut self, new_model: Box<dyn TableModelQuery>);
+    fn set_model_boxed(&mut self, new_model: Box<dyn TableModelQuery>);
 
     /// State that zero or more lines were inserted at the specified range.
     fn insert(&mut self, line_ty: LineTy, range: Range<u64>);
@@ -282,6 +284,14 @@ pub trait TableModelEdit {
 
 /// An extension trait for [`TableModelEdit`].
 pub trait TableModelEditExt: TableModelEdit {
+    /// Set a new `TableModelQuery` object.
+    ///
+    /// This wraps the given object with `Box` and passes it to
+    /// [`TableModelEdit::set_model_boxed`].
+    fn set_model(&mut self, new_model: impl TableModelQuery) {
+        self.set_model_boxed(Box::new(new_model))
+    }
+
     /// Downcast the result of `self.model_mut()`.
     ///
     ///     # use tcw3::ui::views::table::*;

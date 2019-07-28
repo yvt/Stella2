@@ -17,7 +17,7 @@ impl TableModelEdit for TableEdit<'_> {
         &mut *self.state.model_query
     }
 
-    fn set_model(&mut self, new_model: Box<dyn TableModelQuery>) {
+    fn set_model_boxed(&mut self, new_model: Box<dyn TableModelQuery>) {
         self.state.model_query = new_model;
     }
 
