@@ -1,8 +1,25 @@
 //! Implements the public interface of `TableEdit`.
+use std::cell::RefMut;
 use std::ops::Range;
 
-use super::{update::LinesetModelImpl, LineTy, TableEdit, TableModelEdit, TableModelQuery};
-use crate::ui::scrolling::lineset::{DispCb, Index, Size};
+use super::{update::LinesetModelImpl, LineTy, State, TableModelEdit, TableModelQuery};
+use crate::{
+    ui::scrolling::lineset::{DispCb, Index, Size},
+    uicore::HView,
+};
+
+/// A lock guard type for updating a [`Table`]'s internal representation of a
+/// table model.
+///
+/// This type is constructed by [`Table::edit`].
+///
+/// [`Table`]: super::Table
+/// [`Table::edit`]: super::Table::edit
+#[derive(Debug)]
+pub struct TableEdit<'a> {
+    pub(super) view: &'a HView,
+    pub(super) state: RefMut<'a, State>,
+}
 
 impl Drop for TableEdit<'_> {
     fn drop(&mut self) {

@@ -71,13 +71,7 @@
 //!
 use as_any::AsAny;
 use ndarray::Array2;
-use std::{
-    any::Any,
-    cell::{RefCell, RefMut},
-    fmt,
-    ops::Range,
-    rc::Rc,
-};
+use std::{any::Any, cell::RefCell, fmt, ops::Range, rc::Rc};
 
 use crate::ui::scrolling::{lineset::Lineset, tableremap::LineIdxMap};
 use crate::uicore::{HView, ViewFlags};
@@ -140,16 +134,6 @@ impl fmt::Debug for TableCell {
             .field("ctrler", &((&*self.ctrler) as *const _))
             .finish()
     }
-}
-
-/// A lock guard type for updating a [`Table`]'s internal representation of a
-/// table model.
-///
-/// This type is constructed by [`Table::edit`].
-#[derive(Debug)]
-pub struct TableEdit<'a> {
-    view: &'a HView,
-    state: RefMut<'a, State>,
 }
 
 /// A trait for objects that allow the consumer of a table model (usually
@@ -383,3 +367,5 @@ impl Table {
 mod edit;
 mod fixedpoint;
 mod update;
+
+pub use self::edit::TableEdit;
