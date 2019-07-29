@@ -338,7 +338,7 @@ impl Table {
         let inner = Rc::new(inner);
 
         let view = HView::new(ViewFlags::default());
-
+        view.set_listener(listener::TableViewListener::new(Rc::clone(&inner)));
         // TODO
 
         Self { view, inner }
@@ -366,6 +366,7 @@ impl Table {
 
 mod edit;
 mod fixedpoint;
+mod listener;
 mod update;
 
 pub use self::edit::TableEdit;
