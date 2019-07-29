@@ -73,12 +73,6 @@ impl HWnd {
     }
 
     fn update(&self) {
-        // Clear the flag
-        {
-            let dirty = &self.wnd.dirty;
-            dirty.set(dirty.get() - WndDirtyFlags::UPDATE);
-        }
-
         if self.wnd.closed.get() {
             return;
         }
@@ -96,6 +90,21 @@ impl HWnd {
         };
 
         let (new_size, min_size, max_size) = self.update_views();
+
+        // Clear the flag. Beyond this point, when `self.pend_update` is called,
+        // a fresh update request will be enqueued.
+        //
+        // `self.pend_update` is called if a layout requests replacement of
+        // layouts via `LayoutCtx::set_layout`. It's usually (i.e., if
+        // `HView::set_layout` is called outside the layout process) okay, but
+        // in this situation, we don't want a fresh update request to be
+        // enqueued because `update_views` is designed to detect such a
+        // situation by itself and restart the layout process. Thus, clearing
+        // `UPDATE` must happen after `update_views`.
+        {
+            let dirty = &self.wnd.dirty;
+            dirty.set(dirty.get() - WndDirtyFlags::UPDATE);
+        }
 
         // Update the window's attributes
         let mut attrs = pal::WndAttrs::default();
@@ -215,6 +224,17 @@ impl HWnd {
 
             // Layout: up phase
             view.update_subview_frames();
+
+            if view
+                .view
+                .dirty
+                .get()
+                .intersects(flags![ViewDirtyFlags::{SIZE_TRAITS | DESCENDANT_SIZE_TRAITS}])
+            {
+                // Some layout requested replacement of layouts.
+                // Restart the layout process.
+                continue;
+            }
 
             // Position views
             view.flush_position_event(self.wnd.wm);

@@ -29,7 +29,7 @@ pub trait Layout: AsAny {
     ///
     /// The returned value must be a function of `self` and `SizeTraits`s of
     /// subviews retrieved via `ctx`.
-    fn size_traits(&self, ctx: &LayoutCtx) -> SizeTraits;
+    fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits;
 
     /// Position the subviews of a layout.
     ///
@@ -199,7 +199,10 @@ impl HView {
         if dirty.get().intersects(ViewDirtyFlags::SIZE_TRAITS) {
             dirty.set(dirty.get() - ViewDirtyFlags::SIZE_TRAITS);
 
-            let new_size_traits = layout.size_traits(&LayoutCtx { active_view: self });
+            let new_size_traits = layout.size_traits(&LayoutCtx {
+                active_view: self,
+                new_layout: None,
+            });
 
             // See if `size_traits` has changed
             if new_size_traits != self.view.size_traits.get() {
@@ -216,6 +219,11 @@ impl HView {
     /// layouting algorithm.
     ///
     /// During the process, it sets `POSITION_EVENT` dirty bit as necessary.
+    ///
+    /// It's possible for a layout to assign a new layout by calling
+    /// `LayoutCtx::set_layout`. When this happens, relevant dirty flags are
+    /// set on ancestor views as if `HView::set_layout` is called as usual. The
+    /// caller must detect this kind of situation and take an appropriate action.
     pub(super) fn update_subview_frames(&self) {
         let dirty = &self.view.dirty;
         let layout = self.view.layout.borrow();
@@ -230,10 +238,18 @@ impl HView {
             // Invoke the `Layout` to reposition the subviews.
             // It'll call `set_subview_frame` and set `DESCENDANT_SUBVIEWS_FRAME`
             // on `self` and `SUBVIEWS_FRAME` on the subviews.
-            layout.arrange(
-                &mut LayoutCtx { active_view: self },
-                self.view.frame.get().size(),
-            );
+            let mut ctx = LayoutCtx {
+                active_view: self,
+                new_layout: None,
+            };
+            layout.arrange(&mut ctx, self.view.frame.get().size());
+
+            if let Some(new_layout) = ctx.new_layout.take() {
+                // The layout asked replacement of layouts.
+                drop(layout);
+                self.set_layout(new_layout);
+                return;
+            }
         }
 
         if dirty
@@ -367,6 +383,8 @@ impl HView {
 /// The context for [`Layout::arrange`] and [`Layout::size_traits`].
 pub struct LayoutCtx<'a> {
     active_view: &'a HView,
+    /// A new layout object, optionally set by `self.set_layout`.
+    new_layout: Option<Box<dyn Layout>>,
 }
 
 impl<'a> LayoutCtx<'a> {
@@ -406,5 +424,16 @@ impl<'a> LayoutCtx<'a> {
             Rc::downgrade(&self.active_view.view),
             "the view is not a subview"
         );
+    }
+
+    /// Replace the active view's layout object, restarting the layout process.
+    ///
+    /// This operation is only supported by `arrange`.
+    ///
+    /// If this method is called, the layout attempt of the active view is
+    /// considered invalid. Thus, setting the frames of subviews is no longer
+    /// necessary.
+    pub fn set_layout(&mut self, layout: impl Into<Box<dyn Layout>>) {
+        self.new_layout = Some(layout.into());
     }
 }
