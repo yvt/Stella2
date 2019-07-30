@@ -2175,6 +2175,58 @@ impl Lineset {
             range.start.pos..range.end.pos,
         )
     }
+
+    /// Check if the lineset is well-grouped for `vp_by_pos`. In addition,
+    /// returns the line index range `vp` encompasses.
+    pub fn is_well_grouped(&self, vp_by_pos: Range<Size>) -> (bool, Range<Index>) {
+        use rope::{
+            range_by_key,
+            Edge::{Ceil, Floor},
+        };
+
+        // Convert `Range<Size>` to `Range<Index>`. This might be
+        // overconservative if they cross large line groups, but that's okay.
+        let vp_by_idx = {
+            let (_, range) = self.line_grs.range(range_by_key(
+                LineOff::pos,
+                Floor(vp_by_pos.start)..Ceil(vp_by_pos.end),
+            ));
+
+            range.start.index..range.end.index
+        };
+
+        if vp_by_idx.start >= vp_by_idx.end {
+            // Always well-grouped for an empty set.
+            return (true, vp_by_idx);
+        }
+
+        let lod_gr1_i = match self
+            .lod_grs
+            .binary_search_by_key(&vp_by_idx.start, |g| g.index)
+        {
+            Ok(i) => i,
+            Err(i) => {
+                if vp_by_idx.start == self.num_lines() {
+                    i
+                } else {
+                    i - 1
+                }
+            }
+        };
+        let lod_gr2_i = match self
+            .lod_grs
+            .binary_search_by_key(&vp_by_idx.end, |g| g.index)
+        {
+            Ok(i) => i,
+            Err(i) => i,
+        };
+
+        let all_lod0 = self.lod_grs[lod_gr1_i..lod_gr2_i]
+            .iter()
+            .all(|gr| gr.lod == 0);
+
+        (all_lod0, vp_by_idx)
+    }
 }
 
 fn vec_remove_range(v: &mut Vec<impl Clone>, range: Range<usize>) {
@@ -2569,6 +2621,8 @@ mod tests {
                 { lines_in_view }.all(|(_size, num_lines)| num_lines == 1),
                 "found a non-precise line group in view"
             );
+
+            assert!(lineset.is_well_grouped(vp_displaced.clone()).0);
         }
     }
 
@@ -2637,6 +2691,8 @@ mod tests {
                     { lines_in_view }.all(|(_size, num_lines)| num_lines == 1),
                     "found a non-precise line group in view"
                 );
+
+                assert!(lineset.is_well_grouped(vp.clone()).0);
             }
         }
 
