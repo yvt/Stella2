@@ -75,7 +75,6 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
 
     fn new_layer(self, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
-    // FIXME: Maybe pass `LayerAttrs` by value to elide the costly copy?
     /// Set the attributes of a layer.
     ///
     /// The behavior is unspecified if the layer has already been removed.
