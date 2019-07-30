@@ -31,8 +31,12 @@ impl table::TableModelQuery for TableModelQuery {
         (label.view().clone(), Box::new(()))
     }
 
-    fn range_size(&mut self, _line_ty: LineTy, range: Range<u64>, _approx: bool) -> f64 {
-        (range.end - range.start) as f64 * 50.0
+    fn range_size(&mut self, line_ty: LineTy, range: Range<u64>, _approx: bool) -> f64 {
+        (range.end - range.start) as f64
+            * match line_ty {
+                LineTy::Row => 20.0,
+                LineTy::Col => 100.0,
+            }
     }
 }
 
