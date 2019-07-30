@@ -35,7 +35,7 @@ impl table::TableModelQuery for TableModelQuery {
         (range.end - range.start) as f64
             * match line_ty {
                 LineTy::Row => 20.0,
-                LineTy::Col => 100.0,
+                LineTy::Col => 200.0,
             }
     }
 }
@@ -59,7 +59,7 @@ fn main() {
     {
         let mut edit = table.edit().unwrap();
         edit.set_model(TableModelQuery { style_manager });
-        edit.insert(LineTy::Row, 0..500);
+        edit.insert(LineTy::Row, 0..500_000_000_000_000);
         edit.insert(LineTy::Col, 0..300);
     }
 
