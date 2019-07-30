@@ -25,6 +25,7 @@ pub mod views {
         label::Label,
         spacer::{new_spacer, Spacer},
         split::Split,
+        table::Table,
     };
 }
 
