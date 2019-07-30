@@ -11,10 +11,6 @@ pub fn fp_to_fix(x: f64) -> i64 {
     (x * FACTOR) as i64
 }
 
-pub fn fix_to_fp(x: i64) -> f64 {
-    x as f64 * (1.0 / FACTOR)
-}
-
 pub fn fix_to_f32(x: i64) -> f32 {
     x as f32 * (1.0 / FACTOR as f32)
 }
