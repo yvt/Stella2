@@ -70,6 +70,7 @@
 //! [`TableEdit`]: table::TableEdit
 //!
 use as_any::AsAny;
+use bitflags::bitflags;
 use cgmath::{Point2, Vector2};
 use ndarray::Array2;
 use std::{
@@ -80,7 +81,10 @@ use std::{
     rc::Rc,
 };
 
-use crate::ui::scrolling::{lineset::Lineset, tableremap::LineIdxMap};
+use crate::ui::scrolling::{
+    lineset::{Index, Lineset, Size},
+    tableremap::LineIdxMap,
+};
 use crate::uicore::{HView, SizeTraits, ViewFlags};
 
 /// A scrollable widget displaying subviews along imaginary table cells.
@@ -113,16 +117,21 @@ struct Inner {
     /// created.
     ///
     /// The size is represented in the fixed-point format.
-    size: Cell<Vector2<i64>>,
+    size: Cell<Vector2<Size>>,
 
     /// The size traits of the table view.
     size_traits: Cell<SizeTraits>,
 
     /// The line coordinates of the respective top/left edge of the viewport.
-    vp: [Cell<i64>; 2],
+    vp: [Cell<Size>; 2],
+
+    dirty: Cell<DirtyFlags>,
 }
 
+// TODO: scrolling
+
 /// A part of table view state data that is contained by `RefCell`.
+/// The remaining part is in `Inner`, on the contrary to what the name implies.
 struct State {
     model_query: Box<dyn TableModelQuery>,
     cells: Array2<TableCell>,
@@ -133,7 +142,7 @@ struct State {
     /// element in `cells_ranges` represents a range of lines for the
     /// corresponding (see `LineTy`) axis. E.g., `[0..4, 3..7]` means `cells`
     /// has cells from the 0–3rd rows.
-    cells_ranges: [Range<i64>; 2],
+    cells_ranges: [Range<Index>; 2],
 
     /// Used during remapping (the change of the range represented by `cells`).
     /// Logically it only lives during each run of remapping, but is stored
@@ -156,6 +165,18 @@ impl fmt::Debug for State {
             .field("line_idx_maps", &self.line_idx_maps)
             .field("linesets", &self.linesets)
             .finish()
+    }
+}
+
+bitflags! {
+    struct DirtyFlags: u8 {
+        /// Indicates that the new values for `cells` and `cells_ranges` must be
+        /// calculated based on the up-to-date `linesets` and viewport.
+        const CELLS = 1 << 0;
+
+        /// Indicates that the layout of the view is out-dated and must be
+        /// replaced with a new layout.
+        const LAYOUT = 1 << 1;
     }
 }
 
@@ -387,13 +408,17 @@ impl Table {
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),
             vp: [Cell::new(0), Cell::new(0)],
+            dirty: Cell::new(DirtyFlags::empty()),
         };
 
         let inner = Rc::new(inner);
 
         let view = HView::new(ViewFlags::default() | ViewFlags::LAYER_GROUP);
         view.set_listener(listener::TableViewListener::new(Rc::clone(&inner)));
-        view.set_layout(update::TableLayout::from_current_state(Rc::clone(&inner)));
+        view.set_layout(update::TableLayout::from_current_state(
+            Rc::clone(&inner),
+            &inner.state.borrow(),
+        ));
 
         Self { view, inner }
     }
@@ -419,16 +444,18 @@ impl Table {
         Ok(TableEdit {
             view: &self.view,
             state,
+            inner: &self.inner,
         })
     }
 
     /// Set new size traits.
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
     pub fn set_size_traits(&self, value: SizeTraits) {
         self.inner.size_traits.set(value);
-        self.view
-            .set_layout(update::TableLayout::from_current_state(Rc::clone(
-                &self.inner,
-            )));
+        self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
+        Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
     }
 }
 

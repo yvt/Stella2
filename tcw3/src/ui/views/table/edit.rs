@@ -1,8 +1,9 @@
 //! Implements the public interface of `TableEdit`.
-use std::cell::RefMut;
-use std::ops::Range;
+use std::{cell::RefMut, ops::Range, rc::Rc};
 
-use super::{update::LinesetModelImpl, LineTy, State, TableModelEdit, TableModelQuery};
+use super::{
+    update::LinesetModelImpl, DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery,
+};
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
     uicore::HView,
@@ -18,14 +19,16 @@ use crate::{
 #[derive(Debug)]
 pub struct TableEdit<'a> {
     pub(super) view: &'a HView,
+    pub(super) inner: &'a Rc<Inner>,
     pub(super) state: RefMut<'a, State>,
 }
 
 impl Drop for TableEdit<'_> {
     fn drop(&mut self) {
-        // TODO: Remap `cells` using `line_idx_maps`, etc.
-        // TODO: Add and check a dirty flag for each `LineIdxMap`
-        // TODO: Update the view's layout
+        // Process pending updates and clear dirty flags, which might have been
+        // set by editing operations
+        self.inner.update_cells(&mut self.state);
+        Inner::update_layout_if_needed(&self.inner, &self.state, self.view);
     }
 }
 
@@ -61,8 +64,14 @@ impl TableModelEdit for TableEdit<'_> {
         let lineset_model = LinesetModelImpl::new(&mut *state.model_query, line_ty);
         let pos_range = lineset.insert(&lineset_model, range).unwrap();
 
-        // TODO: update viewports using `pos_range`
-        let _ = pos_range;
+        // Apply the displacement policy
+        self.inner.adjust_vp_for_line_resizing(
+            line_ty,
+            pos_range.start..pos_range.start,
+            pos_range.clone(),
+        );
+
+        self.inner.set_dirty_flags(DirtyFlags::CELLS);
     }
 
     fn remove(&mut self, line_ty: LineTy, range: Range<u64>) {
@@ -88,8 +97,14 @@ impl TableModelEdit for TableEdit<'_> {
         let lineset_model = LinesetModelImpl::new(&mut *state.model_query, line_ty);
         let pos_range = lineset.remove(&lineset_model, range).unwrap();
 
-        // TODO: update viewports using `pos_range`
-        let _ = pos_range;
+        // Apply the displacement policy
+        self.inner.adjust_vp_for_line_resizing(
+            line_ty,
+            pos_range.clone(),
+            pos_range.start..pos_range.start,
+        );
+
+        self.inner.set_dirty_flags(DirtyFlags::CELLS);
     }
 
     fn resize(&mut self, line_ty: LineTy, range: Range<u64>) {
@@ -109,21 +124,31 @@ impl TableModelEdit for TableEdit<'_> {
             return;
         }
 
-        struct DispCbImpl {}
+        struct DispCbImpl<'a> {
+            line_ty: LineTy,
+            inner: &'a Inner,
+        }
 
-        impl DispCb for DispCbImpl {
+        impl DispCb for DispCbImpl<'_> {
             fn line_resized(
                 &mut self,
                 _range: Range<Index>,
-                _old_pos: Range<Size>,
-                _new_pos: Range<Size>,
+                old_pos: Range<Size>,
+                new_pos: Range<Size>,
             ) {
-                // TODO: update viewports
+                // Apply the displacement policy
+                self.inner
+                    .adjust_vp_for_line_resizing(self.line_ty, old_pos, new_pos);
+
+                self.inner.set_dirty_flags(DirtyFlags::CELLS);
             }
         }
 
         let lineset_model = LinesetModelImpl::new(&mut *state.model_query, line_ty);
-        let mut disp_cb = DispCbImpl {};
+        let mut disp_cb = DispCbImpl {
+            line_ty,
+            inner: self.inner,
+        };
         let skip_approx = false;
         lineset.recalculate_size(&lineset_model, range, skip_approx, &mut disp_cb);
     }
@@ -147,5 +172,7 @@ impl TableModelEdit for TableEdit<'_> {
         }
 
         line_idx_maps.renew(range);
+
+        self.inner.set_dirty_flags(DirtyFlags::CELLS);
     }
 }

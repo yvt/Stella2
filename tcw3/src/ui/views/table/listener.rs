@@ -46,18 +46,17 @@ impl ViewListener for TableViewListener {
 
     fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
-        let layer = layer.as_ref().unwrap();
+        let layer = layer.as_ref().expect("not mounted");
+
+        let mut new_attrs = pal::LayerAttrs {
+            bounds: Some(view.global_frame()),
+            ..Default::default()
+        };
 
         if let Some(sublayers) = ctx.sublayers().take() {
-            wm.set_layer_attr(
-                &layer,
-                pal::LayerAttrs {
-                    bounds: Some(view.global_frame()),
-                    sublayers: Some(sublayers),
-                    ..Default::default()
-                },
-            );
+            new_attrs.sublayers = Some(sublayers);
         }
+        wm.set_layer_attr(&layer, new_attrs);
 
         if ctx.layers().len() != 1 {
             ctx.set_layers(vec![(*layer).clone()]);

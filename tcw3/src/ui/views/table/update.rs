@@ -2,16 +2,188 @@ use arrayvec::ArrayVec;
 use cggeom::{prelude::*, Box2};
 use cgmath::{Point2, Vector2};
 use ndarray::Array2;
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{
+    cell::RefCell,
+    cmp::{max, min},
+    mem::replace,
+    ops::Range,
+    rc::Rc,
+};
 
 use super::{
     fixedpoint::{fix_to_f32, fp_to_fix},
-    Inner, LineTy, TableModelQuery,
+    DirtyFlags, Inner, LineTy, State, TableCell, TableModelQuery,
 };
 use crate::{
-    ui::scrolling::lineset::{Index, LinesetModel, Size},
+    ui::scrolling::{
+        lineset::{DispCb, Index, LinesetModel, Size},
+        tableremap::shuffle2d,
+    },
     uicore::{HView, Layout, LayoutCtx, SizeTraits},
 };
+
+impl Inner {
+    /// Adjust viewports after some lines are resized.
+    ///
+    /// This is where the so-called displacement policy is implemented.
+    /// TODO: provide means to customize the displacement policy.
+    ///
+    /// Does not update dirty flags.
+    pub(super) fn adjust_vp_for_line_resizing(
+        &self,
+        line_ty: LineTy,
+        old_pos: Range<Size>,
+        new_pos: Range<Size>,
+    ) {
+        debug_assert!(old_pos.start == new_pos.start);
+
+        let size = *line_ty.vec_get(&self.size.get());
+
+        let vp_cell = &self.vp[line_ty.i()];
+        let mut vp = vp_cell.get();
+
+        // Fix the right/bottom edge
+        let bottom = vp_cell.get() + size;
+
+        if old_pos.end <= bottom {
+            let diff = new_pos.end - old_pos.end;
+            vp = max(0, vp + diff);
+        } else if old_pos.start < bottom {
+            // The resized line set includes the right/bottom edge. Move the
+            // viewport so that resizing won't reveal the next line.
+            vp = max(0, min(vp, new_pos.end - size));
+        }
+
+        vp_cell.set(vp);
+    }
+
+    /// An utility function for updating `self.dirty`.
+    pub(super) fn set_dirty_flags(&self, new_flags: DirtyFlags) {
+        self.dirty.set(self.dirty.get() | new_flags);
+    }
+
+    /// Update `State::cells`, clearing the dirty flag `CELLS`. Might set
+    /// the dirty flag `LAYOUT`.
+    pub(super) fn update_cells(&self, state: &mut State) {
+        if !self.dirty.get().contains(DirtyFlags::CELLS) {
+            return;
+        }
+        self.dirty.set(self.dirty.get() - DirtyFlags::CELLS);
+        self.dirty.set(self.dirty.get() | DirtyFlags::LAYOUT);
+
+        // Regroup line groups. This makes sure every line group in the viewport
+        // correspond to a single line.
+        for &ty in &[LineTy::Row, LineTy::Col] {
+            let size = *ty.vec_get(&self.size.get());
+            let vp_cell = &self.vp[ty.i()];
+            let lineset = &mut state.linesets[ty.i()];
+
+            // Regrouping might shrink some line groups. A set of line groups
+            // that covered the viewport might no longer after regrouping. If
+            // this happens, we try regrouping again.
+            loop {
+                // Bound the viewport offset first
+                let max_vp = lineset.total_size() - size;
+                vp_cell.set(max(0, min(vp_cell.get(), max_vp)));
+
+                // Calculate the viewport range
+                let vp_start = vp_cell.get();
+                let vp = vp_start..vp_start + size;
+
+                struct DispCbImpl<'a> {
+                    line_ty: LineTy,
+                    inner: &'a Inner,
+                }
+
+                impl DispCb for DispCbImpl<'_> {
+                    fn line_resized(
+                        &mut self,
+                        _range: Range<Index>,
+                        old_pos: Range<Size>,
+                        new_pos: Range<Size>,
+                    ) {
+                        // Apply the displacement policy
+                        self.inner
+                            .adjust_vp_for_line_resizing(self.line_ty, old_pos, new_pos);
+                    }
+                }
+
+                let lineset_model = LinesetModelImpl::new(&mut *state.model_query, ty);
+                let mut disp_cb = DispCbImpl {
+                    line_ty: ty,
+                    inner: self,
+                };
+
+                lineset.regroup(&lineset_model, &[vp.clone()], &mut disp_cb);
+
+                if lineset.is_well_grouped(vp.clone()).0 {
+                    break;
+                }
+            }
+        }
+
+        // Calculate the range of visible lines
+        let mut new_cells_ranges = [0..0, 0..0];
+        for &ty in &[LineTy::Row, LineTy::Col] {
+            let size = *ty.vec_get(&self.size.get());
+
+            let vp_cell = &self.vp[ty.i()];
+            let vp_start = vp_cell.get();
+            let vp_end = vp_start + size;
+
+            let (_line_grs, line_grs_range_idx, _line_grs_range_pos) =
+                state.linesets[ty.i()].range(vp_start..vp_end);
+
+            new_cells_ranges[ty.i()] = line_grs_range_idx;
+        }
+
+        // Remap `cells` using the new `cells_ranges`.
+        //
+        // We do not wish to re-create `cells` from scratch. We should be able
+        // to simply move elements from the old `cells` for table cells that
+        // remained on the screen. This is where `line_idx_maps` comes in.
+        // See `tableremap`'s module documentation for details.
+        let model_query = &mut state.model_query;
+        let new_cells = shuffle2d(
+            state.cells.view_mut(),
+            state.line_idx_maps[0].invert(new_cells_ranges[0].clone()),
+            state.line_idx_maps[1].invert(new_cells_ranges[1].clone()),
+            // Map function (for existing cells)
+            |old_cell: &mut TableCell| TableCell {
+                view: old_cell.view.clone(),
+                ctrler: replace(&mut old_cell.ctrler, Box::new(())),
+            },
+            // Factory function (for new cells)
+            |[row, col]| {
+                let row = row as u64 + new_cells_ranges[0].start as u64;
+                let col = col as u64 + new_cells_ranges[1].start as u64;
+                let (view, ctrler) = model_query.new_view([row, col]);
+                TableCell { view, ctrler }
+            },
+        );
+
+        state.cells = new_cells;
+        state.cells_ranges = new_cells_ranges;
+
+        // Reset `line_idx_maps`.
+        for (line_idx_map, cells_range) in state
+            .line_idx_maps
+            .iter_mut()
+            .zip(state.cells_ranges.iter())
+        {
+            line_idx_map.set_identity(cells_range.clone());
+        }
+    }
+
+    pub(super) fn update_layout_if_needed(this: &Rc<Inner>, state: &State, view: &HView) {
+        if !this.dirty.get().contains(DirtyFlags::LAYOUT) {
+            return;
+        }
+        this.dirty.set(this.dirty.get() - DirtyFlags::LAYOUT);
+
+        view.set_layout(TableLayout::from_current_state(Rc::clone(&this), state));
+    }
+}
 
 /// Exposes `TableModelQuery` as a `LinesetModel`.
 pub(super) struct LinesetModelImpl<'a> {
@@ -74,10 +246,21 @@ impl Layout for TableLayout {
         let fix_size = size.cast::<f64>().unwrap().map(fp_to_fix);
         if fix_size != self.inner.size.get() {
             self.inner.size.set(fix_size);
-            // TODO: do the recalculation thingy
+
+            self.inner.set_dirty_flags(DirtyFlags::CELLS);
+            self.inner.update_cells(&mut self.inner.state.borrow_mut());
+
+            // The `LAYOUT` dirty flag can be cleared here because
+            // we'll replace layouts this instant
+            self.inner
+                .dirty
+                .set(self.inner.dirty.get() - DirtyFlags::LAYOUT);
 
             // Set a new layout, restarting the layout process
-            ctx.set_layout(Self::from_current_state(Rc::clone(&self.inner)));
+            ctx.set_layout(Self::from_current_state(
+                Rc::clone(&self.inner),
+                &self.inner.state.borrow(),
+            ));
             return;
         }
 
@@ -113,12 +296,8 @@ impl TableLayout {
     /// Construct a `TableLayout` based on the current state of a table view.
     /// The constructed `TableLayout` might recreate itself as the view varies
     /// in its size. That's why it needs a `Rc<Inner>`.
-    ///
-    /// `inner.state` must not have a mutable borrow at the point of the
-    /// function call.
-    pub(super) fn from_current_state(inner: Rc<Inner>) -> Self {
+    pub(super) fn from_current_state(inner: Rc<Inner>, state: &State) -> Self {
         // TODO: Assert `line_idx_maps` is an identity transform
-        let state = inner.state.borrow();
 
         // Get coordinates of the lines
         let pos_lists: ArrayVec<[_; 2]> = [LineTy::Row, LineTy::Col]
