@@ -391,7 +391,7 @@ impl Table {
 
         let inner = Rc::new(inner);
 
-        let view = HView::new(ViewFlags::default());
+        let view = HView::new(ViewFlags::default() | ViewFlags::LAYER_GROUP);
         view.set_listener(listener::TableViewListener::new(Rc::clone(&inner)));
         view.set_layout(update::TableLayout::from_current_state(Rc::clone(&inner)));
 
