@@ -398,6 +398,11 @@ impl Table {
         Self { view, inner }
     }
 
+    /// Get a handle to the view representing the widget.
+    pub fn view(&self) -> &HView {
+        &self.view
+    }
+
     /// Attempt to acquire a lock to update the table model.
     ///
     /// Locking fails if there is another agent accessing the table model. For
