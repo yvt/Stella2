@@ -20,10 +20,10 @@
 //! done to `LineIdxMap`. We can change the viewport as we wish. After that,
 //! we call `LineIdxMap::inverse` to create a mapping from new indices to old
 //! indices, which we pass to `shuffle2d` to create the desired `Array2`.
-use ndarray::{s, Array2, ArrayView2};
+use ndarray::{s, Array2, ArrayViewMut2};
 use std::{iter::FusedIterator, ops::Range};
 
-/// Construct a `Array2` by shuffling an existing `ArrayView2`.
+/// Construct a `Array2` by shuffling an existing `ArrayViewMut2`.
 ///
 /// Let `row_src_indices[i]` and `col_src_indices[i]` be the `i`-th element
 /// of `row_src_indices` and `col_src_indices`, respectively. The element
@@ -34,10 +34,10 @@ use std::{iter::FusedIterator, ops::Range};
 /// `row_src_indices` and `col_src_indices` are usually created by
 /// `LineIdxMap::inverse()`.
 pub fn shuffle2d<S, D>(
-    src: ArrayView2<'_, S>,
+    mut src: ArrayViewMut2<'_, S>,
     row_src_indices: impl Iterator<Item = usize> + ExactSizeIterator + Clone,
     col_src_indices: impl Iterator<Item = usize> + ExactSizeIterator + Clone,
-    mut map: impl FnMut(&S) -> D,
+    mut map: impl FnMut(&mut S) -> D,
     mut new: impl FnMut([usize; 2]) -> D,
 ) -> Array2<D> {
     let num_rows = row_src_indices.len();
@@ -49,15 +49,15 @@ pub fn shuffle2d<S, D>(
         if row_src >= src.dim().0 {
             cells.extend((0..num_cols).map(|i| new([row_dst, i])));
         } else {
-            let row_src = src.slice(s![row_src, ..]);
-            let row_src = row_src.as_slice().unwrap();
+            let mut row_src = src.slice_mut(s![row_src, ..]);
+            let row_src = row_src.as_slice_mut().unwrap();
 
             let col_src_indices = col_src_indices.clone();
             for (col_dst, col_src) in col_src_indices.take(num_cols).enumerate() {
                 if col_src >= row_src.len() {
                     cells.push(new([row_dst, col_dst]));
                 } else {
-                    cells.push(map(&row_src[col_src]));
+                    cells.push(map(&mut row_src[col_src]));
                 }
             }
         }
@@ -400,11 +400,11 @@ mod tests {
                 dbg!(&table);
 
                 table = shuffle2d(
-                    { table }.view(),
+                    { table }.view_mut(),
                     row_line_idx_map.invert(model.row_vp.clone()),
                     col_line_idx_map.invert(model.col_vp.clone()),
                     // Just copy old elements
-                    |&x| x,
+                    |&mut x| x,
                     // The cells which were present in the original `table` are
                     // recalculated from the model
                     |[row, col]| model.cell_in_vp(row, col),
