@@ -1064,7 +1064,13 @@ impl Lineset {
                 .binary_search_by_key(&vp_by_idx.start, |g| g.index)
             {
                 Ok(i) => i,
-                Err(i) => i - 1,
+                Err(i) => {
+                    if vp_by_idx.start == self.num_lines() {
+                        i
+                    } else {
+                        i - 1
+                    }
+                }
             };
             let lod_gr2_i = match self
                 .lod_grs
