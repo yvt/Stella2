@@ -6,12 +6,12 @@ impl HView {
     pub(super) fn call_pending_mount_if_dirty(&self, wm: WM, hwnd: &HWnd) {
         let dirty = &self.view.dirty;
 
-        if !dirty.get().contains(ViewDirtyFlags::MOUNT) {
-            return;
-        }
-        dirty.set(dirty.get() - ViewDirtyFlags::MOUNT);
-
         if dirty.get().contains(ViewDirtyFlags::MOUNTED) {
+            if !dirty.get().contains(ViewDirtyFlags::MOUNT) {
+                return;
+            }
+            dirty.set(dirty.get() - ViewDirtyFlags::MOUNT);
+
             // This view is mounted, but some of the subviews might not be.
             for subview in self.view.layout.borrow().subviews().iter() {
                 subview.call_pending_mount_if_dirty(wm, hwnd);
