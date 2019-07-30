@@ -116,8 +116,6 @@ impl HLayer {
     fn handle_pending_deletion(&self, layer_pool:&Pool<Layer>, wm: WM, deletion_queue: &mut Vec<HLayer>) {
         let this_layer: &Layer = &layer_pool[self.ptr];
 
-        debug_assert!(this_layer.superlayer.get().is_none());
-
         if !this_layer.pending_deletion.get() {
             return;
         }
