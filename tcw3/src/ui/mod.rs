@@ -51,3 +51,8 @@ mod scrolling {
     pub mod piecewise;
     pub mod tableremap;
 }
+
+/// Re-exports some traits from the `ui` module.
+pub mod prelude {
+    pub use super::views::table::{TableModelEdit, TableModelEditExt};
+}
