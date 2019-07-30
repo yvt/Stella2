@@ -70,11 +70,18 @@
 //! [`TableEdit`]: table::TableEdit
 //!
 use as_any::AsAny;
+use cgmath::{Point2, Vector2};
 use ndarray::Array2;
-use std::{any::Any, cell::RefCell, fmt, ops::Range, rc::Rc};
+use std::{
+    any::Any,
+    cell::{Cell, RefCell},
+    fmt,
+    ops::Range,
+    rc::Rc,
+};
 
 use crate::ui::scrolling::{lineset::Lineset, tableremap::LineIdxMap};
-use crate::uicore::{HView, ViewFlags};
+use crate::uicore::{HView, SizeTraits, ViewFlags};
 
 /// A scrollable widget displaying subviews along imaginary table cells.
 ///
@@ -85,18 +92,48 @@ pub struct Table {
     inner: Rc<Inner>,
 }
 
-/// A 0-based two-dimensional index `[row, column]` specifying a single cell in
-/// a table.
+/// A 0-based two-dimensional index `[row, column]` (or `[y, x]`) specifying a
+/// single cell in a table.
 pub type CellIdx = [u64; 2];
 
+/// The underlying data of a table view.
 #[derive(Debug)]
 struct Inner {
     state: RefCell<State>,
+
+    /// The widget size.
+    ///
+    /// Basically, `uicore` only tells the actual size to `Layout`. But to
+    /// determine which lines are visible, we need to know the size.
+    /// The solution is to store the last known size in `size`. When the
+    /// `Layout::arrange` is called, it compares the actual size against the
+    /// size stored in `size`. If they don't match, the curreent `Layout` is
+    /// no longer valid. Thus, `size` is updated with the up-to-date value,
+    /// new visible line sets are calculated, and a brand new `Layout` is
+    /// created.
+    ///
+    /// The size is represented in the fixed-point format.
+    size: Cell<Vector2<i64>>,
+
+    /// The size traits of the table view.
+    size_traits: Cell<SizeTraits>,
+
+    /// The line coordinates of the respective top/left edge of the viewport.
+    vp: [Cell<i64>; 2],
 }
 
+/// A part of table view state data that is contained by `RefCell`.
 struct State {
     model_query: Box<dyn TableModelQuery>,
     cells: Array2<TableCell>,
+
+    /// Ranges of lines represented by `cells`.
+    ///
+    /// `cells` represents a rectangular region in the line index space. Each
+    /// element in `cells_ranges` represents a range of lines for the
+    /// corresponding (see `LineTy`) axis. E.g., `[0..4, 3..7]` means `cells`
+    /// has cells from the 0–3rd rows.
+    cells_ranges: [Range<i64>; 2],
 
     /// Used during remapping (the change of the range represented by `cells`).
     /// Logically it only lives during each run of remapping, but is stored
@@ -311,6 +348,8 @@ impl std::error::Error for EditLockError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineTy {
+    // TODO: Transpose the axes? They are confusing because they are the opposite
+    //       of `Vector2`
     Row = 0,
     Col = 1,
 }
@@ -321,6 +360,17 @@ impl LineTy {
     fn i(self) -> usize {
         self as usize
     }
+
+    /// Select and get a reference to an element of `Vector2` based on `LineTy`.
+    fn vec_get<T>(self, v: &Vector2<T>) -> &T {
+        &v[1 - self as usize]
+    }
+
+    /// Select and get a mutable reference to an element of `Point2` based on
+    /// `LineTy`.
+    fn point_get_mut<T>(self, v: &mut Point2<T>) -> &mut T {
+        &mut v[1 - self as usize]
+    }
 }
 
 impl Table {
@@ -330,16 +380,20 @@ impl Table {
             state: RefCell::new(State {
                 model_query: Box::new(()),
                 cells: Array2::from_shape_fn((0, 0), |_| unreachable!()),
+                cells_ranges: [0..0, 0..0],
                 line_idx_maps: [LineIdxMap::new(0..0), LineIdxMap::new(0..0)],
                 linesets: [Lineset::new(), Lineset::new()],
             }),
+            size: Cell::new(Vector2::new(0, 0)),
+            size_traits: Cell::new(SizeTraits::default()),
+            vp: [Cell::new(0), Cell::new(0)],
         };
 
         let inner = Rc::new(inner);
 
         let view = HView::new(ViewFlags::default());
         view.set_listener(listener::TableViewListener::new(Rc::clone(&inner)));
-        // TODO
+        view.set_layout(update::TableLayout::from_current_state(Rc::clone(&inner)));
 
         Self { view, inner }
     }
@@ -361,6 +415,15 @@ impl Table {
             view: &self.view,
             state,
         })
+    }
+
+    /// Set new size traits.
+    pub fn set_size_traits(&self, value: SizeTraits) {
+        self.inner.size_traits.set(value);
+        self.view
+            .set_layout(update::TableLayout::from_current_state(Rc::clone(
+                &self.inner,
+            )));
     }
 }
 

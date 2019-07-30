@@ -6,6 +6,7 @@ edition = "2018"
 license = "MIT"
 
 [dependencies]
+arrayvec = "0.4.10"
 cgmath = "0.17.0"
 bitflags = "1.1.0"
 cggeom = { path = "../support/cggeom" }
