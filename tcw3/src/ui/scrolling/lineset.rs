@@ -217,6 +217,11 @@ impl Lineset {
         self.line_grs.offset_len().index
     }
 
+    /// Get the total size of lines in a lineset.
+    pub fn total_size(&self) -> Size {
+        self.line_grs.offset_len().pos
+    }
+
     /// Synchronize the structure after new lines are inserted to the underlying
     /// model (`LinesetModel`).
     ///
