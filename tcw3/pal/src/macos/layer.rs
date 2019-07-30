@@ -20,6 +20,8 @@ use super::{
 
 static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>, WM> = MtSticky::new(RefCell::new(Pool::new()));
 
+static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>, WM> = MtSticky::new(RefCell::new(Vec::new()));
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     /// The pointer to a `Layer` in `LAYER_POOL`.
@@ -50,6 +52,11 @@ struct Layer {
     /// Thus, it's based on the reverse mapping of
     /// `attrs_diff.sublayers.unwrap_or(sublayers)`.
     superlayer: Cell<Option<HLayer>>,
+
+    /// `true` if `remove` was called, but the layer can't be deleted because
+    /// `superlayer` is not `None`. It'll be deleted when its detached from the
+    /// superlayer.
+    pending_deletion: Cell<bool>,
 }
 
 impl Layer {
@@ -67,6 +74,7 @@ impl Layer {
             sublayers: RefCell::new(Vec::new()),
             needs_update: Cell::new(false),
             superlayer: Cell::new(None),
+            pending_deletion: Cell::new(false),
         }
     }
 }
@@ -81,7 +89,51 @@ impl HLayer {
     }
 
     pub(super) fn remove(&self, wm: WM) {
-        LAYER_POOL.get_with_wm(wm).borrow_mut().deallocate(self.ptr);
+        let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
+
+        let this_layer: &Layer = &layer_pool[self.ptr];
+
+        this_layer.pending_deletion.set(true);
+
+        if this_layer.superlayer.get().is_none() {
+            // We can delete the layer immediately if it doesn't
+            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
+            debug_assert!(deletion_queue.is_empty());
+
+            self.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
+
+            for hlayer in deletion_queue.drain(..) {
+                layer_pool.deallocate(hlayer.ptr);
+            }
+        }
+    }
+
+    /// Delete the layer if `pending_deletion == true`. This might cause cascade
+    /// deletion for sublayers with `pending_deletion.get() == true`
+    ///
+    /// The method doesn't actually do the deletion - it just adds the layers to
+    /// be deleted to `deletion_queue`.
+    fn handle_pending_deletion(&self, layer_pool:&Pool<Layer>, wm: WM, deletion_queue: &mut Vec<HLayer>) {
+        let this_layer: &Layer = &layer_pool[self.ptr];
+
+        debug_assert!(this_layer.superlayer.get().is_none());
+
+        if !this_layer.pending_deletion.get() {
+            return;
+        }
+
+        deletion_queue.push(*self);
+
+        let attrs_diff = this_layer.attrs_diff.borrow();
+        let committed_sublayers = this_layer.sublayers.borrow();
+        let sublayers = attrs_diff
+            .sublayers
+            .as_ref()
+            .unwrap_or(&*committed_sublayers);
+
+        for hlayer in sublayers.iter() {
+            hlayer.handle_pending_deletion(layer_pool, wm, &mut *deletion_queue);
+        }
     }
 
     pub(super) fn set_attrs(&self, wm: WM, attrs: LayerAttrs) {
@@ -99,9 +151,14 @@ impl HLayer {
                 .sublayers
                 .as_ref()
                 .unwrap_or(&*committed_sublayers);
+
+            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
+            debug_assert!(deletion_queue.is_empty());
+
             for hlayer in sublayers.iter() {
                 debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(*self));
                 layer_pool[hlayer.ptr].superlayer.set(None);
+                hlayer.handle_pending_deletion(&layer_pool,wm,  &mut deletion_queue);
             }
         }
 
@@ -135,6 +192,15 @@ impl HLayer {
                 } else {
                     break;
                 }
+            }
+        }
+
+        // Flush deferred layer deletion
+        if update_sublayers {
+            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
+
+            for hlayer in deletion_queue.drain(..) {
+                layer_pool.deallocate(hlayer.ptr);
             }
         }
     }

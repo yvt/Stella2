@@ -79,6 +79,11 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     ///
     /// The behavior is unspecified if the layer has already been removed.
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>);
+    /// Delete a layer.
+    ///
+    /// If the layer has a superlayer, the deletion will be postponed until it's
+    /// removed from the superlayer or the superlayer is deleted. Thus, it's
+    /// safe to call this method for a layer still in use.
     fn remove_layer(self, layer: &Self::HLayer);
 }
 
