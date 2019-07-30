@@ -35,20 +35,29 @@ impl HWnd {
             return;
         }
 
-        let mut attrs = pal::WndAttrs {
-            listener: Some(Box::new(PalWndListener {
-                wnd: Rc::downgrade(&self.wnd),
-            })),
-            ..Default::default()
-        };
-        let dirty = &self.wnd.dirty;
+        let mut attrs = Default::default();
         let style_attrs = self.wnd.style_attrs.borrow();
-
+        let dirty = &self.wnd.dirty;
         style_attrs.transfer_to_pal(dirty.get(), &mut attrs);
         dirty.set(dirty.get() - WndDirtyFlags::style());
 
         let pal_wnd = self.wnd.wm.new_wnd(attrs);
         *pal_wnd_cell = Some(pal_wnd);
+
+        drop(pal_wnd_cell);
+
+        // Set the listener after creating the window. The listener's methods
+        // expect `pal_wnd` to be borrowable.
+        let pal_wnd_cell = self.wnd.pal_wnd.borrow();
+        self.wnd.wm.set_wnd_attr(
+            pal_wnd_cell.as_ref().unwrap(),
+            pal::WndAttrs {
+                listener: Some(Box::new(PalWndListener {
+                    wnd: Rc::downgrade(&self.wnd),
+                })),
+                ..Default::default()
+            },
+        )
     }
 
     /// Pend an update.
