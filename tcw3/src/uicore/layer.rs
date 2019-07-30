@@ -6,9 +6,7 @@ use crate::pal::{self, WM};
 
 impl HView {
     pub(super) fn view_with_containing_layer(&self) -> Option<HView> {
-        let mut view_or_not = (self.view.superview.borrow())
-            .view()
-            .and_then(|weak| weak.upgrade());
+        let mut view_or_not = Some(self.view.clone());
         while let Some(view) = view_or_not {
             if view.flags.get().contains(ViewFlags::LAYER_GROUP) {
                 return Some(HView { view });
