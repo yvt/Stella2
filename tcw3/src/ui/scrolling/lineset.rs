@@ -1069,7 +1069,7 @@ impl Lineset {
                 Err(i) => i,
             };
 
-            // Do we have to do this?
+            // Do we have to process these LOD groups?
             let skip = self.lod_grs[lod_gr1_i..lod_gr2_i]
                 .iter()
                 .all(|gr| gr.lod <= 1);
