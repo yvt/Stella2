@@ -1,7 +1,7 @@
 //! Fixed-point arithmetics for line size calculation.
 //!
 //! Line sizes use fixed-point numbers to prevent floating-point error
-//! accumulation during the operation of a lineset This module provides
+//! accumulation during the operation of a lineset. This module provides
 //! functions for conversion between fixed-point numbers (used by `Lineset`) and
 //! floating-point numbers (used by `Table`'s public interface).
 
