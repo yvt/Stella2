@@ -120,10 +120,12 @@ impl<T> FreezableCell<T> {
 }
 
 impl<'a, T> FreezableCellRef<'a, T> {
-    pub fn freeze(this: Self) {
+    pub fn freeze(this: Self) -> &'a T {
         use std::mem::forget;
         this.0.state.store(STATE_FROZEN, Ordering::Release);
+        let ptr = this.0.data.get();
         forget(this);
+        unsafe { &*ptr }
     }
 }
 
