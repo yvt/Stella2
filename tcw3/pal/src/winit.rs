@@ -10,19 +10,21 @@ use fragile::Fragile;
 use once_cell::sync::OnceCell;
 use std::{
     cell::{Cell, RefCell},
+    collections::LinkedList,
     ptr::NonNull,
+    sync::Mutex,
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
 use super::{iface::WM, MtSticky};
-
-// TODO
 
 /// The user event type.
 type UserEvent = Box<dyn FnOnce(&'static WinitWm) + Send>;
 
 pub struct WinitEnv<TWM: WM> {
     mt: OnceCell<MtData<TWM>>,
+    /// Invoke events which were created before `mt` is initialized.
+    pending_invoke_events: OnceCell<Mutex<Vec<UserEvent>>>,
 }
 
 /// Things bound to the main thread.
@@ -43,12 +45,14 @@ pub struct WinitWm {
     /// of `run`. It's a reference supplied to the event handler function that
     /// only lives through a single iteration of the main event loop.
     event_loop_wnd_target: Cell<Option<NonNull<EventLoopWindowTarget<UserEvent>>>>,
+    unsend_invoke_events: RefCell<LinkedList<Box<dyn FnOnce(&'static WinitWm)>>>,
 }
 
 impl<TWM: WM> WinitEnv<TWM> {
     pub const fn new() -> Self {
         Self {
             mt: OnceCell::new(),
+            pending_invoke_events: OnceCell::new(),
         }
     }
 
@@ -65,6 +69,13 @@ impl<TWM: WM> WinitEnv<TWM> {
     }
 
     fn mt_data_or_init(&self) -> &MtData<TWM> {
+        self.mt.get().unwrap_or_else(|| self.mt_data_or_init_slow())
+    }
+
+    #[cold]
+    fn mt_data_or_init_slow(&self) -> &MtData<TWM> {
+        let mut lock = None;
+
         self.mt.get_or_init(|| {
             // Mark the current thread as the main thread
             let mt_check = Fragile::new(());
@@ -73,9 +84,24 @@ impl<TWM: WM> WinitEnv<TWM> {
             let mut winit_wm = WinitWm::new();
             let proxy = winit_wm.create_proxy();
 
+            // Acquire a lock on `pending_invoke_events` to process pending
+            // events.
+            let mut pending_invoke_events = self
+                .pending_invoke_events
+                .get_or_init(Default::default)
+                .lock()
+                .unwrap();
+
+            Self::handle_pending_invoke_events(&mut pending_invoke_events, &proxy);
+
+            // The lock must survive until `self.mt` is initialized. Otherwise,
+            // we might miss some events, which would be stuck in
+            // `pending_invoke_events` that we would never check again.
+            lock = Some(pending_invoke_events);
+
             MtData {
                 mt_check,
-                // We define the current thread as the main thread, so this
+                // *We* define the current thread as the main thread, so this
                 // should be safe
                 wm: unsafe { MtSticky::new_unchecked(winit_wm) },
                 proxy,
@@ -92,7 +118,43 @@ impl<TWM: WM> WinitEnv<TWM> {
         &'static self,
         cb: impl FnOnce(&'static WinitWm) + Send + 'static,
     ) {
-        unimplemented!()
+        let e: UserEvent = Box::new(cb);
+
+        if let Some(mt) = self.mt.get() {
+            let _ = mt.proxy.send_event(e);
+            return;
+        }
+
+        self.invoke_on_main_thread_slow(e)
+    }
+
+    #[cold]
+    fn invoke_on_main_thread_slow(&self, e: UserEvent) {
+        // `EventLoop` might not be there yet, so push the event to
+        // the ephemeral queue we manage
+        let mut pending_invoke_events = self
+            .pending_invoke_events
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap();
+        pending_invoke_events.push(e);
+
+        // Check `mt` again. It might have been initialized while we were
+        // updating `pending_invoke_events`.
+        if let Some(mt) = self.mt.get() {
+            Self::handle_pending_invoke_events(&mut pending_invoke_events, &mt.proxy);
+        }
+    }
+
+    #[cold]
+    fn handle_pending_invoke_events(
+        pending_invoke_events: &mut Vec<UserEvent>,
+        proxy: &EventLoopProxy<UserEvent>,
+    ) {
+        for e in std::mem::replace(pending_invoke_events, Vec::new()) {
+            // Ignore `EventLoopClosed`
+            let _ = proxy.send_event(e);
+        }
     }
 }
 
@@ -102,6 +164,7 @@ impl WinitWm {
             event_loop: RefCell::new(Some(EventLoop::new_user_event())),
             should_terminate: Cell::new(false),
             event_loop_wnd_target: Cell::new(None),
+            unsend_invoke_events: RefCell::new(LinkedList::new()),
         }
     }
 
@@ -131,9 +194,14 @@ impl WinitWm {
                 .set(Some(NonNull::from(event_loop_wnd_target)));
             let _guard = Guard(&self.event_loop_wnd_target);
 
+            match event {
+                _ => {}
+            }
             // TODO
 
-            // TODO: Move `event_loop_wnd_target`
+            while let Some(e) = self.unsend_invoke_events.borrow_mut().pop_front() {
+                e(self);
+            }
 
             if self.should_terminate.get() {
                 *control_flow = ControlFlow::Exit;
@@ -183,6 +251,8 @@ impl WinitWm {
     }
 
     pub fn invoke(&'static self, cb: impl FnOnce(&'static WinitWm) + 'static) {
-        unimplemented!()
+        self.unsend_invoke_events
+            .borrow_mut()
+            .push_back(Box::new(cb));
     }
 }
