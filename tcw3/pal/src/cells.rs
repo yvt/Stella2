@@ -53,7 +53,7 @@ impl<T: 'static, TWM: WMTrait> MtSticky<T, TWM> {
 
     /// Construct a `MtSticky` with compile-time thread checking.
     #[inline]
-    pub fn with_wm(_: WM, x: T) -> Self {
+    pub fn with_wm(_: TWM, x: T) -> Self {
         unsafe { Self::new_unchecked(x) }
     }
 
@@ -65,7 +65,7 @@ impl<T: 'static, TWM: WMTrait> MtSticky<T, TWM> {
 
     /// Take the inner value with run-time thread checking.
     #[inline]
-    pub fn into_inner(self, _: WM) -> T {
+    pub fn into_inner(self, _: TWM) -> T {
         let inner = unsafe { self.cell.get().read() };
         std::mem::forget(self);
         inner
@@ -91,13 +91,13 @@ impl<T: 'static, TWM: WMTrait> MtSticky<T, TWM> {
 
     /// Get a reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_with_wm(&self, _: WM) -> &T {
+    pub fn get_with_wm(&self, _: TWM) -> &T {
         unsafe { &*self.get_ptr() }
     }
 
     /// Get a mutable reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_mut_with_wm(&mut self, _: WM) -> &mut T {
+    pub fn get_mut_with_wm(&mut self, _: TWM) -> &mut T {
         unsafe { &mut *self.get_ptr() }
     }
 }
@@ -112,7 +112,7 @@ impl<T: 'static, TWM: WMTrait> Drop for MtSticky<T, TWM> {
             // in the main thread, and we are sending it back to the main
             // thread.
             let cell = AssertSend(unsafe { self.cell.get().read() });
-            WM::invoke_on_main_thread(move |_| {
+            TWM::invoke_on_main_thread(move |_| {
                 drop(cell);
             });
         }
