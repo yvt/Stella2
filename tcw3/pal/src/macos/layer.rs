@@ -113,7 +113,12 @@ impl HLayer {
     ///
     /// The method doesn't actually do the deletion - it just adds the layers to
     /// be deleted to `deletion_queue`.
-    fn handle_pending_deletion(&self, layer_pool:&Pool<Layer>, wm: WM, deletion_queue: &mut Vec<HLayer>) {
+    fn handle_pending_deletion(
+        &self,
+        layer_pool: &Pool<Layer>,
+        wm: WM,
+        deletion_queue: &mut Vec<HLayer>,
+    ) {
         let this_layer: &Layer = &layer_pool[self.ptr];
 
         if !this_layer.pending_deletion.get() {
@@ -156,7 +161,7 @@ impl HLayer {
             for hlayer in sublayers.iter() {
                 debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(*self));
                 layer_pool[hlayer.ptr].superlayer.set(None);
-                hlayer.handle_pending_deletion(&layer_pool,wm,  &mut deletion_queue);
+                hlayer.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
             }
         }
 
