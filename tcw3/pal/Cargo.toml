@@ -13,8 +13,8 @@ cfg-if = "0.1.7"
 cggeom = { path = "../../support/cggeom" }
 cgmath = "0.17.0"
 fragile = "0.3.0"
-freeze = { path = "../../support/freeze" }
 iterpool = { path = "../../support/iterpool" }
+once_cell = { version = "0.2.4", default-features = false }
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"

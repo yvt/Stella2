@@ -7,7 +7,7 @@
 //! module, but should implement window content rendering by themselves by
 //! invoking their respective platform APIs.
 use fragile::Fragile;
-use freeze::{FreezableCell, FreezableCellRef};
+use once_cell::sync::OnceCell;
 use std::{
     cell::{Cell, RefCell},
     ptr::NonNull,
@@ -22,11 +22,14 @@ use super::{iface::WM, MtSticky};
 type UserEvent = Box<dyn FnOnce(&'static WinitWm) + Send>;
 
 pub struct WinitEnv<TWM: WM> {
-    mt_check: FreezableCell<Option<Fragile<()>>>,
-    wm_and_proxy: FreezableCell<Option<WmAndProxy<TWM>>>,
+    mt: OnceCell<MtData<TWM>>,
 }
 
-struct WmAndProxy<TWM: WM> {
+/// Things bound to the main thread.
+struct MtData<TWM: WM> {
+    /// `Fragile`'s content is only accessible to the initializing thread. We
+    /// leverage this property to implement `is_main_thread`.
+    mt_check: Fragile<()>,
     wm: MtSticky<WinitWm, TWM>,
     proxy: EventLoopProxy<UserEvent>,
 }
@@ -45,9 +48,7 @@ pub struct WinitWm {
 impl<TWM: WM> WinitEnv<TWM> {
     pub const fn new() -> Self {
         Self {
-            mt_check: FreezableCell::new_unfrozen(None),
-            // It's safe to send `None` even if `Some(x)` isn't sendable
-            wm_and_proxy: FreezableCell::new_unfrozen(None),
+            mt: OnceCell::new(),
         }
     }
 
@@ -55,70 +56,36 @@ impl<TWM: WM> WinitEnv<TWM> {
     /// marked as the main thread yet, *mark the current thread as one*,
     /// returning `true`.
     ///
-    /// Panics on a race condition (e.g., when multiple threads call this at
-    /// the same time).
-    ///
-    /// Assuming `TWM` uses this method to implement `WM::is_main_thread`, this
+    /// `TWM` should use this method to implement `WM::is_main_thread`. This
     /// is the canonical source of a predicate defining what is the main
     /// thread and what is not.
     #[inline]
     pub fn is_main_thread(&self) -> bool {
-        if let Ok(Some(fragile)) = self.mt_check.frozen_borrow() {
-            // Some thread is already registered as the main thread. The
-            // contained `Fragile` is bound to that thread.
-            return fragile.try_get().is_ok();
-        }
-
-        // Mark the current thread as the main thread.
-        self.mark_main_thread()
+        self.mt_data_or_init().mt_check.try_get().is_ok()
     }
 
-    #[cold]
-    fn mark_main_thread(&self) -> bool {
-        let mut lock = self
-            .mt_check
-            .unfrozen_borrow_mut()
-            .expect("race condition detected");
+    fn mt_data_or_init(&self) -> &MtData<TWM> {
+        self.mt.get_or_init(|| {
+            // Mark the current thread as the main thread
+            let mt_check = Fragile::new(());
 
-        debug_assert!(lock.is_none());
-        *lock = Some(Fragile::new(()));
+            // Create a winit event loop
+            let mut winit_wm = WinitWm::new();
+            let proxy = winit_wm.create_proxy();
 
-        FreezableCellRef::freeze(lock);
-
-        // A return value of `is_main_thread`. By returning it here, we enable
-        // the tail call optimization for `in_main_thread`.
-        true
+            MtData {
+                mt_check,
+                // We define the current thread as the main thread, so this
+                // should be safe
+                wm: unsafe { MtSticky::new_unchecked(winit_wm) },
+                proxy,
+            }
+        })
     }
 
     #[inline]
     pub fn wm_with_wm(&'static self, wm: TWM) -> &WinitWm {
-        if let Ok(Some(wm_and_proxy)) = self.wm_and_proxy.frozen_borrow() {
-            wm_and_proxy.wm.get_with_wm(wm)
-        } else {
-            self.wm_with_wm_slow(wm)
-        }
-    }
-
-    #[cold]
-    fn wm_with_wm_slow(&'static self, wm: TWM) -> &WinitWm {
-        // This is not supposed to fail unless `WinitWm::new()` calls this
-        // method recursively
-        let mut lock = self.wm_and_proxy.unfrozen_borrow_mut().unwrap();
-
-        debug_assert!(lock.is_none());
-
-        let mut winit_wm = WinitWm::new();
-        let proxy = winit_wm.create_proxy();
-        *lock = Some(WmAndProxy {
-            wm: MtSticky::with_wm(wm, winit_wm),
-            proxy,
-        });
-
-        FreezableCellRef::freeze(lock)
-            .as_ref()
-            .unwrap()
-            .wm
-            .get_with_wm(wm)
+        self.mt_data_or_init().wm.get_with_wm(wm)
     }
 
     pub fn invoke_on_main_thread(
