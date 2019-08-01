@@ -29,7 +29,7 @@ pub mod prelude {
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-pub mod winit;
+mod winit;
 
 /// The type aliases for the current target platform.
 pub mod native {
