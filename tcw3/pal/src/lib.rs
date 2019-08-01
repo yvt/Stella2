@@ -25,8 +25,11 @@ pub mod prelude {
 //       of images doesn't match that of the display. This overhead can be
 //       addressed by assigning a correct profile on images.
 
+// TODO: Maybe rewrite `macos` to use `winit`
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+pub mod winit;
 
 /// The type aliases for the current target platform.
 pub mod native {

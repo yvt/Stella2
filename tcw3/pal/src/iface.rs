@@ -14,6 +14,10 @@ use std::{borrow::Cow, fmt::Debug};
 
 pub type RGBAF32 = RGBA<f32>;
 
+// FIXME: winit will be the primary (but not only) target, but our API isn't a
+//        perfect fit. This is because the API was originally built around
+//        Cocoa (macOS's system API). It's perfectly okay to modify it.
+
 pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// A window handle type.
     type HWnd: Debug + Clone;

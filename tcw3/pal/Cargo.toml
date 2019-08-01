@@ -12,10 +12,13 @@ bitflags = "1.1.0"
 cfg-if = "0.1.7"
 cggeom = { path = "../../support/cggeom" }
 cgmath = "0.17.0"
+fragile = "0.3.0"
+freeze = { path = "../../support/freeze" }
 iterpool = { path = "../../support/iterpool" }
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
+winit = "0.20.0-alpha2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.18.4"
