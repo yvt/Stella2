@@ -21,7 +21,7 @@ unsafe impl<T: 'static, TWM: WMTrait> Sync for MtSticky<T, TWM> {}
 
 impl<T: 'static + fmt::Debug, TWM: WMTrait> fmt::Debug for MtSticky<T, TWM> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Ok(wm) = WM::try_global() {
+        if let Ok(wm) = TWM::try_global() {
             f.debug_tuple("MtSticky")
                 .field(self.get_with_wm(wm))
                 .finish()
