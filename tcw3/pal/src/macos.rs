@@ -106,12 +106,14 @@ impl iface::WM for WM {
 
     #[cfg(feature = "macos_winit")]
     fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {
-        WINIT_ENV.invoke_on_main_thread(move |_| f(unsafe { WM::global_unchecked() }));
+        WINIT_ENV.invoke_on_main_thread(move |winit_wm| f(winit_wm.wm()));
     }
 
     #[cfg(feature = "macos_winit")]
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
-        WINIT_ENV.wm_with_wm(self).invoke(move |_| f(self));
+        WINIT_ENV
+            .wm_with_wm(self)
+            .invoke(move |winit_wm| f(winit_wm.wm()));
     }
 
     #[cfg(feature = "macos_winit")]

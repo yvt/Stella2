@@ -19,12 +19,12 @@ use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowT
 use super::{iface::WM, MtSticky};
 
 /// The user event type.
-type UserEvent = Box<dyn FnOnce(&'static WinitWm) + Send>;
+type UserEvent<TWM> = Box<dyn FnOnce(&'static WinitWm<TWM>) + Send>;
 
 pub struct WinitEnv<TWM: WM> {
     mt: OnceCell<MtData<TWM>>,
     /// Invoke events which were created before `mt` is initialized.
-    pending_invoke_events: OnceCell<Mutex<Vec<UserEvent>>>,
+    pending_invoke_events: OnceCell<Mutex<Vec<UserEvent<TWM>>>>,
 }
 
 /// Things bound to the main thread.
@@ -32,20 +32,21 @@ struct MtData<TWM: WM> {
     /// `Fragile`'s content is only accessible to the initializing thread. We
     /// leverage this property to implement `is_main_thread`.
     mt_check: Fragile<()>,
-    wm: MtSticky<WinitWm, TWM>,
-    proxy: EventLoopProxy<UserEvent>,
+    wm: MtSticky<WinitWm<TWM>, TWM>,
+    proxy: EventLoopProxy<UserEvent<TWM>>,
 }
 
-pub struct WinitWm {
+pub struct WinitWm<TWM: WM> {
+    wm: TWM,
     /// This `EventLoop` is wrapped by `RefCell` so that it can be moved out when
     /// starting the main event loop.
-    event_loop: RefCell<Option<EventLoop<UserEvent>>>,
+    event_loop: RefCell<Option<EventLoop<UserEvent<TWM>>>>,
     should_terminate: Cell<bool>,
     /// This is a handle used to create `winit::window::Window` from the inside
     /// of `run`. It's a reference supplied to the event handler function that
     /// only lives through a single iteration of the main event loop.
-    event_loop_wnd_target: Cell<Option<NonNull<EventLoopWindowTarget<UserEvent>>>>,
-    unsend_invoke_events: RefCell<LinkedList<Box<dyn FnOnce(&'static WinitWm)>>>,
+    event_loop_wnd_target: Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM>>>>>,
+    unsend_invoke_events: RefCell<LinkedList<Box<dyn FnOnce(&'static WinitWm<TWM>)>>>,
 }
 
 impl<TWM: WM> WinitEnv<TWM> {
@@ -80,8 +81,12 @@ impl<TWM: WM> WinitEnv<TWM> {
             // Mark the current thread as the main thread
             let mt_check = Fragile::new(());
 
+            // *We* define the current thread as the main thread, so this
+            // should be safe
+            let wm = unsafe { TWM::global_unchecked() };
+
             // Create a winit event loop
-            let mut winit_wm = WinitWm::new();
+            let mut winit_wm = WinitWm::new(wm);
             let proxy = winit_wm.create_proxy();
 
             // Acquire a lock on `pending_invoke_events` to process pending
@@ -103,22 +108,22 @@ impl<TWM: WM> WinitEnv<TWM> {
                 mt_check,
                 // *We* define the current thread as the main thread, so this
                 // should be safe
-                wm: unsafe { MtSticky::new_unchecked(winit_wm) },
+                wm: MtSticky::with_wm(wm, winit_wm),
                 proxy,
             }
         })
     }
 
     #[inline]
-    pub fn wm_with_wm(&'static self, wm: TWM) -> &WinitWm {
+    pub fn wm_with_wm(&'static self, wm: TWM) -> &WinitWm<TWM> {
         self.mt_data_or_init().wm.get_with_wm(wm)
     }
 
     pub fn invoke_on_main_thread(
         &'static self,
-        cb: impl FnOnce(&'static WinitWm) + Send + 'static,
+        cb: impl FnOnce(&'static WinitWm<TWM>) + Send + 'static,
     ) {
-        let e: UserEvent = Box::new(cb);
+        let e: UserEvent<TWM> = Box::new(cb);
 
         if let Some(mt) = self.mt.get() {
             let _ = mt.proxy.send_event(e);
@@ -129,7 +134,7 @@ impl<TWM: WM> WinitEnv<TWM> {
     }
 
     #[cold]
-    fn invoke_on_main_thread_slow(&self, e: UserEvent) {
+    fn invoke_on_main_thread_slow(&self, e: UserEvent<TWM>) {
         // `EventLoop` might not be there yet, so push the event to
         // the ephemeral queue we manage
         let mut pending_invoke_events = self
@@ -148,8 +153,8 @@ impl<TWM: WM> WinitEnv<TWM> {
 
     #[cold]
     fn handle_pending_invoke_events(
-        pending_invoke_events: &mut Vec<UserEvent>,
-        proxy: &EventLoopProxy<UserEvent>,
+        pending_invoke_events: &mut Vec<UserEvent<TWM>>,
+        proxy: &EventLoopProxy<UserEvent<TWM>>,
     ) {
         for e in std::mem::replace(pending_invoke_events, Vec::new()) {
             // Ignore `EventLoopClosed`
@@ -158,9 +163,10 @@ impl<TWM: WM> WinitEnv<TWM> {
     }
 }
 
-impl WinitWm {
-    pub fn new() -> Self {
+impl<TWM: WM> WinitWm<TWM> {
+    pub fn new(wm: TWM) -> Self {
         Self {
+            wm,
             event_loop: RefCell::new(Some(EventLoop::new_user_event())),
             should_terminate: Cell::new(false),
             event_loop_wnd_target: Cell::new(None),
@@ -168,7 +174,11 @@ impl WinitWm {
         }
     }
 
-    fn create_proxy(&mut self) -> EventLoopProxy<UserEvent> {
+    pub fn wm(&self) -> TWM {
+        self.wm
+    }
+
+    fn create_proxy(&mut self) -> EventLoopProxy<UserEvent<TWM>> {
         self.event_loop.get_mut().as_ref().unwrap().create_proxy()
     }
 
@@ -178,9 +188,9 @@ impl WinitWm {
             .replace(None)
             .expect("can't call enter_main_loop twice");
 
-        struct Guard<'a>(&'a Cell<Option<NonNull<EventLoopWindowTarget<UserEvent>>>>);
+        struct Guard<'a, TWM: WM>(&'a Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM>>>>>);
 
-        impl Drop for Guard<'_> {
+        impl<TWM: WM> Drop for Guard<'_, TWM> {
             fn drop(&mut self) {
                 self.0.set(None);
             }
@@ -222,7 +232,7 @@ impl WinitWm {
     /// must not call `enter_main_loop`.
     fn with_event_loop_wnd_target<R>(
         &self,
-        f: impl FnOnce(&EventLoopWindowTarget<UserEvent>) -> R,
+        f: impl FnOnce(&EventLoopWindowTarget<UserEvent<TWM>>) -> R,
     ) -> R {
         let target;
         let borrow;
@@ -250,7 +260,7 @@ impl WinitWm {
         f(target)
     }
 
-    pub fn invoke(&'static self, cb: impl FnOnce(&'static WinitWm) + 'static) {
+    pub fn invoke(&'static self, cb: impl FnOnce(&'static WinitWm<TWM>) + 'static) {
         self.unsend_invoke_events
             .borrow_mut()
             .push_back(Box::new(cb));
