@@ -5,6 +5,15 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 license = "MIT"
 
+[features]
+default = ["macos_winit"]
+
+# This flag enables the use of `winit` in the macOS backend for creating
+# windows and handling input events. Whether this should be default or not is
+# yet to be determined. After it's decided, this feature flag probably should be
+# remove.
+macos_winit = ["winit"]
+
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
 array = "0.0.1"
@@ -18,7 +27,7 @@ once_cell = { version = "0.2.4", default-features = false }
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
-winit = "0.20.0-alpha2"
+winit = { version = "0.20.0-alpha2", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.18.4"
