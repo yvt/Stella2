@@ -1,4 +1,5 @@
 //! The backend for macOS, Cocoa, and Core Graphics.
+use cfg_if::cfg_if;
 use cocoa::{
     appkit,
     appkit::{NSApplication, NSApplicationActivationPolicy},
@@ -14,12 +15,24 @@ mod drawutils;
 mod layer;
 mod text;
 mod utils;
-mod window;
 pub use self::bitmap::{Bitmap, BitmapBuilder};
 pub use self::layer::HLayer;
 pub use self::text::{CharStyle, TextLayout};
-use self::utils::{is_main_thread, IdRef};
-pub use self::window::HWnd;
+
+cfg_if! {
+    if #[cfg(feature = "macos_winit")] {
+        mod winitwindow;
+        pub use self::winitwindow::HWnd;
+
+        use super::winit::WinitEnv;
+        static WINIT_ENV: WinitEnv<WM> = WinitEnv::new();
+    } else {
+        mod window;
+        pub use self::window::HWnd;
+
+        use self::utils::{is_main_thread, IdRef};
+    }
+}
 
 /// Provides an access to the window system.
 ///
@@ -42,14 +55,17 @@ impl iface::WM for WM {
         }
     }
 
+    #[cfg(not(feature = "macos_winit"))]
     fn is_main_thread() -> bool {
         is_main_thread()
     }
 
+    #[cfg(not(feature = "macos_winit"))]
     fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {
         dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
     }
 
+    #[cfg(not(feature = "macos_winit"))]
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
         // Give `Send` uncondionally because we don't `Send` actually
         // (we are already on the main thread)
@@ -63,6 +79,7 @@ impl iface::WM for WM {
         });
     }
 
+    #[cfg(not(feature = "macos_winit"))]
     fn enter_main_loop(self) {
         unsafe {
             let app = appkit::NSApp();
@@ -74,11 +91,37 @@ impl iface::WM for WM {
         }
     }
 
+    #[cfg(not(feature = "macos_winit"))]
     fn terminate(self) {
         unsafe {
             let app = appkit::NSApp();
             let () = msg_send![app, terminate: nil];
         }
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn is_main_thread() -> bool {
+        WINIT_ENV.is_main_thread()
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {
+        WINIT_ENV.invoke_on_main_thread(move |_| f(unsafe { WM::global_unchecked() }));
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn invoke(self, f: impl FnOnce(Self) + 'static) {
+        WINIT_ENV.wm_with_wm(self).invoke(move |_| f(self));
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn enter_main_loop(self) {
+        WINIT_ENV.wm_with_wm(self).enter_main_loop();
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn terminate(self) {
+        WINIT_ENV.wm_with_wm(self).terminate();
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {

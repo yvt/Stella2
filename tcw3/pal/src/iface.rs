@@ -44,6 +44,11 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
         }
     }
 
+    /// Check if the calling thread is the main thread or not.
+    ///
+    /// On some backends, the first thread calling this method is registered as
+    /// the main thread. On other backends, the first thread created in the
+    /// process is always recognized as the main thread.
     fn is_main_thread() -> bool;
 
     /// Enqueue a call to the specified function on the main thread. The calling
