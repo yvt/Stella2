@@ -18,6 +18,9 @@ pub type RGBAF32 = RGBA<f32>;
 //        perfect fit. This is because the API was originally built around
 //        Cocoa (macOS's system API). It's perfectly okay to modify it.
 
+/// A trait for window managers.
+///
+/// All methods are reentrant with some exceptions.
 pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// A window handle type.
     type HWnd: Debug + Clone;
@@ -58,16 +61,31 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// Enqueue a call to the specified function on the main thread.
     fn invoke(self, f: impl FnOnce(Self) + 'static);
 
+    /// Enter the main loop. This method will never return.
+    ///
+    /// It's not allowed to call this method from a `WndListener`.
     fn enter_main_loop(self);
+
+    /// Quit the application gracefully.
     fn terminate(self);
 
+    /// Create a layer.
     fn new_wnd(self, attrs: WndAttrs<'_, Self, Self::HLayer>) -> Self::HWnd;
 
     /// Set the attributes of a window.
     ///
-    /// Panics if the window has already been closed.
+    /// Panics if the window has already been closed. Also, it's not allowed to
+    /// replace a window's `WndListener` while a method of the current one is
+    /// currently being called.
     fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_, Self, Self::HLayer>);
+
+    /// Destroy a window.
+    ///
+    /// The window will be closed as soon as possible (if not immediately).
+    /// `WndListener::close_requested` is not called. All system resources
+    /// associated with the window will be released.
     fn remove_wnd(self, window: &Self::HWnd);
+
     /// Update a window's contents.
     ///
     /// Calling this method requests that the contents of a window is updated
@@ -75,19 +93,23 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// possible. Conversely, all attribute updates may be deferred until this
     /// method is called.
     fn update_wnd(self, window: &Self::HWnd);
+
     /// Get the size of a window's content region.
     fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2];
+
     /// Get the DPI scaling factor of a window.
     fn get_wnd_dpi_scale(self, _window: &Self::HWnd) -> f32 {
         1.0
     }
 
+    /// Create a layer.
     fn new_layer(self, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
     /// Set the attributes of a layer.
     ///
     /// The behavior is unspecified if the layer has already been removed.
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>);
+
     /// Delete a layer.
     ///
     /// If the layer has a superlayer, the deletion will be postponed until it's
