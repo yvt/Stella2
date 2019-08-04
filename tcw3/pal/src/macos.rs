@@ -80,7 +80,7 @@ impl iface::WM for WM {
     }
 
     #[cfg(not(feature = "macos_winit"))]
-    fn enter_main_loop(self) {
+    fn enter_main_loop(self) -> ! {
         unsafe {
             let app = appkit::NSApp();
             app.setActivationPolicy_(
@@ -89,6 +89,8 @@ impl iface::WM for WM {
             app.finishLaunching();
             app.run();
         }
+
+        std::process::exit(0);
     }
 
     #[cfg(not(feature = "macos_winit"))]
@@ -117,7 +119,7 @@ impl iface::WM for WM {
     }
 
     #[cfg(feature = "macos_winit")]
-    fn enter_main_loop(self) {
+    fn enter_main_loop(self) -> ! {
         WINIT_ENV.wm_with_wm(self).enter_main_loop();
     }
 

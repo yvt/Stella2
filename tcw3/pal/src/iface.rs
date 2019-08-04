@@ -64,7 +64,7 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// Enter the main loop. This method will never return.
     ///
     /// It's not allowed to call this method from a `WndListener`.
-    fn enter_main_loop(self);
+    fn enter_main_loop(self) -> !;
 
     /// Quit the application gracefully.
     fn terminate(self);
