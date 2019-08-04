@@ -1,11 +1,15 @@
 use super::super::{
-    WndAttrs,
+    WndAttrs, winit::{WndContent as WndContentTrait},
 };
 use super::WM;
 
 #[derive(Debug, Clone)]
 pub struct HWnd {
 }
+
+pub(super) struct WndContent {}
+
+impl WndContentTrait for WndContent {}
 
 impl HWnd {
     /// Must be called from a main thread.

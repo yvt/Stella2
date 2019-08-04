@@ -25,7 +25,7 @@ cfg_if! {
         pub use self::winitwindow::HWnd;
 
         use super::winit::WinitEnv;
-        static WINIT_ENV: WinitEnv<WM> = WinitEnv::new();
+        static WINIT_ENV: WinitEnv<WM, winitwindow::WndContent> = WinitEnv::new();
     } else {
         mod window;
         pub use self::window::HWnd;
