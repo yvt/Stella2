@@ -42,24 +42,24 @@ pub trait SplitDragListener {
     /// clipped [`value`].
     ///
     /// [`value`]: crate::ui::views::split::Split::value
-    fn down(&self, _: pal::WM, _new_value: f32) {}
+    fn down(&self, _: pal::Wm, _new_value: f32) {}
 
     /// The splitter is being moevd. `new_value` specifies the new [`value`].
     ///
     /// The caller may return `new_value` as it is or return a modified `value`.
     ///
     /// [`value`]: crate::ui::views::split::Split::value
-    fn motion(&self, _: pal::WM, new_value: f32) -> f32 {
+    fn motion(&self, _: pal::Wm, new_value: f32) -> f32 {
         new_value
     }
 
     /// The splitter was moved.
     ///
     /// [`value`]: crate::ui::views::split::Split::value
-    fn up(&self, _: pal::WM) {}
+    fn up(&self, _: pal::Wm) {}
 
     /// The drag gesture was cancelled.
-    fn cancel(&self, _: pal::WM) {}
+    fn cancel(&self, _: pal::Wm) {}
 }
 
 impl SplitDragListener for () {}
@@ -71,7 +71,7 @@ struct Shared {
     container: HView,
     splitter: HView,
     subviews: RefCell<[HView; 2]>,
-    on_drag: RefCell<Box<dyn Fn(pal::WM) -> Box<dyn SplitDragListener>>>,
+    on_drag: RefCell<Box<dyn Fn(pal::Wm) -> Box<dyn SplitDragListener>>>,
 }
 
 impl fmt::Debug for Shared {
@@ -171,7 +171,7 @@ impl Split {
     /// The `f32` parameter indicates the latest clipped `value`.
     pub fn set_on_drag(
         &mut self,
-        handler: impl Fn(pal::WM) -> Box<dyn SplitDragListener> + 'static,
+        handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static,
     ) {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
@@ -343,7 +343,7 @@ struct SplitterListener {
 }
 
 impl ViewListener for SplitterListener {
-    fn mount(&self, wm: pal::WM, view: &HView, _: &HWnd) {
+    fn mount(&self, wm: pal::Wm, view: &HView, _: &HWnd) {
         // Create a layer for the splitter line
         let layer = wm.new_layer(pal::LayerAttrs {
             bg_color: Some(pal::RGBAF32::new(0.1, 0.1, 0.1, 1.0)),
@@ -355,16 +355,16 @@ impl ViewListener for SplitterListener {
         view.pend_update();
     }
 
-    fn unmount(&self, wm: pal::WM, _: &HView) {
+    fn unmount(&self, wm: pal::Wm, _: &HView) {
         let layer = self.layer.borrow_mut().take().unwrap();
         wm.remove_layer(&layer);
     }
 
-    fn position(&self, _: pal::WM, view: &HView) {
+    fn position(&self, _: pal::Wm, view: &HView) {
         view.pend_update();
     }
 
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 
@@ -389,7 +389,7 @@ impl ViewListener for SplitterListener {
 
     fn mouse_drag(
         &self,
-        wm: pal::WM,
+        wm: pal::Wm,
         _: &HView,
         _loc: Point2<f32>,
         _button: u8,
@@ -425,7 +425,7 @@ struct DragState {
 }
 
 impl MouseDragListener for SplitterDragListener {
-    fn mouse_down(&self, wm: pal::WM, _: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>, button: u8) {
         if let Some(shared) = self.shared.upgrade() {
             if button == 0 {
                 let axis_pri = shared.vertical as usize;
@@ -442,7 +442,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn mouse_motion(&self, wm: pal::WM, _: &HView, loc: Point2<f32>) {
+    fn mouse_motion(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>) {
         if let (Some(shared), Some(drag)) = (self.shared.upgrade(), self.drag.borrow().clone()) {
             let axis_pri = shared.vertical as usize;
 
@@ -457,7 +457,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn mouse_up(&self, wm: pal::WM, _: &HView, _loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
         if button == 0 {
             *self.drag.borrow_mut() = None;
 
@@ -465,7 +465,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn cancel(&self, wm: pal::WM, _: &HView) {
+    fn cancel(&self, wm: pal::Wm, _: &HView) {
         if let Some(shared) = self.shared.upgrade() {
             self.user_listener.cancel(wm);
 

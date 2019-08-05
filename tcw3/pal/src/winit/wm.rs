@@ -8,10 +8,10 @@ use std::{
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
-use super::super::{iface::WM, MtSticky};
+use super::super::{iface::Wm, MtSticky};
 use super::{MtData, UserEvent, WinitEnv, WinitWm, WndContent};
 
-impl<TWM: WM, TWC: WndContent> WinitEnv<TWM, TWC> {
+impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
         Self {
             mt: OnceCell::new(),
@@ -23,7 +23,7 @@ impl<TWM: WM, TWC: WndContent> WinitEnv<TWM, TWC> {
     /// marked as the main thread yet, *mark the current thread as one*,
     /// returning `true`.
     ///
-    /// `TWM` should use this method to implement `WM::is_main_thread`. This
+    /// `TWM` should use this method to implement `Wm::is_main_thread`. This
     /// is the canonical source of a predicate defining what is the main
     /// thread and what is not.
     #[inline]
@@ -125,7 +125,7 @@ impl<TWM: WM, TWC: WndContent> WinitEnv<TWM, TWC> {
     }
 }
 
-impl<TWM: WM, TWC: WndContent> WinitWm<TWM, TWC> {
+impl<TWM: Wm, TWC: WndContent> WinitWm<TWM, TWC> {
     fn new(wm: TWM) -> Self {
         Self {
             wm,
@@ -151,11 +151,11 @@ impl<TWM: WM, TWC: WndContent> WinitWm<TWM, TWC> {
             .replace(None)
             .expect("can't call enter_main_loop twice");
 
-        struct Guard<'a, TWM: WM, TWC: WndContent>(
+        struct Guard<'a, TWM: Wm, TWC: WndContent>(
             &'a Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>>>,
         );
 
-        impl<TWM: WM, TWC: WndContent> Drop for Guard<'_, TWM, TWC> {
+        impl<TWM: Wm, TWC: WndContent> Drop for Guard<'_, TWM, TWC> {
             fn drop(&mut self) {
                 self.0.set(None);
             }

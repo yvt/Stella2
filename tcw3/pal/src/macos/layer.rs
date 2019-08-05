@@ -15,12 +15,12 @@ use super::{
         ca_transform_3d_from_matrix4, cg_color_from_rgbaf32, cg_rect_from_box2,
         extend_matrix3_with_identity_z,
     },
-    WM,
+    Wm,
 };
 
-static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>, WM> = MtSticky::new(RefCell::new(Pool::new()));
+static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>, Wm> = MtSticky::new(RefCell::new(Pool::new()));
 
-static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>, WM> = MtSticky::new(RefCell::new(Vec::new()));
+static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>, Wm> = MtSticky::new(RefCell::new(Vec::new()));
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
@@ -60,7 +60,7 @@ struct Layer {
 }
 
 impl Layer {
-    pub fn new(_: WM) -> Self {
+    pub fn new(_: Wm) -> Self {
         // `CALayer::new` wraps `[CALayer layer]`, which `autorelease`s itself,
         // so we have to `retain` the returned `CALayer` to prevent it
         // from being dealloced prematurely. (This clearly should be done by
@@ -80,7 +80,7 @@ impl Layer {
 }
 
 impl HLayer {
-    pub(super) fn new(wm: WM, attrs: LayerAttrs) -> Self {
+    pub(super) fn new(wm: Wm, attrs: LayerAttrs) -> Self {
         let layer = Layer::new(wm);
         let ptr = LAYER_POOL.get_with_wm(wm).borrow_mut().allocate(layer);
         let this = Self { ptr };
@@ -88,7 +88,7 @@ impl HLayer {
         this
     }
 
-    pub(super) fn remove(&self, wm: WM) {
+    pub(super) fn remove(&self, wm: Wm) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
 
         let this_layer: &Layer = &layer_pool[self.ptr];
@@ -116,7 +116,7 @@ impl HLayer {
     fn handle_pending_deletion(
         &self,
         layer_pool: &Pool<Layer>,
-        wm: WM,
+        wm: Wm,
         deletion_queue: &mut Vec<HLayer>,
     ) {
         let this_layer: &Layer = &layer_pool[self.ptr];
@@ -139,7 +139,7 @@ impl HLayer {
         }
     }
 
-    pub(super) fn set_attrs(&self, wm: WM, attrs: LayerAttrs) {
+    pub(super) fn set_attrs(&self, wm: Wm, attrs: LayerAttrs) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
         let layer_pool = &mut *layer_pool; // enable split borrow
 
@@ -325,14 +325,14 @@ impl HLayer {
     ///
     /// The operation is performed recursively on sublayers.
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn flush(&self, wm: WM) {
+    pub(super) fn flush(&self, wm: Wm) {
         self.flush_with_layer_pool(&LAYER_POOL.get_with_wm(wm).borrow());
     }
 
     /// Get the `CALayer` of a layer.
     ///
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn ca_layer(&self, wm: WM) -> id {
+    pub(super) fn ca_layer(&self, wm: Wm) -> id {
         LAYER_POOL.get_with_wm(wm).borrow()[self.ptr].ca_layer.id()
     }
 }

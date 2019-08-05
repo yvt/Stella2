@@ -5,7 +5,7 @@ use flags_macro::flags;
 use std::{fmt, rc::Rc};
 
 use super::{HView, ViewDirtyFlags, ViewFlags};
-use crate::pal::WM;
+use crate::pal::Wm;
 
 /// Represents a type defining the positioning of subviews.
 ///
@@ -277,7 +277,7 @@ impl HView {
     }
 
     /// Call `ViewListener::position` for subviews as necessary.
-    pub(super) fn flush_position_event(&self, wm: WM) {
+    pub(super) fn flush_position_event(&self, wm: Wm) {
         fn update_global_frame(this: &HView, global_offset: Point2<f32>) {
             // Global position
             let frame = this.view.frame.get();

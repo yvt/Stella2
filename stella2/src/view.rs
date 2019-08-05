@@ -18,14 +18,14 @@ use crate::model;
 mod toolbar;
 
 pub struct AppView {
-    wm: pal::WM,
+    wm: pal::Wm,
     state: RefCell<Elem<model::AppState>>,
     pending_actions: RefCell<Vec<model::AppAction>>,
     main_wnd: Rc<WndView>,
 }
 
 impl AppView {
-    pub fn new(wm: pal::WM) -> Rc<Self> {
+    pub fn new(wm: pal::Wm) -> Rc<Self> {
         let state = model::AppState::new();
 
         let main_wnd = WndView::new(wm, Elem::clone(&state.main_wnd));
@@ -96,7 +96,7 @@ struct WndView {
 }
 
 impl WndView {
-    pub fn new(wm: pal::WM, wnd_state: Elem<model::WndState>) -> Rc<Self> {
+    pub fn new(wm: pal::Wm, wnd_state: Elem<model::WndState>) -> Rc<Self> {
         let hwnd = HWnd::new(wm);
         let style_manager = theming::Manager::global(wm);
 
@@ -215,7 +215,7 @@ impl WndView {
 struct WndViewWndListener;
 
 impl WndListener for WndViewWndListener {
-    fn close(&self, wm: pal::WM, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: &HWnd) {
         wm.terminate();
     }
 }

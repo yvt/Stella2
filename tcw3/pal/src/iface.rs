@@ -21,7 +21,7 @@ pub type RGBAF32 = RGBA<f32>;
 /// A trait for window managers.
 ///
 /// All methods are reentrant with some exceptions.
-pub trait WM: Clone + Copy + Sized + Debug + 'static {
+pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// A window handle type.
     type HWnd: Debug + Clone;
 
@@ -31,12 +31,12 @@ pub trait WM: Clone + Copy + Sized + Debug + 'static {
     /// A bitmap type.
     type Bitmap: Bitmap;
 
-    /// Get the default instance of [`WM`]. It only can be called by a main thread.
+    /// Get the default instance of [`Wm`]. It only can be called by a main thread.
     fn global() -> Self {
         Self::try_global().unwrap()
     }
 
-    /// Get the default instance of [`WM`] without checking the calling thread.
+    /// Get the default instance of [`Wm`] without checking the calling thread.
     unsafe fn global_unchecked() -> Self;
 
     fn try_global() -> Result<Self, BadThread> {
@@ -130,7 +130,7 @@ impl std::fmt::Display for BadThread {
 
 impl std::error::Error for BadThread {}
 
-pub struct WndAttrs<'a, T: WM, TLayer> {
+pub struct WndAttrs<'a, T: Wm, TLayer> {
     /// The size of the content region.
     pub size: Option<[u32; 2]>,
     pub min_size: Option<[u32; 2]>,
@@ -142,7 +142,7 @@ pub struct WndAttrs<'a, T: WM, TLayer> {
     pub layer: Option<Option<TLayer>>,
 }
 
-impl<'a, T: WM, TLayer> Default for WndAttrs<'a, T, TLayer> {
+impl<'a, T: Wm, TLayer> Default for WndAttrs<'a, T, TLayer> {
     fn default() -> Self {
         Self {
             size: None,
@@ -289,7 +289,7 @@ bitflags! {
 ///
 /// The receiver is immutable because event handlers may manipulate windows,
 /// which in turn might cause other event handlers to be called.
-pub trait WndListener<T: WM> {
+pub trait WndListener<T: Wm> {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
     fn close_requested(&self, _: T, _: &T::HWnd) -> bool {
@@ -304,9 +304,9 @@ pub trait WndListener<T: WM> {
     /// While the user is resizing a window, this method is called repeatedly
     /// as the window's outline is dragged.
     ///
-    /// The new window size can be retrieved using [`WM::get_wnd_size`].
+    /// The new window size can be retrieved using [`Wm::get_wnd_size`].
     /// Based on the new window size, The client (the implementer of this trait)
-    /// should relayout, update composition layers, and call [`WM::update_wnd`]
+    /// should relayout, update composition layers, and call [`Wm::update_wnd`]
     /// in this method.
     fn resize(&self, _: T, _: &T::HWnd) {}
 
@@ -346,7 +346,7 @@ pub trait WndListener<T: WM> {
 }
 
 /// A default implementation of [`WndListener`].
-impl<T: WM> WndListener<T> for () {}
+impl<T: Wm> WndListener<T> for () {}
 
 /// Mouse event handlers for mouse drag gestures.
 ///
@@ -355,7 +355,7 @@ impl<T: WM> WndListener<T> for () {}
 ///  - `mouse_up` is called and there are no currently pressed buttons.
 ///  - `cancel` is called.
 ///
-pub trait MouseDragListener<T: WM> {
+pub trait MouseDragListener<T: Wm> {
     /// The mouse pointer has moved inside a window when at least one of the
     /// mouse buttons are pressed.
     fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
@@ -378,7 +378,7 @@ pub trait MouseDragListener<T: WM> {
 }
 
 /// A default implementation of [`MouseDragListener`].
-impl<T: WM> MouseDragListener<T> for () {}
+impl<T: Wm> MouseDragListener<T> for () {}
 
 /// A immutable, ref-counted bitmap image.
 pub trait Bitmap: Clone + Sized + Send + Sync + Debug {

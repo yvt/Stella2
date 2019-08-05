@@ -25,7 +25,7 @@ impl MyViewListener {
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: pal::WM, view: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
         self.canvas.borrow_mut().mount(wm, view, wnd);
         wm.set_layer_attr(
             self.canvas.borrow().layer().unwrap(),
@@ -36,15 +36,15 @@ impl ViewListener for MyViewListener {
         );
     }
 
-    fn unmount(&self, wm: pal::WM, view: &HView) {
+    fn unmount(&self, wm: pal::Wm, view: &HView) {
         self.canvas.borrow_mut().unmount(wm, view);
     }
 
-    fn position(&self, wm: pal::WM, view: &HView) {
+    fn position(&self, wm: pal::Wm, view: &HView) {
         self.canvas.borrow_mut().position(wm, view);
     }
 
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
         self.canvas.borrow_mut().update(wm, view, ctx, |draw_ctx| {
             let c = &mut draw_ctx.canvas;
 
@@ -66,13 +66,13 @@ impl ViewListener for MyViewListener {
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::WM, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: &HWnd) {
         wm.terminate();
     }
 }
 
 fn main() {
-    let wm = pal::WM::global();
+    let wm = pal::Wm::global();
 
     let wnd = HWnd::new(wm);
     wnd.set_visibility(true);

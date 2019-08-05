@@ -3,7 +3,7 @@ use std::fmt;
 use std::rc::{Rc, Weak};
 
 use super::{HView, HWnd, ViewFlags, Wnd};
-use crate::{pal, pal::WM};
+use crate::{pal, pal::Wm};
 
 /// Mouse event handlers for mouse drag gestures.
 ///
@@ -16,10 +16,10 @@ use crate::{pal, pal::WM};
 pub trait MouseDragListener {
     /// The mouse pointer has moved inside a window when at least one of the
     /// mouse buttons are pressed.
-    fn mouse_motion(&self, _: WM, _: &HView, _loc: Point2<f32>) {}
+    fn mouse_motion(&self, _: Wm, _: &HView, _loc: Point2<f32>) {}
 
     /// A mouse button was pressed inside a window.
-    fn mouse_down(&self, _: WM, _: &HView, _loc: Point2<f32>, _button: u8) {}
+    fn mouse_down(&self, _: Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
 
     /// A mouse button was released inside a window.
     ///
@@ -29,10 +29,10 @@ pub trait MouseDragListener {
     /// [`WndListener::mouse_drag`] next time a mouse button is pressed.
     ///
     /// [`WndListener::mouse_drag`]: crate::pal::iface::WndListener::mouse_drag
-    fn mouse_up(&self, _: WM, _: &HView, _loc: Point2<f32>, _button: u8) {}
+    fn mouse_up(&self, _: Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
 
     /// A mouse drag gesture was cancelled.
-    fn cancel(&self, _: WM, _: &HView) {}
+    fn cancel(&self, _: Wm, _: &HView) {}
 }
 
 /// A default implementation of [`MouseDragListener`].
@@ -73,7 +73,7 @@ impl HWnd {
         &self,
         loc: Point2<f32>,
         button: u8,
-    ) -> Box<dyn pal::iface::MouseDragListener<pal::WM>> {
+    ) -> Box<dyn pal::iface::MouseDragListener<pal::Wm>> {
         let mut st = self.wnd.mouse_state.borrow_mut();
 
         if st.drag_gestures.is_some() {
@@ -136,7 +136,7 @@ impl WndMouseState {
     /// Cancel drag gestures for `view` (if any).
     ///
     /// If `subview` is `true`, the subviews of `view` are also affected.
-    fn cancel_drag_gestures(&mut self, wm: WM, view: &HView, subview: bool) {
+    fn cancel_drag_gestures(&mut self, wm: Wm, view: &HView, subview: bool) {
         let cancel_drag;
         if let Some(drag) = &self.drag_gestures {
             if subview {
@@ -191,23 +191,23 @@ impl Drop for PalDragListener {
 
 /// Forwards events from `pal::iface::MouseDragListener` to
 /// `uicore::MouseDragListener`.
-impl pal::iface::MouseDragListener<pal::WM> for PalDragListener {
-    fn mouse_motion(&self, wm: WM, _: &pal::HWnd, loc: Point2<f32>) {
+impl pal::iface::MouseDragListener<pal::Wm> for PalDragListener {
+    fn mouse_motion(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>) {
         self.with_drag_gesture(|drag| {
             drag.listener.mouse_motion(wm, &drag.view, loc);
         })
     }
-    fn mouse_down(&self, wm: WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         self.with_drag_gesture(|drag| {
             drag.listener.mouse_down(wm, &drag.view, loc, button);
         })
     }
-    fn mouse_up(&self, wm: WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         self.with_drag_gesture(|drag| {
             drag.listener.mouse_up(wm, &drag.view, loc, button);
         })
     }
-    fn cancel(&self, wm: WM, _: &pal::HWnd) {
+    fn cancel(&self, wm: Wm, _: &pal::HWnd) {
         self.with_drag_gesture(|drag| {
             drag.listener.cancel(wm, &drag.view);
         })

@@ -24,7 +24,7 @@ struct Inner {
     button_mixin: ButtonMixin,
     styled_box: RefCell<StyledBox>,
     label: RefCell<Label>,
-    activate_handler: RefCell<Box<dyn Fn(pal::WM)>>,
+    activate_handler: RefCell<Box<dyn Fn(pal::Wm)>>,
 }
 
 impl fmt::Debug for Inner {
@@ -113,10 +113,10 @@ impl Button {
 
     /// Set the function called when a push button widget is activated.
     ///
-    /// The function is called via `WM::invoke`, thus allowed to modify
+    /// The function is called via `Wm::invoke`, thus allowed to modify
     /// view hierarchy and view attributes. However, it's not allowed to call
     /// `set_on_activate` on the activated `Button`.
-    pub fn set_on_activate(&mut self, cb: impl Fn(pal::WM) + 'static) {
+    pub fn set_on_activate(&mut self, cb: impl Fn(pal::Wm) + 'static) {
         *self.inner.activate_handler.borrow_mut() = Box::new(cb);
     }
 }
@@ -128,7 +128,7 @@ struct ButtonViewListener {
 impl ViewListener for ButtonViewListener {
     fn mouse_drag(
         &self,
-        _: pal::WM,
+        _: pal::Wm,
         _: &HView,
         _loc: Point2<f32>,
         _button: u8,
@@ -146,7 +146,7 @@ struct ButtonMixinListener {
 }
 
 impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
-    fn update(&self, _: pal::WM, _: &HView) {
+    fn update(&self, _: pal::Wm, _: &HView) {
         let styled_box = self.inner.styled_box.borrow();
 
         let mut class_set = styled_box.class_set();
@@ -159,7 +159,7 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
             .set_parent_class_path(Some(styled_box.class_path().clone()));
     }
 
-    fn activate(&self, wm: pal::WM, _: &HView) {
+    fn activate(&self, wm: pal::Wm, _: &HView) {
         let inner = Rc::clone(&self.inner);
         wm.invoke(move |wm| {
             let handler = inner.activate_handler.borrow();

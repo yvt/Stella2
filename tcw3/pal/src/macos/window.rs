@@ -31,10 +31,10 @@ use std::{
 };
 
 use super::super::{
-    iface::{self, WM as _},
+    iface::{self, Wm as _},
     WndAttrs,
 };
-use super::{drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, WM};
+use super::{drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, Wm};
 
 #[derive(Debug, Clone)]
 pub struct HWnd {
@@ -43,7 +43,7 @@ pub struct HWnd {
 }
 
 struct WndState {
-    listener: RefCell<Box<dyn iface::WndListener<WM>>>,
+    listener: RefCell<Box<dyn iface::WndListener<Wm>>>,
     layer: Cell<Option<HLayer>>,
     hwnd: HWnd,
 }
@@ -136,7 +136,7 @@ impl HWnd {
 
         if let Some(value) = attrs.layer {
             let layer = if let Some(hlayer) = value {
-                hlayer.ca_layer(WM::global_unchecked())
+                hlayer.ca_layer(Wm::global_unchecked())
             } else {
                 nil
             };
@@ -152,7 +152,7 @@ impl HWnd {
         });
     }
 
-    pub(super) fn update(&self, wm: WM) {
+    pub(super) fn update(&self, wm: Wm) {
         if let Some(layer) = self.state().layer.get() {
             with_autorelease_pool(|| {
                 transaction::begin();
@@ -163,12 +163,12 @@ impl HWnd {
         }
     }
 
-    pub(super) fn get_size(&self, _: WM) -> [u32; 2] {
+    pub(super) fn get_size(&self, _: Wm) -> [u32; 2] {
         let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
         [size.width as u32, size.height as u32]
     }
 
-    pub(super) fn get_dpi_scale(&self, _: WM) -> f32 {
+    pub(super) fn get_dpi_scale(&self, _: Wm) -> f32 {
         unsafe { msg_send![*self.ctrler, dpiScale] }
     }
 }
@@ -176,11 +176,11 @@ impl HWnd {
 // These functions are called by `TCWWindowController`
 type TCWListenerUserData = *const WndState;
 
-unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(WM, &WndState) -> T) -> Option<T> {
+unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(Wm, &WndState) -> T) -> Option<T> {
     if ud.is_null() {
         return None;
     }
-    let wm = WM::global_unchecked();
+    let wm = Wm::global_unchecked();
     Some(f(wm, &*ud))
 }
 
@@ -274,18 +274,18 @@ unsafe extern "C" fn tcw_wndlistener_mouse_drag(
 type TCWMouseDragListenerUserData = *const DragState;
 
 struct DragState {
-    listener: Box<dyn iface::MouseDragListener<WM>>,
+    listener: Box<dyn iface::MouseDragListener<Wm>>,
     hwnd: HWnd,
 }
 
 unsafe fn drag_method_impl<T>(
     ud: TCWMouseDragListenerUserData,
-    f: impl FnOnce(WM, &DragState) -> T,
+    f: impl FnOnce(Wm, &DragState) -> T,
 ) -> Option<T> {
     if ud.is_null() {
         return None;
     }
-    let wm = WM::global_unchecked();
+    let wm = Wm::global_unchecked();
     Some(f(wm, &*ud))
 }
 

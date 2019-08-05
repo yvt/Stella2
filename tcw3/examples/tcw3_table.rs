@@ -14,7 +14,7 @@ use tcw3::{
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::WM, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: &HWnd) {
         wm.terminate();
     }
 }
@@ -41,7 +41,7 @@ impl table::TableModelQuery for TableModelQuery {
 }
 
 fn main() {
-    let wm = pal::WM::global();
+    let wm = pal::Wm::global();
     let style_manager = theming::Manager::global(wm);
 
     let wnd = HWnd::new(wm);

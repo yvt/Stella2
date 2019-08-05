@@ -6,16 +6,16 @@ struct Listener {
     flex_layer: pal::HLayer,
 }
 
-impl WndListener<pal::WM> for Listener {
-    fn dpi_scale_changed(&self, wm: pal::WM, wnd: &pal::HWnd) {
+impl WndListener<pal::Wm> for Listener {
+    fn dpi_scale_changed(&self, wm: pal::Wm, wnd: &pal::HWnd) {
         dbg!(wm.get_wnd_dpi_scale(wnd));
     }
 
-    fn close(&self, wm: pal::WM, _: &pal::HWnd) {
+    fn close(&self, wm: pal::Wm, _: &pal::HWnd) {
         wm.terminate();
     }
 
-    fn resize(&self, wm: pal::WM, hwnd: &pal::HWnd) {
+    fn resize(&self, wm: pal::Wm, hwnd: &pal::HWnd) {
         let [w, h] = wm.get_wnd_size(hwnd);
         wm.set_layer_attr(
             &self.flex_layer,
@@ -30,21 +30,21 @@ impl WndListener<pal::WM> for Listener {
         wm.update_wnd(hwnd);
     }
 
-    fn mouse_motion(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>) {
+    fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>) {
         println!("mouse_motion {:?}", loc);
     }
 
-    fn mouse_leave(&self, _: pal::WM, _: &pal::HWnd) {
+    fn mouse_leave(&self, _: pal::Wm, _: &pal::HWnd) {
         println!("mouse_leave");
     }
 
     fn mouse_drag(
         &self,
-        _: pal::WM,
+        _: pal::Wm,
         _: &pal::HWnd,
         loc: Point2<f32>,
         button: u8,
-    ) -> Box<dyn MouseDragListener<pal::WM>> {
+    ) -> Box<dyn MouseDragListener<pal::Wm>> {
         println!("mouse_drag {:?}", (loc, button));
         Box::new(DragListener)
     }
@@ -52,23 +52,23 @@ impl WndListener<pal::WM> for Listener {
 
 struct DragListener;
 
-impl MouseDragListener<pal::WM> for DragListener {
-    fn mouse_motion(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>) {
+impl MouseDragListener<pal::Wm> for DragListener {
+    fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>) {
         println!("drag: mouse_motion {:?}", loc);
     }
-    fn mouse_down(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         println!("drag: mouse_down {:?}", (loc, button));
     }
-    fn mouse_up(&self, _: pal::WM, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         println!("drag: mouse_up {:?}", (loc, button));
     }
-    fn cancel(&self, _: pal::WM, _: &pal::HWnd) {
+    fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
         println!("drag: cancel");
     }
 }
 
 fn main() {
-    let wm = pal::WM::global();
+    let wm = pal::Wm::global();
 
     let mut bmp_builder = pal::BitmapBuilder::new([100, 100]);
     bmp_builder.move_to(Point2::new(20.0, 20.0));

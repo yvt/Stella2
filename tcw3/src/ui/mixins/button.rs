@@ -5,7 +5,7 @@ use flags_macro::flags;
 use std::{cell::Cell, rc::Rc};
 
 use crate::{
-    pal::WM,
+    pal::Wm,
     uicore::{HView, MouseDragListener},
 };
 
@@ -18,14 +18,14 @@ pub struct ButtonMixin {
 
 pub trait ButtonListener {
     /// The state of the push button was updated.
-    fn update(&self, _: WM, _: &HView) {}
+    fn update(&self, _: Wm, _: &HView) {}
 
     /// The push button was activated.
     ///
     /// This method is called from a view's event handler, the same restrictions
-    /// of `ViewListener` apply. Consider using `WM::invoke` to circumvent
+    /// of `ViewListener` apply. Consider using `Wm::invoke` to circumvent
     /// them.
-    fn activate(&self, _: WM, _: &HView) {}
+    fn activate(&self, _: Wm, _: &HView) {}
 }
 
 #[derive(Debug)]
@@ -82,7 +82,7 @@ struct MouseDragListenerImpl {
 }
 
 impl MouseDragListener for MouseDragListenerImpl {
-    fn mouse_motion(&self, wm: WM, view: &HView, loc: Point2<f32>) {
+    fn mouse_motion(&self, wm: Wm, view: &HView, loc: Point2<f32>) {
         let inner = &self.inner;
         let mut state = inner.state.get();
         if state.contains(StateFlags::DRAG) {
@@ -93,7 +93,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         }
     }
 
-    fn mouse_down(&self, wm: WM, view: &HView, _loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: Wm, view: &HView, _loc: Point2<f32>, button: u8) {
         if button != 0 {
             return;
         }
@@ -107,7 +107,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         );
     }
 
-    fn mouse_up(&self, wm: WM, view: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: Wm, view: &HView, loc: Point2<f32>, button: u8) {
         if button != 0 {
             return;
         }
@@ -120,7 +120,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         }
     }
 
-    fn cancel(&self, wm: WM, view: &HView) {
+    fn cancel(&self, wm: Wm, view: &HView) {
         self.inner
             .set_state(&self.client_listener, wm, view, StateFlags::empty());
     }
@@ -135,7 +135,7 @@ impl Inner {
     fn set_state(
         &self,
         listener: &Box<dyn ButtonListener + 'static>,
-        wm: WM,
+        wm: Wm,
         view: &HView,
         new_flags: StateFlags,
     ) {

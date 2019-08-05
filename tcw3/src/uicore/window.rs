@@ -13,7 +13,7 @@ use super::{
     HView, HWnd, Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener,
     Wnd, WndStyleFlags,
 };
-use crate::pal::{self, prelude::WM as _, WM};
+use crate::pal::{self, prelude::Wm as _, Wm};
 
 impl HView {
     /// Get the containing window for a view.
@@ -319,8 +319,8 @@ impl PalWndListener {
     }
 }
 
-impl pal::iface::WndListener<WM> for PalWndListener {
-    fn close_requested(&self, wm: WM, _: &pal::HWnd) -> bool {
+impl pal::iface::WndListener<Wm> for PalWndListener {
+    fn close_requested(&self, wm: Wm, _: &pal::HWnd) -> bool {
         if let Some(hwnd) = self.hwnd() {
             let listener = hwnd.wnd.listener.borrow();
             listener.close_requested(wm, &hwnd)
@@ -329,7 +329,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn close(&self, wm: WM, _: &pal::HWnd) {
+    fn close(&self, wm: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             hwnd.close();
 
@@ -338,7 +338,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn resize(&self, _: WM, _: &pal::HWnd) {
+    fn resize(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             if hwnd.wnd.updating.get() {
                 // Prevent recursion
@@ -358,7 +358,7 @@ impl pal::iface::WndListener<WM> for PalWndListener {
         }
     }
 
-    fn dpi_scale_changed(&self, _: WM, _: &pal::HWnd) {
+    fn dpi_scale_changed(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             let handlers = hwnd.wnd.dpi_scale_changed_handlers.borrow();
             for handler in handlers.iter() {
@@ -369,11 +369,11 @@ impl pal::iface::WndListener<WM> for PalWndListener {
 
     fn mouse_drag(
         &self,
-        _: WM,
+        _: Wm,
         _: &pal::HWnd,
         loc: Point2<f32>,
         button: u8,
-    ) -> Box<dyn pal::iface::MouseDragListener<WM>> {
+    ) -> Box<dyn pal::iface::MouseDragListener<Wm>> {
         if let Some(hwnd) = self.hwnd() {
             hwnd.handle_mouse_drag(loc, button)
         } else {
@@ -401,7 +401,7 @@ impl RootViewListener {
 }
 
 impl ViewListener for RootViewListener {
-    fn mount(&self, wm: WM, _: &HView, _: &HWnd) {
+    fn mount(&self, wm: Wm, _: &HView, _: &HWnd) {
         *self.layer.borrow_mut() = Some(wm.new_layer(pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(box2! { min: [0.0, 0.0], max: [1.0, 1.0] }),
@@ -409,13 +409,13 @@ impl ViewListener for RootViewListener {
         }));
     }
 
-    fn unmount(&self, wm: WM, _: &HView) {
+    fn unmount(&self, wm: Wm, _: &HView) {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }
     }
 
-    fn update(&self, wm: WM, _: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: Wm, _: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 

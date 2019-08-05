@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use flags_macro::flags;
 
 use super::{HView, HWnd, ViewDirtyFlags, ViewFlags};
-use crate::pal::{self, WM};
+use crate::pal::{self, Wm};
 
 impl HView {
     pub(super) fn view_with_containing_layer(&self) -> Option<HView> {
@@ -33,7 +33,7 @@ impl HView {
     ///
     /// Returns `true` if `layers` has changed. The return value is used to
     /// implement a recursive algorithm of `update_layers` itself.
-    pub(super) fn update_layers(&self, wm: WM, hwnd: &HWnd) -> bool {
+    pub(super) fn update_layers(&self, wm: Wm, hwnd: &HWnd) -> bool {
         let dirty = &self.view.dirty;
 
         let mut layers_changed = false;

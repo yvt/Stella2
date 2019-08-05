@@ -25,7 +25,7 @@ cfg_if! {
         pub use self::winitwindow::HWnd;
 
         use super::winit::WinitEnv;
-        static WINIT_ENV: WinitEnv<WM, winitwindow::WndContent> = WinitEnv::new();
+        static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
     } else {
         mod window;
         pub use self::window::HWnd;
@@ -36,21 +36,21 @@ cfg_if! {
 
 /// Provides an access to the window system.
 ///
-/// `WM` is only accessible by the application's main thread. Therefore, the
-/// ownership of `WM` can be used as an evidence that the main thread has the
+/// `Wm` is only accessible by the application's main thread. Therefore, the
+/// ownership of `Wm` can be used as an evidence that the main thread has the
 /// control.
 #[derive(Debug, Clone, Copy)]
-pub struct WM {
+pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
-impl iface::WM for WM {
+impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type Bitmap = Bitmap;
 
-    unsafe fn global_unchecked() -> WM {
-        WM {
+    unsafe fn global_unchecked() -> Wm {
+        Wm {
             _no_send_sync: PhantomData,
         }
     }
@@ -61,7 +61,7 @@ impl iface::WM for WM {
     }
 
     #[cfg(not(feature = "macos_winit"))]
-    fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {
+    fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
         dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
     }
 
@@ -107,7 +107,7 @@ impl iface::WM for WM {
     }
 
     #[cfg(feature = "macos_winit")]
-    fn invoke_on_main_thread(f: impl FnOnce(WM) + Send + 'static) {
+    fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
         WINIT_ENV.invoke_on_main_thread(move |winit_wm| f(winit_wm.wm()));
     }
 
@@ -129,19 +129,19 @@ impl iface::WM for WM {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        // Having a reference to `WM` means we are on a main thread, so
+        // Having a reference to `Wm` means we are on a main thread, so
         // this is safe
         unsafe { HWnd::new(attrs) }
     }
 
     fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        // Having a reference to `WM` means we are on a main thread, so
+        // Having a reference to `Wm` means we are on a main thread, so
         // this is safe
         unsafe { window.set_attrs(attrs) }
     }
 
     fn remove_wnd(self, window: &Self::HWnd) {
-        // Having a reference to `WM` means we are on a main thread, so
+        // Having a reference to `Wm` means we are on a main thread, so
         // this is safe
         unsafe { window.remove() }
     }

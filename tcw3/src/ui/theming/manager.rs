@@ -16,9 +16,9 @@ use crate::{pal, pal::prelude::*};
 
 pub(crate) type SheetId = usize;
 
-pub(crate) type ManagerCb = Box<dyn Fn(pal::WM, &Manager)>;
+pub(crate) type ManagerCb = Box<dyn Fn(pal::Wm, &Manager)>;
 
-pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::WM, &Manager, &mut NewSheetSetCtx<'_>)>;
+pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::Wm, &Manager, &mut NewSheetSetCtx<'_>)>;
 
 /// The center of the theming system.
 ///
@@ -27,7 +27,7 @@ pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::WM, &Manager, &mut NewSheetSetCt
 /// out a notification via the callback functions registered via
 /// `subscribe_sheet_set_changed`.
 pub struct Manager {
-    wm: pal::WM,
+    wm: pal::Wm,
     sheet_set: RefCell<SheetSet>,
     set_change_handlers: RefCell<SubscriberList<ManagerCb>>,
     new_set_handlers: RefCell<SubscriberList<ManagerNewSheetSetCb>>,
@@ -49,7 +49,7 @@ mt_lazy_static! {
 }
 
 impl Manager {
-    fn new(wm: pal::WM) -> Self {
+    fn new(wm: pal::Wm) -> Self {
         let this = Self {
             wm,
             sheet_set: RefCell::new(SheetSet { sheets: Vec::new() }),
@@ -65,7 +65,7 @@ impl Manager {
     }
 
     /// Get a global instance of `Manager`.
-    pub fn global(wm: pal::WM) -> &'static Self {
+    pub fn global(wm: pal::Wm) -> &'static Self {
         GLOBAL_MANAGER.get_with_wm(wm)
     }
 
@@ -247,7 +247,7 @@ pub struct Elem {
     inner: Rc<ElemInner>,
 }
 
-pub type ElemChangeCb = Box<dyn Fn(pal::WM, PropKindFlags)>;
+pub type ElemChangeCb = Box<dyn Fn(pal::Wm, PropKindFlags)>;
 
 struct ElemInner {
     sub: Cell<Option<Sub>>,

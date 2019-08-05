@@ -288,7 +288,7 @@ impl SbListener {
 }
 
 impl ViewListener for SbListener {
-    fn mount(&self, wm: pal::WM, _: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, _: &HView, wnd: &HWnd) {
         let mut layers = self.layers.borrow_mut();
         assert!(layers.is_none());
 
@@ -326,7 +326,7 @@ impl ViewListener for SbListener {
         }
     }
 
-    fn unmount(&self, wm: pal::WM, _: &HView) {
+    fn unmount(&self, wm: pal::Wm, _: &HView) {
         let layers = self.layers.borrow_mut().take().unwrap();
 
         for layer in layers.clip {
@@ -341,13 +341,13 @@ impl ViewListener for SbListener {
         }
     }
 
-    fn position(&self, _: pal::WM, _: &HView) {
+    fn position(&self, _: pal::Wm, _: &HView) {
         if let Some(shared) = self.shared.upgrade() {
             shared.set_dirty(PropKindFlags::LAYER_BOUNDS);
         }
     }
 
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let shared;
         if let Some(shared_rc) = self.shared.upgrade() {
             shared = shared_rc;

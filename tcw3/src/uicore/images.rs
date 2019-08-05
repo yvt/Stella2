@@ -9,7 +9,7 @@ pub(crate) fn handle_new_wnd(hwnd: &HWnd) {
     use std::cell::Cell;
 
     struct ListenerState {
-        wm: pal::WM,
+        wm: pal::Wm,
         dpi_scale: Cell<f32>,
     }
 

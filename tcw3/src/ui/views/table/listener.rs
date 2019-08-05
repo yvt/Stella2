@@ -23,7 +23,7 @@ impl TableViewListener {
 }
 
 impl ViewListener for TableViewListener {
-    fn mount(&self, wm: pal::WM, _: &HView, _: &HWnd) {
+    fn mount(&self, wm: pal::Wm, _: &HView, _: &HWnd) {
         let layer = wm.new_layer(pal::LayerAttrs {
             flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
             ..Default::default()
@@ -34,17 +34,17 @@ impl ViewListener for TableViewListener {
         assert!(old_layer.is_none());
     }
 
-    fn unmount(&self, wm: pal::WM, _: &HView) {
+    fn unmount(&self, wm: pal::Wm, _: &HView) {
         if let Some(layer) = self.layer.replace(None) {
             wm.remove_layer(&layer);
         }
     }
 
-    fn position(&self, _: pal::WM, view: &HView) {
+    fn position(&self, _: pal::Wm, view: &HView) {
         view.pend_update();
     }
 
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().expect("not mounted");
 

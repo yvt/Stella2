@@ -26,7 +26,7 @@ use std::{
 };
 use subscriber_list::{SubscriberList, UntypedSubscription};
 
-use crate::pal::{self, prelude::WM as _, WM};
+use crate::pal::{self, prelude::Wm as _, Wm};
 
 mod images;
 mod layer;
@@ -54,12 +54,12 @@ pub struct HWnd {
 pub trait WndListener {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
-    fn close_requested(&self, _: WM, _: &HWnd) -> bool {
+    fn close_requested(&self, _: Wm, _: &HWnd) -> bool {
         true
     }
 
     /// A window has been closed.
-    fn close(&self, _: WM, _: &HWnd) {}
+    fn close(&self, _: Wm, _: &HWnd) {}
 }
 
 /// A no-op implementation of `WndListener`.
@@ -72,7 +72,7 @@ impl<T: WndListener + 'static> From<T> for Box<dyn WndListener> {
 }
 
 /// The boxed function type for window callbacks with no extra parameters.
-pub type WndCb = Box<dyn Fn(WM, &HWnd)>;
+pub type WndCb = Box<dyn Fn(Wm, &HWnd)>;
 
 /// Represents an event subscription.
 ///
@@ -95,7 +95,7 @@ pub type Sub = UntypedSubscription;
 ///    a reference to the provided `Wnd`.
 ///
 struct Wnd {
-    wm: WM,
+    wm: Wm,
     dirty: Cell<window::WndDirtyFlags>,
     pal_wnd: RefCell<Option<pal::HWnd>>,
     listener: RefCell<Box<dyn WndListener>>,
@@ -132,7 +132,7 @@ impl fmt::Debug for Wnd {
 }
 
 impl Wnd {
-    fn new(wm: WM) -> Self {
+    fn new(wm: Wm) -> Self {
         let content_view = window::new_root_content_view();
 
         // Pend mount
@@ -212,35 +212,35 @@ impl ViewFlags {
 /// View event handlers.
 ///
 /// It's generally not safe to modify view properties and/or hierarchy from
-/// these methods. Consider deferring modifications using `WM::invoke`.
+/// these methods. Consider deferring modifications using `Wm::invoke`.
 pub trait ViewListener {
     /// A view was added to a window.
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn mount(&self, _: WM, _: &HView, _: &HWnd) {}
+    fn mount(&self, _: Wm, _: &HView, _: &HWnd) {}
 
     /// A view was removed from a window.
-    fn unmount(&self, _: WM, _: &HView) {}
+    fn unmount(&self, _: Wm, _: &HView) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
     /// updated.
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn position(&self, _: WM, _: &HView) {}
+    fn position(&self, _: Wm, _: &HView) {}
 
     /// A view should be updated.
     ///
     /// This method is called after [`HView::pend_update`] is called or a view
     /// is added to a window for the first time.
     /// The system automatically flushes changes to the layers by calling
-    /// [`WM::update_wnd`] after calling this method for all
+    /// [`Wm::update_wnd`] after calling this method for all
     /// pending views, so this is the optimal place to update the properties of
     /// associated layers (if any).
     ///
-    /// [`WM::update_wnd`]: crate::pal::iface::WM::update_wnd
-    fn update(&self, _: WM, _: &HView, _: &mut UpdateCtx<'_>) {}
+    /// [`Wm::update_wnd`]: crate::pal::iface::Wm::update_wnd
+    fn update(&self, _: Wm, _: &HView, _: &mut UpdateCtx<'_>) {}
 
     /// Get event handlers for handling the mouse drag gesture initiated by
     /// a mouse down event described by `loc` and `button`.
@@ -253,7 +253,7 @@ pub trait ViewListener {
     /// You must set [`ViewFlags::ACCEPT_MOUSE_DRAG`] for this to be called.
     fn mouse_drag(
         &self,
-        _: WM,
+        _: Wm,
         _: &HView,
         _loc: Point2<f32>,
         _button: u8,
@@ -390,7 +390,7 @@ impl PartialEq<Weak<View>> for Superview {
 
 impl HWnd {
     /// Construct a window object and return a handle to it.
-    pub fn new(wm: WM) -> Self {
+    pub fn new(wm: Wm) -> Self {
         let hwnd = Self {
             wnd: Rc::new(Wnd::new(wm)),
         };
@@ -412,7 +412,7 @@ impl HWnd {
         hwnd
     }
 
-    pub(crate) fn wm(&self) -> WM {
+    pub(crate) fn wm(&self) -> Wm {
         self.wnd.wm
     }
 

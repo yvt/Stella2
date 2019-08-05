@@ -1,7 +1,7 @@
 use super::super::{
     WndAttrs, winit::{WndContent as WndContentTrait},
 };
-use super::WM;
+use super::Wm;
 
 #[derive(Debug, Clone)]
 pub struct HWnd {
@@ -27,15 +27,15 @@ impl HWnd {
         unimplemented!()
     }
 
-    pub(super) fn update(&self, _: WM) {
+    pub(super) fn update(&self, _: Wm) {
         unimplemented!()
     }
 
-    pub(super) fn get_size(&self, _: WM) -> [u32; 2] {
+    pub(super) fn get_size(&self, _: Wm) -> [u32; 2] {
         unimplemented!()
     }
 
-    pub(super) fn get_dpi_scale(&self, _: WM) -> f32 {
+    pub(super) fn get_dpi_scale(&self, _: Wm) -> f32 {
         unimplemented!()
     }
 }

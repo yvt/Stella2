@@ -1,9 +1,9 @@
 use super::{HView, HWnd, ViewDirtyFlags};
-use crate::pal::WM;
+use crate::pal::Wm;
 
 impl HView {
     /// Call `ViewListener::mount` as necessary.
-    pub(super) fn call_pending_mount_if_dirty(&self, wm: WM, hwnd: &HWnd) {
+    pub(super) fn call_pending_mount_if_dirty(&self, wm: Wm, hwnd: &HWnd) {
         let dirty = &self.view.dirty;
 
         if dirty.get().contains(ViewDirtyFlags::MOUNTED) {
@@ -23,7 +23,7 @@ impl HView {
     }
 
     /// Call `ViewListener::mount` as necessary. It ignores the `MOUNT` dirty bit.
-    fn call_pending_mount(&self, wm: WM, hwnd: &HWnd) {
+    fn call_pending_mount(&self, wm: Wm, hwnd: &HWnd) {
         let dirty = &self.view.dirty;
         dirty.set(dirty.get() - ViewDirtyFlags::MOUNT);
 
@@ -39,7 +39,7 @@ impl HView {
     }
 
     /// Unmount this view and its all subviews.
-    pub(super) fn call_unmount(&self, wm: WM) {
+    pub(super) fn call_unmount(&self, wm: Wm) {
         let dirty = &self.view.dirty;
 
         if !dirty.get().contains(ViewDirtyFlags::MOUNTED) {

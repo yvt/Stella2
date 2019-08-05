@@ -8,7 +8,7 @@ mod view;
 fn main() {
     crashhandler::init();
 
-    let wm = pal::WM::global();
+    let wm = pal::Wm::global();
 
     // Register the application's custom stylesheet
     let style_manager = tcw3::ui::theming::Manager::global(wm);

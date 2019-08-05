@@ -1,7 +1,7 @@
 use iterpool::{intrusive_list, Pool, PoolPtr};
 use quick_error2::quick_error;
 use std::{cell::RefCell, fmt, sync::Arc};
-use tcw3_pal::{self as pal, iface::WM as _, Bitmap, MtLock, MtSticky, WM};
+use tcw3_pal::{self as pal, iface::Wm as _, Bitmap, MtLock, MtSticky, Wm};
 
 /// A bitmap created by rasterizing [`Img`]. The second value represents the
 /// actual DPI scale value of the bitmap, which may or may not match the
@@ -44,14 +44,14 @@ impl HImg {
     }
 
     /// Construct a `Bitmap` for the specified DPI scale. Uses a global cache,
-    /// which is owned by the main thread (hence the `WM` parameter).
+    /// which is owned by the main thread (hence the `Wm` parameter).
     ///
     /// The cache only stores `Bmp`s created for DPI scale values used by any of
     /// open windows. For other DPI scale values, this method behaves like
     /// `new_bmp_uncached`.
     ///
     /// Returns a constructed `Bitmap` and the actual DPI scale of the `Bitmap`.
-    pub fn new_bmp(&self, wm: WM, dpi_scale: f32) -> Bmp {
+    pub fn new_bmp(&self, wm: Wm, dpi_scale: f32) -> Bmp {
         let mut cache_ref = self
             .inner
             .cache_ref
@@ -108,8 +108,8 @@ impl HImg {
 impl Drop for ImgCacheRef {
     fn drop(&mut self) {
         if let Some(img_ptr) = self.img_ptr {
-            // `ImgCacheRef` is wrapped by `MtSticky`, so `WM::global()` will succeed
-            let wm = WM::global();
+            // `ImgCacheRef` is wrapped by `MtSticky`, so `Wm::global()` will succeed
+            let wm = Wm::global();
             CACHE.get_with_wm(wm).borrow_mut().img_remove(img_ptr);
         }
     }
@@ -131,7 +131,7 @@ impl<T: ?Sized> fmt::Debug for ImgInner<T> {
 /// no longer used.
 ///
 /// [`dpi_scale_release`] decrements the use count.
-pub fn dpi_scale_add_ref(wm: pal::WM, dpi_scale: f32) {
+pub fn dpi_scale_add_ref(wm: pal::Wm, dpi_scale: f32) {
     CACHE
         .get_with_wm(wm)
         .borrow_mut()
@@ -141,7 +141,7 @@ pub fn dpi_scale_add_ref(wm: pal::WM, dpi_scale: f32) {
 /// Decrement the use count of the specified DPI scale value.
 ///
 /// See [`dpi_scale_add_ref`] for more.
-pub fn dpi_scale_release(wm: pal::WM, dpi_scale: f32) {
+pub fn dpi_scale_release(wm: pal::Wm, dpi_scale: f32) {
     CACHE
         .get_with_wm(wm)
         .borrow_mut()

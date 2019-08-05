@@ -21,7 +21,7 @@ use winit::{
     window::Window,
 };
 
-use super::{iface::WM, MtSticky};
+use super::{iface::Wm, MtSticky};
 
 mod wm;
 
@@ -31,14 +31,14 @@ type UserEvent<TWM, TWC> = Box<dyn FnOnce(&'static WinitWm<TWM, TWC>) + Send>;
 /// The global state of the window manager, accessible by any threads.
 /// `WinitWm` is included in this struct, protected by `MtSticky`. This struct
 /// is also responsible for defining what is the main thread and what is not.
-pub struct WinitEnv<TWM: WM, TWC: WndContent> {
+pub struct WinitEnv<TWM: Wm, TWC: WndContent> {
     mt: OnceCell<MtData<TWM, TWC>>,
     /// Invoke events which were created before `mt` is initialized.
     pending_invoke_events: OnceCell<Mutex<Vec<UserEvent<TWM, TWC>>>>,
 }
 
 /// Things bound to the main thread.
-struct MtData<TWM: WM, TWC: WndContent> {
+struct MtData<TWM: Wm, TWC: WndContent> {
     /// `Fragile`'s content is only accessible to the initializing thread. We
     /// leverage this property to implement `is_main_thread`.
     mt_check: Fragile<()>,
@@ -47,7 +47,7 @@ struct MtData<TWM: WM, TWC: WndContent> {
 }
 
 /// The global state of the window manager, only accessible to the main thread.
-pub struct WinitWm<TWM: WM, TWC: WndContent> {
+pub struct WinitWm<TWM: Wm, TWC: WndContent> {
     wm: TWM,
     /// This `EventLoop` is wrapped by `RefCell` so that it can be moved out when
     /// starting the main event loop.

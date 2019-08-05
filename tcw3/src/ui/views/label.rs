@@ -213,19 +213,19 @@ impl Layout for LabelListener {
 }
 
 impl ViewListener for LabelListener {
-    fn mount(&self, wm: pal::WM, view: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
         self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
     }
 
-    fn unmount(&self, wm: pal::WM, view: &HView) {
+    fn unmount(&self, wm: pal::Wm, view: &HView) {
         self.inner.state.borrow_mut().canvas.unmount(wm, view);
     }
 
-    fn position(&self, wm: pal::WM, view: &HView) {
+    fn position(&self, wm: pal::Wm, view: &HView) {
         self.inner.state.borrow_mut().canvas.position(wm, view);
     }
 
-    fn update(&self, wm: pal::WM, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
         let mut state = self.inner.state.borrow_mut();
         let state = &mut *state; // enable split borrow
 

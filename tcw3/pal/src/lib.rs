@@ -14,7 +14,7 @@ pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        TextLayout, WndListener, WM,
+        TextLayout, WndListener, Wm,
     };
 }
 
@@ -38,7 +38,7 @@ pub mod native {
 
     cfg_if! {
         if #[cfg(target_os = "macos")] {
-            pub type WM = macos::WM;
+            pub type Wm = macos::Wm;
             pub type Bitmap = macos::Bitmap;
             pub type BitmapBuilder = macos::BitmapBuilder;
             pub type CharStyle = macos::CharStyle;
@@ -53,7 +53,7 @@ pub mod native {
 //       UI tests to provide stimuli
 
 /// The default window manager type for the target platform.
-pub type WM = native::WM;
+pub type Wm = native::Wm;
 
 /// The default bitmap type for the target platform implementing
 /// `Bitmap`.
@@ -84,14 +84,14 @@ pub use self::iface::{
     BadThread, LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,
 };
 
-/// The window handle type of [`WM`].
-pub type HWnd = <WM as iface::WM>::HWnd;
+/// The window handle type of [`Wm`].
+pub type HWnd = <Wm as iface::Wm>::HWnd;
 
-/// The layer handle type of [`WM`].
-pub type HLayer = <WM as iface::WM>::HLayer;
+/// The layer handle type of [`Wm`].
+pub type HLayer = <Wm as iface::Wm>::HLayer;
 
 /// A specialization of `WndAttrs` for the default backend.
-pub type WndAttrs<'a> = iface::WndAttrs<'a, WM, HLayer>;
+pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 
 /// A specialization of `LayerAttrs` for the default backend.
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -103,7 +103,7 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 // exactly like type aliases. Specifically, they cannot be used in every place
 // where traits can be used, like `impl` blocks.
 //
-//      pub trait WndListener = iface::WndListener<WM>;
+//      pub trait WndListener = iface::WndListener<Wm>;
 //
 
 // ============================================================================

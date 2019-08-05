@@ -54,7 +54,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::mount`].
     ///
     /// [`ViewListener::mount`]: crate::uicore::ViewListener::mount
-    pub fn mount(&mut self, wm: pal::WM, view: &HView, wnd: &HWnd) {
+    pub fn mount(&mut self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
         assert!(self.state.is_none());
 
         let layer = wm.new_layer(pal::LayerAttrs {
@@ -80,7 +80,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::unmount`].
     ///
     /// [`ViewListener::unmount`]: crate::uicore::ViewListener::unmount
-    pub fn unmount(&mut self, wm: pal::WM, _: &HView) {
+    pub fn unmount(&mut self, wm: pal::Wm, _: &HView) {
         let state = self.state.take().expect("not mounted");
         wm.remove_layer(&state.layer);
         state.sub.unsubscribe().unwrap();
@@ -89,7 +89,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::position`].
     ///
     /// [`ViewListener::position`]: crate::uicore::ViewListener::position
-    pub fn position(&mut self, _: pal::WM, view: &HView) {
+    pub fn position(&mut self, _: pal::Wm, view: &HView) {
         assert!(self.state.is_some(), "not mounted");
         view.pend_update();
     }
@@ -108,7 +108,7 @@ impl CanvasMixin {
     /// `Box2::with_size(Point2::new(0.0, 0.0), frame().size())`.
     pub fn update_layer(
         &mut self,
-        wm: pal::WM,
+        wm: pal::Wm,
         view: &HView,
         wnd: &HWnd,
         visual_bounds: Box2<f32>,
@@ -200,7 +200,7 @@ impl CanvasMixin {
     /// `(-radius, -radius)-(radius, radius)`.
     pub fn update_layer_border(
         &mut self,
-        wm: pal::WM,
+        wm: pal::Wm,
         view: &HView,
         wnd: &HWnd,
         radius: f32,
@@ -281,7 +281,7 @@ impl CanvasMixin {
     /// [`layer`]: CanvasMixin::layer
     pub fn update(
         &mut self,
-        wm: pal::WM,
+        wm: pal::Wm,
         view: &HView,
         ctx: &mut UpdateCtx<'_>,
         paint: impl FnOnce(&mut PaintContext<'_>),
