@@ -129,21 +129,15 @@ impl iface::Wm for Wm {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        // Having a reference to `Wm` means we are on a main thread, so
-        // this is safe
-        unsafe { HWnd::new(attrs) }
+        HWnd::new(self, attrs)
     }
 
     fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        // Having a reference to `Wm` means we are on a main thread, so
-        // this is safe
-        unsafe { window.set_attrs(attrs) }
+        window.set_attrs(self, attrs);
     }
 
     fn remove_wnd(self, window: &Self::HWnd) {
-        // Having a reference to `Wm` means we are on a main thread, so
-        // this is safe
-        unsafe { window.remove() }
+        window.remove(self);
     }
 
     fn update_wnd(self, window: &Self::HWnd) {

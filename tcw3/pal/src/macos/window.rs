@@ -49,16 +49,17 @@ struct WndState {
 }
 
 impl HWnd {
-    /// Must be called from a main thread.
-    pub(super) unsafe fn new(attrs: WndAttrs<'_>) -> Self {
+    pub(super) fn new(wm: Wm, attrs: WndAttrs<'_>) -> Self {
         with_autorelease_pool(|| {
             extern "C" {
                 /// Return `[TCWWindowController class]`.
                 fn tcw_wnd_ctrler_cls() -> id;
             }
 
-            let ctrler: id = msg_send![tcw_wnd_ctrler_cls(), alloc];
-            let ctrler = IdRef::new(msg_send![ctrler, init]).non_nil().unwrap();
+            let ctrler: id = unsafe { msg_send![tcw_wnd_ctrler_cls(), alloc] };
+            let ctrler = IdRef::new(unsafe { msg_send![ctrler, init] })
+                .non_nil()
+                .unwrap();
 
             // Create a handle
             let this = HWnd { ctrler };
@@ -71,10 +72,10 @@ impl HWnd {
             });
 
             // Attach `WndState`
-            let () = msg_send![*this.ctrler, setListenerUserData: Rc::into_raw(state)];
+            let () = unsafe { msg_send![*this.ctrler, setListenerUserData: Rc::into_raw(state)] };
 
-            this.set_attrs(attrs);
-            let () = msg_send![*this.ctrler, center];
+            this.set_attrs(wm, attrs);
+            let () = unsafe { msg_send![*this.ctrler, center] };
 
             this
         })
@@ -90,42 +91,41 @@ impl HWnd {
         }
     }
 
-    /// Must be called from a main thread.
-    pub(super) unsafe fn set_attrs(&self, attrs: WndAttrs<'_>) {
+    pub(super) fn set_attrs(&self, wm: Wm, attrs: WndAttrs<'_>) {
         let state = self.state();
 
         // Call `setFlags` before `setContentSize` to make sure the window
         // properly sized based on the target window style masks
         if let Some(value) = attrs.flags {
-            let () = msg_send![*self.ctrler, setFlags: value.bits()];
+            let () = unsafe { msg_send![*self.ctrler, setFlags: value.bits()] };
         }
 
         if let Some(value) = attrs.size {
             let size = NSSize::new(value[0] as _, value[1] as _);
-            let () = msg_send![*self.ctrler, setContentSize: size];
+            let () = unsafe { msg_send![*self.ctrler, setContentSize: size] };
         }
 
         if let Some(value) = attrs.min_size {
             let min_size = NSSize::new(value[0] as _, value[1] as _);
-            let () = msg_send![*self.ctrler, setContentMinSize: min_size];
+            let () = unsafe { msg_send![*self.ctrler, setContentMinSize: min_size] };
         }
 
         if let Some(value) = attrs.max_size {
             let max_size = NSSize::new(value[0] as _, value[1] as _);
-            let () = msg_send![*self.ctrler, setContentMaxSize: max_size];
+            let () = unsafe { msg_send![*self.ctrler, setContentMaxSize: max_size] };
         }
 
         if let Some(value) = &attrs.caption {
-            let title = IdRef::new(NSString::alloc(nil).init_str(&**value));
-            let () = msg_send![*self.ctrler, setTitle:*title];
+            let title = IdRef::new(unsafe { NSString::alloc(nil).init_str(&**value) });
+            let () = unsafe { msg_send![*self.ctrler, setTitle:*title] };
         }
 
         match attrs.visible {
             Some(true) => {
-                let () = msg_send![*self.ctrler, makeKeyAndOrderFront];
+                let () = unsafe { msg_send![*self.ctrler, makeKeyAndOrderFront] };
             }
             Some(false) => {
-                let () = msg_send![*self.ctrler, orderOut];
+                let () = unsafe { msg_send![*self.ctrler, orderOut] };
             }
             None => {}
         }
@@ -136,19 +136,18 @@ impl HWnd {
 
         if let Some(value) = attrs.layer {
             let layer = if let Some(hlayer) = value {
-                hlayer.ca_layer(Wm::global_unchecked())
+                hlayer.ca_layer(wm)
             } else {
                 nil
             };
-            let () = msg_send![*self.ctrler, setLayer: layer];
+            let () = unsafe { msg_send![*self.ctrler, setLayer: layer] };
             state.layer.set(value);
         }
     }
 
-    /// Must be called from a main thread.
-    pub(super) unsafe fn remove(&self) {
+    pub(super) fn remove(&self, _: Wm) {
         with_autorelease_pool(|| {
-            let () = msg_send![*self.ctrler, close];
+            let () = unsafe { msg_send![*self.ctrler, close] };
         });
     }
 
