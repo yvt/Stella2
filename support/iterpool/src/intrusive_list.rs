@@ -1,7 +1,7 @@
 //! Intrusive doubly linked list for `Pool`s and `IterablePool`s.
+use crate::PoolPtr;
 use std::mem::transmute;
 use std::ops;
-use crate::PoolPtr;
 
 /// Circualr linked list header.
 #[derive(Debug, Default, Copy, Clone)]

@@ -14,7 +14,7 @@ pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        TextLayout, WndListener, Wm,
+        TextLayout, Wm, WndListener,
     };
 }
 
