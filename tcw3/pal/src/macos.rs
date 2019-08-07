@@ -24,7 +24,7 @@ cfg_if! {
         mod winitwindow;
         pub use self::winitwindow::HWnd;
 
-        use super::winit::WinitEnv;
+        use super::winit::{WinitEnv, WinitWm};
         static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
     } else {
         mod window;
@@ -42,6 +42,16 @@ cfg_if! {
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
+}
+
+impl Wm {
+    /// Get the global `WinitWm` instance.
+    ///
+    /// Use `WinitWm::wm` for the conversion in the other way around.
+    #[cfg(feature = "macos_winit")]
+    fn winit_wm(self) -> &'static WinitWm<Wm, winitwindow::WndContent> {
+        WINIT_ENV.wm_with_wm(self)
+    }
 }
 
 impl iface::Wm for Wm {
@@ -113,9 +123,7 @@ impl iface::Wm for Wm {
 
     #[cfg(feature = "macos_winit")]
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
-        WINIT_ENV
-            .wm_with_wm(self)
-            .invoke(move |winit_wm| f(winit_wm.wm()));
+        self.winit_wm().invoke(move |winit_wm| f(winit_wm.wm()));
     }
 
     #[cfg(feature = "macos_winit")]

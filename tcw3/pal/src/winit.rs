@@ -21,8 +21,12 @@ use winit::{
     window::Window,
 };
 
-use super::{iface::Wm, MtSticky};
+use super::{
+    iface::{Wm, WndListener},
+    MtSticky,
+};
 
+mod window;
 mod wm;
 
 /// The user event type.
@@ -61,7 +65,14 @@ pub struct WinitWm<TWM: Wm, TWC: WndContent> {
 
     /// A list of open windows. To support reentrancy, this must be unborrowed
     /// before calling any user event handlers.
-    wnds: RefCell<Pool<Rc<Wnd<TWC>>>>,
+    wnds: RefCell<Pool<Rc<Wnd<TWM, TWC>>>>,
+}
+
+/// Represents a type wrapping `WinitWm` to implement `Wm`.
+pub trait WinitWmWrap: Wm {
+    /// Convert `HWnd` to a backend-specific `HWnd`. Panic if the given window
+    /// handle is invalid.
+    fn winit_hwnd_to_hwnd(self, hwnd: &HWnd) -> Self::HWnd;
 }
 
 #[derive(Debug, Clone)]
@@ -69,9 +80,34 @@ pub struct HWnd {
     ptr: PoolPtr,
 }
 
-pub trait WndContent: 'static {}
+pub trait WndContent: 'static + Sized {
+    /// A window manager type.
+    type Wm: Wm;
 
-struct Wnd<TWC> {
+    /// A layer handle type that this `WndContent` accepts as the root layer.
+    type HLayer: std::fmt::Debug + Clone;
+
+    /// Called when a new root layer is attached. Redraw can be deferred until
+    /// the next call to `update` or `paint`.
+    fn set_layer(
+        &mut self,
+        wm: &WinitWm<Self::Wm, Self>,
+        winit_wnd: &Window,
+        layer: Option<Self::HLayer>,
+    );
+
+    /// Called inside `update_wnd`.
+    fn update(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+
+    /// Called as a response to the `RedrawRequested` event. Note that `WinitWm`
+    /// does not automatically call `request_redraw`.
+    fn redraw_requested(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+
+    fn close(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+}
+
+struct Wnd<TWM: Wm, TWC> {
     winit_wnd: Window,
-    content: TWC,
+    content: RefCell<TWC>,
+    listener: RefCell<Box<dyn WndListener<TWM>>>,
 }
