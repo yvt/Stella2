@@ -9,4 +9,13 @@ fn main() {
             .flag("-fobjc-weak")
             .compile("tcwsupport");
     }
+
+    #[cfg(feature = "macos_winit")]
+    {
+        cc::Build::new()
+            .file("src/macos/TCWWinitView.m")
+            .flag("-fobjc-arc")
+            .flag("-fobjc-weak")
+            .compile("tcwsupport_winit");
+    }
 }
