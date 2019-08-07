@@ -8,6 +8,12 @@ mod view;
 fn main() {
     crashhandler::init();
 
+    // Enable logging only in debug builds
+    #[cfg(debug_assertions)]
+    {
+        pretty_env_logger::init();
+    }
+
     let wm = pal::Wm::global();
 
     // Register the application's custom stylesheet
