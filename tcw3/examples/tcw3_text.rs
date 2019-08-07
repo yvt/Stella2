@@ -102,6 +102,8 @@ impl WndListener for MyWndListener {
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     // Parse command-line arguments
     let opt = Opt::from_args();
 

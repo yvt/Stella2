@@ -72,6 +72,8 @@ impl WndListener for MyWndListener {
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     let wm = pal::Wm::global();
     let style_manager = theming::Manager::global(wm);
 
