@@ -24,7 +24,7 @@ cfg_if! {
         mod winitwindow;
         pub use self::winitwindow::HWnd;
 
-        use super::winit::{WinitEnv, WinitWm};
+        use super::winit::{WinitEnv, WinitWmCore};
         static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
     } else {
         mod window;
@@ -45,11 +45,11 @@ pub struct Wm {
 }
 
 impl Wm {
-    /// Get the global `WinitWm` instance.
+    /// Get the global `WinitWmCore` instance.
     ///
-    /// Use `WinitWm::wm` for the conversion in the other way around.
+    /// Use `WinitWmCore::wm` for the conversion in the other way around.
     #[cfg(feature = "macos_winit")]
-    fn winit_wm(self) -> &'static WinitWm<Wm, winitwindow::WndContent> {
+    fn winit_wm(self) -> &'static WinitWmCore<Wm, winitwindow::WndContent> {
         WINIT_ENV.wm_with_wm(self)
     }
 }

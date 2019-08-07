@@ -9,7 +9,7 @@ use std::{
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
 use super::super::{iface::Wm, MtSticky};
-use super::{MtData, UserEvent, WinitEnv, WinitWm, WndContent};
+use super::{MtData, UserEvent, WinitEnv, WinitWmCore, WndContent};
 
 impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
@@ -48,7 +48,7 @@ impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
             let wm = unsafe { TWM::global_unchecked() };
 
             // Create a winit event loop
-            let mut winit_wm = WinitWm::new(wm);
+            let mut winit_wm = WinitWmCore::new(wm);
             let proxy = winit_wm.create_proxy();
 
             // Acquire a lock on `pending_invoke_events` to process pending
@@ -77,13 +77,13 @@ impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
     }
 
     #[inline]
-    pub fn wm_with_wm(&'static self, wm: TWM) -> &WinitWm<TWM, TWC> {
+    pub fn wm_with_wm(&'static self, wm: TWM) -> &WinitWmCore<TWM, TWC> {
         self.mt_data_or_init().wm.get_with_wm(wm)
     }
 
     pub fn invoke_on_main_thread(
         &'static self,
-        cb: impl FnOnce(&'static WinitWm<TWM, TWC>) + Send + 'static,
+        cb: impl FnOnce(&'static WinitWmCore<TWM, TWC>) + Send + 'static,
     ) {
         let e: UserEvent<TWM, TWC> = Box::new(cb);
 
@@ -125,7 +125,7 @@ impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
     }
 }
 
-impl<TWM: Wm, TWC: WndContent> WinitWm<TWM, TWC> {
+impl<TWM: Wm, TWC: WndContent> WinitWmCore<TWM, TWC> {
     fn new(wm: TWM) -> Self {
         Self {
             wm,

@@ -30,10 +30,10 @@ mod window;
 mod wm;
 
 /// The user event type.
-type UserEvent<TWM, TWC> = Box<dyn FnOnce(&'static WinitWm<TWM, TWC>) + Send>;
+type UserEvent<TWM, TWC> = Box<dyn FnOnce(&'static WinitWmCore<TWM, TWC>) + Send>;
 
 /// The global state of the window manager, accessible by any threads.
-/// `WinitWm` is included in this struct, protected by `MtSticky`. This struct
+/// `WinitWmCore` is included in this struct, protected by `MtSticky`. This struct
 /// is also responsible for defining what is the main thread and what is not.
 pub struct WinitEnv<TWM: Wm, TWC: WndContent> {
     mt: OnceCell<MtData<TWM, TWC>>,
@@ -46,12 +46,12 @@ struct MtData<TWM: Wm, TWC: WndContent> {
     /// `Fragile`'s content is only accessible to the initializing thread. We
     /// leverage this property to implement `is_main_thread`.
     mt_check: Fragile<()>,
-    wm: MtSticky<WinitWm<TWM, TWC>, TWM>,
+    wm: MtSticky<WinitWmCore<TWM, TWC>, TWM>,
     proxy: EventLoopProxy<UserEvent<TWM, TWC>>,
 }
 
 /// The global state of the window manager, only accessible to the main thread.
-pub struct WinitWm<TWM: Wm, TWC: WndContent> {
+pub struct WinitWmCore<TWM: Wm, TWC: WndContent> {
     wm: TWM,
     /// This `EventLoop` is wrapped by `RefCell` so that it can be moved out when
     /// starting the main event loop.
@@ -68,15 +68,16 @@ pub struct WinitWm<TWM: Wm, TWC: WndContent> {
     wnds: RefCell<Pool<Rc<Wnd<TWM, TWC>>>>,
 }
 
-/// Represents a type wrapping `WinitWm` to implement `Wm`.
-pub trait WinitWmWrap: Wm {
-    /// Convert `HWnd` to a backend-specific `HWnd`. Panic if the given window
+/// Represents a type wrapping `WinitWmCore` to implement `Wm`.
+pub trait WinitWm: Wm {
+    /// Convert `HWndCore` to a backend-specific `HWnd`. Panic if the given window
     /// handle is invalid.
-    fn winit_hwnd_to_hwnd(self, hwnd: &HWnd) -> Self::HWnd;
+    fn hwnd_core_to_hwnd(self, hwnd: &HWndCore) -> Self::HWnd;
 }
 
+/// The window handle type used by `WinitWmCore`.
 #[derive(Debug, Clone)]
-pub struct HWnd {
+pub struct HWndCore {
     ptr: PoolPtr,
 }
 
@@ -91,19 +92,19 @@ pub trait WndContent: 'static + Sized {
     /// the next call to `update` or `paint`.
     fn set_layer(
         &mut self,
-        wm: &WinitWm<Self::Wm, Self>,
+        wm: &WinitWmCore<Self::Wm, Self>,
         winit_wnd: &Window,
         layer: Option<Self::HLayer>,
     );
 
     /// Called inside `update_wnd`.
-    fn update(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+    fn update(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
 
-    /// Called as a response to the `RedrawRequested` event. Note that `WinitWm`
+    /// Called as a response to the `RedrawRequested` event. Note that `WinitWmCore`
     /// does not automatically call `request_redraw`.
-    fn redraw_requested(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+    fn redraw_requested(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
 
-    fn close(&mut self, _wm: &WinitWm<Self::Wm, Self>, _winit_wnd: &Window) {}
+    fn close(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
 }
 
 struct Wnd<TWM: Wm, TWC> {

@@ -1,14 +1,14 @@
 use winit::window::Window;
 
 use super::super::{
-    winit::{HWnd as WinitHWnd, WinitWm, WinitWmWrap, WndContent as WndContentTrait},
+    winit::{HWndCore, WinitWmCore, WinitWm, WndContent as WndContentTrait},
     WndAttrs,
 };
 use super::{HLayer, Wm};
 
 #[derive(Debug, Clone)]
 pub struct HWnd {
-    winit_hwnd: WinitHWnd,
+    winit_hwnd: HWndCore,
 }
 
 pub(super) struct WndContent {}
@@ -19,7 +19,7 @@ impl WndContentTrait for WndContent {
 
     fn set_layer(
         &mut self,
-        _wm: &WinitWm<Self::Wm, Self>,
+        _wm: &WinitWmCore<Self::Wm, Self>,
         _winit_wnd: &Window,
         _layer: Option<Self::HLayer>,
     ) {
@@ -27,8 +27,8 @@ impl WndContentTrait for WndContent {
     }
 }
 
-impl WinitWmWrap for Wm {
-    fn winit_hwnd_to_hwnd(self, hwnd: &WinitHWnd) -> Self::HWnd {
+impl WinitWm for Wm {
+    fn hwnd_core_to_hwnd(self, hwnd: &HWndCore) -> Self::HWnd {
         HWnd {
             winit_hwnd: hwnd.clone(),
         }

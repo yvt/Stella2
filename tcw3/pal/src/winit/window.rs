@@ -2,9 +2,9 @@ use std::{cell::RefCell, rc::Rc};
 use winit::window::{Window, WindowBuilder};
 
 use super::super::iface::{WndAttrs, WndFlags};
-use super::{HWnd, WinitWm, WinitWmWrap, Wnd, WndContent};
+use super::{HWndCore, WinitWm, WinitWmCore, Wnd, WndContent};
 
-impl<TWM: WinitWmWrap, TWC: WndContent<Wm = TWM>> WinitWm<TWM, TWC> {
+impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     /// Create a window and return a window handle.
     ///
     /// `content_factory` is a function that constructs a backend-specific
@@ -13,7 +13,7 @@ impl<TWM: WinitWmWrap, TWC: WndContent<Wm = TWM>> WinitWm<TWM, TWC> {
         &self,
         attrs: WndAttrs<'_, TWM, TWC::HLayer>,
         content_factory: impl FnOnce(&Window, Option<TWC::HLayer>) -> TWC,
-    ) -> HWnd {
+    ) -> HWndCore {
         let winit_wnd = self.with_event_loop_wnd_target(|el_wnd_target| {
             let mut builder = WindowBuilder::new();
 
@@ -55,10 +55,10 @@ impl<TWM: WinitWmWrap, TWC: WndContent<Wm = TWM>> WinitWm<TWM, TWC> {
 
         let ptr = self.wnds.borrow_mut().allocate(Rc::new(wnd));
 
-        HWnd { ptr }
+        HWndCore { ptr }
     }
 
-    pub fn set_wnd_attr(&self, hwnd: &HWnd, attrs: WndAttrs<'_, TWM, TWC::HLayer>) {
+    pub fn set_wnd_attr(&self, hwnd: &HWndCore, attrs: WndAttrs<'_, TWM, TWC::HLayer>) {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
         let winit_wnd = &wnd.winit_wnd;
 
@@ -86,23 +86,23 @@ impl<TWM: WinitWmWrap, TWC: WndContent<Wm = TWM>> WinitWm<TWM, TWC> {
         }
     }
 
-    pub fn remove_wnd(&self, hwnd: &HWnd) {
+    pub fn remove_wnd(&self, hwnd: &HWndCore) {
         // Call `WndListener::close`. Note that we must unborrow `RefCell`
         // before calling into `WndListener`.
         let wnd = self.wnds.borrow_mut().deallocate(hwnd.ptr).unwrap();
-        let outer_hwnd = self.wm().winit_hwnd_to_hwnd(hwnd);
+        let outer_hwnd = self.wm().hwnd_core_to_hwnd(hwnd);
         wnd.listener.borrow().close(self.wm(), &outer_hwnd);
 
         // And then call `WndContent::close`
         wnd.content.borrow_mut().close(self, &wnd.winit_wnd);
     }
 
-    pub fn update_wnd(&self, hwnd: &HWnd) {
+    pub fn update_wnd(&self, hwnd: &HWndCore) {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
         wnd.content.borrow_mut().update(self, &wnd.winit_wnd);
     }
 
-    pub fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
+    pub fn get_wnd_size(&self, hwnd: &HWndCore) -> [u32; 2] {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
 
         let size = wnd.winit_wnd.inner_size();
@@ -110,7 +110,7 @@ impl<TWM: WinitWmWrap, TWC: WndContent<Wm = TWM>> WinitWm<TWM, TWC> {
         // Truncating fractions. The ramification is unknonw.
         [size.width as u32, size.height as u32]
     }
-    pub fn get_wnd_dpi_scale(&self, hwnd: &HWnd) -> f32 {
+    pub fn get_wnd_dpi_scale(&self, hwnd: &HWndCore) -> f32 {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
 
         wnd.winit_wnd.hidpi_factor() as f32
