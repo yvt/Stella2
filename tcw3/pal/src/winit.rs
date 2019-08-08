@@ -6,6 +6,7 @@
 //! contents. A platform-specific module may delegate window handling to this
 //! module, but should implement window content rendering by themselves by
 //! invoking their respective platform APIs.
+use cgmath::Point2;
 use fragile::Fragile;
 use iterpool::{Pool, PoolPtr};
 use once_cell::sync::OnceCell;
@@ -22,10 +23,11 @@ use winit::{
 };
 
 use super::{
-    iface::{Wm, WndListener},
+    iface::{MouseDragListener, Wm, WndListener},
     MtSticky,
 };
 
+mod utils;
 mod window;
 mod wm;
 
@@ -111,4 +113,12 @@ struct Wnd<TWM: Wm, TWC> {
     winit_wnd: Window,
     content: RefCell<TWC>,
     listener: RefCell<Box<dyn WndListener<TWM>>>,
+    mouse_drag: RefCell<Option<WndMouseDrag<TWM>>>,
+    mouse_pos: Cell<Point2<f32>>,
+}
+
+struct WndMouseDrag<TWM: Wm> {
+    listener: Box<dyn MouseDragListener<TWM>>,
+    /// A bit set of mouse buttons which are currently pressed down.
+    pressed_buttons: u64,
 }

@@ -1,8 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
-use winit::window::{Window, WindowBuilder};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
+use winit::{
+    event::{ElementState, WindowEvent},
+    window::{Window, WindowBuilder, WindowId},
+};
 
 use super::super::iface::{WndAttrs, WndFlags};
-use super::{HWndCore, WinitWm, WinitWmCore, Wnd, WndContent};
+use super::{
+    utils::{log_pos_to_point2, mouse_button_to_id},
+    HWndCore, WinitWm, WinitWmCore, Wnd, WndContent, WndMouseDrag,
+};
 
 impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     /// Create a window and return a window handle.
@@ -51,6 +60,8 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             winit_wnd,
             content: RefCell::new(content),
             listener: RefCell::new(listener),
+            mouse_drag: RefCell::new(None),
+            mouse_pos: Cell::new((0.0, 0.0).into()),
         };
 
         let ptr = self.wnds.borrow_mut().allocate(Rc::new(wnd));
@@ -84,6 +95,9 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         if let Some(x) = attrs.layer {
             wnd.content.borrow_mut().set_layer(self, &wnd.winit_wnd, x);
         }
+        if let Some(x) = attrs.listener {
+            *wnd.listener.borrow_mut() = x;
+        }
     }
 
     pub fn remove_wnd(&self, hwnd: &HWndCore) {
@@ -114,5 +128,126 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
 
         wnd.winit_wnd.hidpi_factor() as f32
+    }
+
+    pub(super) fn handle_wnd_evt(&self, wnd_id: WindowId, evt: WindowEvent) {
+        let (wnd, hwnd_core);
+
+        if let Some((ptr, wnd_ref)) = self
+            .wnds
+            .borrow()
+            .ptr_iter()
+            .find(|(_, w)| w.winit_wnd.id() == wnd_id)
+        {
+            wnd = Rc::clone(wnd_ref);
+            hwnd_core = HWndCore { ptr }
+        } else {
+            return;
+        }
+
+        let listener = wnd.listener.borrow();
+
+        let hwnd = self.wm().hwnd_core_to_hwnd(&hwnd_core);
+
+        match evt {
+            WindowEvent::Resized(_) => {
+                listener.resize(self.wm(), &hwnd);
+            }
+            WindowEvent::CloseRequested => {
+                if listener.close_requested(self.wm(), &hwnd) {
+                    self.remove_wnd(&hwnd_core);
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                wnd.mouse_pos.set(log_pos_to_point2(position));
+
+                if let Some(ref mut mouse_drag) = &mut *wnd.mouse_drag.borrow_mut() {
+                    mouse_drag
+                        .listener
+                        .mouse_motion(self.wm(), &hwnd, log_pos_to_point2(position));
+                } else {
+                    listener.mouse_motion(self.wm(), &hwnd, log_pos_to_point2(position));
+                }
+            }
+            WindowEvent::CursorLeft { .. } => {
+                listener.mouse_leave(self.wm(), &hwnd);
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let mut mouse_drag_cell = wnd.mouse_drag.borrow_mut();
+
+                // `MouseInput` doesn't provide the coordinates, so we get them
+                // from the last `CursorMoved` event
+                let mouse_pos = wnd.mouse_pos.get();
+
+                let mouse_button = mouse_button_to_id(button);
+                if mouse_button >= 64 {
+                    // Can't fit within our bitfield's range, ignore the event
+                    return;
+                }
+                let mouse_button_mask = 1u64 << mouse_button;
+
+                match state {
+                    ElementState::Pressed => {
+                        let mouse_drag = mouse_drag_cell.get_or_insert_with(|| {
+                            // `wnd.mouse_drag` is `None`. Initiate a mouse drag
+                            // gesture
+                            let drag_listener =
+                                listener.mouse_drag(self.wm(), &hwnd, mouse_pos, mouse_button);
+
+                            WndMouseDrag {
+                                listener: drag_listener,
+                                pressed_buttons: 0,
+                            }
+                        });
+
+                        if (mouse_drag.pressed_buttons & mouse_button_mask) != 0 {
+                            // Already pressed?
+                            return;
+                        }
+
+                        mouse_drag.pressed_buttons |= mouse_button_mask;
+
+                        mouse_drag
+                            .listener
+                            .mouse_down(self.wm(), &hwnd, mouse_pos, mouse_button);
+                    }
+                    ElementState::Released => {
+                        let mouse_drag = if let Some(x) = &mut *mouse_drag_cell {
+                            x
+                        } else {
+                            // No mouse drag gesture that we know is active, ignoring
+                            // the event
+                            return;
+                        };
+
+                        if (mouse_drag.pressed_buttons & mouse_button_mask) == 0 {
+                            // We think the button hasn't been pressed
+                            return;
+                        }
+
+                        mouse_drag.pressed_buttons &= !mouse_button_mask;
+
+                        mouse_drag
+                            .listener
+                            .mouse_up(self.wm(), &hwnd, mouse_pos, mouse_button);
+
+                        // End the mouse drag gesture if no buttons are pressed anymore
+                        if mouse_drag.pressed_buttons == 0 {
+                            *mouse_drag_cell = None;
+                        }
+                    }
+                } // match state
+            } // WindowEvent::MouseInput
+            WindowEvent::RedrawRequested => {
+                drop(listener);
+                wnd.content
+                    .borrow_mut()
+                    .redraw_requested(self, &wnd.winit_wnd);
+            }
+            WindowEvent::HiDpiFactorChanged(_) => {
+                listener.dpi_scale_changed(self.wm(), &hwnd);
+            }
+            _ => {}
+        }
     }
 }

@@ -8,10 +8,10 @@ use std::{
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
-use super::super::{iface::Wm, MtSticky};
-use super::{MtData, UserEvent, WinitEnv, WinitWmCore, WndContent};
+use super::super::MtSticky;
+use super::{MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
 
-impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
+impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
         Self {
             mt: OnceCell::new(),
@@ -125,7 +125,7 @@ impl<TWM: Wm, TWC: WndContent> WinitEnv<TWM, TWC> {
     }
 }
 
-impl<TWM: Wm, TWC: WndContent> WinitWmCore<TWM, TWC> {
+impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     fn new(wm: TWM) -> Self {
         Self {
             wm,
@@ -151,11 +151,11 @@ impl<TWM: Wm, TWC: WndContent> WinitWmCore<TWM, TWC> {
             .replace(None)
             .expect("can't call enter_main_loop twice");
 
-        struct Guard<'a, TWM: Wm, TWC: WndContent>(
+        struct Guard<'a, TWM: WinitWm, TWC: WndContent>(
             &'a Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>>>,
         );
 
-        impl<TWM: Wm, TWC: WndContent> Drop for Guard<'_, TWM, TWC> {
+        impl<TWM: WinitWm, TWC: WndContent> Drop for Guard<'_, TWM, TWC> {
             fn drop(&mut self) {
                 self.0.set(None);
             }
@@ -169,10 +169,17 @@ impl<TWM: Wm, TWC: WndContent> WinitWmCore<TWM, TWC> {
                 .set(Some(NonNull::from(event_loop_wnd_target)));
             let _guard = Guard(&self.event_loop_wnd_target);
 
+            use winit::event::Event;
+
             match event {
+                Event::WindowEvent { window_id, event } => {
+                    self.handle_wnd_evt(window_id, event);
+                }
+                Event::UserEvent(cb) => {
+                    cb(self);
+                }
                 _ => {}
             }
-            // TODO
 
             loop {
                 let e = self.unsend_invoke_events.borrow_mut().pop_front();
