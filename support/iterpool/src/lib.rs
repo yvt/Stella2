@@ -233,6 +233,29 @@ impl<T> Pool<T> {
             Entry::Used(x) => Some(x),
         })
     }
+
+    /// Iterate over objects and their pointers. Unlike `IterablePool`, `Pool`
+    /// can't skip free space, so this might be less efficient.
+    pub fn ptr_iter(&self) -> impl Iterator<Item = (PoolPtr, &'_ T)> + '_ {
+        self.storage
+            .iter()
+            .enumerate()
+            .filter_map(|(i, e)| match e {
+                Entry::Free(_) => None,
+                Entry::Used(x) => Some((PoolPtr::new(i), x)),
+            })
+    }
+    /// Iterate over objects, allowing mutation. Unlike `IterablePool`,
+    /// `Pool` can't skip free space, so this might be less efficient.
+    pub fn ptr_iter_mut(&mut self) -> impl Iterator<Item = (PoolPtr, &'_ mut T)> + '_ {
+        self.storage
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(i, e)| match e {
+                Entry::Free(_) => None,
+                Entry::Used(x) => Some((PoolPtr::new(i), x)),
+            })
+    }
 }
 
 impl<T> IterablePool<T> {
