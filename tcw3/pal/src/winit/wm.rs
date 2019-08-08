@@ -174,8 +174,13 @@ impl<TWM: Wm, TWC: WndContent> WinitWmCore<TWM, TWC> {
             }
             // TODO
 
-            while let Some(e) = self.unsend_invoke_events.borrow_mut().pop_front() {
-                e(self);
+            loop {
+                let e = self.unsend_invoke_events.borrow_mut().pop_front();
+                if let Some(e) = e {
+                    e(self);
+                } else {
+                    break;
+                }
             }
 
             if self.should_terminate.get() {
