@@ -1,11 +1,5 @@
 //! The backend for macOS, Cocoa, and Core Graphics.
 use cfg_if::cfg_if;
-use cocoa::{
-    appkit,
-    appkit::{NSApplication, NSApplicationActivationPolicy},
-    base::nil,
-};
-use objc::{msg_send, sel, sel_impl};
 use std::marker::PhantomData;
 
 use super::{iface, LayerAttrs, WndAttrs};
@@ -27,6 +21,13 @@ cfg_if! {
         use super::winit::{WinitEnv, WinitWmCore};
         static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
     } else {
+        use cocoa::{
+            appkit,
+            appkit::{NSApplication, NSApplicationActivationPolicy},
+            base::nil,
+        };
+        use objc::{msg_send, sel, sel_impl};
+
         mod window;
         pub use self::window::HWnd;
 

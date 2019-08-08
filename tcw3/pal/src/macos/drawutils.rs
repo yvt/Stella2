@@ -40,6 +40,7 @@ pub fn cg_size_from_vec2(p: Vector2<f64>) -> CGSize {
     CGSize::new(p.x, p.y)
 }
 
+#[allow(dead_code)]
 pub fn point2_from_ns_point(p: NSPoint) -> Point2<f64> {
     Point2::new(p.x, p.y)
 }

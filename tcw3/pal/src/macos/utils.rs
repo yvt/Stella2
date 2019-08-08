@@ -81,6 +81,7 @@ pub fn with_autorelease_pool<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 
+#[allow(dead_code)]
 pub fn is_main_thread() -> bool {
     let result: BOOL = unsafe { msg_send![class!(NSThread), isMainThread] };
     result != NO
