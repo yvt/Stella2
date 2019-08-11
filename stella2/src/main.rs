@@ -11,7 +11,7 @@ fn main() {
     // Enable logging only in debug builds
     #[cfg(debug_assertions)]
     {
-        pretty_env_logger::init();
+        env_logger::init();
     }
 
     let wm = pal::Wm::global();
