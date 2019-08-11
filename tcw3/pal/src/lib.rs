@@ -25,29 +25,26 @@ pub mod prelude {
 //       of images doesn't match that of the display. This overhead can be
 //       addressed by assigning a correct profile on images.
 
-// TODO: Maybe rewrite `macos` to use `winit`
+// ============================================================================
+//
+// The main module for each target platform. The active one for the current
+// target is aliased as `native`.
+
 #[cfg(target_os = "macos")]
 pub mod macos;
+#[cfg(target_os = "macos")]
+pub use macos as native;
 
+// TODO: Other platforms
+
+// And here is the supporting module, which is shared between the
+// platform-specific modules.
 #[cfg(feature = "winit")]
 mod winit;
 
-/// The type aliases for the current target platform.
-pub mod native {
-    use super::*;
-
-    cfg_if! {
-        if #[cfg(target_os = "macos")] {
-            pub type Wm = macos::Wm;
-            pub type Bitmap = macos::Bitmap;
-            pub type BitmapBuilder = macos::BitmapBuilder;
-            pub type CharStyle = macos::CharStyle;
-            pub type TextLayout = macos::TextLayout;
-        }
-    }
-}
-
-// TODO: Other platforms
+// ============================================================================
+//
+// Type aliases for the default backend.
 
 // TODO: A test driver, which replaces the following type aliases, allowing
 //       UI tests to provide stimuli
@@ -73,12 +70,12 @@ pub type TextLayout = native::TextLayout;
 
 // ============================================================================
 //
-// Type aliases/re-exports from `iface` with concrete backend types are
+// Type aliases/re-exports from `iface` specialized for the default backend are
 // defined below.
 //
 // Implementation notes: It's okay to use the following types in the backend
 // code. In other words, enabled backends can assume that they are the default
-// backend.
+// backend. TODO: This will be no longer true once we have a test driver
 
 pub use self::iface::{
     BadThread, LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,
