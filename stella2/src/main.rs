@@ -1,3 +1,4 @@
+use log::debug;
 use tcw3::pal::{self, prelude::*};
 
 mod crashhandler;
@@ -14,6 +15,7 @@ fn main() {
         env_logger::init();
     }
 
+    debug!("Initializing WM");
     let wm = pal::Wm::global();
 
     // Register the application's custom stylesheet
@@ -22,5 +24,6 @@ fn main() {
 
     let _view = self::view::AppView::new(wm);
 
+    debug!("Entering the main loop");
     wm.enter_main_loop();
 }

@@ -1,4 +1,5 @@
 use harmony::Elem;
+use log::trace;
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
@@ -54,7 +55,7 @@ impl AppView {
     }
 
     fn dispatch(this: &Rc<Self>, action: model::AppAction) {
-        dbg!(&action);
+        trace!("Dispatching the action: {:?}", action);
 
         let mut pending_actions = this.pending_actions.borrow_mut();
 
@@ -197,7 +198,7 @@ impl WndView {
             return;
         }
 
-        dbg!(new_wnd_state);
+        trace!("New window state: {:?}", new_wnd_state);
 
         *wnd_state = Elem::clone(new_wnd_state);
 
