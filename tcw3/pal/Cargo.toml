@@ -17,6 +17,7 @@ macos_winit = ["winit"]
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
 array = "0.0.1"
+arrayvec = "0.4.10"
 bitflags = "1.1.0"
 cfg-if = "0.1.7"
 cggeom = { path = "../../support/cggeom" }

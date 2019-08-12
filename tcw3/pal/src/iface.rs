@@ -177,9 +177,9 @@ pub struct LayerAttrs<TBitmap, TLayer> {
     /// The 2D transformation applied to the contents of the layer.
     /// It doesn't have an effect on sublayers.
     ///
-    /// The input coordinate space is based on `bounds`. The output coordinate
-    /// space is virtual pixel coordinates with `(0,0)` at the top left corner
-    /// of a window's client region.
+    /// The input coordinate space is the one used to express `bounds`. The
+    /// output coordinate space is virtual pixel coordinates with `(0,0)` at the
+    /// top left corner of a window's client region.
     ///
     /// `value.x.z` and `value.y.z` may be assumed to be zero. This means
     /// projective transformations are not supported and only affine

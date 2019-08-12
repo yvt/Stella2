@@ -42,6 +42,8 @@ pub use macos as native;
 #[cfg(feature = "winit")]
 mod winit;
 
+mod swrast;
+
 // ============================================================================
 //
 // Type aliases for the default backend.
