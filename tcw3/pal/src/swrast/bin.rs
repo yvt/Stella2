@@ -1197,5 +1197,156 @@ impl<TBmp> Content<TBmp> {
 mod tests {
     use super::*;
 
+    use array::*;
+    use cgmath::abs_diff_eq;
+    use quickcheck::TestResult;
+    use quickcheck_macros::quickcheck;
+
+    #[quickcheck]
+    fn test_parallelogram_aabb(
+        (m00, m01, m02, m10, m11, m12): (f32, f32, f32, f32, f32, f32),
+    ) -> bool {
+        let mat = Matrix3::new(m00, m10, 0.0, m01, m11, 0.0, m02, m12, 1.0);
+
+        // Calculate the AABB using `parallelogram_aabb`
+        let aabb = parallelogram_aabb(mat);
+
+        // Calculate the actual AABB from the corners
+        let corners: [Point2<f32>; 4] = [
+            [0.0, 0.0].into(),
+            [1.0, 0.0].into(),
+            [0.0, 1.0].into(),
+            [1.0, 1.0].into(),
+        ];
+        let corners = corners.map(|p| mat.transform_point(p));
+
+        let expected_aabb = box2! {
+            min: [
+                corners.map(|p| p.x).fmin(),
+                corners.map(|p| p.y).fmin(),
+            ],
+            max: [
+                corners.map(|p| p.x).fmax(),
+                corners.map(|p| p.y).fmax(),
+            ],
+        };
+
+        abs_diff_eq!(dbg!(aabb), dbg!(expected_aabb), epsilon = 0.001)
+    }
+
+    #[quickcheck]
+    fn test_xform_and_aabb_to_parallelogram(
+        (m00, m01, m02, m10, m11, m12): (f32, f32, f32, f32, f32, f32),
+        bx: Box2<f32>,
+    ) -> bool {
+        let mat = Matrix3::new(m00, m10, 0.0, m01, m11, 0.0, m02, m12, 1.0);
+
+        let par = xform_and_aabb_to_parallelogram(mat, bx);
+
+        // Calculate the corners using `par`
+        let corners: [Point2<f32>; 4] = [
+            [0.0, 0.0].into(),
+            [1.0, 0.0].into(),
+            [0.0, 1.0].into(),
+            [1.0, 1.0].into(),
+        ];
+        let corners = dbg!(corners.map(|p| par.transform_point(p)));
+
+        // Calculate the corners using `mat`
+        let actual_corners: [Point2<f32>; 4] = [
+            [bx.min.x, bx.min.y].into(),
+            [bx.max.x, bx.min.y].into(),
+            [bx.min.x, bx.max.y].into(),
+            [bx.max.x, bx.max.y].into(),
+        ];
+        let actual_corners = dbg!(actual_corners.map(|p| mat.transform_point(p)));
+
+        (0..4).all(|i| abs_diff_eq!(corners[i], actual_corners[i], epsilon = 0.1))
+    }
+
+    #[test]
+    fn test_round_aabb_conservative() {
+        assert_eq!(
+            round_aabb_conservative(box2! {
+                min: [4.0, 6.0],
+                max: [42.0, 43.0],
+            }),
+            box2! {
+                min: [4.0, 6.0],
+                max: [42.0, 43.0],
+            }
+        );
+
+        assert_eq!(
+            round_aabb_conservative(box2! {
+                min: [4.5, 6.9],
+                max: [42.3, 43.7],
+            }),
+            box2! {
+                min: [4.0, 6.0],
+                max: [43.0, 44.0],
+            }
+        );
+    }
+
+    #[quickcheck]
+    fn test_xform_to_clip_planes_aabb(bx: Box2<f32>) -> TestResult {
+        let sz = bx.size();
+        let mid = bx.min + (bx.max - bx.min) * 0.5;
+
+        // `bx` represents an empty region
+        if sz.x == 0.0 || sz.y == 0.0 {
+            return TestResult::discard();
+        }
+
+        // ┌             ┐
+        // │  w   0   x  │
+        // │  0   h   y  │
+        // │  0   0   1  │
+        // └             ┘
+        let mat = Matrix3::new(sz.x, 0.0, 0.0, 0.0, sz.y, 0.0, bx.min.x, bx.min.y, 1.0);
+
+        let clip_planes = dbg!(xform_to_clip_planes(mat));
+
+        if clip_planes[0].n.x == 0 || clip_planes[0].n.y != 0 {
+            return TestResult::failed();
+        }
+        if clip_planes[1].n.x != 0 || clip_planes[1].n.y == 0 {
+            return TestResult::failed();
+        }
+
+        fn eval(cp: &ClipPlanes, p: Point2<f32>) -> i32 {
+            cp.n.cast::<f32>().unwrap().dot([p.x, p.y].into()) as i32
+        }
+
+        for (s_x, s_y) in (0..3).cartesian_product(0..3) {
+            let samp_x = [bx.min.x - sz.x, mid.x, bx.max.x + sz.x][s_x];
+            let samp_y = [bx.min.y - sz.y, mid.y, bx.max.y + sz.y][s_y];
+            let samp = Point2::new(samp_x, samp_y);
+            let d_x = eval(&clip_planes[0], samp);
+            let d_y = eval(&clip_planes[1], samp);
+
+            dbg!((s_x, s_y, samp, d_x, d_y));
+
+            let ok_x = match s_x {
+                0 => d_x <= clip_planes[0].d.start,
+                1 => clip_planes[0].d.contains(&d_x),
+                2 => clip_planes[0].d.end <= d_x,
+                _ => unreachable!(),
+            };
+            let ok_y = match s_y {
+                0 => d_y <= clip_planes[1].d.start,
+                1 => clip_planes[1].d.contains(&d_y),
+                2 => clip_planes[1].d.end <= d_y,
+                _ => unreachable!(),
+            };
+
+            if !ok_x || !ok_y {
+                return TestResult::failed();
+            }
+        }
+
+        TestResult::passed()
+    }
     // TODO
 }

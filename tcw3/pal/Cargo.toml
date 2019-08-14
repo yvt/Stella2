@@ -20,7 +20,7 @@ array = "0.0.1"
 arrayvec = "0.4.10"
 bitflags = "1.1.0"
 cfg-if = "0.1.7"
-cggeom = { path = "../../support/cggeom" }
+cggeom = { path = "../../support/cggeom", features = ["quickcheck"] }
 cgmath = "0.17.0"
 flags-macro = "0.1.3"
 fragile = "0.3.0"
@@ -46,3 +46,5 @@ cc = "1.0.35"
 
 [dev-dependencies]
 pretty_env_logger = "0.3.0"
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
