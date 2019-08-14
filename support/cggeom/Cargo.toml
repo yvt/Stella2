@@ -7,3 +7,4 @@ license = "MIT/Apache-2.0"
 
 [dependencies]
 cgmath = "0.17.0"
+quickcheck = { version = "0.8", optional = true }

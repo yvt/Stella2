@@ -299,6 +299,55 @@ impl<S: BaseFloat> UlpsEq for Box3<S> {
     }
 }
 
+#[cfg(feature = "quickcheck")]
+use quickcheck::{Arbitrary, Gen};
+
+#[cfg(feature = "quickcheck")]
+impl<T: Arbitrary + BaseFloat> Arbitrary for Box2<T> {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        let (x1, x2, x3, x4) = Arbitrary::arbitrary(g);
+        Box2::new(Point2::new(x1, x2), Point2::new(x3, x4))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            (
+                self.min.x.clone(),
+                self.min.y.clone(),
+                self.max.x.clone(),
+                self.max.y.clone(),
+            )
+                .shrink()
+                .map(|(x1, x2, x3, x4)| Box2::new(Point2::new(x1, x2), Point2::new(x3, x4))),
+        )
+    }
+}
+
+#[cfg(feature = "quickcheck")]
+impl<T: Arbitrary + BaseFloat> Arbitrary for Box3<T> {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        let (x1, x2, x3, x4, x5, x6) = Arbitrary::arbitrary(g);
+        Box3::new(Point3::new(x1, x2, x3), Point3::new(x4, x5, x6))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            (
+                self.min.x.clone(),
+                self.min.y.clone(),
+                self.min.z.clone(),
+                self.max.x.clone(),
+                self.max.y.clone(),
+                self.max.z.clone(),
+            )
+                .shrink()
+                .map(|(x1, x2, x3, x4, x5, x6)| {
+                    Box3::new(Point3::new(x1, x2, x3), Point3::new(x4, x5, x6))
+                }),
+        )
+    }
+}
+
 /// A macro for constructing `Box2` using various types of origin points and
 /// using `Into::into`.
 ///
