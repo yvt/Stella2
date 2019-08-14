@@ -4,7 +4,6 @@
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(const_vec_new)] // `Vec::new()` as `const fn`
 #![feature(doc_cfg)] // `cfg(rustdoc)`
-use cfg_if::cfg_if;
 
 mod canvas;
 pub mod iface;
