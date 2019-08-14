@@ -830,8 +830,22 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
                         clip_planes,
                     });
                 }
+            } else if !use_slicing {
+                // `slice_by_clip == false && use_slicing == false`
+                let uv_xform = uv_xforms.first().unwrap();
+
+                let scissor = bb;
+                let content = Content::from_bmp(bmp.clone(), *uv_xform, scissor);
+
+                elems.push(Elem {
+                    flags: elem_flags,
+                    opacity,
+                    content,
+                    scissor,
+                    clip_planes: clip_planes.clone(),
+                });
             } else {
-                // slice_by_clip
+                // `slice_by_clip == false && use_slicing == true`
                 debug_assert!(aligned_to_axis);
 
                 // Indicates whether `xform` involves axis transposition.
@@ -927,7 +941,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
                         clip_planes: clip_planes.clone(),
                     });
                 }
-            } // endif slice_by_clip
+            } // endif slice_by_clip, !use_slicing
         }
 
         if info.bg_color.a > 0 {
