@@ -50,9 +50,34 @@ pub trait AxisAlignedBox<T>: Sized {
         point.element_wise_ge(&self.min()).all() && point.element_wise_lt(&self.max()).all()
     }
 
+    /// Return `true` iff at least one of the box's dimensions is < 0.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{box2, prelude::*};
+    ///
+    ///     assert!(box2! { min: [0u32, 0], max: [10, 10] }.is_valid() == true);
+    ///     assert!(box2! { min: [10u32, 0], max: [10, 10] }.is_valid() == true);
+    ///     assert!(box2! { min: [10u32, 0], max: [5, 10] }.is_valid() == false);
+    ///
     fn is_valid(&self) -> bool;
+
+    /// Return `true` iff at least one of the box's dimensions is ≤ 0.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{box2, prelude::*};
+    ///
+    ///     assert!(box2! { min: [0u32, 0], max: [10, 10] }.is_empty() == false);
+    ///     assert!(box2! { min: [10u32, 0], max: [10, 10] }.is_empty() == true);
+    ///     assert!(box2! { min: [10u32, 0], max: [5, 10] }.is_empty() == true);
+    ///
     fn is_empty(&self) -> bool;
 
+    /// Get the dimensions of the box.
+    ///
+    /// The dimensions are calculated as `self.max() - self.min()`. This may
+    /// panic on overflow in debug builds.
     #[inline]
     fn size(&self) -> <Self::Point as EuclideanSpace>::Diff
     where
@@ -138,13 +163,11 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box2<T> {
 
     #[inline]
     fn is_valid(&self) -> bool {
-        let size = self.size();
-        size.x >= T::zero() && size.y >= T::zero()
+        self.max.x >= self.min.x && self.max.y >= self.min.y
     }
     #[inline]
     fn is_empty(&self) -> bool {
-        let size = self.size();
-        size.x <= T::zero() && size.y <= T::zero()
+        self.max.x <= self.min.x || self.max.y <= self.min.y
     }
 
     #[inline]
@@ -176,13 +199,11 @@ impl<T: BaseNum> AxisAlignedBox<T> for Box3<T> {
 
     #[inline]
     fn is_valid(&self) -> bool {
-        let size = self.size();
-        size.x >= T::zero() && size.y >= T::zero() && size.z >= T::zero()
+        self.max.x >= self.min.x && self.max.y >= self.min.y && self.max.z >= self.min.z
     }
     #[inline]
     fn is_empty(&self) -> bool {
-        let size = self.size();
-        size.x <= T::zero() && size.y <= T::zero() && size.z <= T::zero()
+        self.max.x <= self.min.x || self.max.y <= self.min.y || self.max.z <= self.min.z
     }
 
     #[inline]
@@ -445,6 +466,101 @@ macro_rules! box2 {
                 $crate::cgmath::Point2::new(origin.x - size.x, origin.y - size.y),
                 $crate::cgmath::Point2::new(origin.x, origin.y),
             )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_empty_box2_u32() {
+        let bx: Box2<u32> = Box2::new([20, 20].into(), [30, 30].into());
+        assert!(!bx.is_empty(), "{:?}", bx);
+
+        let bxs: &[Box2<u32>] = &[
+            Box2::new([20, 20].into(), [20, 30].into()),
+            Box2::new([20, 20].into(), [15, 30].into()),
+            Box2::new([20, 20].into(), [30, 20].into()),
+            Box2::new([20, 20].into(), [30, 15].into()),
+            Box2::new([20, 20].into(), [20, 20].into()),
+            Box2::new([20, 20].into(), [15, 15].into()),
+        ];
+
+        for bx in bxs {
+            assert!(bx.is_empty(), "{:?}", bx);
+        }
+    }
+
+    #[test]
+    fn is_empty_box3_u32() {
+        let bx: Box3<u32> = Box3::new([20, 20, 20].into(), [30, 30, 30].into());
+        assert!(!bx.is_empty(), "{:?}", bx);
+
+        let bxs: &[Box3<u32>] = &[
+            Box3::new([20, 20, 20].into(), [20, 30, 20].into()),
+            Box3::new([20, 20, 20].into(), [15, 30, 20].into()),
+            Box3::new([20, 20, 20].into(), [30, 20, 20].into()),
+            Box3::new([20, 20, 20].into(), [30, 15, 20].into()),
+            Box3::new([20, 20, 20].into(), [20, 20, 20].into()),
+            Box3::new([20, 20, 20].into(), [15, 15, 20].into()),
+            Box3::new([20, 20, 20].into(), [30, 20, 20].into()),
+            Box3::new([20, 20, 20].into(), [30, 20, 15].into()),
+            Box3::new([20, 20, 20].into(), [20, 20, 30].into()),
+        ];
+
+        for bx in bxs {
+            assert!(bx.is_empty(), "{:?}", bx);
+        }
+    }
+
+    #[test]
+    fn is_valid_box2_u32() {
+        let bxs: &[Box2<u32>] = &[
+            Box2::new([20, 20].into(), [30, 30].into()),
+            Box2::new([20, 20].into(), [20, 30].into()),
+            Box2::new([20, 20].into(), [30, 20].into()),
+            Box2::new([20, 20].into(), [20, 20].into()),
+        ];
+
+        for bx in bxs {
+            assert!(bx.is_valid(), "{:?}", bx);
+        }
+
+        let bxs: &[Box2<u32>] = &[
+            Box2::new([20, 20].into(), [15, 30].into()),
+            Box2::new([20, 20].into(), [30, 15].into()),
+            Box2::new([20, 20].into(), [15, 15].into()),
+        ];
+
+        for bx in bxs {
+            assert!(!bx.is_valid(), "{:?}", bx);
+        }
+    }
+
+    #[test]
+    fn is_valid_box3_u32() {
+        let bxs: &[Box3<u32>] = &[
+            Box3::new([20, 20, 20].into(), [30, 30, 30].into()),
+            Box3::new([20, 20, 20].into(), [20, 30, 30].into()),
+            Box3::new([20, 20, 20].into(), [30, 20, 20].into()),
+            Box3::new([20, 20, 20].into(), [20, 20, 20].into()),
+        ];
+
+        for bx in bxs {
+            assert!(bx.is_valid(), "{:?}", bx);
+        }
+
+        let bxs: &[Box3<u32>] = &[
+            Box3::new([20, 20, 20].into(), [15, 30, 30].into()),
+            Box3::new([20, 20, 20].into(), [30, 15, 30].into()),
+            Box3::new([20, 20, 20].into(), [15, 15, 30].into()),
+            Box3::new([20, 20, 20].into(), [30, 30, 15].into()),
+        ];
+
+        for bx in bxs {
+            assert!(!bx.is_valid(), "{:?}", bx);
         }
     }
 }
