@@ -1295,7 +1295,6 @@ mod tests {
     #[quickcheck]
     fn test_xform_to_clip_planes_aabb(bx: Box2<f32>, transposed: bool) -> TestResult {
         let sz = bx.size();
-        let mid = bx.min + (bx.max - bx.min) * 0.5;
 
         // `bx` represents an empty region
         if sz.x == 0.0 || sz.y == 0.0 {
@@ -1405,5 +1404,84 @@ mod tests {
         assert!(!clip_planes.iter().any(is_clip_planes_aligned_to_axis));
     }
 
-    // TODO
+    #[derive(Debug, Clone)]
+    struct TestBmp;
+
+    impl Bmp for TestBmp {
+        fn data(&self) -> &[u8] {
+            unreachable!()
+        }
+        fn size(&self) -> [usize; 2] {
+            [40, 20]
+        }
+        fn stride(&self) -> usize {
+            40
+        }
+    }
+
+    #[test]
+    fn draw() {
+        let mut binner = Binner::new();
+
+        let mats = [
+            // pixel-aligned
+            Matrix3::new(5.0, 0.0, 0.0, 0.0, 7.0, 0.0, 10.0, 15.0, 1.0),
+            // axis-aligned
+            Matrix3::new(5.5, 0.0, 0.0, 0.0, 7.3, 0.0, 10.1, 15.0, 1.0),
+            // generic
+            Matrix3::new(5.5, 7.5, 0.0, 6.0, 4.5, 0.0, 10.0, 15.0, 1.0),
+        ];
+
+        let group_types = [
+            (None, 1.0),
+            (None, 0.5),
+            (Some(mats[0]), 1.0),
+            (Some(mats[1]), 1.0),
+            (Some(mats[2]), 1.0),
+            (Some(mats[0]), 0.5),
+            (Some(mats[1]), 0.5),
+            (Some(mats[2]), 0.5),
+        ];
+
+        let ct_centers = [
+            box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
+            box2! { min: [1.0, 0.0], max: [1.0, 1.0] },
+            box2! { min: [0.2, 0.3], max: [0.7, 0.8] },
+            box2! { min: [0.0, 0.3], max: [0.7, 0.8] },
+        ];
+
+        let bg_colors = [
+            RGBA8::new(40, 60, 80, 0),
+            RGBA8::new(40, 60, 80, 200),
+            RGBA8::new(40, 60, 80, 255),
+        ];
+
+        let ops = [0.0, 0.6, 1.0];
+
+        for ((((&xform, &(gr_xform, gr_op)), &ct_center), &bg_color), &op) in mats
+            .iter()
+            .cartesian_product(group_types.iter())
+            .cartesian_product(ct_centers.iter())
+            .cartesian_product(bg_colors.iter())
+            .cartesian_product(ops.iter())
+        {
+            dbg!((xform, gr_xform, gr_op, ct_center));
+            let mut builder = binner.build([200, 100]);
+            builder.open_group(gr_xform, gr_op);
+
+            builder.push_elem(ElemInfo {
+                xform,
+                bounds: box2! { min: [0.0, 0.0], max: [20.0, 20.0] },
+                contents_center: ct_center,
+                contents_scale: 1.0,
+                bitmap: Some(TestBmp),
+                bg_color,
+                opacity: op,
+            });
+
+            builder.close_group();
+            builder.finish();
+            dbg!(&binner);
+        }
+    }
 }
