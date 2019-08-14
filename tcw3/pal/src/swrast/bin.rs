@@ -1484,7 +1484,6 @@ mod tests {
 
             builder.close_group();
             builder.finish();
-            dbg!(&binner);
         }
     }
 }
