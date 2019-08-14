@@ -1293,7 +1293,7 @@ mod tests {
     }
 
     #[quickcheck]
-    fn test_xform_to_clip_planes_aabb(bx: Box2<f32>) -> TestResult {
+    fn test_xform_to_clip_planes_aabb(bx: Box2<f32>, transposed: bool) -> TestResult {
         let sz = bx.size();
         let mid = bx.min + (bx.max - bx.min) * 0.5;
 
@@ -1302,30 +1302,31 @@ mod tests {
             return TestResult::discard();
         }
 
-        // ┌             ┐
-        // │  w   0   x  │
-        // │  0   h   y  │
-        // │  0   0   1  │
-        // └             ┘
-        let mat = Matrix3::new(sz.x, 0.0, 0.0, 0.0, sz.y, 0.0, bx.min.x, bx.min.y, 1.0);
+        let mat = if !transposed {
+            // ┌             ┐
+            // │  w   0   x  │
+            // │  0   h   y  │
+            // │  0   0   1  │
+            // └             ┘
+            Matrix3::new(sz.x, 0.0, 0.0, 0.0, sz.y, 0.0, bx.min.x, bx.min.y, 1.0)
+        } else {
+            // ┌             ┐
+            // │  0   w   x  │
+            // │  h   0   y  │
+            // │  0   0   1  │
+            // └             ┘
+            Matrix3::new(0.0, sz.y, 0.0, sz.x, 0.0, 0.0, bx.min.x, bx.min.y, 1.0)
+        };
 
         let clip_planes = dbg!(xform_to_clip_planes(mat));
-
-        if clip_planes[0].n.x == 0 || clip_planes[0].n.y != 0 {
-            return TestResult::failed();
-        }
-        if clip_planes[1].n.x != 0 || clip_planes[1].n.y == 0 {
-            return TestResult::failed();
-        }
 
         fn eval(cp: &ClipPlanes, p: Point2<f32>) -> i32 {
             cp.n.cast::<f32>().unwrap().dot([p.x, p.y].into()) as i32
         }
 
         for (s_x, s_y) in (0..3).cartesian_product(0..3) {
-            let samp_x = [bx.min.x - sz.x, mid.x, bx.max.x + sz.x][s_x];
-            let samp_y = [bx.min.y - sz.y, mid.y, bx.max.y + sz.y][s_y];
-            let samp = Point2::new(samp_x, samp_y);
+            let samp: Point2<f32> =
+                mat.transform_point([s_x as f32 - 0.5, s_y as f32 - 0.5].into());
             let d_x = eval(&clip_planes[0], samp);
             let d_y = eval(&clip_planes[1], samp);
 
@@ -1351,5 +1352,58 @@ mod tests {
 
         TestResult::passed()
     }
+
+    #[quickcheck]
+    fn clip_planes_aligned_to_pixel(bx: Box2<i8>, transposed: bool) -> TestResult {
+        // `bx` is aligned to pixels becaue of the use of `i8`
+        let bx = bx.cast::<f32>().unwrap();
+        let sz = bx.size();
+        if sz.x == 0.0 || sz.y == 0.0 {
+            return TestResult::discard();
+        }
+
+        let mat = if !transposed {
+            Matrix3::new(sz.x, 0.0, 0.0, 0.0, sz.y, 0.0, bx.min.x, bx.min.y, 1.0)
+        } else {
+            Matrix3::new(0.0, sz.y, 0.0, sz.x, 0.0, 0.0, bx.min.x, bx.min.y, 1.0)
+        };
+
+        let clip_planes = dbg!(xform_to_clip_planes(mat));
+        let ok = clip_planes.iter().all(is_clip_planes_aligned_to_pixel);
+        TestResult::from_bool(ok)
+    }
+
+    #[quickcheck]
+    fn clip_planes_aligned_to_axis(bx: Box2<f32>, transposed: bool) -> TestResult {
+        let sz = bx.size();
+        if sz.x == 0.0 || sz.y == 0.0 {
+            return TestResult::discard();
+        }
+
+        let mat = if !transposed {
+            Matrix3::new(sz.x, 0.0, 0.0, 0.0, sz.y, 0.0, bx.min.x, bx.min.y, 1.0)
+        } else {
+            Matrix3::new(0.0, sz.y, 0.0, sz.x, 0.0, 0.0, bx.min.x, bx.min.y, 1.0)
+        };
+
+        let clip_planes = dbg!(xform_to_clip_planes(mat));
+        let ok = clip_planes.iter().all(is_clip_planes_aligned_to_axis);
+        TestResult::from_bool(ok)
+    }
+
+    #[test]
+    fn clip_planes_not_aligned_to_pixel() {
+        let mat = Matrix3::new(30.5, 0.0, 0.0, 0.0, 10.5, 0.0, 5.0, 5.0, 1.0);
+        let clip_planes = dbg!(xform_to_clip_planes(mat));
+        assert!(!clip_planes.iter().any(is_clip_planes_aligned_to_pixel));
+    }
+
+    #[test]
+    fn clip_planes_not_aligned_to_axis() {
+        let mat = Matrix3::new(30.5, 0.5, 0.0, 15.0, 10.5, 0.0, 5.0, 5.0, 1.0);
+        let clip_planes = dbg!(xform_to_clip_planes(mat));
+        assert!(!clip_planes.iter().any(is_clip_planes_aligned_to_axis));
+    }
+
     // TODO
 }
