@@ -813,6 +813,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
                     };
                     let scissor = if let Some(x) =
                         saturating_aabb_f32_to_u16(round_aabb_conservative(scissor))
+                            .and_then(|scissor| scissor.intersection(&bb))
                     {
                         x
                     } else {
@@ -910,9 +911,11 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
                         ],
                     };
 
-                    if scissor.is_empty() {
+                    let scissor = if let Some(x) = scissor.intersection(&bb) {
+                        x
+                    } else {
                         continue;
-                    }
+                    };
 
                     let content = Content::from_bmp(bmp.clone(), uv_xform, scissor);
 
