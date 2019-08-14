@@ -4,6 +4,7 @@
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(const_vec_new)] // `Vec::new()` as `const fn`
 #![feature(doc_cfg)] // `cfg(rustdoc)`
+#![feature(is_sorted)] // `<[_]>::is_sorted`
 
 mod canvas;
 pub mod iface;
