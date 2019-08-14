@@ -1124,11 +1124,14 @@ fn xform_to_clip_planes(xform: Matrix3<f32>) -> [ClipPlanes; 2] {
     // Use L1-normalization to ensure the transition width is at least as large
     // as a pixel when the vectors are not aligned to an axis.
     let fac = [n[0].x.abs() + n[0].y.abs(), n[1].x.abs() + n[1].y.abs()];
-    let n = [n[0] / fac[0], n[1] / fac[1]];
+    let mut n = [n[0] / fac[0], n[1] / fac[1]];
 
     // The widths of the thick straight lines
     let det = xform.x.x * xform.y.y - xform.x.y * xform.y.x;
-    let w = [det / fac[0], det / fac[1]];
+    let w = [det.abs() / fac[0], det.abs() / fac[1]];
+
+    n[0] *= 1.0f32.copysign(det);
+    n[1] *= 1.0f32.copysign(det);
 
     // The distances from the origin point to the lines
     let p = Vector2::new(xform.z.x, xform.z.y);
