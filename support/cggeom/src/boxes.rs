@@ -303,7 +303,7 @@ impl<S: BaseFloat> UlpsEq for Box3<S> {
 use quickcheck::{Arbitrary, Gen};
 
 #[cfg(feature = "quickcheck")]
-impl<T: Arbitrary + BaseFloat> Arbitrary for Box2<T> {
+impl<T: Arbitrary + BaseNum> Arbitrary for Box2<T> {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let (x1, x2, x3, x4) = Arbitrary::arbitrary(g);
         Box2::new(Point2::new(x1, x2), Point2::new(x3, x4))
@@ -324,7 +324,7 @@ impl<T: Arbitrary + BaseFloat> Arbitrary for Box2<T> {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<T: Arbitrary + BaseFloat> Arbitrary for Box3<T> {
+impl<T: Arbitrary + BaseNum> Arbitrary for Box3<T> {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let (x1, x2, x3, x4, x5, x6) = Arbitrary::arbitrary(g);
         Box3::new(Point3::new(x1, x2, x3), Point3::new(x4, x5, x6))
