@@ -1,5 +1,7 @@
 use cgmath::prelude::*;
-use cgmath::{num_traits::NumCast, BaseNum, Point2, Point3, Vector2, Vector3};
+use cgmath::{
+    num_traits::NumCast, AbsDiffEq, BaseFloat, BaseNum, Point2, Point3, UlpsEq, Vector2, Vector3,
+};
 use std::ops::Add;
 
 use super::{BoolArray, ElementWiseOp, ElementWisePartialOrd};
@@ -230,6 +232,70 @@ impl<S: NumCast + Copy> Box3<S> {
             None => return None,
         };
         Some(Box3 { min, max })
+    }
+}
+
+impl<S: BaseFloat> AbsDiffEq for Box2<S> {
+    type Epsilon = S::Epsilon;
+
+    fn default_epsilon() -> Self::Epsilon {
+        S::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.min.abs_diff_eq(&other.min, epsilon) && self.max.abs_diff_eq(&other.max, epsilon)
+    }
+
+    fn abs_diff_ne(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.min.abs_diff_ne(&other.min, epsilon) || self.max.abs_diff_ne(&other.max, epsilon)
+    }
+}
+
+impl<S: BaseFloat> AbsDiffEq for Box3<S> {
+    type Epsilon = S::Epsilon;
+
+    fn default_epsilon() -> Self::Epsilon {
+        S::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.min.abs_diff_eq(&other.min, epsilon) && self.max.abs_diff_eq(&other.max, epsilon)
+    }
+
+    fn abs_diff_ne(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.min.abs_diff_ne(&other.min, epsilon) || self.max.abs_diff_ne(&other.max, epsilon)
+    }
+}
+
+impl<S: BaseFloat> UlpsEq for Box2<S> {
+    fn default_max_ulps() -> u32 {
+        S::default_max_ulps()
+    }
+
+    fn ulps_eq(&self, other: &Self, epsilon: Self::Epsilon, max_ulps: u32) -> bool {
+        self.min.ulps_eq(&other.min, epsilon, max_ulps)
+            && self.max.ulps_eq(&other.max, epsilon, max_ulps)
+    }
+
+    fn ulps_ne(&self, other: &Self, epsilon: Self::Epsilon, max_ulps: u32) -> bool {
+        self.min.ulps_ne(&other.min, epsilon, max_ulps)
+            || self.max.ulps_ne(&other.max, epsilon, max_ulps)
+    }
+}
+
+impl<S: BaseFloat> UlpsEq for Box3<S> {
+    fn default_max_ulps() -> u32 {
+        S::default_max_ulps()
+    }
+
+    fn ulps_eq(&self, other: &Self, epsilon: Self::Epsilon, max_ulps: u32) -> bool {
+        self.min.ulps_eq(&other.min, epsilon, max_ulps)
+            && self.max.ulps_eq(&other.max, epsilon, max_ulps)
+    }
+
+    fn ulps_ne(&self, other: &Self, epsilon: Self::Epsilon, max_ulps: u32) -> bool {
+        self.min.ulps_ne(&other.min, epsilon, max_ulps)
+            || self.max.ulps_ne(&other.max, epsilon, max_ulps)
     }
 }
 
