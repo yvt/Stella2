@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Point2, Vector2};
 use flags_macro::flags;
-use itertools::Itertools;
+use itertools::iproduct;
 use rgb::RGBA8;
 use std::{
     cmp::{max, min},
@@ -679,8 +679,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
 
             use array::*;
 
-            let valid_slices: ArrayVec<[_; 9]> = (0..3)
-                .cartesian_product(0..3)
+            let valid_slices: ArrayVec<[_; 9]> = iproduct!(0..3, 0..3)
                 .filter(|&(x, y)| {
                     let slice_valid_x = (slice_info.valid_slices & (1 << x)) != 0;
                     let slice_valid_y = (slice_info.valid_slices & (16 << y)) != 0;
@@ -979,7 +978,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
             let bin_xs = sci_min.x / TILE..(sci_max.x + TILE - 1) / TILE;
             let bin_ys = sci_min.y / TILE..(sci_max.y + TILE - 1) / TILE;
 
-            for (bin_x, bin_y) in bin_xs.cartesian_product(bin_ys) {
+            for (bin_x, bin_y) in iproduct!(bin_xs, bin_ys) {
                 // TODO: Clip plane cull
                 let bin_i = bin_x + bin_y * self.binner.bin_count[0];
 
@@ -1340,7 +1339,7 @@ mod tests {
             cp.n.cast::<f32>().unwrap().dot([p.x, p.y].into()) as i32
         }
 
-        for (s_x, s_y) in (0..3).cartesian_product(0..3) {
+        for (s_x, s_y) in iproduct!(0..3, 0..3) {
             let samp: Point2<f32> =
                 mat.transform_point([s_x as f32 - 0.5, s_y as f32 - 0.5].into());
             let d_x = eval(&clip_planes[0], samp);
@@ -1475,13 +1474,13 @@ mod tests {
 
         let ops = [0.0, 0.6, 1.0];
 
-        for ((((&xform, &(gr_xform, gr_op)), &ct_center), &bg_color), &op) in mats
-            .iter()
-            .cartesian_product(group_types.iter())
-            .cartesian_product(ct_centers.iter())
-            .cartesian_product(bg_colors.iter())
-            .cartesian_product(ops.iter())
-        {
+        for (&xform, &(gr_xform, gr_op), &ct_center, &bg_color, &op) in iproduct!(
+            mats.iter(),
+            group_types.iter(),
+            ct_centers.iter(),
+            bg_colors.iter(),
+            ops.iter()
+        ) {
             dbg!((xform, gr_xform, gr_op, ct_center));
             let mut builder = binner.build([200, 100]);
             builder.open_group(gr_xform, gr_op);
