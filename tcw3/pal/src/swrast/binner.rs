@@ -1,4 +1,4 @@
-//! Binner (not "bin"ary!)
+//! Binner
 use alt_fp::{FloatOrd, FloatOrdSet};
 use arrayvec::ArrayVec;
 use bitflags::bitflags;

@@ -31,5 +31,5 @@ const NUM_LAYERS: usize = 16;
 /// The number of groups.
 const NUM_GROUPS: usize = 32;
 
-pub mod bin;
+pub mod binner;
 pub mod layers;
