@@ -28,15 +28,17 @@ impl BinRast {
     /// Copy the result image (of size `TILE`²) to a supplied image buffer.
     ///
     /// For each `(x, y)` in range `0 ≤ x < clip_width` (`clip_width` must be
-    /// ≤ `TILE`) and `0 ≤ y < TILE`, the corresponding pixel in the result
-    /// buffer is copied to `to[x + y * stride..][0..4]`.
-    pub fn copy_to(&self, to: &mut [u8], stride: usize, clip_width: usize) {
+    /// ≤ `TILE`) and `0 ≤ y < clip_height` (`clip_height` must be ≤ `TILE`),
+    /// the corresponding pixel in the result buffer is copied to
+    /// `to[x + y * stride..][0..4]`.
+    pub fn copy_to(&self, to: &mut [u8], stride: usize, clip_width: usize, clip_height: usize) {
         assert!(clip_width <= TILE);
+        assert!(clip_height <= TILE);
 
         let src_layer = &self.layers[0];
         let [src_l0, src_l1, src_l2, src_l3] = src_layer;
 
-        for y in 0..TILE {
+        for y in 0..clip_height {
             let row_start = y * TILE;
             let row_range = row_start..row_start + clip_width;
             let src_row0 = &src_l0[row_range.clone()];
