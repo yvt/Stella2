@@ -33,8 +33,17 @@ pub struct Binner<TBmp> {
 
 /// A clonable reference to a color-matched bitmap image.
 pub trait Bmp: Send + Sync + Clone + 'static {
+    /// Get a reference to the image data.
+    ///
+    /// The pixel format must be ARGB8 with premultiplied alpha. Must contain
+    /// at least `stride() * size()[1]` bytes.
     fn data(&self) -> &[u8];
+
+    /// Get the dimensions of the bitmap.
     fn size(&self) -> [usize; 2];
+
+    /// Get the byte offset between rows. Must be at least `size()[0] * 4` and
+    /// a multiple of `4`.
     fn stride(&self) -> usize;
 }
 
@@ -62,48 +71,59 @@ struct Bin {
 /// A rendered element, referenced by one or more fragments
 #[derive(Debug)]
 pub(super) struct Elem<TBmp> {
-    flags: ElemFlags,
+    pub flags: ElemFlags,
 
     /// Opacity in range `0..=256`.
-    opacity: u16,
+    pub opacity: u16,
 
-    content: Content<TBmp>,
+    pub content: Content<TBmp>,
 
     /// The scissor rectangle.
-    scissor: Box2<u16>,
+    pub scissor: Box2<u16>,
 
     /// Clip planes (enabled by `ElemFlags::CLIP_PLANES`).
-    clip_planes: [ClipPlanes; 2],
+    pub clip_planes: [ClipPlanes; 2],
 }
 
 /// Clip planes (enabled by `ElemFlags::CLIP_PLANES`). Given window
-/// pixel coordinates `p = vec2(x, y)`, the pixel is considered included if
-/// `d.contains(&p.dot(n)))`. The length of `n` must be close to `CLIP_SUB` for
-/// edge antialiasing to work.
+/// pixel coordinates `p = vec2(x, y) ∈ ℤ²`, the pixel is considered included if
+/// `d.contains(&p.dot(n)))`.
+///
+/// When antialiasing is enabled (by `ElemFlags::CLIP_PLANES_ANTIALIASED`), the
+/// coverage value is calculated as:
+/// ```text
+///        1      p.dot(n) + CLIP_SUB
+///   ---------- ∫         step(x - d.start) - step(x - d.end) dx
+///    CLIP_SUB   p.dot(n)
+/// ```
+/// Thus, the length of `n` must be close to `CLIP_SUB` for edge antialiasing to
+/// work.
 ///
 /// We wish to rasterize an parallelogram with antialiasing. The naïve
-/// derivation is, for each output pixel, to integrate a square region in a
-/// 2D function representing the shape to get the coverage value, but this
-/// approach is complicated and probably slow. Thus we rely on approximation.
+/// derivation is, for each output pixel, to integrate the product of a 2D
+/// function representing the shape and a kernel function representing the
+/// coverage of the pixel, but this approach is complicated and probably slow.
+/// Thus we rely on approximation.
 ///
-/// A parallelogram is an intersection of two thick straight lines, each of
-/// which is in turn an intersection of two half planes sharing the same
-/// normal vector. Based on this observation, we approximate the calculation
-/// of coverage values as follows:
+/// A parallelogram is equal to the intersecting region of two thick straight
+/// lines. Based on this observation, we approximate the calculation of coverage
+/// values as follows:
 ///
 ///  - A coverage value of a shape formed by an intersection of two shapes
 ///    is calculated as a product of coverage values calculated for the
 ///    the individual shapes. Thus, the final coverage value is a product
-///    of the four half planes' coverage values.
+///    of the two straigfht lines' coverage values.
 ///
-///  - A coverage value of a half plane is a clamped linear function of
-///    sample coordinates. (In reality, it's a piecewise linear function.)
-///    The width of the function's transition zone has a size of a pixel.
+///  - When calculating a coverage value for a straight line, the kernel
+///    function is defined to be a square shape which is oriented in a way in
+///    which two of the sides are parallel to the straight line. This greatly
+///    simplifies the calculation because the interaction between the straight
+///    line and the kernel function is now limited to one dimension.
 ///
 #[derive(Debug, Clone)]
 pub(super) struct ClipPlanes {
-    n: Vector2<i32>,
-    d: Range<i32>,
+    pub n: Vector2<i32>,
+    pub d: Range<i32>,
 }
 
 impl Default for ClipPlanes {
@@ -147,11 +167,13 @@ pub(super) enum Content<TBmp> {
     /// ```
     ///
     /// **Using this automatically clears the source layer.**
+    ///
+    /// The layer number `x` must be greater than `Elem::layer`.
     Layer(u8),
 }
 
 bitflags! {
-    struct ElemFlags: u8 {
+    pub(super) struct ElemFlags: u8 {
         /// Enable clipping by clip planes
         ///
         /// Clip planes are more flexible than a scissor rectangle, but render
@@ -241,7 +263,7 @@ impl<TBmp: Bmp> Binner<TBmp> {
     pub(super) fn bin_elems(
         &self,
         bin_index: [usize; 2],
-    ) -> impl Iterator<Item = &Elem<TBmp>> + '_ {
+    ) -> impl Iterator<Item = (&Elem<TBmp>, u8)> + '_ {
         let bin_i = bin_index[0] + bin_index[1] * self.bin_count[0];
         let bin = &self.bins[bin_i];
 
@@ -251,7 +273,7 @@ impl<TBmp: Bmp> Binner<TBmp> {
             } else {
                 let frag = &self.frags[*frag_i as usize];
                 *frag_i = frag.next_frag_i;
-                Some(&self.elems[frag.elem_i as usize])
+                Some((&self.elems[frag.elem_i as usize], frag.layer))
             }
         })
     }
