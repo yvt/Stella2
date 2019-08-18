@@ -61,7 +61,7 @@ struct Bin {
 
 /// A rendered element, referenced by one or more fragments
 #[derive(Debug)]
-struct Elem<TBmp> {
+pub(super) struct Elem<TBmp> {
     flags: ElemFlags,
 
     /// Opacity in range `0..=256`.
@@ -101,7 +101,7 @@ struct Elem<TBmp> {
 ///    The width of the function's transition zone has a size of a pixel.
 ///
 #[derive(Debug, Clone)]
-struct ClipPlanes {
+pub(super) struct ClipPlanes {
     n: Vector2<i32>,
     d: Range<i32>,
 }
@@ -116,7 +116,7 @@ impl Default for ClipPlanes {
 }
 
 #[derive(Debug, Clone)]
-enum Content<TBmp> {
+pub(super) enum Content<TBmp> {
     /// A solid color, The alpha channel is ignored and taken from
     /// `Elem::opacity`.
     Solid([u8; 4]),
@@ -235,6 +235,25 @@ impl<TBmp: Bmp> Binner<TBmp> {
                 max: [size[0] as u16, size[1] as u16],
             }),
         }
+    }
+
+    /// Enumerate the fragments occupying the specified bin.
+    pub(super) fn bin_elems(
+        &self,
+        bin_index: [usize; 2],
+    ) -> impl Iterator<Item = &Elem<TBmp>> + '_ {
+        let bin_i = bin_index[0] + bin_index[1] * self.bin_count[0];
+        let bin = &self.bins[bin_i];
+
+        itertools::unfold(bin.frag_first_i, move |frag_i| {
+            if *frag_i == NONE {
+                None
+            } else {
+                let frag = &self.frags[*frag_i as usize];
+                *frag_i = frag.next_frag_i;
+                Some(&self.elems[frag.elem_i as usize])
+            }
+        })
     }
 }
 
