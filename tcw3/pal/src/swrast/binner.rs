@@ -226,6 +226,8 @@ impl<TBmp: Bmp> Binner<TBmp> {
     /// Initialize the storage to accomodate the specified render target size,
     /// and start filling bins.
     pub(super) fn build(&mut self, size: [usize; 2]) -> BinnerBuilder<'_, TBmp> {
+        const SIZE_ERR: &str = "size is too large";
+
         assert!(size[0] <= <u16>::max_value() as usize);
         assert!(size[1] <= <u16>::max_value() as usize);
 
@@ -235,17 +237,20 @@ impl<TBmp: Bmp> Binner<TBmp> {
 
         self.target_size = size;
         self.bin_count = [
-            (size[0] + TILE as usize - 1) / TILE as usize,
-            (size[1] + TILE as usize - 1) / TILE as usize,
+            size[0].checked_add(TILE as usize - 1).expect(SIZE_ERR) / TILE as usize,
+            size[1].checked_add(TILE as usize - 1).expect(SIZE_ERR) / TILE as usize,
         ];
 
-        self.bins
-            .extend((0..self.bin_count[0] * self.bin_count[1]).map(|_| Bin {
-                frag_first_i: NONE,
-                frag_last_i: NONE,
-                max_layered_group_i: 0,
-                _pad: 0,
-            }));
+        let num_bins = self.bin_count[0]
+            .checked_mul(self.bin_count[1])
+            .expect(SIZE_ERR);
+
+        self.bins.extend((0..num_bins).map(|_| Bin {
+            frag_first_i: NONE,
+            frag_last_i: NONE,
+            max_layered_group_i: 0,
+            _pad: 0,
+        }));
 
         BinnerBuilder {
             binner: self,
@@ -264,6 +269,9 @@ impl<TBmp: Bmp> Binner<TBmp> {
         &self,
         bin_index: [usize; 2],
     ) -> impl Iterator<Item = (&Elem<TBmp>, u8)> + '_ {
+        debug_assert!(bin_index[0] < self.bin_count[0]);
+        debug_assert!(bin_index[1] < self.bin_count[1]);
+
         let bin_i = bin_index[0] + bin_index[1] * self.bin_count[0];
         let bin = &self.bins[bin_i];
 
@@ -1261,6 +1269,27 @@ mod tests {
     use cgmath::abs_diff_eq;
     use quickcheck::TestResult;
     use quickcheck_macros::quickcheck;
+
+    #[test]
+    #[should_panic]
+    fn too_large_size1() {
+        let mut binner = Binner::<TestBmp>::new();
+        binner.build([<usize>::max_value(), 2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn too_large_size2() {
+        let mut binner = Binner::<TestBmp>::new();
+        binner.build([2, <usize>::max_value()]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn too_large_size3() {
+        let mut binner = Binner::<TestBmp>::new();
+        binner.build([<usize>::max_value(); 2]);
+    }
 
     #[quickcheck]
     fn test_parallelogram_aabb(
