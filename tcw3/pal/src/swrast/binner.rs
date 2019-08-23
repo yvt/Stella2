@@ -285,6 +285,25 @@ impl<TBmp: Bmp> Binner<TBmp> {
             }
         })
     }
+
+    /// Get the render target size `self` is currently configured for.
+    pub(super) fn target_size(&self) -> [usize; 2] {
+        self.target_size
+    }
+
+    /// Get the bin count.
+    ///
+    /// This is calculated by:
+    ///
+    /// ```no_test
+    /// bin_count = [
+    ///     (target_size[0] + TILE - 1) / TILE,
+    ///     (target_size[1] + TILE - 1) / TILE,
+    /// ];
+    /// ```
+    pub(super) fn bin_count(&self) -> [usize; 2] {
+        self.bin_count
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

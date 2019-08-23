@@ -34,3 +34,4 @@ const NUM_GROUPS: usize = 32;
 pub mod binner;
 mod binrast;
 pub mod layers;
+mod rast;
