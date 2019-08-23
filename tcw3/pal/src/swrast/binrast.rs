@@ -209,10 +209,11 @@ impl BinRast {
                         mask = izip!(&cps, &cvs)
                             .map(|(cp, cv)| {
                                 (integrate_step(cv - cp.d.start) - integrate_step(cv - cp.d.end))
+                                    as u32
                                     >> (CLIP_SUB_SHIFT - 8)
                             })
-                            .fold(256, |x, y| (x * y as u32) / 256)
-                            * 256;
+                            .product::<u32>()
+                            / 256;
                     } else {
                         mask = izip!(&cps, &cvs)
                             .map(|(cp, cv)| cp.d.contains(cv) as u32)
