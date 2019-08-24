@@ -96,6 +96,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// based on the attributes of the window and its all sublayers as soon as
     /// possible. Conversely, all attribute updates may be deferred until this
     /// method is called.
+    ///
+    /// The implementation may call this automatically in the main event loop.
     fn update_wnd(self, window: &Self::HWnd);
 
     /// Get the size of a window's content region.
