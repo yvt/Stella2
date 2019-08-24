@@ -49,7 +49,7 @@ struct MtData<TWM: Wm, TWC: WndContent> {
     /// leverage this property to implement `is_main_thread`.
     mt_check: Fragile<()>,
     wm: MtSticky<WinitWmCore<TWM, TWC>, TWM>,
-    proxy: EventLoopProxy<UserEvent<TWM, TWC>>,
+    proxy: Mutex<EventLoopProxy<UserEvent<TWM, TWC>>>,
 }
 
 /// The global state of the window manager, only accessible to the main thread.

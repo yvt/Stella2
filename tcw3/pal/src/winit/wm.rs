@@ -5,6 +5,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::LinkedList,
     ptr::NonNull,
+    sync::Mutex,
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
@@ -71,7 +72,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
                 // *We* define the current thread as the main thread, so this
                 // should be safe
                 wm: MtSticky::with_wm(wm, winit_wm),
-                proxy,
+                proxy: Mutex::new(proxy),
             }
         })
     }
@@ -88,7 +89,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
         let e: UserEvent<TWM, TWC> = Box::new(cb);
 
         if let Some(mt) = self.mt.get() {
-            let _ = mt.proxy.send_event(e);
+            let _ = mt.proxy.lock().unwrap().send_event(e);
             return;
         }
 
@@ -109,7 +110,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
         // Check `mt` again. It might have been initialized while we were
         // updating `pending_invoke_events`.
         if let Some(mt) = self.mt.get() {
-            Self::handle_pending_invoke_events(&mut pending_invoke_events, &mt.proxy);
+            Self::handle_pending_invoke_events(
+                &mut pending_invoke_events,
+                &mt.proxy.lock().unwrap(),
+            );
         }
     }
 
@@ -129,7 +133,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     fn new(wm: TWM) -> Self {
         Self {
             wm,
-            event_loop: RefCell::new(Some(EventLoop::new_user_event())),
+            event_loop: RefCell::new(Some(EventLoop::with_user_event())),
             should_terminate: Cell::new(false),
             event_loop_wnd_target: Cell::new(None),
             unsend_invoke_events: RefCell::new(LinkedList::new()),
