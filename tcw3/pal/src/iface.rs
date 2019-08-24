@@ -26,6 +26,10 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     type HWnd: Debug + Clone;
 
     /// A layer handle type.
+    ///
+    /// A layer only can appear in a single window throughout its lifetime.
+    /// I.e., after a layer is added to a window, it must never moved to another
+    /// window.
     type HLayer: Debug + Clone;
 
     /// A bitmap type.
