@@ -12,14 +12,18 @@
 use alt_fp::FloatOrd;
 use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
-use cgmath::{prelude::*, Matrix3};
+use cgmath::{prelude::*, Matrix3, Vector2};
 use flags_macro::flags;
 use iterpool::{Pool, PoolPtr};
 
 use super::super::iface;
 
 use super::{
-    binner::{round_aabb_conservative, xform_aabb, Bmp},
+    binner::{
+        round_aabb_conservative, xform_aabb, xform_and_aabb_to_parallelogram, Binner,
+        BinnerBuilder, Bmp, ElemInfo,
+    },
+    rast::rasterize,
     utils::Box2UsizeUnion,
 };
 
@@ -652,20 +656,117 @@ struct UpdateCtx {
 
 impl<TBmp: Bmp> Screen<TBmp> {
     /// Render the content of a window to the specified image buffer.
-    /// The rendered area is limited to `dirty`.
+    /// The rendered area is limited to `rect`.
     ///
-    /// `dirty` is usually based on the return value of `update_wnd`, but does
+    /// `rect` is usually based on the return value of `update_wnd`, but does
     /// not necessarily have to be to meet specific requirements (such as
     /// double buffering).
+    ///
+    /// Let `size` be `bx.size()`.  `out.len()` must be at least
+    /// `out_stride * (size[1] - 1) + size[0] * 4`.
+    ///
+    /// `binner` is used as a temporary storage.
     pub fn render_wnd(
         &mut self,
-        wnd: &HWnd,
+        hwnd: &HWnd,
         out: &mut [u8],
         out_stride: usize,
-        dirty: Box2<usize>,
+        bx: Box2<usize>,
+        binner: &mut Binner<TBmp>,
+        contents_scale: f32,
     ) {
-        unimplemented!()
+        let wnd = &self.wnds[hwnd.ptr];
+        assert!(bx.max.x <= wnd.size[0] && bx.max.y <= wnd.size[1]);
+        assert!(bx.is_valid());
+
+        let mut builder = binner.build(bx.size().into());
+        if let Some(root) = &wnd.root {
+            let ctx = RenderCtx {
+                contents_scale,
+                offset: [bx.min.x as f32, bx.min.y as f32].into(),
+            };
+            self.binner_build_layer(&mut builder, &ctx, &self.layers[root.ptr]);
+        }
+        builder.finish();
+
+        rasterize(&binner, out, out_stride);
     }
+
+    fn binner_build_layer(
+        &self,
+        builder: &mut BinnerBuilder<'_, TBmp>,
+        ctx: &RenderCtx,
+        layer: &Layer<TBmp>,
+    ) {
+        // If the layer has both of a content and sublayers, and it's translucent,
+        // then we have to create an outer group for group opacity effect.
+        // TODO: Actually, `push_elem` creates an implicit group under a variety of
+        //       situations. This could be avoided if `layer` has `MASK_TO_BOUNDS`,
+        //       i.e., sublayers are masked by this layer's bounds.
+        let attrs = &layer.attrs;
+        let has_sublayers = layer.sublayers.len() > 0;
+        let has_content = attrs.bg_color.a > 0.0 || attrs.contents.is_some();
+
+        let use_opacity_group = has_sublayers && has_content && attrs.opacity < 1.0;
+
+        let inner_opacity = if use_opacity_group {
+            1.0
+        } else {
+            attrs.opacity
+        };
+
+        if use_opacity_group {
+            builder.open_group(None, attrs.opacity);
+        }
+
+        if has_sublayers {
+            let mask_xform = if (attrs.flags).contains(iface::LayerFlags::MASK_TO_BOUNDS) {
+                Some(xform_and_aabb_to_parallelogram(
+                    attrs.transform,
+                    attrs.bounds,
+                ))
+            } else {
+                None
+            };
+            builder.open_group(mask_xform, inner_opacity);
+
+            for hlayer in layer.sublayers.iter().rev() {
+                self.binner_build_layer(builder, ctx, &self.layers[hlayer.ptr]);
+            }
+
+            builder.close_group();
+        }
+
+        if has_content {
+            let bg_color = attrs.bg_color;
+            let to_u8 = |x: f32| (x.fmax(0.0).fmin(1.0) * 255.0 + 0.5) as u8;
+
+            builder.push_elem(ElemInfo {
+                xform: attrs.transform,
+                bounds: attrs.bounds,
+                contents_center: attrs.contents_center,
+                contents_scale: attrs.contents_scale * ctx.contents_scale,
+                bitmap: attrs.contents.clone(),
+                bg_color: [
+                    to_u8(bg_color.r),
+                    to_u8(bg_color.g),
+                    to_u8(bg_color.b),
+                    to_u8(bg_color.a),
+                ]
+                .into(),
+                opacity: inner_opacity,
+            });
+        }
+
+        if use_opacity_group {
+            builder.close_group();
+        }
+    }
+}
+
+struct RenderCtx {
+    contents_scale: f32,
+    offset: Vector2<f32>,
 }
 
 fn bbox2_intersect(x: Option<Box2<usize>>, y: Option<Box2<usize>>) -> Option<Box2<usize>> {

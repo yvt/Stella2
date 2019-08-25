@@ -1151,7 +1151,7 @@ fn parallelogram_aabb(xform: Matrix3<f32>) -> Box2<f32> {
 /// represented by  `0 ≤ x, y ≤ 1` using `M`, the output shape is identical to
 /// `P`.
 #[rustfmt::skip]
-fn xform_and_aabb_to_parallelogram(xform: Matrix3<f32>, bx: Box2<f32>) -> Matrix3<f32> {
+pub(super) fn xform_and_aabb_to_parallelogram(xform: Matrix3<f32>, bx: Box2<f32>) -> Matrix3<f32> {
     let p = xform.transform_point(bx.min);
     let size = bx.max - bx.min;
 
