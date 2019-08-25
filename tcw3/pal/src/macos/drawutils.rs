@@ -25,7 +25,7 @@ pub fn extend_matrix3_with_identity_z(m: Matrix3<f32>) -> Matrix4<f32> {
 }
 
 pub fn ca_transform_3d_from_matrix4(m: Matrix4<f64>) -> CATransform3D {
-    unsafe { std::mem::transmute(m.transpose()) }
+    unsafe { std::mem::transmute(m) }
 }
 
 pub fn cg_rect_from_box2(bx: Box2<f64>) -> CGRect {
