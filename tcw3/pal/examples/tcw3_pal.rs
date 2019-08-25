@@ -1,5 +1,6 @@
 use cggeom::{box2, prelude::*};
 use cgmath::Point2;
+use log::info;
 use tcw3_pal::{self as pal, prelude::*};
 
 struct Listener {
@@ -8,7 +9,7 @@ struct Listener {
 
 impl WndListener<pal::Wm> for Listener {
     fn dpi_scale_changed(&self, wm: pal::Wm, wnd: &pal::HWnd) {
-        dbg!(wm.get_wnd_dpi_scale(wnd));
+        info!("dpi_scale_changed {:?}", wm.get_wnd_dpi_scale(wnd));
     }
 
     fn close(&self, wm: pal::Wm, _: &pal::HWnd) {
@@ -31,11 +32,11 @@ impl WndListener<pal::Wm> for Listener {
     }
 
     fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>) {
-        println!("mouse_motion {:?}", loc);
+        info!("mouse_motion {:?}", loc);
     }
 
     fn mouse_leave(&self, _: pal::Wm, _: &pal::HWnd) {
-        println!("mouse_leave");
+        info!("mouse_leave");
     }
 
     fn mouse_drag(
@@ -45,7 +46,7 @@ impl WndListener<pal::Wm> for Listener {
         loc: Point2<f32>,
         button: u8,
     ) -> Box<dyn MouseDragListener<pal::Wm>> {
-        println!("mouse_drag {:?}", (loc, button));
+        info!("mouse_drag {:?}", (loc, button));
         Box::new(DragListener)
     }
 }
@@ -54,16 +55,16 @@ struct DragListener;
 
 impl MouseDragListener<pal::Wm> for DragListener {
     fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>) {
-        println!("drag: mouse_motion {:?}", loc);
+        info!("drag: mouse_motion {:?}", loc);
     }
     fn mouse_down(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
-        println!("drag: mouse_down {:?}", (loc, button));
+        info!("drag: mouse_down {:?}", (loc, button));
     }
     fn mouse_up(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
-        println!("drag: mouse_up {:?}", (loc, button));
+        info!("drag: mouse_up {:?}", (loc, button));
     }
     fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
-        println!("drag: cancel");
+        info!("drag: cancel");
     }
 }
 
