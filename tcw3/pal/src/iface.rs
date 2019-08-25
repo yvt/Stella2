@@ -287,6 +287,10 @@ impl<TBitmap, TLayer> Default for LayerAttrs<TBitmap, TLayer> {
 bitflags! {
     pub struct LayerFlags: u32 {
         /// Clip sublayers to the content bounds.
+        ///
+        /// **This flag cannot be modified once a layer is created.** Changing
+        /// it via `set_layer_attr` might cause visual corruption on some
+        /// backends (namely, `swrast`).
         const MASK_TO_BOUNDS = 1;
     }
 }

@@ -1126,7 +1126,7 @@ fn is_affine_xform(xform: Matrix3<f32>) -> bool {
 }
 
 /// Transform an axis-aligned box, returning the AABB of the transformed box.
-fn xform_aabb(xform: Matrix3<f32>, bx: Box2<f32>) -> Box2<f32> {
+pub(super) fn xform_aabb(xform: Matrix3<f32>, bx: Box2<f32>) -> Box2<f32> {
     parallelogram_aabb(xform_and_aabb_to_parallelogram(xform, bx))
 }
 
@@ -1162,7 +1162,7 @@ fn xform_and_aabb_to_parallelogram(xform: Matrix3<f32>, bx: Box2<f32>) -> Matrix
     )
 }
 
-fn round_aabb_conservative(bx: Box2<f32>) -> Box2<f32> {
+pub(super) fn round_aabb_conservative(bx: Box2<f32>) -> Box2<f32> {
     box2! {
         min: [bx.min.x.floor(), bx.min.y.floor()],
         max: [bx.max.x.ceil(), bx.max.y.ceil()],

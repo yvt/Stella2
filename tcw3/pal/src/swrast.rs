@@ -35,3 +35,4 @@ pub mod binner;
 mod binrast;
 pub mod layers;
 mod rast;
+mod utils;
