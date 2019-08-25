@@ -72,7 +72,7 @@ impl WndListener for MyWndListener {
 }
 
 fn main() {
-    pretty_env_logger::init();
+    env_logger::init();
 
     let wm = pal::Wm::global();
 

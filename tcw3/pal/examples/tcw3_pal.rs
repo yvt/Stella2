@@ -68,7 +68,7 @@ impl MouseDragListener<pal::Wm> for DragListener {
 }
 
 fn main() {
-    pretty_env_logger::init();
+    env_logger::init();
 
     let wm = pal::Wm::global();
 
