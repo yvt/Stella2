@@ -733,6 +733,9 @@ mod tests {
         screen.remove_wnd(&wnd2);
     }
 
+    // layer_ref_counting*
+    // ----------------------------------------------------------------------
+    // Validates the reference counting behaviour of layers.
     #[test]
     fn layer_ref_counting1() {
         let mut screen: Screen<TestBmp> = Screen::new();
@@ -820,5 +823,325 @@ mod tests {
 
         screen.update_wnd(&wnd);
         assert_eq!(screen.layers.iter().count(), 2);
+    }
+
+    // root_update_*
+    // ----------------------------------------------------------------------
+    // A root layer is modified. After that, the calculated dirty region is
+    // checked.
+    #[test]
+    fn root_update_content() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer1,
+            iface::LayerAttrs {
+                contents: Some(Some(TestBmp)),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 30], max: [80, 50] })
+        );
+    }
+
+    #[test]
+    fn root_update_position() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            bg_color: Some([0.5, 0.6, 0.7, 0.8].into()),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer1,
+            iface::LayerAttrs {
+                bounds: Some(box2! { min: [40.0, 70.0], max: [90.0, 80.0] }),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 30], max: [90, 80] })
+        );
+    }
+
+    // sublayer_update_*
+    // ----------------------------------------------------------------------
+    // A sublayer of the root layer is modified. After that, the calculated
+    // dirty region is checked.
+    #[test]
+    fn sublayer_update_content() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [30.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                contents: Some(Some(TestBmp)),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 30], max: [80, 50] })
+        );
+    }
+
+    #[test]
+    fn sublayer_update_position() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            bg_color: Some([0.5, 0.6, 0.7, 0.8].into()),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [30.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                bounds: Some(box2! { min: [40.0, 70.0], max: [90.0, 80.0] }),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 30], max: [90, 80] })
+        );
+    }
+
+    // masked_sublayer_update_*
+    // ----------------------------------------------------------------------
+    // A sublayer of the root layer with `MASK_TO_BOUNDS` is modified. After
+    // that, the calculated dirty region is checked.
+    //
+    //  (20, 30)
+    //     ┌─────────────────────────┐
+    //     │ (30, 40)                │layer2
+    //     │    ┌────────┐           │
+    //     │    │        │layer1     │
+    //     │    │        │(root)     │
+    //     │    └────────┘           │
+    //     │         (60, 60)        │
+    //     │                         │
+    //     │                         │
+    //     └─────────────────────────┘
+    //                           (80, 50)
+    #[test]
+    fn masked_sublayer_update_content() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [30.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            flags: Some(iface::LayerFlags::MASK_TO_BOUNDS),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                contents: Some(Some(TestBmp)),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [30, 40], max: [60, 50] })
+        );
+    }
+
+    //  (20, 30)
+    //     ┌──────────────────────────┐
+    //     │ (30, 40)                 │layer2
+    //     │   ┌────────────┐         │
+    //     │   │(40, 50)    │         │
+    //     │   │  ┌─────────┼─────────┼────┐
+    //     │   │  │         │layer1   │    │layer2 (after)
+    //     │   │  │         │(root)   │    │
+    //     │   └──┼─────────┘         │    │
+    //     │      │     (60, 60)      │    │
+    //     │      │                   │    │
+    //     └──────┼───────────────────┘    │
+    //            │                (80, 50)│
+    //            └────────────────────────┘
+    //                             (90, 80)
+    #[test]
+    fn masked_sublayer_update_position() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            bg_color: Some([0.5, 0.6, 0.7, 0.8].into()),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [30.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            flags: Some(iface::LayerFlags::MASK_TO_BOUNDS),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                bounds: Some(box2! { min: [40.0, 50.0], max: [90.0, 80.0] }),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [30, 40], max: [60, 60] })
+        );
+    }
+
+    // root_opacity
+    // ----------------------------------------------------------------------
+    // The opacity of a root layer is modified. The root layer contains a
+    // sublayer. The calculated dirty region is checked.
+    #[test]
+    fn root_opacity() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            contents: Some(Some(TestBmp)),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [30.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer1,
+            iface::LayerAttrs {
+                opacity: Some(0.5),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 30], max: [80, 50] })
+        );
     }
 }
