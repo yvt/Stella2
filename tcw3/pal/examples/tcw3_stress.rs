@@ -122,7 +122,7 @@ fn main() {
     let wnd = wm.new_wnd(pal::WndAttrs {
         caption: Some("tcw3_stress".into()),
         visible: Some(true),
-        layer: Some(Some(layer)),
+        layer: Some(Some(layer.clone())),
         size: Some(FBSIZE),
         listener: Some(Box::new(Listener {})),
         flags: Some(pal::WndFlags::default() - pal::WndFlags::RESIZABLE),
