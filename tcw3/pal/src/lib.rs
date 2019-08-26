@@ -35,7 +35,12 @@ pub mod macos;
 #[cfg(target_os = "macos")]
 pub use macos as native;
 
-// TODO: Other platforms
+#[cfg(not(target_os = "macos"))]
+pub mod unix;
+#[cfg(not(target_os = "macos"))]
+pub use unix as native;
+
+// TODO: Windows
 
 // And here is the supporting module, which is shared between the
 // platform-specific modules.
