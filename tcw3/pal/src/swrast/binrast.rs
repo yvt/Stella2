@@ -174,7 +174,7 @@ impl BinRast {
             for (i, x, x_g, d0, d1, d2, d3) in izip!(
                 row_range.start..,
                 0..,
-                sci_clip_g[1]..,
+                sci_clip_g[0]..,
                 dest_row0,
                 dest_row1,
                 dest_row2,
