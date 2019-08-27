@@ -75,6 +75,9 @@ pub trait WinitWm: Wm {
     /// Convert `HWndCore` to a backend-specific `HWnd`. Panic if the given window
     /// handle is invalid.
     fn hwnd_core_to_hwnd(self, hwnd: &HWndCore) -> Self::HWnd;
+
+    /// Called once after `WinitWmCore` is created.
+    fn init(self) {}
 }
 
 /// The window handle type used by `WinitWmCore`.

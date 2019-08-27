@@ -7,13 +7,15 @@
 //!  - Cairo for 2D drawing (WIP)
 //!  - FreeType/Pango/fontconfig for text rendering (WIP).
 //!
-use super::{
-    iface,
-    winit::{HWndCore, WinitEnv, WinitWm, WinitWmCore, WndContent as WndContentTrait},
-};
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::marker::PhantomData;
+
+use super::{
+    iface,
+    prelude::MtLazyStatic,
+    winit::{HWndCore, WinitEnv, WinitWm, WinitWmCore},
+};
 
 // Define a global instance of `WinitEnv`.
 //
@@ -27,6 +29,9 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
 pub type HWnd = HWndCore;
 
+mod comp;
+pub use self::comp::{HLayer, WndContent};
+
 /// Provides an access to the window system.
 ///
 /// `Wm` is only accessible by the application's main thread. Therefore, the
@@ -37,6 +42,10 @@ pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
+mt_lazy_static! {
+    static ref COMP: comp::Compositor => |wm| comp::Compositor::new(wm);
+}
+
 impl Wm {
     /// Get the global `WinitWmCore` instance.
     ///
@@ -44,12 +53,32 @@ impl Wm {
     fn winit_wm_core(self) -> &'static WinitWmCore<Wm, WndContent> {
         WINIT_ENV.wm_with_wm(self)
     }
+
+    /// Get the global `Compositor` instance.
+    fn comp(self) -> &'static comp::Compositor {
+        COMP.get_with_wm(self)
+    }
 }
 
 // `super::winit` uses this `impl` for the framework's operation
 impl WinitWm for Wm {
     fn hwnd_core_to_hwnd(self, hwnd: &HWndCore) -> Self::HWnd {
         hwnd.clone()
+    }
+
+    fn init(self) {
+        // Force the initialization of `COMP`. We should this now because if
+        // we do it later, we might not be able to access winit's `EventLoop`,
+        // which we need to initialize `Compositor`.
+        //
+        // Astoundingly un-Rusty... TODO: Perhaps make this more Rusty?
+        // I think we could add a new type parameter to `WinitEnv` or a new
+        // associate type to `WinitWm` to allow storing custom data in
+        // `WinitWmCore`. Note that we can't store it in `Wm` because `Wm` is
+        // just a marker type indicating the main thread. But, do not forget
+        // to think about the practical benefits! (Do not blindly follow the
+        // "best practices".)
+        let _ = COMP.get_with_wm(self);
     }
 }
 
@@ -87,8 +116,7 @@ impl iface::Wm for Wm {
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
         self.winit_wm_core().new_wnd(attrs, |winit_wnd, layer| {
-            // TODO
-            WndContent
+            self.comp().new_wnd(winit_wnd, layer)
         })
     }
 
@@ -113,37 +141,17 @@ impl iface::Wm for Wm {
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        HLayer
-        // TODO
+        self.comp().new_layer(attrs)
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        // TODO
+        self.comp().set_layer_attr(layer, attrs)
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        // TODO
+        self.comp().remove_layer(layer)
     }
 }
 
 // The following types are all TODO
-struct WndContent;
-
-impl WndContentTrait for WndContent {
-    type Wm = Wm;
-    type HLayer = HLayer;
-
-    fn set_layer(
-        &mut self,
-        wm: &WinitWmCore<Self::Wm, Self>,
-        winit_wnd: &winit::window::Window,
-        layer: Option<Self::HLayer>,
-    ) {
-        // TODO
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct HLayer;
-
 #[derive(Debug, Clone)]
 pub struct Bitmap;
 

@@ -28,6 +28,7 @@ fragile = "0.3.0"
 iterpool = { path = "../../support/iterpool" }
 itertools = "0.8.0"
 once_cell = { version = "0.2.4", default-features = false }
+owning_ref = "0.4.0"
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"

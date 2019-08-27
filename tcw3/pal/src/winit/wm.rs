@@ -1,6 +1,7 @@
 use fragile::Fragile;
 use iterpool::Pool;
 use once_cell::sync::OnceCell;
+use owning_ref::OwningRef;
 use std::{
     cell::{Cell, RefCell},
     collections::LinkedList,
@@ -39,8 +40,9 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
     #[cold]
     fn mt_data_or_init_slow(&self) -> &MtData<TWM, TWC> {
         let mut lock = None;
+        let mut wm_cell = None;
 
-        self.mt.get_or_init(|| {
+        let mt_data = self.mt.get_or_init(|| {
             // Mark the current thread as the main thread
             let mt_check = Fragile::new(());
 
@@ -67,6 +69,8 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
             // `pending_invoke_events` that we would never check again.
             lock = Some(pending_invoke_events);
 
+            wm_cell = Some(wm);
+
             MtData {
                 mt_check,
                 // *We* define the current thread as the main thread, so this
@@ -74,7 +78,14 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
                 wm: MtSticky::with_wm(wm, winit_wm),
                 proxy: Mutex::new(proxy),
             }
-        })
+        });
+
+        // Call the `init` hook if we just created an instance of `WinitWmCore`.
+        if let Some(wm) = wm_cell {
+            wm.init();
+        }
+
+        mt_data
     }
 
     #[inline]
@@ -204,6 +215,20 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
     pub fn terminate(&self) {
         self.should_terminate.set(true);
+    }
+
+    /// Get a reference to winit's `EventLoop`.
+    ///
+    /// Returns `None` if the main event loop has already been entered.
+    pub fn event_loop(
+        &self,
+    ) -> Option<impl std::ops::Deref<Target = EventLoop<UserEvent<TWM, TWC>>> + '_> {
+        let x = self.event_loop.borrow();
+        if x.is_some() {
+            Some(OwningRef::new(x).map(|x| x.as_ref().unwrap()))
+        } else {
+            None
+        }
     }
 
     /// Call a function using the `EventLoopWindowTarget` supplied by `EventLoop`

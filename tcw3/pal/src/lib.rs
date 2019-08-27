@@ -27,6 +27,15 @@ pub mod prelude {
 
 // ============================================================================
 //
+// Utilities (should be defined first because it defines a macro
+// used by some submodules)
+//
+#[macro_use]
+mod cells;
+pub use self::cells::{MtLock, MtSticky};
+
+// ============================================================================
+//
 // The main module for each target platform. The active one for the current
 // target is aliased as `native`.
 
@@ -109,11 +118,3 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 //
 //      pub trait WndListener = iface::WndListener<Wm>;
 //
-
-// ============================================================================
-//
-// Utilities
-//
-#[macro_use]
-mod cells;
-pub use self::cells::{MtLock, MtSticky};
