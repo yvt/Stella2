@@ -1201,6 +1201,63 @@ mod tests {
         );
     }
 
+    //         (20, 30)
+    //            ┌──────────────────────────┐
+    //   (10, 40) │                          │layer2
+    //          ┌─┼────────────────┐         │
+    //          │ │    (40, 50)    │         │
+    //          │ │      ┌─────────┼─────────┼────┐
+    //          │ │      │         │layer1   │    │layer2 (after)
+    //          │ │      │         │(root)   │    │
+    //          └─┼──────┼─────────┘         │    │
+    //            │      │     (60, 60)      │    │
+    //            │      │                   │    │
+    //            └──────┼───────────────────┘    │
+    //                   │                (80, 50)│
+    //                   └────────────────────────┘
+    //                                    (90, 80)
+    #[test]
+    fn masked_sublayer_update_position2() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            bg_color: Some([0.5, 0.6, 0.7, 0.8].into()),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [10.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            flags: Some(iface::LayerFlags::MASK_TO_BOUNDS),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [100, 100]);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [100, 100] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                bounds: Some(box2! { min: [40.0, 50.0], max: [90.0, 80.0] }),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [20, 40], max: [60, 60] })
+        );
+    }
+
     // root_opacity
     // ----------------------------------------------------------------------
     // The opacity of a root layer is modified. The root layer contains a
