@@ -25,6 +25,8 @@ pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
+pub type HWnd = HWndCore;
+
 /// Provides an access to the window system.
 ///
 /// `Wm` is only accessible by the application's main thread. Therefore, the
@@ -47,7 +49,7 @@ impl Wm {
 // `super::winit` uses this `impl` for the framework's operation
 impl WinitWm for Wm {
     fn hwnd_core_to_hwnd(self, hwnd: &HWndCore) -> Self::HWnd {
-        unimplemented!()
+        hwnd.clone()
     }
 }
 
@@ -84,44 +86,45 @@ impl iface::Wm for Wm {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        unimplemented!()
+        self.winit_wm_core().new_wnd(attrs, |winit_wnd, layer| {
+            // TODO
+            WndContent
+        })
     }
 
-    fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        unimplemented!()
+    fn set_wnd_attr(self, hwnd: &Self::HWnd, attrs: WndAttrs<'_>) {
+        self.winit_wm_core().set_wnd_attr(hwnd, attrs)
     }
 
-    fn remove_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+    fn remove_wnd(self, hwnd: &Self::HWnd) {
+        self.winit_wm_core().remove_wnd(hwnd)
     }
 
-    fn update_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+    fn update_wnd(self, hwnd: &Self::HWnd) {
+        self.winit_wm_core().update_wnd(hwnd)
     }
 
-    fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2] {
-        unimplemented!()
+    fn get_wnd_size(self, hwnd: &Self::HWnd) -> [u32; 2] {
+        self.winit_wm_core().get_wnd_size(hwnd)
     }
 
-    fn get_wnd_dpi_scale(self, window: &Self::HWnd) -> f32 {
-        unimplemented!()
+    fn get_wnd_dpi_scale(self, hwnd: &Self::HWnd) -> f32 {
+        self.winit_wm_core().get_wnd_dpi_scale(hwnd)
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        unimplemented!()
+        HLayer
+        // TODO
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        unimplemented!()
+        // TODO
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        unimplemented!()
+        // TODO
     }
 }
 
 // The following types are all TODO
-#[derive(Debug, Clone)]
-pub struct HWnd;
-
 struct WndContent;
 
 impl WndContentTrait for WndContent {
@@ -134,7 +137,7 @@ impl WndContentTrait for WndContent {
         winit_wnd: &winit::window::Window,
         layer: Option<Self::HLayer>,
     ) {
-        unimplemented!()
+        // TODO
     }
 }
 
