@@ -15,7 +15,6 @@ use super::{Bitmap, LayerAttrs, Wm};
 /// This stores references to objects possibly shared by multiple windows, such
 /// as a Wayland connection and Vulkan devices.
 pub(super) struct Compositor {
-    wm: Wm,
     sw_ctx: SwContext,
     state: RefCell<State>,
 }
@@ -54,9 +53,8 @@ impl Compositor {
         };
 
         Self {
-            wm,
             sw_ctx: swsurface::ContextBuilder::new(&event_loop)
-                .with_ready_cb(|winit_wnd_id| {
+                .with_ready_cb(|_winit_wnd_id| {
                     // TODO
                 })
                 .build(),

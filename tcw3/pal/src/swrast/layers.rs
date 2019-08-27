@@ -13,7 +13,6 @@ use alt_fp::FloatOrd;
 use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Vector2};
-use flags_macro::flags;
 use iterpool::{Pool, PoolPtr};
 
 use super::super::iface;
