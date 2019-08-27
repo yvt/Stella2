@@ -186,6 +186,9 @@ impl WndContentTrait for WndContent {
 
             self.dirty_rect =
                 vec![Some(box2! { min: [0, 0], max: surf_size_sz }); sw_surf.num_images()];
+
+            self.surf_size = surf_size;
+            self.surf_dpi_scale = surf_dpi_scale;
         }
 
         // Compute the dirty region
