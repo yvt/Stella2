@@ -31,8 +31,13 @@ const NUM_LAYERS: usize = 16;
 /// The number of groups.
 const NUM_GROUPS: usize = 32;
 
-pub mod binner;
+mod binner;
 mod binrast;
-pub mod layers;
+mod layers;
 mod rast;
 mod utils;
+
+pub(crate) use self::{
+    binner::{Binner, Bmp},
+    layers::{HLayer, HWnd, Screen},
+};
