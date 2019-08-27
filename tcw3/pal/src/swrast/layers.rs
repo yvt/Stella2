@@ -168,6 +168,7 @@ struct Wnd {
     /// reflect the root view's dirty flag.
     dirty: bool,
     size: [usize; 2],
+    dpi_scale: f32,
     root: Option<HLayer>,
 }
 
@@ -183,6 +184,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let ptr = self.wnds.allocate(Wnd {
             dirty: true,
             size: [0; 2],
+            dpi_scale: 1.0,
             root: None,
         });
 
@@ -197,6 +199,12 @@ impl<TBmp: Bmp> Screen<TBmp> {
     pub fn set_wnd_size(&mut self, wnd: &HWnd, size: [usize; 2]) {
         let wnd = &mut self.wnds[wnd.ptr];
         wnd.size = size;
+        wnd.dirty = true;
+    }
+
+    pub fn set_wnd_dpi_scale(&mut self, wnd: &HWnd, dpi_scale: f32) {
+        let wnd = &mut self.wnds[wnd.ptr];
+        wnd.dpi_scale = dpi_scale;
         wnd.dirty = true;
     }
 
@@ -372,6 +380,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let root = wnd.root.clone();
         let ctx = UpdateCtx {
             wnd_size_f32: [wnd.size[0] as f32, wnd.size[1] as f32],
+            dpi_scale: wnd.dpi_scale,
             full_update: wnd.dirty,
         };
 
@@ -573,7 +582,8 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let should_check_content = layer.dirty.contains(LayerDirtyFlags::CONTENT) | ctx.full_update;
 
         if should_check_content {
-            let bx = xform_aabb(layer.attrs.transform, layer.attrs.bounds);
+            let tx = scale_mat3(layer.attrs.transform, ctx.dpi_scale);
+            let bx = xform_aabb(tx, layer.attrs.bounds);
             let bx = round_aabb_conservative(bx);
             let size = ctx.wnd_size_f32;
             let bx = box2! {
@@ -643,6 +653,8 @@ impl<TBmp: Bmp> Screen<TBmp> {
 struct UpdateCtx {
     wnd_size_f32: [f32; 2],
 
+    dpi_scale: f32,
+
     /// Instructs to ignore the dirty flags of layers. All derived fields in
     /// `Layer` will be recalculated.
     ///
@@ -673,7 +685,6 @@ impl<TBmp: Bmp> Screen<TBmp> {
         out_stride: usize,
         bx: Box2<usize>,
         binner: &mut Binner<TBmp>,
-        contents_scale: f32,
     ) {
         let wnd = &self.wnds[hwnd.ptr];
         assert!(bx.max.x <= wnd.size[0] && bx.max.y <= wnd.size[1]);
@@ -682,7 +693,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let mut builder = binner.build(bx.size().into());
         if let Some(root) = &wnd.root {
             let ctx = RenderCtx {
-                contents_scale,
+                dpi_scale: wnd.dpi_scale,
                 offset: [bx.min.x as f32, bx.min.y as f32].into(),
             };
             self.binner_build_layer(&mut builder, &ctx, &self.layers[root.ptr]);
@@ -719,12 +730,11 @@ impl<TBmp: Bmp> Screen<TBmp> {
             builder.open_group(None, attrs.opacity);
         }
 
+        let transform = scale_mat3(attrs.transform, ctx.dpi_scale);
+
         if has_sublayers {
             let mask_xform = if (attrs.flags).contains(iface::LayerFlags::MASK_TO_BOUNDS) {
-                Some(xform_and_aabb_to_parallelogram(
-                    attrs.transform,
-                    attrs.bounds,
-                ))
+                Some(xform_and_aabb_to_parallelogram(transform, attrs.bounds))
             } else {
                 None
             };
@@ -742,10 +752,10 @@ impl<TBmp: Bmp> Screen<TBmp> {
             let to_u8 = |x: f32| (x.fmax(0.0).fmin(1.0) * 255.0 + 0.5) as u8;
 
             builder.push_elem(ElemInfo {
-                xform: attrs.transform,
+                xform: transform,
                 bounds: attrs.bounds,
                 contents_center: attrs.contents_center,
-                contents_scale: attrs.contents_scale * ctx.contents_scale,
+                contents_scale: attrs.contents_scale,
                 bitmap: attrs.contents.clone(),
                 bg_color: [
                     to_u8(bg_color.r),
@@ -765,7 +775,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
 }
 
 struct RenderCtx {
-    contents_scale: f32,
+    dpi_scale: f32,
     offset: Vector2<f32>,
 }
 
@@ -782,6 +792,16 @@ fn bbox2_union(x: Option<Box2<usize>>, y: Option<Box2<usize>>) -> Option<Box2<us
         .cloned()
         .collect::<Box2UsizeUnion>()
         .into_box2()
+}
+
+fn scale_mat3(mut m: Matrix3<f32>, scale: f32) -> Matrix3<f32> {
+    m.x.x *= scale;
+    m.x.y *= scale;
+    m.y.x *= scale;
+    m.y.y *= scale;
+    m.z.x *= scale;
+    m.z.y *= scale;
+    m
 }
 
 #[cfg(test)]
@@ -1255,6 +1275,66 @@ mod tests {
         debug_assert_eq!(
             screen.update_wnd(&wnd),
             Some(box2! { min: [20, 40], max: [60, 60] })
+        );
+    }
+
+    //         (20, 30)
+    //            ┌──────────────────────────┐
+    //   (10, 40) │                          │layer2
+    //          ┌─┼────────────────┐         │
+    //          │ │    (40, 50)    │         │
+    //          │ │      ┌─────────┼─────────┼────┐
+    //          │ │      │         │layer1   │    │layer2 (after)
+    //          │ │      │         │(root)   │    │
+    //          └─┼──────┼─────────┘         │    │
+    //            │      │     (60, 60)      │    │
+    //            │      │                   │    │
+    //            └──────┼───────────────────┘    │
+    //                   │                (80, 50)│
+    //                   └────────────────────────┘
+    //                                    (90, 80)
+    // The difference from `masked_sublayer_update_position2` is the addition
+    // of `set_wnd_dpi_scale`.
+    #[test]
+    fn masked_sublayer_update_position2_dpi_scale() {
+        let mut screen: Screen<TestBmp> = Screen::new();
+
+        let layer2 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [20.0, 30.0], max: [80.0, 50.0] }),
+            bg_color: Some([0.5, 0.6, 0.7, 0.8].into()),
+            ..Default::default()
+        });
+        let layer1 = screen.new_layer(iface::LayerAttrs {
+            bounds: Some(box2! { min: [10.0, 40.0], max: [60.0, 60.0] }),
+            sublayers: Some(vec![layer2.clone()]),
+            flags: Some(iface::LayerFlags::MASK_TO_BOUNDS),
+            ..Default::default()
+        });
+
+        let wnd = screen.new_wnd();
+        screen.set_wnd_size(&wnd, [200, 200]);
+        screen.set_wnd_dpi_scale(&wnd, 2.0);
+        screen.set_wnd_layer(&wnd, Some(layer1.clone()));
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [0, 0], max: [200, 200] })
+        );
+        debug_assert_eq!(screen.update_wnd(&wnd), None);
+
+        screen.set_layer_attr(
+            &layer2,
+            iface::LayerAttrs {
+                bounds: Some(box2! { min: [40.0, 50.0], max: [90.0, 80.0] }),
+                ..Default::default()
+            },
+        );
+
+        dbg!(&screen);
+
+        debug_assert_eq!(
+            screen.update_wnd(&wnd),
+            Some(box2! { min: [40, 80], max: [120, 120] })
         );
     }
 
