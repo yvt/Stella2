@@ -1588,4 +1588,28 @@ mod tests {
             builder.finish();
         }
     }
+
+    #[test]
+    fn occupy_correct_bin() {
+        let mut binner = Binner::new();
+
+        let mut builder = binner.build([300, 300]);
+        builder.push_elem(ElemInfo {
+            xform: Matrix3::identity(),
+            bounds: box2! { min: [200.0, 100.0], max: [230.0, 150.0] },
+            contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
+            contents_scale: 1.0,
+            bitmap: Some(TestBmp),
+            bg_color: [40, 60, 80, 255].into(),
+            opacity: 0.8,
+        });
+        builder.finish();
+
+        let bin_xs = 200 / TILE..(230 + TILE - 1) / TILE;
+        let bin_ys = 100 / TILE..(150 + TILE - 1) / TILE;
+        for (bin_x, bin_y) in iproduct!(bin_xs, bin_ys) {
+            let elems: Vec<_> = binner.bin_elems([bin_x, bin_y]).collect();
+            assert!(!elems.is_empty(), "{:?}", (bin_x, bin_y, &binner));
+        }
+    }
 }
