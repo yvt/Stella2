@@ -731,6 +731,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         }
 
         let transform = scale_mat3(attrs.transform, ctx.dpi_scale);
+        let transform = translate_neg_mat3(transform, ctx.offset);
 
         if has_sublayers {
             let mask_xform = if (attrs.flags).contains(iface::LayerFlags::MASK_TO_BOUNDS) {
@@ -801,6 +802,12 @@ fn scale_mat3(mut m: Matrix3<f32>, scale: f32) -> Matrix3<f32> {
     m.y.y *= scale;
     m.z.x *= scale;
     m.z.y *= scale;
+    m
+}
+
+fn translate_neg_mat3(mut m: Matrix3<f32>, v: Vector2<f32>) -> Matrix3<f32> {
+    m.z.x -= v.x;
+    m.z.y -= v.y;
     m
 }
 

@@ -1,6 +1,6 @@
 //! A bin rasterizer.
 use arrayvec::ArrayVec;
-use cgmath::{vec2, Vector2};
+use cgmath::vec2;
 use itertools::izip;
 use std::cmp::{max, min};
 use zerocopy::LayoutVerified;
@@ -132,7 +132,7 @@ impl BinRast {
                     .unwrap()
                     .into_slice();
 
-                uv_origin = uv_origin
+                uv_origin = uv_origin_
                     + duv_dx * (sci_clip_g[0] - sci.min.x as u32) as i32
                     + duv_dy * (sci_clip_g[1] - sci.min.y as u32) as i32;
                 duv_dx = duv_dx_;
@@ -175,7 +175,7 @@ impl BinRast {
                 dest_row3
             ) {
                 let uv = uv_origin + duv_dy * y as i32 + duv_dx * x as i32;
-                let mut cvs = cps
+                let cvs = cps
                     .iter()
                     .map(|cp| cp.n.x * x_g as i32 + cp.n.y * y_g as i32)
                     .collect::<ArrayVec<[_; 2]>>()
@@ -183,7 +183,7 @@ impl BinRast {
                     .unwrap();
 
                 // Get the content color value
-                let mut c = match cont {
+                let c = match cont {
                     RastContent::Solid([c0, c1, c2, _]) => [c0 as u32, c1 as u32, c2 as u32, 255],
 
                     RastContent::Bmp {
