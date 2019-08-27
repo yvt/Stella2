@@ -65,6 +65,12 @@ impl BinRast {
 
     /// Rasterize the bin in `binner`, specified by `bin_index`.
     pub fn rasterize<TBmp: Bmp>(&mut self, binner: &Binner<TBmp>, bin_index: [usize; 2]) {
+        for chan in self.layers[0].iter_mut() {
+            for x in chan.iter_mut() {
+                *x = 0;
+            }
+        }
+
         for (elem, layer) in binner.bin_elems(bin_index) {
             self.rasterize_elem(bin_index, elem, layer as usize);
         }
@@ -243,6 +249,15 @@ impl BinRast {
                 // Blend over (with premultiplied alpha)
                 for (d, c) in izip!(&mut [d0, d1, d2, d3], &c) {
                     **d = min(*c + **d as u32 * (256 - alpha) / 256, 255) as u8;
+                }
+            }
+        }
+
+        if let RastContent::Layer(src_layer) = cont {
+            // Clear the source layer
+            for chan in src_layer.iter_mut() {
+                for x in chan.iter_mut() {
+                    *x = 0;
                 }
             }
         }
