@@ -230,6 +230,12 @@ impl iface::Canvas for BitmapBuilder {
     }
 }
 
+impl iface::CanvasText<TextLayout> for BitmapBuilder {
+    fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CharStyle;
 
