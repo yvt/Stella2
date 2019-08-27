@@ -1262,6 +1262,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "swsurface"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "calloop 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cocoa 0.18.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-foundation 0.6.4 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)",
+ "core-graphics 0.17.3 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)",
+ "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fragile 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smithay-client-toolkit 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wayland-client 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wayland-sys 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winit 0.20.0-alpha3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x11-dl 2.18.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "syn"
 version = "0.15.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1370,6 +1393,7 @@ dependencies = [
  "quickcheck_macros 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "swsurface 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.20.0-alpha3 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerocopy 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1778,6 +1802,7 @@ dependencies = [
 "checksum svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc1a2d1667ccfebed8487ffe53a3ad0778b0ada1de46ab28bb8da362bfc78972"
 "checksum svgdom 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3ffe3c59d84b307fc361bbf0baff2aa6f6d7c946fdd4f1fbbcbb7efcd04b0334"
 "checksum svgtypes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "444c882c28925ae0585df228a90f9951569588646ceca4753560de93cdd02258"
+"checksum swsurface 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d0256d6fa4046f66c2a0b3acf0bc549f73fb961579e9ef87b80df522561ce994"
 "checksum syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)" = "9ca4b3b69a77cbe1ffc9e198781b7acb0c7365a883670e8f1c1bc66fba79a5c5"
 "checksum syn 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c65d951ab12d976b61a41cf9ed4531fc19735c6e6d84a4bb1453711e762ec731"
 "checksum synstructure 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)" = "02353edf96d6e4dc81aea2d8490a7e9db177bf8acb0e951c24940bf866cb313f"

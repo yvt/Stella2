@@ -44,8 +44,10 @@ dispatch = "0.1.4"
 lazy_static = "1"
 objc = "0.2.3"
 
+# `unix` backend
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 winit = "0.20.0-alpha2"
+swsurface = "0.1.1"
 
 [build-dependencies]
 cc = "1.0.35"
