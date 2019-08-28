@@ -32,7 +32,7 @@ owning_ref = "0.4.0"
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
-winit = { version = "0.20.0-alpha2", optional = true }
+winit = { version = "0.20.0-alpha3", optional = true }
 zerocopy = "0.2.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -46,8 +46,8 @@ objc = "0.2.3"
 
 # `unix` backend
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-winit = "0.20.0-alpha2"
-swsurface = "0.1.1"
+winit = "0.20.0-alpha3"
+swsurface = "0.1.2"
 
 [build-dependencies]
 cc = "1.0.35"

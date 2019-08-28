@@ -1263,7 +1263,7 @@ dependencies = [
 
 [[package]]
 name = "swsurface"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "calloop 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1394,7 +1394,7 @@ dependencies = [
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "swsurface 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "swsurface 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.20.0-alpha3 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerocopy 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1803,7 +1803,7 @@ dependencies = [
 "checksum svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc1a2d1667ccfebed8487ffe53a3ad0778b0ada1de46ab28bb8da362bfc78972"
 "checksum svgdom 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3ffe3c59d84b307fc361bbf0baff2aa6f6d7c946fdd4f1fbbcbb7efcd04b0334"
 "checksum svgtypes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "444c882c28925ae0585df228a90f9951569588646ceca4753560de93cdd02258"
-"checksum swsurface 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d0256d6fa4046f66c2a0b3acf0bc549f73fb961579e9ef87b80df522561ce994"
+"checksum swsurface 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b014345d9ec8589a9cb42cc968b24b47a807dc11b17d55b90920b063d188e2e5"
 "checksum syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)" = "9ca4b3b69a77cbe1ffc9e198781b7acb0c7365a883670e8f1c1bc66fba79a5c5"
 "checksum syn 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c65d951ab12d976b61a41cf9ed4531fc19735c6e6d84a4bb1453711e762ec731"
 "checksum synstructure 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)" = "02353edf96d6e4dc81aea2d8490a7e9db177bf8acb0e951c24940bf866cb313f"
