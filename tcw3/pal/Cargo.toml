@@ -48,6 +48,9 @@ objc = "0.2.3"
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 winit = "0.20.0-alpha3"
 swsurface = "0.1.2"
+cairo-rs = "0.7.1"
+pangocairo = "0.8.0"
+pango = "0.7.0"
 
 [build-dependencies]
 cc = "1.0.35"
