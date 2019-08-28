@@ -1392,6 +1392,7 @@ dependencies = [
  "quickcheck 0.8.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "quickcheck_macros 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "structopt 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "swsurface 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.20.0-alpha3 (registry+https://github.com/rust-lang/crates.io-index)",
