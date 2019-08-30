@@ -1,5 +1,5 @@
 use cggeom::{box2, prelude::*};
-use cgmath::{vec2, Matrix3, Deg};
+use cgmath::{vec2, Deg, Matrix3};
 use std::{cell::RefCell, time::Instant};
 use structopt::StructOpt;
 use tcw3_pal::{self as pal, prelude::*, MtSticky};
