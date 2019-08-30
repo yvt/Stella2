@@ -152,6 +152,14 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         match evt {
             WindowEvent::Resized(_) => {
                 listener.resize(self.wm(), &hwnd);
+
+                // I thought `Resized` implies `RedrawRequested` is automatically
+                // called. Without this, the window content and the size gets
+                // desynced on macOS + `unix` backend.
+                drop(listener);
+                wnd.content
+                    .borrow_mut()
+                    .redraw_requested(self, &wnd.winit_wnd);
             }
             WindowEvent::CloseRequested => {
                 if listener.close_requested(self.wm(), &hwnd) {
