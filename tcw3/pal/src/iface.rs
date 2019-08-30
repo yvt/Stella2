@@ -504,6 +504,11 @@ pub trait Canvas: Debug {
     fn set_line_cap(&mut self, cap: LineCap);
     fn set_line_join(&mut self, join: LineJoin);
     fn set_line_dash(&mut self, phase: f32, lengths: &[f32]);
+    /// Set the line width in pixels. Defaults to `1.0`.
+    ///
+    /// Note that strokes are converted to a path before the current
+    /// transformation matrix is applied. This means that, the rendered line
+    /// width varies depending on the scaling factor of the CTM.
     fn set_line_width(&mut self, width: f32);
     fn set_line_miter_limit(&mut self, miter_limit: f32);
 

@@ -107,6 +107,7 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
         .expect("failed to create a Cairo surface");
 
         let cairo_ctx = Context::new(&cairo_surface);
+        cairo_ctx.set_line_width(1.0);
 
         BitmapBuilder {
             cairo_surface,
