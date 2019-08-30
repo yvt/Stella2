@@ -193,17 +193,24 @@ impl HWnd {
                 ];
             }
 
-            // `<u32>::max_value() as f32` using the rounded-toward-zero
-            // rounding mode.
-            const U32_MAX: f32 = 4294967000.0;
+            // A sensitive limit we set for window sizes.
+            //
+            // Some backends can handle a very large maximum window size, while
+            // others fail when we set it to a very large value. For instance,
+            // when dimensions close to `u32::max_value()` are specified via
+            // `with_max_inner_size`, winit + Wayland (SCTK) causes an error
+            // like "xdg_toplevel@31: error 4: invalid negative max size
+            // requested -256 x -226". As a work-around, we limit the maximum
+            // size so that it won't cause a problem.
+            const SIZE_MAX: f32 = 16777216.0;
 
             let min_s = [
                 size_traits.min.x.ceil() as u32,
                 size_traits.min.y.ceil() as u32,
             ];
             let max_s = [
-                size_traits.max.x.fmin(U32_MAX) as u32,
-                size_traits.max.y.fmin(U32_MAX) as u32,
+                size_traits.max.x.fmin(SIZE_MAX) as u32,
+                size_traits.max.y.fmin(SIZE_MAX) as u32,
             ];
 
             let max_s = [max(max_s[0], min_s[0]), max(max_s[1], min_s[1])];
