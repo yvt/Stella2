@@ -139,8 +139,8 @@ impl BinRast {
                     .into_slice();
 
                 uv_origin = uv_origin_
-                    + duv_dx * (sci_clip_g[0] - sci.min.x as u32) as i32
-                    + duv_dy * (sci_clip_g[1] - sci.min.y as u32) as i32;
+                    + duv_dx_ * (sci_clip_g[0] - sci.min.x as u32) as i32
+                    + duv_dy_ * (sci_clip_g[1] - sci.min.y as u32) as i32;
                 duv_dx = duv_dx_;
                 duv_dy = duv_dy_;
 
