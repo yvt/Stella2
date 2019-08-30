@@ -245,17 +245,3 @@ impl WndContentTrait for WndContent {
         state.sr_scrn.remove_wnd(&self.sr_wnd);
     }
 }
-
-impl swrast::Bmp for Bitmap {
-    fn data(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn size(&self) -> [usize; 2] {
-        unimplemented!()
-    }
-
-    fn stride(&self) -> usize {
-        unimplemented!()
-    }
-}

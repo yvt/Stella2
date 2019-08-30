@@ -74,6 +74,7 @@ fn main() {
     let wm = pal::Wm::global();
 
     let mut bmp_builder = pal::BitmapBuilder::new([100, 100]);
+    bmp_builder.set_stroke_rgb([0.0, 0.0, 0.0, 1.0].into());
     bmp_builder.move_to(Point2::new(20.0, 20.0));
     bmp_builder.line_to(Point2::new(80.0, 20.0));
     bmp_builder.line_to(Point2::new(20.0, 80.0));
