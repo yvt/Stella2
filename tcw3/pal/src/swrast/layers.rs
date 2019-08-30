@@ -758,9 +758,9 @@ impl<TBmp: Bmp> Screen<TBmp> {
                 contents_scale: attrs.contents_scale,
                 bitmap: attrs.contents.clone(),
                 bg_color: [
-                    to_u8(bg_color.r),
-                    to_u8(bg_color.g),
                     to_u8(bg_color.b),
+                    to_u8(bg_color.g),
+                    to_u8(bg_color.r),
                     to_u8(bg_color.a),
                 ]
                 .into(),

@@ -6,7 +6,6 @@ use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Point2, Vector2};
 use flags_macro::flags;
 use itertools::iproduct;
-use rgb::RGBA8;
 use std::{
     cmp::{max, min},
     ops::Range,
@@ -313,8 +312,8 @@ pub(super) struct ElemInfo<TBmp> {
     pub contents_center: Box2<f32>,
     pub contents_scale: f32,
     pub bitmap: Option<TBmp>,
-    /// The background color.
-    pub bg_color: RGBA8,
+    /// The background color in the BGRA format.
+    pub bg_color: [u8; 4],
     pub opacity: f32,
 }
 
@@ -680,7 +679,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
         // (Alternatively, we could add a new `Content` item to handle this
         // case, but that will increase the code size with few benefits.)
         let use_proxy = use_slicing && !aligned_to_axis
-            || info.bg_color.a > 0 && info.opacity < 1.0 && info.bitmap.is_some();
+            || info.bg_color[3] > 0 && info.opacity < 1.0 && info.bitmap.is_some();
 
         // -------------------------------------------------------------------
         // Analysis is mostly done, now it's a time to emit things.
@@ -1011,8 +1010,8 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
             } // endif slice_by_clip, !use_slicing
         }
 
-        if info.bg_color.a > 0 {
-            let mut bg_op = info.bg_color.a as u32;
+        if info.bg_color[3] > 0 {
+            let mut bg_op = info.bg_color[3] as u32;
 
             if !use_proxy {
                 bg_op = (bg_op as f32 * info.opacity) as u32;
@@ -1555,11 +1554,7 @@ mod tests {
             box2! { min: [0.0, 0.3], max: [0.7, 0.8] },
         ];
 
-        let bg_colors = [
-            RGBA8::new(40, 60, 80, 0),
-            RGBA8::new(40, 60, 80, 200),
-            RGBA8::new(40, 60, 80, 255),
-        ];
+        let bg_colors = [[40, 60, 80, 0], [40, 60, 80, 200], [40, 60, 80, 255]];
 
         let ops = [0.0, 0.6, 1.0];
 
