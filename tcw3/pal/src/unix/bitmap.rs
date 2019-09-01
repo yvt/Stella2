@@ -255,7 +255,15 @@ impl iface::Canvas for BitmapBuilder {
 }
 
 impl iface::CanvasText<TextLayout> for BitmapBuilder {
-    fn draw_text(&mut self, _layout: &TextLayout, _origin: Point2<f32>, _color: iface::RGBAF32) {
-        unimplemented!()
+    fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
+        self.cairo_ctx.move_to(origin.x as f64, origin.y as f64);
+        pangocairo::functions::update_layout(&self.cairo_ctx, layout.lock_layout());
+        self.cairo_ctx.set_source_rgba(
+            color.r as f64,
+            color.g as f64,
+            color.b as f64,
+            color.a as f64,
+        );
+        pangocairo::functions::show_layout(&self.cairo_ctx, layout.lock_layout());
     }
 }

@@ -7,7 +7,6 @@
 //!  - Cairo for 2D drawing (WIP)
 //!  - FreeType/Pango/fontconfig for text rendering (WIP).
 //!
-use cggeom::Box2;
 use std::marker::PhantomData;
 
 use super::{
