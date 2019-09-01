@@ -1,5 +1,5 @@
 use checked::Checked;
-use itertools::izip;
+use rayon::prelude::*;
 use std::{cell::RefCell, cmp::min};
 
 use super::{
@@ -34,21 +34,22 @@ pub fn rasterize(binner: &Binner<impl Bmp>, out: &mut [u8], out_stride: usize) {
     let required_size = required_size.expect("overflow");
     assert!(out.len() >= required_size);
 
-    // TODO: Maybe use `rayon` to leverage multiple processor cores
+    // For each row of tiles...
+    out.par_chunks_mut(out_stride * TILE)
+        .enumerate()
+        .take(bin_count[1])
+        .for_each(|(y, out)| {
+            BIN_RAST.with(|cell| {
+                let mut bin_rast = cell.borrow_mut();
+                let bin_h = min(TILE, target_size[1] - y * TILE);
+                for x in 0..bin_count[0] {
+                    let bin_w = min(TILE, target_size[0] - x * TILE);
 
-    BIN_RAST.with(|cell| {
-        let mut bin_rast = cell.borrow_mut();
-
-        for (y, out) in izip!(0..bin_count[1], out.chunks_mut(out_stride * TILE)) {
-            let bin_h = min(TILE, target_size[1] - y * TILE);
-            for x in 0..bin_count[0] {
-                let bin_w = min(TILE, target_size[0] - x * TILE);
-
-                bin_rast.rasterize(binner, [x, y]);
-                bin_rast.copy_to(&mut out[x * TILE * 4..], out_stride, bin_w, bin_h);
-            }
-        }
-    });
+                    bin_rast.rasterize(binner, [x, y]);
+                    bin_rast.copy_to(&mut out[x * TILE * 4..], out_stride, bin_w, bin_h);
+                }
+            });
+        });
 }
 
 #[cfg(test)]
