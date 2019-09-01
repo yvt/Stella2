@@ -30,9 +30,11 @@ pub type HWnd = HWndCore;
 
 mod bitmap;
 mod comp;
+mod text;
 pub use self::{
     bitmap::{Bitmap, BitmapBuilder},
     comp::{HLayer, WndContent},
+    text::{CharStyle, TextLayout},
 };
 
 /// Provides an access to the window system.
@@ -151,38 +153,5 @@ impl iface::Wm for Wm {
     }
     fn remove_layer(self, layer: &Self::HLayer) {
         self.comp().remove_layer(layer)
-    }
-}
-
-// The following types are all TODO
-#[derive(Debug, Clone)]
-pub struct CharStyle;
-
-impl iface::CharStyle for CharStyle {
-    fn new(attrs: CharStyleAttrs) -> Self {
-        unimplemented!()
-    }
-
-    fn size(&self) -> f32 {
-        unimplemented!()
-    }
-}
-
-#[derive(Debug)]
-pub struct TextLayout;
-
-impl iface::TextLayout for TextLayout {
-    type CharStyle = CharStyle;
-
-    fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
-        unimplemented!()
-    }
-
-    fn visual_bounds(&self) -> Box2<f32> {
-        unimplemented!()
-    }
-
-    fn layout_bounds(&self) -> Box2<f32> {
-        unimplemented!()
     }
 }
