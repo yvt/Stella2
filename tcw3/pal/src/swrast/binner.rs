@@ -821,7 +821,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
                     .map(|(i, clip_plane)| {
                         let points = [
                             points[if i == 0 { 1 } else { 0 }][if i == 1 { 1 } else { 0 }],
-                            points[if i == 0 { 2 } else { 0 }][if i == 1 { 3 } else { 0 }],
+                            points[if i == 0 { 2 } else { 0 }][if i == 1 { 2 } else { 0 }],
                         ];
                         let dist = |p: Point2<f32>| {
                             let n = clip_plane.n;
