@@ -33,6 +33,20 @@ struct Opt {
     /// Make particles opaque.
     #[structopt(short = "o", long = "opaque")]
     opaque: bool,
+
+    /// The shape of particles.
+    #[structopt(
+        short = "p", default_value = "square",
+        possible_values(&Shape::variants()), case_insensitive = true
+    )]
+    shape: Shape,
+}
+
+#[derive(Debug, Clone, Copy, arg_enum_proc_macro::ArgEnum)]
+enum Shape {
+    Square,
+    RoundedSquare,
+    Circle,
 }
 
 struct Listener {}
@@ -68,20 +82,59 @@ impl State {
 
         let size = opt.particle_size;
 
-        let layers: Vec<_> = (0..opt.num_particles)
+        let attrs: Vec<_> = (0..16)
             .map(|_| {
+                let mut attrs = pal::LayerAttrs {
+                    bounds: Some(box2! { min: [0.0, 0.0], max: [size as f32; 2] }),
+                    ..Default::default()
+                };
+
                 let color = [
                     (rng.next() % 256) as f32 / 255.0,
                     (rng.next() % 256) as f32 / 255.0,
                     (rng.next() % 256) as f32 / 255.0,
                     if opt.opaque { 1.0 } else { 0.8 },
                 ];
-                wm.new_layer(pal::LayerAttrs {
-                    bounds: Some(box2! { min: [0.0, 0.0], max: [size as f32; 2] }),
-                    bg_color: Some(color.into()),
-                    ..Default::default()
-                })
+
+                match opt.shape {
+                    Shape::Square => {
+                        attrs.bg_color = Some(color.into());
+                    }
+                    Shape::RoundedSquare => {
+                        // Draw rounded sequares using 9-slice scaling
+                        let radius = opt.particle_size / 4;
+                        let size = radius * 2 + 1;
+                        let mut builder = pal::BitmapBuilder::new([size; 2]);
+
+                        builder.set_fill_rgb(color.into());
+
+                        builder.rounded_rect(
+                            box2! { top_left: [0.0, 0.0], size: [size as f32; 2] },
+                            [[radius as f32; 2]; 4],
+                        );
+                        builder.fill();
+
+                        attrs.contents = Some(Some(builder.into_bitmap()));
+                        attrs.contents_center = Some(box2! { point: [0.5, 0.5] });
+                    }
+                    Shape::Circle => {
+                        let mut builder = pal::BitmapBuilder::new([size; 2]);
+
+                        builder.set_fill_rgb(color.into());
+
+                        builder.ellipse(box2! { top_left: [0.0, 0.0], size: [size as f32; 2] });
+                        builder.fill();
+
+                        attrs.contents = Some(Some(builder.into_bitmap()));
+                    }
+                }
+
+                attrs
             })
+            .collect();
+
+        let layers: Vec<_> = (0..opt.num_particles)
+            .map(|_| wm.new_layer(attrs[rng.next() as usize % attrs.len()].clone()))
             .collect();
 
         let particles: Vec<_> = (0..opt.num_particles)
