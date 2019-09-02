@@ -1,3 +1,8 @@
+// Windows-specific: Set the subsystem flag to `windows` (from the default
+// value `console`). This prevents a new console window from opening on
+// application launch.
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 use log::debug;
 use tcw3::pal::{self, prelude::*};
 
