@@ -56,6 +56,7 @@ pub use unix as native;
 #[cfg(feature = "winit")]
 mod winit;
 
+#[cfg(not(target_os = "macos"))]
 mod swrast;
 
 // ============================================================================
