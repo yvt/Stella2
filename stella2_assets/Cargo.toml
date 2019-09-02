@@ -11,7 +11,3 @@ stvg_macro = { path = "../stvg/macro" }
 embed-resource = "1.3.0"
 icon_baker = "2.2.0"
 libflate = "0.1.27"
-
-[[bin]]
-name = "stella2-windres-test"
-path = "src/bin/test.rs"
