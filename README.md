@@ -1,17 +1,28 @@
-# Stella2
+# Stella 2
 
 TODO
 
 ## Directory structutre
 
     stella2
+     │
      ├╴stella2          The main program
-     ├╴stella2_assets
-     ├╴res              Metadata attached to Stella2's executable
+     │
+     ├╴stellca2_assets
+     │
+     ├╴res              Things related to metadata attached to Stella2's executable
+     │  │
+     │  ├╴mkmacosbundle A command-line utility for creating a macOS application
+     │  │               bundle (This program is invoked from `/build-mac.sh`.)
+     │  │
      │  └╴windres       Windows resources (application icon, manifest, etc.)
-     ├╴tcw3             TCW3, a GUI framework
+     │
+     ├╴tcw3             TCW3, the GUI framework
+     │
      ├╴harmony          A state management library
+     │
      ├╴stvg             A library for encoding/decoding vector images
+     │
      └╴support          An assortment of supporting libraries
 
 ## Prerequisites
