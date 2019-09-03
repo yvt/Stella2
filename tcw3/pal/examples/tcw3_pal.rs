@@ -12,7 +12,7 @@ impl WndListener<pal::Wm> for Listener {
         info!("dpi_scale_changed {:?}", wm.get_wnd_dpi_scale(wnd));
     }
 
-    fn close(&self, wm: pal::Wm, _: &pal::HWnd) {
+    fn close_requested(&self, wm: pal::Wm, _: &pal::HWnd) {
         wm.terminate();
     }
 

@@ -58,7 +58,10 @@ pub trait WndListener {
         true
     }
 
-    /// A window has been closed.
+    /// A window is about to be closed.
+    ///
+    /// This will not be called if the window was closed programatically (via
+    /// `HWnd::close`).
     fn close(&self, _: Wm, _: &HWnd) {}
 }
 

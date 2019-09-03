@@ -52,7 +52,7 @@ enum Shape {
 struct Listener {}
 
 impl WndListener<pal::Wm> for Listener {
-    fn close(&self, wm: pal::Wm, _: &pal::HWnd) {
+    fn close_requested(&self, wm: pal::Wm, _: &pal::HWnd) {
         wm.terminate();
     }
 }

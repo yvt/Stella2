@@ -295,7 +295,6 @@ impl Wnd {
         }
 
         if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
-            // TODO: should clarify whether `pal::WndListener::close` is called or not
             self.wm.remove_wnd(&hwnd);
         }
 
@@ -327,21 +326,14 @@ impl PalWndListener {
 }
 
 impl pal::iface::WndListener<Wm> for PalWndListener {
-    fn close_requested(&self, wm: Wm, _: &pal::HWnd) -> bool {
+    fn close_requested(&self, wm: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             let listener = hwnd.wnd.listener.borrow();
-            listener.close_requested(wm, &hwnd)
-        } else {
-            true
-        }
-    }
-
-    fn close(&self, wm: Wm, _: &pal::HWnd) {
-        if let Some(hwnd) = self.hwnd() {
-            hwnd.close();
-
-            let listener = hwnd.wnd.listener.borrow();
-            listener.close(wm, &hwnd);
+            let should_close = listener.close_requested(wm, &hwnd);
+            if should_close {
+                listener.close(wm, &hwnd);
+                hwnd.close();
+            }
         }
     }
 

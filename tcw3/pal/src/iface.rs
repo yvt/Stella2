@@ -300,14 +300,8 @@ bitflags! {
 /// The receiver is immutable because event handlers may manipulate windows,
 /// which in turn might cause other event handlers to be called.
 pub trait WndListener<T: Wm> {
-    /// The user has attempted to close a window. Returns `true` if the window
-    /// can be closed.
-    fn close_requested(&self, _: T, _: &T::HWnd) -> bool {
-        true
-    }
-
-    /// A window has been closed.
-    fn close(&self, _: T, _: &T::HWnd) {}
+    /// The user has attempted to close a window.
+    fn close_requested(&self, _: T, _: &T::HWnd) {}
 
     /// A window is being resized.
     ///

@@ -101,11 +101,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     }
 
     pub fn remove_wnd(&self, hwnd: &HWndCore) {
-        // Call `WndListener::close`. Note that we must unborrow `RefCell`
-        // before calling into `WndListener`.
         let wnd = self.wnds.borrow_mut().deallocate(hwnd.ptr).unwrap();
-        let outer_hwnd = self.wm().hwnd_core_to_hwnd(hwnd);
-        wnd.listener.borrow().close(self.wm(), &outer_hwnd);
 
         // And then call `WndContent::close`
         wnd.content.borrow_mut().close(self, &wnd.winit_wnd);
@@ -162,9 +158,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                     .redraw_requested(self, &wnd.winit_wnd);
             }
             WindowEvent::CloseRequested => {
-                if listener.close_requested(self.wm(), &hwnd) {
-                    self.remove_wnd(&hwnd_core);
-                }
+                let _ = listener.close_requested(self.wm(), &hwnd);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 wnd.mouse_pos.set(log_pos_to_point2(position));

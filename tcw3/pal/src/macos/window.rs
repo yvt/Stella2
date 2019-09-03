@@ -22,7 +22,7 @@ use cocoa::{
 };
 use objc::{
     msg_send,
-    runtime::{BOOL, YES},
+    runtime::{BOOL, NO, YES},
     sel, sel_impl,
 };
 use std::{
@@ -189,17 +189,16 @@ unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(Wm, &WndState) 
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
-        state.listener.borrow().close_requested(wm, &state.hwnd) as _
-    })
-    .unwrap_or(YES)
+        state.listener.borrow().close_requested(wm, &state.hwnd);
+    });
+
+    NO
 }
 
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
-        state.listener.borrow().close(wm, &state.hwnd);
-
         // Detach the listener from the controller
         let () = msg_send![*state.hwnd.ctrler, setListenerUserData: nil];
     });
