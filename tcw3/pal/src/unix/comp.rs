@@ -175,6 +175,11 @@ impl WndContentTrait for WndContent {
         let surf_size_sz: [usize; 2] = [size_w as _, size_h as _];
         let surf_dpi_scale = winit_wnd.hidpi_factor() as f32;
 
+        if size_w == 0 || size_h == 0 {
+            // Suspend update if one of the surface dimensions is zero
+            return;
+        }
+
         if (surf_size, surf_dpi_scale) != (self.surf_size, self.surf_dpi_scale) {
             // Update the surface size
             sw_surf.update_surface(surf_size, swsurface::Format::Argb8888);
