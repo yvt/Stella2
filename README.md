@@ -2,6 +2,18 @@
 
 TODO
 
+## Directory structutre
+
+    stella2
+     ├╴stella2          The main program
+     ├╴stella2_assets
+     ├╴res              Metadata attached to Stella2's executable
+     │  └╴windres       Windows resources (application icon, manifest, etc.)
+     ├╴tcw3             TCW3, a GUI framework
+     ├╴harmony          A state management library
+     ├╴stvg             A library for encoding/decoding vector images
+     └╴support          An assortment of supporting libraries
+
 ## Prerequisites
 
 The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work.

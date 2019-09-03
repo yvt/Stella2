@@ -1543,6 +1543,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "stella2_assets 0.1.0",
+ "stella2_windres 0.1.0",
  "stvg_tcw3 0.1.0",
  "tcw3 0.1.0",
 ]
@@ -1551,10 +1552,16 @@ dependencies = [
 name = "stella2_assets"
 version = "0.1.0"
 dependencies = [
+ "stvg_macro 0.1.0",
+]
+
+[[package]]
+name = "stella2_windres"
+version = "0.1.0"
+dependencies = [
  "embed-resource 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "icon_baker 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libflate 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "stvg_macro 0.1.0",
 ]
 
 [[package]]

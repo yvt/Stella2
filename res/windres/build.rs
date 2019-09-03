@@ -11,16 +11,16 @@ fn main() {
     }
 }
 
-/// Build and link a Windows resource for the Stella2 application.
+/// Build Windows resources for the Stella2 application.
 ///
 /// When an executable is linked to this crate, the resource generated here
-/// is added to the executable.
+/// are added to the executable.
 fn add_windows_resource() {
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    // The main script file
+    // The resource script file
     let rc_path = Path::new(&out_dir).join("stella2.rc");
-    copy("windows/stella2.rc", &rc_path).unwrap();
+    copy("stella2.rc", &rc_path).unwrap();
 
     // The appllcation icon
     // TODO: `icon_baker` pulls too many dependencies. (Three different
@@ -50,7 +50,7 @@ fn add_windows_resource() {
 
     // The application manifest
     let manifest_path = Path::new(&out_dir).join("stella2.manifest");
-    copy("windows/stella2.manifest", &manifest_path).unwrap();
+    copy("stella2.manifest", &manifest_path).unwrap();
 
     embed_resource::compile(&rc_path);
 }

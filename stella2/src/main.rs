@@ -11,6 +11,11 @@ mod model;
 mod stylesheet;
 mod view;
 
+#[cfg(target_os = "windows")]
+mod windres {
+    stella2_windres::attach_windres!();
+}
+
 fn main() {
     crashhandler::init();
 
