@@ -1,3 +1,5 @@
+cargo-features = ["profile-overrides"]  # Enable the use of `[profile.dev.overrides]`
+
 [workspace]
 members = [
     "stella2",
@@ -29,6 +31,14 @@ lto = true
 [profile.bench]
 lto = true
 debug = true
+
+[profile.dev.overrides]
+# A software-based compositor (`swrast`) is used when other backends are not
+# available for some reason. This is horrendously slow on debug builds and hurts
+# developer experience. To mitigate this issue, always enable optimization for
+# `tcw3_pal`. This isn't as fast as the release build due to lack of LTO, but
+# at least it's usable.
+tcw3_pal = { opt-level = 3 }
 
 # The following two include:
 # “Expose more APIs on CGContext”
