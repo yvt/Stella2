@@ -1556,6 +1556,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stella2_mkmacosbundle"
+version = "0.1.0"
+dependencies = [
+ "icon_baker 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libflate 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "structopt 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "stella2_windres"
 version = "0.1.0"
 dependencies = [

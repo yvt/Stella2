@@ -17,6 +17,8 @@ members = [
     "support/rope",
     "support/subscriber_list",
     "support/sorted_diff",
+    "res/mkmacosbundle",
+    "res/windres",
 ]
 
 [profile.release]

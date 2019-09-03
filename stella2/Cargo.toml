@@ -5,6 +5,10 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 license = "GPL-3.0-or-later"
 
+# Specify to run this program by default when you do `cargo run` without
+# specifying a binary name.
+default-run = "stella2"
+
 [dependencies]
 tcw3 = { path = "../tcw3" }
 harmony = { path = "../harmony" }

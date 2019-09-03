@@ -1,0 +1,14 @@
+[package]
+name = "stella2_mkmacosbundle"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+structopt = { version = "0.3.0", default-features = false }
+icon_baker = "2.2.0"
+libflate = "0.1.27"
+
+[[bin]]
+name = "mkmacosbundle"
+path = "main.rs"
