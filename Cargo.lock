@@ -250,11 +250,6 @@ version = "0.6.2"
 source = "git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969#673be9f0b53387e806c7a72eef5e9b325917c969"
 
 [[package]]
-name = "core-foundation-sys"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "core-graphics"
 version = "0.17.3"
 source = "git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969#673be9f0b53387e806c7a72eef5e9b325917c969"
@@ -282,7 +277,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "core-foundation-sys 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-foundation-sys 0.6.2 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)",
  "core-graphics 0.17.3 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)",
  "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2168,7 +2163,6 @@ dependencies = [
 "checksum color_quant 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
 "checksum core-foundation 0.6.4 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)" = "<none>"
 "checksum core-foundation-sys 0.6.2 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)" = "<none>"
-"checksum core-foundation-sys 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e7ca8a5221364ef15ce201e8ed2f609fc312682a8f4e0e3d4aa5879764e0fa3b"
 "checksum core-graphics 0.17.3 (git+https://github.com/servo/core-foundation-rs.git?rev=673be9f0b53387e806c7a72eef5e9b325917c969)" = "<none>"
 "checksum core-text 13.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "12684243b314c95600a2b49628fb775f91d97bbe18424522f665b77014f2a640"
 "checksum core-video-sys 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8dc065219542086f72d1e9f7aadbbab0989e980263695d129d502082d063a9d0"

@@ -49,3 +49,6 @@ rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
 [patch.crates-io.core-foundation]
 git = "https://github.com/servo/core-foundation-rs.git"
 rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
+[patch.crates-io.core-foundation-sys]
+git = "https://github.com/servo/core-foundation-rs.git"
+rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
