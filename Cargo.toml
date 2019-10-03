@@ -14,7 +14,6 @@ members = [
     "support/alt_fp",
     "support/as_any",
     "support/cggeom",
-    "support/freeze",
     "support/iterpool",
     "support/rope",
     "support/subscriber_list",
