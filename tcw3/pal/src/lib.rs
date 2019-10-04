@@ -2,7 +2,6 @@
 //!
 //! This crate is reexported by TCW3 as `tcw3::pal`.
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
-#![feature(const_vec_new)] // `Vec::new()` as `const fn`
 #![feature(doc_cfg)] // `cfg(rustdoc)`
 #![feature(is_sorted)] // `<[_]>::is_sorted`
 

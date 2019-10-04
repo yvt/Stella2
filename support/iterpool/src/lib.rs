@@ -1,4 +1,3 @@
-#![feature(const_vec_new)]
 //! High-performance non-thread safe object pool (with an optional iteration
 //! functionality).
 //!

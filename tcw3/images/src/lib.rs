@@ -3,8 +3,6 @@
 //! DPI scale values.
 //!
 //! This crate is reexported by TCW3 as `tcw3::images`.
-#![feature(const_vec_new)] // `Vec::new()` in a constant context
-
 mod bitmap;
 mod canvas;
 mod figures;
