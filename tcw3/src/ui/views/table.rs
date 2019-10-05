@@ -96,7 +96,7 @@ pub struct Table {
     inner: Rc<Inner>,
 }
 
-/// A 0-based two-dimensional index `[row, column]` (or `[y, x]`) specifying a
+/// A 0-based two-dimensional index `[column, row]` (or `[x, y]`) specifying a
 /// single cell in a table.
 pub type CellIdx = [u64; 2];
 
@@ -122,7 +122,7 @@ struct Inner {
     /// The size traits of the table view.
     size_traits: Cell<SizeTraits>,
 
-    /// The line coordinates of the respective top/left edge of the viewport.
+    /// The line coordinates of the respective left/top edge of the viewport.
     vp: [Cell<Size>; 2],
 
     dirty: Cell<DirtyFlags>,
@@ -141,7 +141,7 @@ struct State {
     /// `cells` represents a rectangular region in the line index space. Each
     /// element in `cells_ranges` represents a range of lines for the
     /// corresponding (see `LineTy`) axis. E.g., `[0..4, 3..7]` means `cells`
-    /// has cells from the 0–3rd rows.
+    /// has cells from the 0–3rd columns.
     cells_ranges: [Range<Index>; 2],
 
     /// Used during remapping (the change of the range represented by `cells`).
@@ -293,19 +293,19 @@ pub trait TableModelEdit {
     ///     # use tcw3::ui::views::table::*;
     ///     # fn test(
     ///     #    edit: &mut impl TableModelEdit, new_model: impl TableModelQuery,
-    ///     #    old_model_rows: u64, new_model_rows: u64,
     ///     #    old_model_cols: u64, new_model_cols: u64,
+    ///     #    old_model_rows: u64, new_model_rows: u64,
     ///     # ) {
     ///     // Remove all rows and columns from the old model
-    ///     edit.remove(LineTy::Row, 0..old_model_rows);
     ///     edit.remove(LineTy::Col, 0..old_model_cols);
+    ///     edit.remove(LineTy::Row, 0..old_model_rows);
     ///
     ///     // Swap the `TableModelQuery` object
     ///     edit.set_model(new_model);
     ///
     ///     // Insert all rows from the new model
-    ///     edit.insert(LineTy::Row, 0..new_model_rows);
     ///     edit.insert(LineTy::Col, 0..new_model_cols);
+    ///     edit.insert(LineTy::Row, 0..new_model_rows);
     ///     # }
     ///
     fn set_model_boxed(&mut self, new_model: Box<dyn TableModelQuery>);
@@ -369,10 +369,8 @@ impl std::error::Error for EditLockError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineTy {
-    // TODO: Transpose the axes? They are confusing because they are the opposite
-    //       of `Vector2`
-    Row = 0,
-    Col = 1,
+    Col = 0,
+    Row = 1,
 }
 
 impl LineTy {
@@ -384,13 +382,13 @@ impl LineTy {
 
     /// Select and get a reference to an element of `Vector2` based on `LineTy`.
     fn vec_get<T>(self, v: &Vector2<T>) -> &T {
-        &v[1 - self as usize]
+        &v[self as usize]
     }
 
     /// Select and get a mutable reference to an element of `Point2` based on
     /// `LineTy`.
     fn point_get_mut<T>(self, v: &mut Point2<T>) -> &mut T {
-        &mut v[1 - self as usize]
+        &mut v[self as usize]
     }
 }
 

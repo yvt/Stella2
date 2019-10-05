@@ -1,16 +1,16 @@
 //! This module provides a function that assists the management of cell objects
 //! (mainly but not limited to subviews) in a table view.
 //!
-//! A table view displays a subview for each `(row, column)` in the displayed
+//! A table view displays a subview for each `(column, row)` in the displayed
 //! portion of a table model. A table model can insert or remove lines at any
 //! moment, and scrolling operations change the viewport. After these changes,
 //! we must figure out which subview is still in view and which is not.
 //!
 //! We assume that the subviews are stored using `ndarray::Array2`. The `Array2`
 //! is created based on a viewport and a table model like this: A viewport is a
-//! rectangular region `(row1..row2, col1..col2)`. Given a subview creation
+//! rectangular region `(col1..col2, row1..row2)`. Given a subview creation
 //! function `new`, the `Array2` is created by
-//! `Array2::from_shape_fn((row2 - row1, col2 - col1), |(r, c)| new(row1 + r, col1 + c))`.
+//! `Array2::from_shape_fn((col2 - col1, row2 - row1), |(c, r)| new(col1 + c, row1 + r))`.
 //!
 //! We want to create another `Array2` for a slightly modified table model and
 //! a different viewport without doing this from scratch. First, we create two
@@ -25,35 +25,35 @@ use std::{iter::FusedIterator, ops::Range};
 
 /// Construct a `Array2` by shuffling an existing `ArrayViewMut2`.
 ///
-/// Let `row_src_indices[i]` and `col_src_indices[i]` be the `i`-th element
-/// of `row_src_indices` and `col_src_indices`, respectively. The element
+/// Let `col_src_indices[i]` and `row_src_indices[i]` be the `i`-th element
+/// of `col_src_indices` and `row_src_indices`, respectively. The element
 /// `out[row, column]` is created by
-/// `map(&src[row_src_indices[row], col_src_indices[column]])` if both
+/// `map(&src[col_src_indices[row], row_src_indices[column]])` if both
 /// indices are valid. In other cases, it's created by `new([row, column])`.
 ///
-/// `row_src_indices` and `col_src_indices` are usually created by
+/// `col_src_indices` and `row_src_indices` are usually created by
 /// `LineIdxMap::inverse()`.
 pub fn shuffle2d<S, D>(
     mut src: ArrayViewMut2<'_, S>,
-    row_src_indices: impl Iterator<Item = usize> + ExactSizeIterator + Clone,
     col_src_indices: impl Iterator<Item = usize> + ExactSizeIterator + Clone,
+    row_src_indices: impl Iterator<Item = usize> + ExactSizeIterator + Clone,
     mut map: impl FnMut(&mut S) -> D,
     mut new: impl FnMut([usize; 2]) -> D,
 ) -> Array2<D> {
-    let num_rows = row_src_indices.len();
-    let num_cols = col_src_indices.len();
+    let num_rows = col_src_indices.len();
+    let num_cols = row_src_indices.len();
     let num_cells = num_cols.checked_mul(num_rows).expect("count overflow");
     let mut cells = Vec::with_capacity(num_cells);
 
-    for (row_dst, row_src) in row_src_indices.take(num_rows).enumerate() {
+    for (row_dst, row_src) in col_src_indices.take(num_rows).enumerate() {
         if row_src >= src.dim().0 {
             cells.extend((0..num_cols).map(|i| new([row_dst, i])));
         } else {
             let mut row_src = src.slice_mut(s![row_src, ..]);
             let row_src = row_src.as_slice_mut().unwrap();
 
-            let col_src_indices = col_src_indices.clone();
-            for (col_dst, col_src) in col_src_indices.take(num_cols).enumerate() {
+            let row_src_indices = row_src_indices.clone();
+            for (col_dst, col_src) in row_src_indices.take(num_cols).enumerate() {
                 if col_src >= row_src.len() {
                     cells.push(new([row_dst, col_dst]));
                 } else {
@@ -302,6 +302,7 @@ mod tests {
 
     #[test]
     fn test_shuffle2d() {
+        // note: rows and columns are transposed here for a historical reason
         #[derive(Debug)]
         struct Model {
             // Line model

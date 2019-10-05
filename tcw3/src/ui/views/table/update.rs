@@ -73,7 +73,7 @@ impl Inner {
 
         // Regroup line groups. This makes sure every line group in the viewport
         // correspond to a single line.
-        for &ty in &[LineTy::Row, LineTy::Col] {
+        for &ty in &[LineTy::Col, LineTy::Row] {
             let size = *ty.vec_get(&self.size.get());
             let vp_cell = &self.vp[ty.i()];
             let lineset = &mut state.linesets[ty.i()];
@@ -124,7 +124,7 @@ impl Inner {
 
         // Calculate the range of visible lines
         let mut new_cells_ranges = [0..0, 0..0];
-        for &ty in &[LineTy::Row, LineTy::Col] {
+        for &ty in &[LineTy::Col, LineTy::Row] {
             let size = *ty.vec_get(&self.size.get());
 
             let vp_cell = &self.vp[ty.i()];
@@ -154,10 +154,10 @@ impl Inner {
                 ctrler: replace(&mut old_cell.ctrler, Box::new(())),
             },
             // Factory function (for new cells)
-            |[row, col]| {
-                let row = row as u64 + new_cells_ranges[0].start as u64;
-                let col = col as u64 + new_cells_ranges[1].start as u64;
-                let (view, ctrler) = model_query.new_view([row, col]);
+            |[col, row]| {
+                let col = col as u64 + new_cells_ranges[0].start as u64;
+                let row = row as u64 + new_cells_ranges[1].start as u64;
+                let (view, ctrler) = model_query.new_view([col, row]);
                 TableCell { view, ctrler }
             },
         );
@@ -265,13 +265,13 @@ impl Layout for TableLayout {
         }
 
         // Arrange subviews
-        for ((row, col), view) in self.subviews.indexed_iter() {
-            let cell = [row, col];
+        for ((col, row), view) in self.subviews.indexed_iter() {
+            let cell = [col, row];
 
             // Get the corner coordinates
             let mut min = Point2::new(0.0, 0.0);
             let mut max = Point2::new(0.0, 0.0);
-            for &ty in &[LineTy::Row, LineTy::Col] {
+            for &ty in &[LineTy::Col, LineTy::Row] {
                 *ty.point_get_mut(&mut min) = self.pos_lists[ty.i()][cell[ty.i()]];
                 *ty.point_get_mut(&mut max) = self.pos_lists[ty.i()][cell[ty.i()] + 1];
             }
@@ -300,7 +300,7 @@ impl TableLayout {
         // TODO: Assert `line_idx_maps` is an identity transform
 
         // Get coordinates of the lines
-        let pos_lists: ArrayVec<[_; 2]> = [LineTy::Row, LineTy::Col]
+        let pos_lists: ArrayVec<[_; 2]> = [LineTy::Col, LineTy::Row]
             .iter()
             .map(|&ty| {
                 let i = ty as usize;
