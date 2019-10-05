@@ -6,9 +6,9 @@ edition = "2018"
 
 [dependencies]
 stvg_io = { path = "../io" }
-usvg = "0.6.1"
-syn = "0.15"
-quote = "0.6.12"
+usvg = "0.8.0"
+syn = "1"
+quote = "1"
 rgb = "0.8.13"
 cgmath = "0.17.0"
 

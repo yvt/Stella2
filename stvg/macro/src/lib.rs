@@ -73,7 +73,7 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
             // Shift the coordinates by `FRAC_BITS`
             const FRAC_SCALE: f64 = (1 << stvg_io::FRAC_BITS) as f64;
-            let size = [size.width * FRAC_SCALE, size.height * FRAC_SCALE];
+            let size = [size.width() * FRAC_SCALE, size.height() * FRAC_SCALE];
 
             // Calculate the root transform. Scale the viewbox to maximally
             // fill the size box ([0, 0]–`size`), and align the viewbox at the
@@ -81,8 +81,8 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
             let mut xform =
                 usvg::Transform::new_translate(-viewbox.rect.left(), -viewbox.rect.top());
 
-            let scale = (size[0] / viewbox.rect.width).min(size[1] / viewbox.rect.height);
-            let scaled_viewbox_size = [viewbox.rect.width * scale, viewbox.rect.height * scale];
+            let scale = (size[0] / viewbox.rect.width()).min(size[1] / viewbox.rect.height());
+            let scaled_viewbox_size = [viewbox.rect.width() * scale, viewbox.rect.height() * scale];
 
             xform.scale(scale, scale);
             xform.translate(
@@ -100,8 +100,8 @@ pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream 
     let stvg_bytes = converter.encoder.take_bytes();
 
     let syn_bytes = LitByteStr::new(&stvg_bytes, path_lit.span());
-    let width = size.width as f32;
-    let height = size.height as f32;
+    let width = size.width() as f32;
+    let height = size.height() as f32;
 
     (quote! {
         (#syn_bytes, [#width, #height])
@@ -136,8 +136,15 @@ impl Converter {
                         opacity * fill.opacity.value() as f32,
                     );
 
+                    let segments = path
+                        .data
+                        .subpaths()
+                        .map(|subpath| subpath.0)
+                        .flatten()
+                        .cloned();
+
                     self.encoder.begin_path();
-                    for seg in path.segments.iter() {
+                    for seg in segments {
                         match seg {
                             PathSegment::MoveTo { mut x, mut y } => {
                                 node_xform.apply_to(&mut x, &mut y);
@@ -194,7 +201,13 @@ impl Converter {
                     };
 
                     // Convert the path to a Pathfinder `Outline`
-                    let path = UsvgPathToSegments::new(path.segments.iter().cloned());
+                    let path = UsvgPathToSegments::new(
+                        path.data
+                            .subpaths()
+                            .map(|subpath| subpath.0)
+                            .flatten()
+                            .cloned(),
+                    );
                     let outline = Outline::from_segments(path);
 
                     // Stroke the `Outline`
