@@ -20,6 +20,6 @@ macro_rules! attach_windres {
     () => {
         #[used]
         #[allow(dead_code)]
-        static WINDRES_DUMMY: &'static u8= &$crate::DUMMY;
+        static WINDRES_DUMMY: &'static u8 = &$crate::DUMMY;
     };
 }
