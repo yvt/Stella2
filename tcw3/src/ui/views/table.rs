@@ -122,9 +122,6 @@ struct Inner {
     /// The size traits of the table view.
     size_traits: Cell<SizeTraits>,
 
-    /// The line coordinates of the respective left/top edge of the viewport.
-    vp: [Cell<Size>; 2],
-
     dirty: Cell<DirtyFlags>,
 }
 
@@ -155,6 +152,9 @@ struct State {
     ///
     /// The indices correspond to `LineTy`'s integer values.
     linesets: [Lineset; 2],
+
+    /// Viewports.
+    vp_set: VpSet,
 }
 
 impl fmt::Debug for State {
@@ -164,6 +164,7 @@ impl fmt::Debug for State {
             .field("cells", &self.cells)
             .field("line_idx_maps", &self.line_idx_maps)
             .field("linesets", &self.linesets)
+            .field("vp_set", &self.vp_set)
             .finish()
     }
 }
@@ -178,6 +179,14 @@ bitflags! {
         /// replaced with a new layout.
         const LAYOUT = 1 << 1;
     }
+}
+
+/// Viewports.
+#[derive(Debug)]
+struct VpSet {
+    /// The line coordinates of the respective left/top edge of the viewport
+    /// that corresponds to the current scroll position.
+    scroll_pos: [Size; 2],
 }
 
 struct TableCell {
@@ -402,10 +411,10 @@ impl Table {
                 cells_ranges: [0..0, 0..0],
                 line_idx_maps: [LineIdxMap::new(0..0), LineIdxMap::new(0..0)],
                 linesets: [Lineset::new(), Lineset::new()],
+                vp_set: VpSet { scroll_pos: [0, 0] },
             }),
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),
-            vp: [Cell::new(0), Cell::new(0)],
             dirty: Cell::new(DirtyFlags::empty()),
         };
 

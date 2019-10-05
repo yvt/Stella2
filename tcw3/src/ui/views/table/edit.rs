@@ -3,6 +3,7 @@ use std::{cell::RefMut, ops::Range, rc::Rc};
 
 use super::{
     update::LinesetModelImpl, DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery,
+    VpSet,
 };
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
@@ -65,8 +66,9 @@ impl TableModelEdit for TableEdit<'_> {
         let pos_range = lineset.insert(&lineset_model, range).unwrap();
 
         // Apply the displacement policy
-        self.inner.adjust_vp_for_line_resizing(
+        state.vp_set.adjust_vp_for_line_resizing(
             line_ty,
+            *line_ty.vec_get(&self.inner.size.get()),
             pos_range.start..pos_range.start,
             pos_range.clone(),
         );
@@ -98,8 +100,9 @@ impl TableModelEdit for TableEdit<'_> {
         let pos_range = lineset.remove(&lineset_model, range).unwrap();
 
         // Apply the displacement policy
-        self.inner.adjust_vp_for_line_resizing(
+        state.vp_set.adjust_vp_for_line_resizing(
             line_ty,
+            *line_ty.vec_get(&self.inner.size.get()),
             pos_range.clone(),
             pos_range.start..pos_range.start,
         );
@@ -127,6 +130,8 @@ impl TableModelEdit for TableEdit<'_> {
         struct DispCbImpl<'a> {
             line_ty: LineTy,
             inner: &'a Inner,
+            vp_set: &'a mut VpSet,
+            vp_size: Size,
         }
 
         impl DispCb for DispCbImpl<'_> {
@@ -137,8 +142,12 @@ impl TableModelEdit for TableEdit<'_> {
                 new_pos: Range<Size>,
             ) {
                 // Apply the displacement policy
-                self.inner
-                    .adjust_vp_for_line_resizing(self.line_ty, old_pos, new_pos);
+                self.vp_set.adjust_vp_for_line_resizing(
+                    self.line_ty,
+                    self.vp_size,
+                    old_pos,
+                    new_pos,
+                );
 
                 self.inner.set_dirty_flags(DirtyFlags::CELLS);
             }
@@ -147,7 +156,9 @@ impl TableModelEdit for TableEdit<'_> {
         let lineset_model = LinesetModelImpl::new(&mut *state.model_query, line_ty);
         let mut disp_cb = DispCbImpl {
             line_ty,
-            inner: self.inner,
+            inner: &self.inner,
+            vp_set: &mut state.vp_set,
+            vp_size: *line_ty.vec_get(&self.inner.size.get()),
         };
         let skip_approx = false;
         lineset.recalculate_size(&lineset_model, range, skip_approx, &mut disp_cb);

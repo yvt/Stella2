@@ -12,7 +12,7 @@ use std::{
 
 use super::{
     fixedpoint::{fix_to_f32, fp_to_fix},
-    DirtyFlags, Inner, LineTy, State, TableCell, TableModelQuery,
+    DirtyFlags, Inner, LineTy, State, TableCell, TableModelQuery, VpSet,
 };
 use crate::{
     ui::scrolling::{
@@ -23,40 +23,6 @@ use crate::{
 };
 
 impl Inner {
-    /// Adjust viewports after some lines are resized.
-    ///
-    /// This is where the so-called displacement policy is implemented.
-    /// TODO: provide means to customize the displacement policy.
-    ///
-    /// Does not update dirty flags.
-    pub(super) fn adjust_vp_for_line_resizing(
-        &self,
-        line_ty: LineTy,
-        old_pos: Range<Size>,
-        new_pos: Range<Size>,
-    ) {
-        debug_assert!(old_pos.start == new_pos.start);
-
-        let size = *line_ty.vec_get(&self.size.get());
-
-        let vp_cell = &self.vp[line_ty.i()];
-        let mut vp = vp_cell.get();
-
-        // Fix the right/bottom edge
-        let bottom = vp_cell.get() + size;
-
-        if old_pos.end <= bottom {
-            let diff = new_pos.end - old_pos.end;
-            vp = max(0, vp + diff);
-        } else if old_pos.start < bottom {
-            // The resized line set includes the right/bottom edge. Move the
-            // viewport so that resizing won't reveal the next line.
-            vp = max(0, min(vp, new_pos.end - size));
-        }
-
-        vp_cell.set(vp);
-    }
-
     /// An utility function for updating `self.dirty`.
     pub(super) fn set_dirty_flags(&self, new_flags: DirtyFlags) {
         self.dirty.set(self.dirty.get() | new_flags);
@@ -75,7 +41,6 @@ impl Inner {
         // correspond to a single line.
         for &ty in &[LineTy::Col, LineTy::Row] {
             let size = *ty.vec_get(&self.size.get());
-            let vp_cell = &self.vp[ty.i()];
             let lineset = &mut state.linesets[ty.i()];
 
             // Regrouping might shrink some line groups. A set of line groups
@@ -83,16 +48,15 @@ impl Inner {
             // this happens, we try regrouping again.
             loop {
                 // Bound the viewport offset first
-                let max_vp = lineset.total_size() - size;
-                vp_cell.set(max(0, min(vp_cell.get(), max_vp)));
+                state.vp_set.bound_by(ty, lineset.total_size(), size);
 
                 // Calculate the viewport range
-                let vp_start = vp_cell.get();
-                let vp = vp_start..vp_start + size;
+                let vp_ranges = state.vp_set.vp_ranges(ty, size);
 
                 struct DispCbImpl<'a> {
                     line_ty: LineTy,
-                    inner: &'a Inner,
+                    vp_set: &'a mut VpSet,
+                    vp_size: Size,
                 }
 
                 impl DispCb for DispCbImpl<'_> {
@@ -103,20 +67,30 @@ impl Inner {
                         new_pos: Range<Size>,
                     ) {
                         // Apply the displacement policy
-                        self.inner
-                            .adjust_vp_for_line_resizing(self.line_ty, old_pos, new_pos);
+                        self.vp_set.adjust_vp_for_line_resizing(
+                            self.line_ty,
+                            self.vp_size,
+                            old_pos,
+                            new_pos,
+                        );
                     }
                 }
 
                 let lineset_model = LinesetModelImpl::new(&mut *state.model_query, ty);
                 let mut disp_cb = DispCbImpl {
                     line_ty: ty,
-                    inner: self,
+                    vp_set: &mut state.vp_set,
+                    vp_size: *ty.vec_get(&self.size.get()),
                 };
 
-                lineset.regroup(&lineset_model, &[vp.clone()], &mut disp_cb);
+                lineset.regroup(&lineset_model, &vp_ranges, &mut disp_cb);
 
-                if lineset.is_well_grouped(vp.clone()).0 {
+                let new_vp_ranges = state.vp_set.vp_ranges(ty, size);
+
+                if new_vp_ranges
+                    .iter()
+                    .all(|vp| lineset.is_well_grouped(vp.clone()).0)
+                {
                     break;
                 }
             }
@@ -127,12 +101,10 @@ impl Inner {
         for &ty in &[LineTy::Col, LineTy::Row] {
             let size = *ty.vec_get(&self.size.get());
 
-            let vp_cell = &self.vp[ty.i()];
-            let vp_start = vp_cell.get();
-            let vp_end = vp_start + size;
+            let vp = state.vp_set.visible_vp_range(ty, size);
 
             let (_line_grs, line_grs_range_idx, _line_grs_range_pos) =
-                state.linesets[ty.i()].range(vp_start..vp_end);
+                state.linesets[ty.i()].range(vp);
 
             new_cells_ranges[ty.i()] = line_grs_range_idx;
         }
@@ -182,6 +154,62 @@ impl Inner {
         this.dirty.set(this.dirty.get() - DirtyFlags::LAYOUT);
 
         view.set_layout(TableLayout::from_current_state(Rc::clone(&this), state));
+    }
+}
+
+impl VpSet {
+    /// Adjust viewports after some lines are resized.
+    ///
+    /// This is where the so-called displacement policy is implemented.
+    /// TODO: provide means to customize the displacement policy.
+    ///
+    /// Does not update dirty flags.
+    pub(super) fn adjust_vp_for_line_resizing(
+        &mut self,
+        line_ty: LineTy,
+        vp_size: Size,
+        old_pos: Range<Size>,
+        new_pos: Range<Size>,
+    ) {
+        debug_assert!(old_pos.start == new_pos.start);
+
+        let vp = &mut self.scroll_pos[line_ty.i()];
+
+        // Fix the right/bottom edge
+        let bottom = *vp + vp_size;
+
+        if old_pos.end <= bottom {
+            let diff = new_pos.end - old_pos.end;
+            *vp = max(0, *vp + diff);
+        } else if old_pos.start < bottom {
+            // The resized line set includes the right/bottom edge. Move the
+            // viewport so that resizing won't reveal the next line.
+            *vp = max(0, min(*vp, new_pos.end - vp_size));
+        }
+    }
+
+    /// Restrict viewport positions by the total size of lines.
+    fn bound_by(&mut self, line_ty: LineTy, total_size: Size, vp_size: Size) {
+        debug_assert!(total_size >= 0);
+        debug_assert!(vp_size >= 0);
+
+        let vp = &mut self.scroll_pos[line_ty.i()];
+
+        let max_vp = total_size - vp_size;
+
+        *vp = max(0, min(*vp, max_vp));
+    }
+
+    /// Get the viewport for the actually visible portion aka the scroll
+    /// position.
+    fn visible_vp_range(&self, line_ty: LineTy, vp_size: Size) -> Range<Size> {
+        let vp = self.scroll_pos[line_ty.i()];
+        vp..vp + vp_size
+    }
+
+    /// Get a list of viewports.
+    fn vp_ranges(&self, line_ty: LineTy, vp_size: Size) -> [Range<Size>; 1] {
+        [self.visible_vp_range(line_ty, vp_size)]
     }
 }
 
@@ -307,16 +335,16 @@ impl TableLayout {
                 let cells_range = &state.cells_ranges[i];
                 let lineset = &state.linesets[i];
 
-                let vp_start = inner.vp[i].get();
-                let vp_end = vp_start + *ty.vec_get(&inner.size.get());
+                let vp_size = *ty.vec_get(&inner.size.get());
+                let vp = state.vp_set.visible_vp_range(ty, vp_size);
 
                 let (mut line_grs, line_grs_range_idx, line_grs_range_pos) =
-                    lineset.range(vp_start..vp_end);
+                    lineset.range(vp.clone());
 
                 assert!(line_grs_range_idx.start <= cells_range.start);
 
                 let mut i = line_grs_range_idx.start;
-                let mut pos = line_grs_range_pos.start - vp_start;
+                let mut pos = line_grs_range_pos.start - vp.start;
 
                 // Skip some lines if `line_grs` extra lines
                 while i < cells_range.start {
