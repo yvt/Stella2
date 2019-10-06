@@ -120,7 +120,7 @@ impl TableModelEdit for TableEdit<'_> {
         // Apply the displacement policy
         state.vp_set.adjust_vp_for_line_resizing(
             line_ty,
-            *line_ty.vec_get(&self.inner.size.get()),
+            self.inner.size.get()[line_ty.i()],
             pos_range.start..pos_range.start,
             pos_range.clone(),
         );
@@ -154,7 +154,7 @@ impl TableModelEdit for TableEdit<'_> {
         // Apply the displacement policy
         state.vp_set.adjust_vp_for_line_resizing(
             line_ty,
-            *line_ty.vec_get(&self.inner.size.get()),
+            self.inner.size.get()[line_ty.i()],
             pos_range.clone(),
             pos_range.start..pos_range.start,
         );
@@ -210,7 +210,7 @@ impl TableModelEdit for TableEdit<'_> {
             line_ty,
             inner: &self.inner,
             vp_set: &mut state.vp_set,
-            vp_size: *line_ty.vec_get(&self.inner.size.get()),
+            vp_size: self.inner.size.get()[line_ty.i()],
         };
         let skip_approx = false;
         lineset.recalculate_size(&lineset_model, range, skip_approx, &mut disp_cb);

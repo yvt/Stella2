@@ -58,7 +58,7 @@ impl Inner {
         // Regroup line groups. This makes sure every line group in the viewport
         // correspond to a single line.
         for &ty in &[LineTy::Col, LineTy::Row] {
-            let size = *ty.vec_get(&self.size.get());
+            let size = self.size.get()[ty.i()];
             let lineset = &mut state.linesets[ty.i()];
 
             // Regrouping might shrink some line groups. A set of line groups
@@ -98,7 +98,7 @@ impl Inner {
                 let mut disp_cb = DispCbImpl {
                     line_ty: ty,
                     vp_set: &mut state.vp_set,
-                    vp_size: *ty.vec_get(&self.size.get()),
+                    vp_size: self.size.get()[ty.i()],
                 };
 
                 lineset.regroup(&lineset_model, &vp_ranges, &mut disp_cb);
@@ -117,7 +117,7 @@ impl Inner {
         // Calculate the range of visible lines
         let mut new_cells_ranges = [0..0, 0..0];
         for &ty in &[LineTy::Col, LineTy::Row] {
-            let size = *ty.vec_get(&self.size.get());
+            let size = self.size.get()[ty.i()];
 
             let vp = state.vp_set.visible_vp_range(ty, size);
 
@@ -322,8 +322,8 @@ impl Layout for TableLayout {
             let mut min = Point2::new(0.0, 0.0);
             let mut max = Point2::new(0.0, 0.0);
             for &ty in &[LineTy::Col, LineTy::Row] {
-                *ty.point_get_mut(&mut min) = self.pos_lists[ty.i()][cell[ty.i()]];
-                *ty.point_get_mut(&mut max) = self.pos_lists[ty.i()][cell[ty.i()] + 1];
+                min[ty.i()] = self.pos_lists[ty.i()][cell[ty.i()]];
+                max[ty.i()] = self.pos_lists[ty.i()][cell[ty.i()] + 1];
             }
 
             ctx.set_subview_frame(view, Box2::new(min, max));
@@ -357,7 +357,7 @@ impl TableLayout {
                 let cells_range = &state.cells_ranges[i];
                 let lineset = &state.linesets[i];
 
-                let vp_size = *ty.vec_get(&inner.size.get());
+                let vp_size = inner.size.get()[ty.i()];
                 let vp = state.vp_set.visible_vp_range(ty, vp_size);
 
                 let (mut line_grs, line_grs_range_idx, line_grs_range_pos) =

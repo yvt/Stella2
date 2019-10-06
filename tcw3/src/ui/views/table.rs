@@ -98,7 +98,7 @@
 //!
 use as_any::AsAny;
 use bitflags::bitflags;
-use cgmath::{Point2, Vector2};
+use cgmath::Vector2;
 use ndarray::Array2;
 use std::{
     any::Any,
@@ -434,20 +434,9 @@ pub enum LineTy {
 
 impl LineTy {
     /// Convert `TypeTy` to an index. For example, it's used for indexing into
-    /// `State::line_idx_maps`.
+    /// `State::line_idx_maps`, `Vector2`, and `Point2`.
     fn i(self) -> usize {
         self as usize
-    }
-
-    /// Select and get a reference to an element of `Vector2` based on `LineTy`.
-    fn vec_get<T>(self, v: &Vector2<T>) -> &T {
-        &v[self as usize]
-    }
-
-    /// Select and get a mutable reference to an element of `Point2` based on
-    /// `LineTy`.
-    fn point_get_mut<T>(self, v: &mut Point2<T>) -> &mut T {
-        &mut v[self as usize]
     }
 }
 
