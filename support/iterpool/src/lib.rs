@@ -5,6 +5,14 @@
 //! data structures on it within the "safe" Rust. Memory safety is guaranteed by
 //! runtime checks.
 //!
+//! Initial allocations are guaranteed to return consecutive pointers:
+//!
+//!     use iterpool::{Pool, PoolPtr};
+//!     let mut pool = Pool::new();
+//!     assert_eq!(pool.allocate(42), PoolPtr::new(0));
+//!     assert_eq!(pool.allocate(42), PoolPtr::new(1));
+//!     assert_eq!(pool.allocate(42), PoolPtr::new(2));
+//!
 //! Allocation Performance
 //! ----------------------
 //!
@@ -79,8 +87,11 @@ impl PoolPtr {
         PoolPtr(NonZeroUsize::new(1).unwrap())
     }
 
-    fn new(x: usize) -> Self {
-        PoolPtr(NonZeroUsize::new(x + 1).expect("count overflow"))
+    /// Construct a `PoolPtr` from a given `x: usize`.
+    ///
+    /// `x` must be less than `usize::max_value()`.
+    pub fn new(x: usize) -> Self {
+        PoolPtr(NonZeroUsize::new(x.wrapping_add(1)).expect("count overflow"))
     }
 
     fn get(&self) -> usize {
