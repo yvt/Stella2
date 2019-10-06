@@ -384,6 +384,7 @@ impl<T> IterablePool<T> {
 
     pub fn iter(&self) -> Iter<T> {
         Iter {
+            remaining_len: self.storage.len(),
             pool: self,
             cur: self.first_used,
         }
@@ -391,6 +392,7 @@ impl<T> IterablePool<T> {
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut {
+            remaining_len: self.storage.len(),
             cur: self.first_used,
             pool: self,
         }
@@ -430,6 +432,7 @@ impl<T> ops::IndexMut<PoolPtr> for IterablePool<T> {
 pub struct Iter<'a, T> {
     pool: &'a IterablePool<T>,
     cur: Option<PoolPtr>,
+    remaining_len: usize,
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
@@ -443,10 +446,15 @@ impl<'a, T> Iterator for Iter<'a, T> {
                 // Reached the end
                 self.cur = None;
             }
+            self.remaining_len -= 1;
             Some(entry.as_ref().unwrap())
         } else {
             None
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.remaining_len))
     }
 }
 
@@ -455,6 +463,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 pub struct IterMut<'a, T> {
     pool: &'a mut IterablePool<T>,
     cur: Option<PoolPtr>,
+    remaining_len: usize,
 }
 
 impl<'a, T> Iterator for IterMut<'a, T> {
@@ -470,10 +479,15 @@ impl<'a, T> Iterator for IterMut<'a, T> {
                 // Reached the end
                 self.cur = None;
             }
+            self.remaining_len -= 1;
             Some(entry.as_mut().unwrap())
         } else {
             None
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.remaining_len))
     }
 }
 
@@ -501,5 +515,39 @@ mod tests {
         let ptr = pool.allocate(1);
         pool.deallocate(ptr);
         pool[ptr];
+    }
+
+    #[test]
+    fn pool_iter_size_hint() {
+        let mut pool = Pool::new();
+        let ptr1 = pool.allocate(1);
+        let _ptr2 = pool.allocate(2);
+        pool.deallocate(ptr1);
+
+        let it = pool.iter();
+        let (lower, upper) = dbg!(it.size_hint());
+        assert!(lower <= 1);
+        assert!(upper.unwrap() >= 1);
+        drop(it);
+
+        assert_eq!(pool.iter_mut().size_hint(), (lower, upper));
+        assert_eq!(pool.ptr_iter().size_hint(), (lower, upper));
+        assert_eq!(pool.ptr_iter_mut().size_hint(), (lower, upper));
+    }
+
+    #[test]
+    fn iterable_pool_iter_size_hint() {
+        let mut pool = IterablePool::new();
+        let ptr1 = pool.allocate(1);
+        let _ptr2 = pool.allocate(2);
+        pool.deallocate(ptr1);
+
+        let it = pool.iter();
+        let (lower, upper) = dbg!(it.size_hint());
+        assert!(lower <= 1);
+        assert!(upper.unwrap() >= 1);
+        drop(it);
+
+        assert_eq!(pool.iter_mut().size_hint(), (lower, upper));
     }
 }
