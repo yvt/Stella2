@@ -1,9 +1,15 @@
 //! Implements the public interface of `TableEdit`.
-use std::{cell::RefMut, ops::Range, rc::Rc};
+use std::{
+    cell::RefMut,
+    cmp::{max, min},
+    ops::Range,
+    rc::Rc,
+};
 
 use super::{
-    update::LinesetModelImpl, DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery,
-    VpSet,
+    fixedpoint::{fix_to_fp, fp_to_fix},
+    update::LinesetModelImpl,
+    DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery, VpSet,
 };
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
@@ -11,7 +17,7 @@ use crate::{
 };
 
 /// A lock guard type for updating a [`Table`]'s internal representation of a
-/// table model.
+/// table model and viewports.
 ///
 /// This type is constructed by [`Table::edit`].
 ///
@@ -30,6 +36,42 @@ impl Drop for TableEdit<'_> {
         // set by editing operations
         self.inner.update_cells(&mut self.state);
         Inner::update_layout_if_needed(&self.inner, &self.state, self.view);
+    }
+}
+
+impl TableEdit<'_> {
+    /// Get the current scrolling position for a given axis.
+    pub fn scroll_pos(&self, line_ty: LineTy) -> f64 {
+        fix_to_fp(self.state.vp_set.scroll_pos[line_ty.i()])
+    }
+
+    /// Set the current scrolling position for a given axis.
+    ///
+    /// `pos` is automatically clamped to range `0..scroll_limit(line_ty)`.
+    pub fn set_scroll_pos(&mut self, line_ty: LineTy, pos: f64) {
+        let new_pos = max(0, min(fp_to_fix(pos), self.scroll_limit_raw(line_ty)));
+
+        let vp = &mut self.state.vp_set.scroll_pos[line_ty.i()];
+
+        if new_pos != *vp {
+            *vp = new_pos;
+            self.inner.set_dirty_flags(DirtyFlags::CELLS);
+        }
+    }
+
+    /// Get the maximum scrolling position (the maximum value for `scroll_pos`)
+    /// for a given axis.
+    pub fn scroll_limit(&self, line_ty: LineTy) -> f64 {
+        fix_to_fp(self.scroll_limit_raw(line_ty))
+    }
+
+    fn scroll_limit_raw(&self, line_ty: LineTy) -> Size {
+        let lineset = &self.state.linesets[line_ty.i()];
+        let content_size = lineset.total_size();
+
+        let vp_size = self.inner.size.get()[line_ty.i()];
+
+        max(0, content_size - vp_size)
     }
 }
 

@@ -69,6 +69,33 @@
 //! [`TableModelEdit`]: table::TableModelEdit
 //! [`TableEdit`]: table::TableEdit
 //!
+//! ## Viewports
+//!
+//! Viewports are rectangles each representing a region considered currently
+//! visible. There is one permanent viewport representing the actually visible
+//! region. The position (particularly, the upper-left coordinates) of this
+//! region is also called *a scroll posiiton*. Viewports are managed as a part
+//! of `Table`'s internal state so that they can automatically follow the
+//! movement of lines when lines are inserted, removed, or resized.
+//! A *displacement policy* specifies the exact behaviour, e.g., which direction
+//! a viewport should move to when partially-visible lines are resized.
+//! (TODO: Custom displacement policies)
+//!
+//! For out-of-sight lines, table views use variably-coarse representation with
+//! imprecise sizes, which are refined on-the-fly based on the current state of
+//! viewports. This happens even if no changes are explicitly made to the table
+//! model. Lines covered by viewports are protected by this, and therefore
+//! viewports establish anchor points.
+//!
+//! Additional viewports can be temporarily created, e.g., to remember or “pin”
+//! the original position during a scrolling operation.
+//!
+//! Viewports can be examined and manipulated by calling [`Table::edit`] and
+//! obtaining a lock guard of type [`TableEdit`].
+//!
+//! [`Table::edit`]: table::Table::edit
+//! [`TableEdit`]: table::TableEdit
+//!
 use as_any::AsAny;
 use bitflags::bitflags;
 use cgmath::{Point2, Vector2};
@@ -435,7 +462,7 @@ impl Table {
         &self.view
     }
 
-    /// Attempt to acquire a lock to update the table model.
+    /// Attempt to acquire a lock to update the table model and the viewports.
     ///
     /// Locking fails if there is another agent accessing the table model. For
     /// example, this happens when methods of the registered `TableModelQuery`
