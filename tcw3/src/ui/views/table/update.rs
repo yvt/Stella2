@@ -23,6 +23,18 @@ use crate::{
 };
 
 impl Inner {
+    /// Call callback functions registered to `model_update_handlers`.
+    ///
+    /// `state` must be in an unborrowed state (this is a precondition for the
+    /// callback functions).
+    pub(super) fn call_model_update_handlers(&self) {
+        debug_assert!(self.state.try_borrow_mut().is_ok());
+
+        for cb in self.model_update_handlers.borrow().iter() {
+            cb();
+        }
+    }
+
     /// An utility function for updating `self.dirty`.
     pub(super) fn set_dirty_flags(&self, new_flags: DirtyFlags) {
         self.dirty.set(self.dirty.get() | new_flags);
@@ -30,9 +42,15 @@ impl Inner {
 
     /// Update `State::cells`, clearing the dirty flag `CELLS`. Might set
     /// the dirty flag `LAYOUT`.
-    pub(super) fn update_cells(&self, state: &mut State) {
+    ///
+    /// Returns `true` iff the state is updated, i.e., iff the dirty flag
+    /// `CELLS` had been set.
+    ///
+    /// If the result `call_model_update_handlers` is `true`, the caller usually
+    /// has to call `call_model_update_handlers` as well.
+    pub(super) fn update_cells(&self, state: &mut State) -> bool {
         if !self.dirty.get().contains(DirtyFlags::CELLS) {
-            return;
+            return false;
         }
         self.dirty.set(self.dirty.get() - DirtyFlags::CELLS);
         self.dirty.set(self.dirty.get() | DirtyFlags::LAYOUT);
@@ -145,6 +163,8 @@ impl Inner {
         {
             line_idx_map.set_identity(cells_range.clone());
         }
+
+        true
     }
 
     pub(super) fn update_layout_if_needed(this: &Rc<Inner>, state: &State, view: &HView) {
@@ -277,6 +297,8 @@ impl Layout for TableLayout {
 
             self.inner.set_dirty_flags(DirtyFlags::CELLS);
             self.inner.update_cells(&mut self.inner.state.borrow_mut());
+
+            self.inner.call_model_update_handlers();
 
             // The `LAYOUT` dirty flag can be cleared here because
             // we'll replace layouts this instant

@@ -2,6 +2,7 @@
 use std::{
     cell::RefMut,
     cmp::{max, min},
+    mem::ManuallyDrop,
     ops::Range,
     rc::Rc,
 };
@@ -27,15 +28,24 @@ use crate::{
 pub struct TableEdit<'a> {
     pub(super) view: &'a HView,
     pub(super) inner: &'a Rc<Inner>,
-    pub(super) state: RefMut<'a, State>,
+    pub(super) state: ManuallyDrop<RefMut<'a, State>>,
 }
 
 impl Drop for TableEdit<'_> {
     fn drop(&mut self) {
         // Process pending updates and clear dirty flags, which might have been
         // set by editing operations
-        self.inner.update_cells(&mut self.state);
+        let did_model_update = self.inner.update_cells(&mut self.state);
         Inner::update_layout_if_needed(&self.inner, &self.state, self.view);
+
+        // Unborrow `state` before calling the callback functions
+        unsafe {
+            ManuallyDrop::drop(&mut self.state);
+        }
+
+        if did_model_update {
+            self.inner.call_model_update_handlers();
+        }
     }
 }
 
@@ -85,7 +95,7 @@ impl TableModelEdit for TableEdit<'_> {
     }
 
     fn insert(&mut self, line_ty: LineTy, range: Range<u64>) {
-        let state = &mut *self.state;
+        let state = &mut **self.state;
 
         let lineset = &mut state.linesets[line_ty.i()];
         let line_idx_maps = &mut state.line_idx_maps[line_ty.i()];
@@ -119,7 +129,7 @@ impl TableModelEdit for TableEdit<'_> {
     }
 
     fn remove(&mut self, line_ty: LineTy, range: Range<u64>) {
-        let state = &mut *self.state;
+        let state = &mut **self.state;
 
         let lineset = &mut state.linesets[line_ty.i()];
         let line_idx_maps = &mut state.line_idx_maps[line_ty.i()];
@@ -153,7 +163,7 @@ impl TableModelEdit for TableEdit<'_> {
     }
 
     fn resize(&mut self, line_ty: LineTy, range: Range<u64>) {
-        let state = &mut *self.state;
+        let state = &mut **self.state;
 
         let lineset = &mut state.linesets[line_ty.i()];
 
@@ -207,7 +217,7 @@ impl TableModelEdit for TableEdit<'_> {
     }
 
     fn renew_subviews(&mut self, line_ty: LineTy, range: Range<u64>) {
-        let state = &mut *self.state;
+        let state = &mut **self.state;
 
         let lineset = &mut state.linesets[line_ty.i()];
         let line_idx_maps = &mut state.line_idx_maps[line_ty.i()];

@@ -104,15 +104,17 @@ use std::{
     any::Any,
     cell::{Cell, RefCell},
     fmt,
+    mem::ManuallyDrop,
     ops::Range,
     rc::Rc,
 };
+use subscriber_list::SubscriberList;
 
 use crate::ui::scrolling::{
     lineset::{Index, Lineset, Size},
     tableremap::LineIdxMap,
 };
-use crate::uicore::{HView, SizeTraits, ViewFlags};
+use crate::uicore::{HView, SizeTraits, Sub, ViewFlags};
 
 /// A scrollable widget displaying subviews along imaginary table cells.
 ///
@@ -127,8 +129,10 @@ pub struct Table {
 /// single cell in a table.
 pub type CellIdx = [u64; 2];
 
+/// The boxed function type for [`Table`]'s callback functions.
+pub type Cb = Box<dyn Fn()>;
+
 /// The underlying data of a table view.
-#[derive(Debug)]
 struct Inner {
     state: RefCell<State>,
 
@@ -150,6 +154,25 @@ struct Inner {
     size_traits: Cell<SizeTraits>,
 
     dirty: Cell<DirtyFlags>,
+
+    /// Callback functions to be called on model update. Use
+    /// `Inner::call_model_update_handlers` to call them.
+    model_update_handlers: RefCell<SubscriberList<Cb>>,
+}
+
+impl fmt::Debug for Inner {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Inner")
+            .field("state", &self.state)
+            .field("size", &self.size)
+            .field("size_traits", &self.size_traits)
+            .field("dirty", &self.dirty)
+            .field(
+                "model_update_handlers",
+                &((&self.model_update_handlers) as *const _),
+            )
+            .finish()
+    }
 }
 
 // TODO: scrolling
@@ -443,6 +466,7 @@ impl Table {
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),
             dirty: Cell::new(DirtyFlags::empty()),
+            model_update_handlers: RefCell::new(SubscriberList::new()),
         };
 
         let inner = Rc::new(inner);
@@ -477,7 +501,7 @@ impl Table {
 
         Ok(TableEdit {
             view: &self.view,
-            state,
+            state: ManuallyDrop::new(state),
             inner: &self.inner,
         })
     }
@@ -490,6 +514,28 @@ impl Table {
         self.inner.size_traits.set(value);
         self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
         Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
+    }
+
+    /// Register a function that gets called whenever the table model is updated.
+    ///
+    /// The function is called not only when lines are inserted or removed, but
+    /// also when line groups are regrouped or viewports are updated. The
+    /// function may call [`Table::edit`] for querying the current state but not
+    /// for updating. Because it's possible that the function is called from a
+    /// `Layout` handler, some operations such as setting a new layout for a
+    /// view might result in a panic.
+    ///
+    /// This may be useful when implementing a scroll bar and wanting to watch
+    /// the state of a table view.
+    ///
+    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
+    /// unregister the function.
+    pub fn subscribe_model_update(&self, cb: Cb) -> Sub {
+        self.inner
+            .model_update_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
     }
 }
 
