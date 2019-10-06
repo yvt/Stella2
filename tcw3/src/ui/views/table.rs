@@ -486,7 +486,8 @@ impl Table {
         &self.view
     }
 
-    /// Attempt to acquire a lock to update the table model and the viewports.
+    /// Attempt to acquire a lock to update and/or examine the table model and
+    /// the viewports.
     ///
     /// Locking fails if there is another agent accessing the table model. For
     /// example, this happens when methods of the registered `TableModelQuery`
