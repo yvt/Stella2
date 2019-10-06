@@ -220,6 +220,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     /// Get a reference to winit's `EventLoop`.
     ///
     /// Returns `None` if the main event loop has already been entered.
+    #[allow(dead_code)]
     pub fn event_loop(
         &self,
     ) -> Option<impl std::ops::Deref<Target = EventLoop<UserEvent<TWM, TWC>>> + '_> {

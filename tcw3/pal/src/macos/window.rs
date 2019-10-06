@@ -22,7 +22,7 @@ use cocoa::{
 };
 use objc::{
     msg_send,
-    runtime::{BOOL, NO, YES},
+    runtime::{BOOL, NO},
     sel, sel_impl,
 };
 use std::{
@@ -198,7 +198,7 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
 #[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
-    method_impl(ud, |wm, state| {
+    method_impl(ud, |_wm, state| {
         // Detach the listener from the controller
         let () = msg_send![*state.hwnd.ctrler, setListenerUserData: nil];
     });

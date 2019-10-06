@@ -1,6 +1,6 @@
 use super::super::RGBAF32;
 use cggeom::{prelude::*, Box2};
-use cgmath::{prelude::*, Matrix3, Matrix4, Point2, Vector2};
+use cgmath::{Matrix3, Matrix4, Point2, Vector2};
 use cocoa::{foundation::NSPoint, quartzcore::CATransform3D};
 use core_foundation::base::TCFType;
 use core_graphics::{
