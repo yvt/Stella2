@@ -106,12 +106,14 @@ impl<T> Entry<T> {
             &Entry::Free(_) => None,
         }
     }
+
     fn as_mut(&mut self) -> Option<&mut T> {
         match self {
             &mut Entry::Used(ref mut value) => Some(value),
             &mut Entry::Free(_) => None,
         }
     }
+
     fn next_free_index(&self) -> Option<PoolPtr> {
         match self {
             &Entry::Used(_) => unreachable!(),
@@ -160,6 +162,7 @@ impl<T> Pool<T> {
             first_free: None,
         }
     }
+
     pub fn with_capacity(capacity: usize) -> Self {
         let mut pool = Self {
             storage: Vec::with_capacity(capacity),
@@ -174,6 +177,7 @@ impl<T> Pool<T> {
         }
         pool
     }
+
     pub fn reserve(&mut self, additional: usize) {
         if additional == 0 {
             return;
@@ -190,6 +194,7 @@ impl<T> Pool<T> {
             self.storage.reserve(needed_surplus);
         }
     }
+
     pub fn allocate(&mut self, x: T) -> PoolPtr {
         match self.first_free {
             None => {
@@ -205,6 +210,7 @@ impl<T> Pool<T> {
             }
         }
     }
+
     pub fn deallocate<S: Into<PoolPtr>>(&mut self, i: S) -> Option<T> {
         let i = i.into();
         let ref mut e = self.storage[i.get()];
@@ -221,12 +227,15 @@ impl<T> Pool<T> {
         self.first_free = Some(i);
         Some(x)
     }
+
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
         self.storage[fp.get()].as_ref()
     }
+
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
         self.storage[fp.get()].as_mut()
     }
+
     /// Iterate over objects. Unlike `IterablePool`, `Pool` can't skip free
     /// space, so this might be less efficient.
     pub fn iter(&self) -> impl Iterator<Item = &'_ T> + '_ {
@@ -235,6 +244,7 @@ impl<T> Pool<T> {
             Entry::Used(x) => Some(x),
         })
     }
+
     /// Iterate over objects, allowing mutation. Unlike `IterablePool`,
     /// `Pool` can't skip free space, so this might be less efficient.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut T> + '_ {
@@ -255,6 +265,7 @@ impl<T> Pool<T> {
                 Entry::Used(x) => Some((PoolPtr::new(i), x)),
             })
     }
+
     /// Iterate over objects, allowing mutation. Unlike `IterablePool`,
     /// `Pool` can't skip free space, so this might be less efficient.
     pub fn ptr_iter_mut(&mut self) -> impl Iterator<Item = (PoolPtr, &'_ mut T)> + '_ {
@@ -276,6 +287,7 @@ impl<T> IterablePool<T> {
             first_used: None,
         }
     }
+
     pub fn with_capacity(capacity: usize) -> Self {
         let mut pool = Self {
             storage: Vec::with_capacity(capacity),
@@ -291,6 +303,7 @@ impl<T> IterablePool<T> {
         }
         pool
     }
+
     pub fn reserve(&mut self, additional: usize) {
         if additional == 0 {
             return;
@@ -307,6 +320,7 @@ impl<T> IterablePool<T> {
             self.storage.reserve(needed_surplus);
         }
     }
+
     pub fn allocate(&mut self, x: T) -> PoolPtr {
         use std::mem::replace;
 
@@ -336,6 +350,7 @@ impl<T> IterablePool<T> {
 
         i
     }
+
     pub fn deallocate<S: Into<PoolPtr>>(&mut self, i: S) -> Option<T> {
         let i = i.into();
         let x = match mem::replace(&mut self.storage[i.get()], ItEntry::Free(self.first_free)) {
@@ -358,18 +373,22 @@ impl<T> IterablePool<T> {
         self.first_free = Some(i);
         Some(x)
     }
+
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
         self.storage[fp.get()].as_ref()
     }
+
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
         self.storage[fp.get()].as_mut()
     }
+
     pub fn iter(&self) -> Iter<T> {
         Iter {
             pool: self,
             cur: self.first_used,
         }
     }
+
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut {
             cur: self.first_used,
@@ -458,24 +477,29 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-#[test]
-fn test() {
-    let mut pool = Pool::new();
-    let ptr1 = pool.allocate(1);
-    let ptr2 = pool.allocate(2);
-    assert_eq!(pool[ptr1], 1);
-    assert_eq!(pool[ptr2], 2);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![1, 2]);
-    pool.deallocate(ptr1);
-    assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![2]);
-}
+    #[test]
+    fn test() {
+        let mut pool = Pool::new();
+        let ptr1 = pool.allocate(1);
+        let ptr2 = pool.allocate(2);
+        assert_eq!(pool[ptr1], 1);
+        assert_eq!(pool[ptr2], 2);
 
-#[test]
-#[should_panic]
-fn dangling_ptr() {
-    let mut pool = Pool::new();
-    let ptr = pool.allocate(1);
-    pool.deallocate(ptr);
-    pool[ptr];
+        assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![1, 2]);
+        pool.deallocate(ptr1);
+        assert_eq!(pool.iter().cloned().collect::<Vec<_>>(), vec![2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn dangling_ptr() {
+        let mut pool = Pool::new();
+        let ptr = pool.allocate(1);
+        pool.deallocate(ptr);
+        pool[ptr];
+    }
 }
