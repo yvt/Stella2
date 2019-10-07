@@ -52,7 +52,8 @@ impl Drop for TableEdit<'_> {
 impl TableEdit<'_> {
     /// Get the current scrolling position for a given axis.
     pub fn scroll_pos(&self, line_ty: LineTy) -> f64 {
-        fix_to_fp(self.state.vp_set.scroll_pos[line_ty.i()])
+        let primary_vp = self.state.vp_set.vp_pool[super::primary_vp_ptr()];
+        fix_to_fp(primary_vp[line_ty.i()])
     }
 
     /// Set the current scrolling position for a given axis.
@@ -61,7 +62,8 @@ impl TableEdit<'_> {
     pub fn set_scroll_pos(&mut self, line_ty: LineTy, pos: f64) {
         let new_pos = max(0, min(fp_to_fix(pos), self.scroll_limit_raw(line_ty)));
 
-        let vp = &mut self.state.vp_set.scroll_pos[line_ty.i()];
+        let primary_vp = &mut self.state.vp_set.vp_pool[super::primary_vp_ptr()];
+        let vp = &mut primary_vp[line_ty.i()];
 
         if new_pos != *vp {
             *vp = new_pos;

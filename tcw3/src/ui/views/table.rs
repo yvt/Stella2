@@ -73,10 +73,11 @@
 //!
 //! Viewports are rectangles each representing a region considered currently
 //! visible. There is one permanent viewport representing the actually visible
-//! region. The position (particularly, the upper-left coordinates) of this
-//! region is also called *a scroll posiiton*. Viewports are managed as a part
-//! of `Table`'s internal state so that they can automatically follow the
-//! movement of lines when lines are inserted, removed, or resized.
+//! region, called *a primary viewport*. The position (particularly,
+//! the upper-left coordinates) of this region is also called *a scroll
+//! posiiton*. Viewports are managed as a part of `Table`'s internal state so
+//! that they can automatically follow the movement of lines when lines are
+//! inserted, removed, or resized.
 //! A *displacement policy* specifies the exact behaviour, e.g., which direction
 //! a viewport should move to when partially-visible lines are resized.
 //! (TODO: Custom displacement policies)
@@ -108,6 +109,7 @@ use std::{
     ops::Range,
     rc::Rc,
 };
+use iterpool::{PoolPtr, Pool};
 use subscriber_list::SubscriberList;
 
 use crate::ui::scrolling::{
@@ -234,10 +236,20 @@ bitflags! {
 /// Viewports.
 #[derive(Debug)]
 struct VpSet {
-    /// The line coordinates of the respective left/top edge of the viewport
-    /// that corresponds to the current scroll position.
-    scroll_pos: [Size; 2],
+    /// The line coordinates of the respective left/top edge of each viewport.
+    ///
+    /// There is one element that corresponds to the current scroll position,
+    /// indexed by `primary_vp_ptr()`.
+    vp_pool: Pool<[Size; 2]>,
 }
+
+fn primary_vp_ptr() -> PoolPtr {
+    PoolPtr::new(0)
+}
+
+/// The handle type for viewports in `Table`.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub struct HVp(iterpool::PoolPtr);
 
 struct TableCell {
     view: HView,
@@ -450,7 +462,7 @@ impl Table {
                 cells_ranges: [0..0, 0..0],
                 line_idx_maps: [LineIdxMap::new(0..0), LineIdxMap::new(0..0)],
                 linesets: [Lineset::new(), Lineset::new()],
-                vp_set: VpSet { scroll_pos: [0, 0] },
+                vp_set: VpSet::new(),
             }),
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),

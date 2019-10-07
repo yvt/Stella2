@@ -1,6 +1,7 @@
 use arrayvec::ArrayVec;
 use cggeom::{prelude::*, Box2};
 use cgmath::{Point2, Vector2};
+use iterpool::Pool;
 use ndarray::Array2;
 use std::{
     cell::RefCell,
@@ -119,7 +120,7 @@ impl Inner {
         for &ty in &[LineTy::Col, LineTy::Row] {
             let size = self.size.get()[ty.i()];
 
-            let vp = state.vp_set.visible_vp_range(ty, size);
+            let vp = state.vp_set.primary_vp_range(ty, size);
 
             let (_line_grs, line_grs_range_idx, _line_grs_range_pos) =
                 state.linesets[ty.i()].range(vp);
@@ -178,6 +179,17 @@ impl Inner {
 }
 
 impl VpSet {
+    pub(super) fn new() -> Self {
+        let mut pool = Pool::new();
+
+        // Create a primary viewport
+        let ptr = pool.allocate([0; 2]);
+
+        assert_eq!(ptr, super::primary_vp_ptr());
+
+        Self { vp_pool: pool }
+    }
+
     /// Adjust viewports after some lines are resized.
     ///
     /// This is where the so-called displacement policy is implemented.
@@ -193,18 +205,20 @@ impl VpSet {
     ) {
         debug_assert!(old_pos.start == new_pos.start);
 
-        let vp = &mut self.scroll_pos[line_ty.i()];
+        for vp in self.vp_pool.iter_mut() {
+            let vp = &mut vp[line_ty.i()];
 
-        // Fix the right/bottom edge
-        let bottom = *vp + vp_size;
+            // Fix the right/bottom edge
+            let bottom = *vp + vp_size;
 
-        if old_pos.end <= bottom {
-            let diff = new_pos.end - old_pos.end;
-            *vp = max(0, *vp + diff);
-        } else if old_pos.start < bottom {
-            // The resized line set includes the right/bottom edge. Move the
-            // viewport so that resizing won't reveal the next line.
-            *vp = max(0, min(*vp, new_pos.end - vp_size));
+            if old_pos.end <= bottom {
+                let diff = new_pos.end - old_pos.end;
+                *vp = max(0, *vp + diff);
+            } else if old_pos.start < bottom {
+                // The resized line set includes the right/bottom edge. Move the
+                // viewport so that resizing won't reveal the next line.
+                *vp = max(0, min(*vp, new_pos.end - vp_size));
+            }
         }
     }
 
@@ -213,23 +227,39 @@ impl VpSet {
         debug_assert!(total_size >= 0);
         debug_assert!(vp_size >= 0);
 
-        let vp = &mut self.scroll_pos[line_ty.i()];
-
         let max_vp = total_size - vp_size;
 
-        *vp = max(0, min(*vp, max_vp));
+        for vp in self.vp_pool.iter_mut() {
+            let vp = &mut vp[line_ty.i()];
+
+            *vp = max(0, min(*vp, max_vp));
+        }
     }
 
-    /// Get the viewport for the actually visible portion aka the scroll
+    /// Get the viewport for the primary viewport aka the scroll
     /// position.
-    fn visible_vp_range(&self, line_ty: LineTy, vp_size: Size) -> Range<Size> {
-        let vp = self.scroll_pos[line_ty.i()];
+    fn primary_vp_range(&self, line_ty: LineTy, vp_size: Size) -> Range<Size> {
+        let vp = &self.vp_pool[super::primary_vp_ptr()];
+
+        Self::to_vp_range(vp, line_ty, vp_size)
+    }
+
+    /// Calculate a range for a given viewport.
+    fn to_vp_range(vp: &[Size; 2], line_ty: LineTy, vp_size: Size) -> Range<Size> {
+        let vp = vp[line_ty.i()];
         vp..vp + vp_size
     }
 
     /// Get a list of viewports.
-    fn vp_ranges(&self, line_ty: LineTy, vp_size: Size) -> [Range<Size>; 1] {
-        [self.visible_vp_range(line_ty, vp_size)]
+    fn vp_ranges(
+        &self,
+        line_ty: LineTy,
+        vp_size: Size,
+    ) -> impl std::ops::Deref<Target = [Range<Size>]> {
+        self.vp_pool
+            .iter()
+            .map(|vp| Self::to_vp_range(vp, line_ty, vp_size))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -358,7 +388,7 @@ impl TableLayout {
                 let lineset = &state.linesets[i];
 
                 let vp_size = inner.size.get()[ty.i()];
-                let vp = state.vp_set.visible_vp_range(ty, vp_size);
+                let vp = state.vp_set.primary_vp_range(ty, vp_size);
 
                 let (mut line_grs, line_grs_range_idx, line_grs_range_pos) =
                     lineset.range(vp.clone());
