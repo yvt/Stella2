@@ -251,6 +251,10 @@ fn primary_vp_ptr() -> PoolPtr {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct HVp(iterpool::PoolPtr);
 
+/// Two-dimensional coodinates `[column, row]` (or `[x, y]`) specifying the
+/// position of the upper-left corner of a viewport.
+pub type VpPos = [f64; 2];
+
 struct TableCell {
     view: HView,
     ctrler: Box<dyn CellCtrler>,

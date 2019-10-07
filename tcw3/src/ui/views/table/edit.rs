@@ -10,7 +10,7 @@ use std::{
 use super::{
     fixedpoint::{fix_to_fp, fp_to_fix},
     update::LinesetModelImpl,
-    DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery, VpSet,
+    DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery, VpPos, VpSet,
 };
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
@@ -50,38 +50,43 @@ impl Drop for TableEdit<'_> {
 }
 
 impl TableEdit<'_> {
-    /// Get the current scrolling position for a given axis.
-    pub fn scroll_pos(&self, line_ty: LineTy) -> f64 {
+    /// Get the primary viewport position (the current scrolling position).
+    pub fn scroll_pos(&self) -> VpPos {
         let primary_vp = self.state.vp_set.vp_pool[super::primary_vp_ptr()];
-        fix_to_fp(primary_vp[line_ty.i()])
+        [fix_to_fp(primary_vp[0]), fix_to_fp(primary_vp[1])]
     }
 
-    /// Set the current scrolling position for a given axis.
+    /// Set the primary viewport position (the current scrolling position).
     ///
-    /// `pos` is automatically clamped to range `0..scroll_limit(line_ty)`.
-    pub fn set_scroll_pos(&mut self, line_ty: LineTy, pos: f64) {
-        let new_pos = max(0, min(fp_to_fix(pos), self.scroll_limit_raw(line_ty)));
+    /// `pos[i]` is automatically clamped to range `0.0..scroll_limit()[i]`.
+    pub fn set_scroll_pos(&mut self, pos: VpPos) {
+        let new_pos = [
+            max(0, min(fp_to_fix(pos[0]), self.scroll_limit_raw(0))),
+            max(0, min(fp_to_fix(pos[1]), self.scroll_limit_raw(1))),
+        ];
 
         let primary_vp = &mut self.state.vp_set.vp_pool[super::primary_vp_ptr()];
-        let vp = &mut primary_vp[line_ty.i()];
 
-        if new_pos != *vp {
-            *vp = new_pos;
+        if new_pos != *primary_vp {
+            *primary_vp = new_pos;
             self.inner.set_dirty_flags(DirtyFlags::CELLS);
         }
     }
 
-    /// Get the maximum scrolling position (the maximum value for `scroll_pos`)
+    /// Get the maximum viewport position (the maximum value for `scroll_pos`)
     /// for a given axis.
-    pub fn scroll_limit(&self, line_ty: LineTy) -> f64 {
-        fix_to_fp(self.scroll_limit_raw(line_ty))
+    pub fn scroll_limit(&self) -> VpPos {
+        [
+            fix_to_fp(self.scroll_limit_raw(0)),
+            fix_to_fp(self.scroll_limit_raw(1)),
+        ]
     }
 
-    fn scroll_limit_raw(&self, line_ty: LineTy) -> Size {
-        let lineset = &self.state.linesets[line_ty.i()];
+    fn scroll_limit_raw(&self, line_ty: usize) -> Size {
+        let lineset = &self.state.linesets[line_ty];
         let content_size = lineset.total_size();
 
-        let vp_size = self.inner.size.get()[line_ty.i()];
+        let vp_size = self.inner.size.get()[line_ty];
 
         max(0, content_size - vp_size)
     }

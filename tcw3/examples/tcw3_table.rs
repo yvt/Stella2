@@ -63,7 +63,7 @@ fn main() {
         edit.set_model(TableModelQuery { style_manager });
         edit.insert(LineTy::Row, 0..500_000_000_000_000);
         edit.insert(LineTy::Col, 0..300);
-        edit.set_scroll_pos(LineTy::Col, 0.0);
+        edit.set_scroll_pos([0.0, edit.scroll_pos()[1]]);
     }
 
     wnd.content_view()
