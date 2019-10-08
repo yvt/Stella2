@@ -89,7 +89,8 @@
 //! viewports establish anchor points.
 //!
 //! Additional viewports can be temporarily created, e.g., to remember or “pin”
-//! the original position during a scrolling operation.
+//! the original position during a scrolling operation. Such viewports are
+//! sometimes called *pinned viewports*.
 //!
 //! Viewports can be examined and manipulated by calling [`Table::edit`] and
 //! obtaining a lock guard of type [`TableEdit`].
@@ -247,7 +248,7 @@ fn primary_vp_ptr() -> PoolPtr {
     PoolPtr::new(0)
 }
 
-/// The handle type for viewports in `Table`.
+/// The handle type for pinned viewports in `Table`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct HVp(iterpool::PoolPtr);
 

@@ -1,4 +1,5 @@
 //! Implements the public interface of `TableEdit`.
+use iterpool::PoolPtr;
 use std::{
     cell::RefMut,
     cmp::{max, min},
@@ -10,7 +11,7 @@ use std::{
 use super::{
     fixedpoint::{fix_to_fp, fp_to_fix},
     update::LinesetModelImpl,
-    DirtyFlags, Inner, LineTy, State, TableModelEdit, TableModelQuery, VpPos, VpSet,
+    DirtyFlags, HVp, Inner, LineTy, State, TableModelEdit, TableModelQuery, VpPos, VpSet,
 };
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
@@ -52,25 +53,68 @@ impl Drop for TableEdit<'_> {
 impl TableEdit<'_> {
     /// Get the primary viewport position (the current scrolling position).
     pub fn scroll_pos(&self) -> VpPos {
-        let primary_vp = self.state.vp_set.vp_pool[super::primary_vp_ptr()];
-        [fix_to_fp(primary_vp[0]), fix_to_fp(primary_vp[1])]
+        self.vp_pos_inner(super::primary_vp_ptr())
     }
 
     /// Set the primary viewport position (the current scrolling position).
     ///
     /// `pos[i]` is automatically clamped to range `0.0..scroll_limit()[i]`.
     pub fn set_scroll_pos(&mut self, pos: VpPos) {
-        let new_pos = [
-            max(0, min(fp_to_fix(pos[0]), self.scroll_limit_raw(0))),
-            max(0, min(fp_to_fix(pos[1]), self.scroll_limit_raw(1))),
-        ];
+        self.set_vp_pos_inner(super::primary_vp_ptr(), pos);
+    }
 
-        let primary_vp = &mut self.state.vp_set.vp_pool[super::primary_vp_ptr()];
+    /// Add a new pinned viewport.
+    ///
+    /// `pos[i]` is automatically clamped to range `0.0..scroll_limit()[i]`.
+    pub fn new_vp(&mut self, pos: VpPos) -> HVp {
+        let new_pos = self.pos_to_fix(pos);
+        let ptr = self.state.vp_set.vp_pool.allocate(new_pos);
+        self.inner.set_dirty_flags(DirtyFlags::CELLS);
+        HVp(ptr)
+    }
 
-        if new_pos != *primary_vp {
-            *primary_vp = new_pos;
+    /// Remove the specified pinned viewport.
+    pub fn remove_vp(&mut self, vp: HVp) {
+        debug_assert_ne!(vp.0, super::primary_vp_ptr());
+        self.state.vp_set.vp_pool.deallocate(vp.0).unwrap();
+        self.inner.set_dirty_flags(DirtyFlags::CELLS);
+    }
+
+    /// Get the position of a specified pinned viewport.
+    pub fn vp_pos(&self, vp: HVp) -> VpPos {
+        debug_assert_ne!(vp.0, super::primary_vp_ptr());
+        self.vp_pos_inner(vp.0)
+    }
+
+    /// Set the position of a specified pinned viewport.
+    ///
+    /// `pos[i]` is automatically clamped to range `0.0..scroll_limit()[i]`.
+    pub fn set_vp_pos(&mut self, vp: HVp, pos: VpPos) {
+        debug_assert_ne!(vp.0, super::primary_vp_ptr());
+        self.set_vp_pos_inner(vp.0, pos);
+    }
+
+    /// Get the position of a specified viewport.
+    fn vp_pos_inner(&self, ptr: PoolPtr) -> VpPos {
+        let vp = self.state.vp_set.vp_pool[ptr];
+        [fix_to_fp(vp[0]), fix_to_fp(vp[1])]
+    }
+
+    /// Set the position of a specified viewport.
+    fn set_vp_pos_inner(&mut self, ptr: PoolPtr, pos: VpPos) {
+        let new_pos = self.pos_to_fix(pos);
+        let vp = &mut self.state.vp_set.vp_pool[ptr];
+        if new_pos != *vp {
+            *vp = new_pos;
             self.inner.set_dirty_flags(DirtyFlags::CELLS);
         }
+    }
+
+    fn pos_to_fix(&self, pos: VpPos) -> [Size; 2] {
+        [
+            max(0, min(fp_to_fix(pos[0]), self.scroll_limit_raw(0))),
+            max(0, min(fp_to_fix(pos[1]), self.scroll_limit_raw(1))),
+        ]
     }
 
     /// Get the maximum viewport position (the maximum value for `scroll_pos`)
