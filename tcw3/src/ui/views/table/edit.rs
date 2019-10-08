@@ -134,6 +134,8 @@ impl TableEdit<'_> {
 
         max(0, content_size - vp_size)
     }
+
+    // TODO: Methods for querying the position of lines
 }
 
 impl TableModelEdit for TableEdit<'_> {

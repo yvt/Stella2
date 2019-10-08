@@ -86,7 +86,8 @@
 //! imprecise sizes, which are refined on-the-fly based on the current state of
 //! viewports. This happens even if no changes are explicitly made to the table
 //! model. Lines covered by viewports are protected by this, and therefore
-//! viewports establish anchor points.
+//! viewports establish anchor points. You should use viewports to save scroll
+//! positions in a reliable way.
 //!
 //! Additional viewports can be temporarily created, e.g., to remember or “pin”
 //! the original position during a scrolling operation. Such viewports are
