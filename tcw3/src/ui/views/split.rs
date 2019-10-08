@@ -44,7 +44,7 @@ pub trait SplitDragListener {
     /// [`value`]: crate::ui::views::split::Split::value
     fn down(&self, _: pal::Wm, _new_value: f32) {}
 
-    /// The splitter is being moevd. `new_value` specifies the new [`value`].
+    /// The splitter is being moved. `new_value` specifies the new [`value`].
     ///
     /// The caller may return `new_value` as it is or return a modified `value`.
     ///
@@ -54,8 +54,6 @@ pub trait SplitDragListener {
     }
 
     /// The splitter was moved.
-    ///
-    /// [`value`]: crate::ui::views::split::Split::value
     fn up(&self, _: pal::Wm) {}
 
     /// The drag gesture was cancelled.
