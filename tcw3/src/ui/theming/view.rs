@@ -1,9 +1,11 @@
 use alt_fp::FloatOrd;
-use cggeom::box2;
+use cggeom::{box2, Box2};
 use cgmath::Vector2;
 use flags_macro::flags;
+use momo::momo;
 use std::{
     cell::{Cell, RefCell},
+    fmt,
     rc::{Rc, Weak},
 };
 
@@ -31,7 +33,34 @@ pub struct StyledBox {
     shared: Rc<Shared>,
 }
 
+/// Programmatically overrides [`StyledBox`]'s behavior for fine control.
+pub trait StyledBoxOverride: 'static + as_any::AsAny {
+    /// Modify the frame of a subview.
+    fn modify_arrangement(&self, args: ModifyArrangementArgs<'_>) {
+        let _ = args;
+    }
+
+    /// Compare this `StyledBoxOverride` against another to calculate dirty
+    /// flags. `other` must not refer to the same object as `self`.
+    ///
+    /// The default implementation conservatively returns `PropKindFlags::all()`.
+    /// Custom implementations may calculate and return more precise flags.
+    fn dirty_flags(&self, other: &dyn StyledBoxOverride) -> PropKindFlags {
+        PropKindFlags::all()
+    }
+}
+
+impl StyledBoxOverride for () {}
+
+/// A set of arguments for [`StyledBoxOverride::modify_arrangement`].
 #[derive(Debug)]
+pub struct ModifyArrangementArgs<'a> {
+    pub role: Role,
+    pub frame: &'a mut Box2<f32>,
+    pub size_traits: &'a SizeTraits,
+    pub size: &'a Vector2<f32>,
+}
+
 struct Shared {
     view: HView,
 
@@ -39,10 +68,26 @@ struct Shared {
     dirty: Cell<PropKindFlags>,
 
     subviews: RefCell<Vec<(Role, HView)>>,
+    /// `override` is a reserved keyword, so `overrider` is used here
+    overrider: RefCell<Rc<dyn StyledBoxOverride>>,
 
     suspend_flag: SuspendFlag,
 
     has_layer_group: bool,
+}
+
+impl fmt::Debug for Shared {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Shared")
+            .field("view", &self.view)
+            .field("style_elem", &self.style_elem)
+            .field("dirty", &self.dirty)
+            .field("subviews", &self.subviews)
+            .field("overrider", &())
+            .field("suspend_flag", &self.suspend_flag)
+            .field("has_layer_group", &self.has_layer_group)
+            .finish()
+    }
 }
 
 impl StyledBox {
@@ -50,9 +95,12 @@ impl StyledBox {
         // Create `Elem` based on the inital properties
         let style_elem = Elem::new(style_manager);
 
+        // Create the initial `StyledBoxOverride`
+        let overrider: Rc<dyn StyledBoxOverride> = Rc::new(());
+
         // Create the initial `Layout` based on the inital properties
         let subviews = Vec::new();
-        let layout = SbLayout::new(&subviews, &style_elem);
+        let layout = SbLayout::new(&subviews, &style_elem, Rc::clone(&overrider));
 
         // Create and set up a `View`
         let view = HView::new(view_flags);
@@ -60,6 +108,7 @@ impl StyledBox {
         let shared = Rc::new(Shared {
             view: view.clone(),
             subviews: RefCell::new(subviews),
+            overrider: RefCell::new(overrider),
             style_elem,
             // Already have an up-to-date `Layout`, so exclude it from
             // the dirty flags
@@ -140,6 +189,22 @@ impl StyledBox {
         self.shared.style_elem.class_path()
     }
 
+    /// Set a new [`StyledBoxOverride`]  object.
+    #[momo]
+    pub fn set_override(&self, new_override: impl Into<Rc<dyn StyledBoxOverride>>) {
+        let new_override = new_override.into();
+
+        let mut override_cell = self.shared.overrider.borrow_mut();
+
+        // Calculate dirty flags
+        let dirty_flags = new_override.dirty_flags(&**override_cell);
+
+        // Replace `overrider`
+        *override_cell = new_override;
+
+        self.shared.set_dirty(dirty_flags);
+    }
+
     /// Get the view representing a styled box.
     pub fn view(&self) -> &HView {
         &self.view
@@ -158,8 +223,11 @@ impl Shared {
         }
 
         if diff.intersects(PropKindFlags::LAYOUT) {
-            self.view
-                .set_layout(SbLayout::new(&self.subviews.borrow(), &self.style_elem));
+            self.view.set_layout(SbLayout::new(
+                &self.subviews.borrow(),
+                &self.style_elem,
+                Rc::clone(&self.overrider.borrow()),
+            ));
         }
 
         if diff.intersects(flags![PropKindFlags::{LAYER_ALL | CLIP_LAYER}]) {
@@ -171,20 +239,25 @@ impl Shared {
 }
 
 struct SbLayout {
-    subview_layout: Vec<Metrics>,
+    subview_layout: Vec<(Role, Metrics)>,
     subviews: Vec<HView>,
     min_size: Vector2<f32>,
+    overrider: Rc<dyn StyledBoxOverride>,
 }
 
 impl SbLayout {
-    fn new(subviews: &Vec<(Role, HView)>, elem: &Elem) -> Self {
+    fn new(
+        subviews: &Vec<(Role, HView)>,
+        elem: &Elem,
+        overrider: Rc<dyn StyledBoxOverride>,
+    ) -> Self {
         // Evaluate the layout properties now
         Self {
             subview_layout: subviews
                 .iter()
                 .map(
                     |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
-                        PropValue::Metrics(m) => m,
+                        PropValue::Metrics(m) => (role, m),
                         _ => unreachable!(),
                     },
                 )
@@ -194,6 +267,7 @@ impl SbLayout {
                 PropValue::Vector2(v) => v,
                 _ => unreachable!(),
             },
+            overrider,
         }
     }
 }
@@ -212,7 +286,7 @@ impl Layout for SbLayout {
         let mut num_pref_x = 0;
         let mut num_pref_y = 0;
 
-        for (metrics, sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
+        for ((_, metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let margin = &metrics.margin;
             let sv_traits = ctx.subview_size_traits(sv);
 
@@ -245,11 +319,18 @@ impl Layout for SbLayout {
     }
 
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
-        for (metrics, sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
+        for (&(role, ref metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let sv_traits = ctx.subview_size_traits(sv);
             let container = box2! {top_left: [0.0, 0.0], size: size};
 
-            let frame = metrics.arrange(container, sv_traits.preferred);
+            let mut frame = metrics.arrange(container, sv_traits.preferred);
+
+            self.overrider.modify_arrangement(ModifyArrangementArgs {
+                role,
+                frame: &mut frame,
+                size: &size,
+                size_traits: &sv_traits,
+            });
 
             ctx.set_subview_frame(sv, frame);
         }

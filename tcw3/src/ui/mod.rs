@@ -39,7 +39,7 @@ pub mod theming {
         manager::{Elem, ElemChangeCb, Manager, PropKindFlags},
         style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
         stylesheet::*,
-        view::StyledBox,
+        view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
     };
 }
 
