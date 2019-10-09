@@ -370,6 +370,12 @@ impl Elem {
     }
 
     /// Get the class path.
+    ///
+    /// This is calculated based on the element's parent class path (set by
+    /// [`set_parent_class_path`]) and class set (set by [`set_class_set`]).
+    ///
+    /// [`set_parent_class_path`]: Elem::set_parent_class_path
+    /// [`set_class_set`]: Elem::set_class_set
     pub fn class_path(&self) -> Rc<ElemClassPath> {
         Rc::clone(&self.inner.rules.borrow().class_path)
     }

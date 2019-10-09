@@ -185,6 +185,12 @@ impl StyledBox {
     /// Get `Rc<ElemClassPath>` representing the class path of the styled
     /// element. The returned value can be set on subviews as a parent class
     /// path.
+    ///
+    /// This is calculated based on the element's parent class path (set by
+    /// [`set_parent_class_path`]) and class set (set by [`set_class_set`]).
+    ///
+    /// [`set_parent_class_path`]: StyledBox::set_parent_class_path
+    /// [`set_class_set`]: StyledBox::set_class_set
     pub fn class_path(&self) -> Rc<ElemClassPath> {
         self.shared.style_elem.class_path()
     }
