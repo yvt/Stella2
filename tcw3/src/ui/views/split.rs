@@ -166,7 +166,6 @@ impl Split {
     /// resizes the panels.
     ///
     /// The function is called when the user starts a mouse drag gesture.
-    /// The `f32` parameter indicates the latest clipped `value`.
     pub fn set_on_drag(
         &mut self,
         handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static,
