@@ -45,12 +45,18 @@ pub trait StyledBoxOverride: 'static + as_any::AsAny {
     ///
     /// The default implementation conservatively returns `PropKindFlags::all()`.
     /// Custom implementations may calculate and return more precise flags.
-    fn dirty_flags(&self, other: &dyn StyledBoxOverride) -> PropKindFlags {
+    fn dirty_flags(&self, _other: &dyn StyledBoxOverride) -> PropKindFlags {
         PropKindFlags::all()
     }
 }
 
 impl StyledBoxOverride for () {}
+
+impl<T: StyledBoxOverride + 'static> From<T> for Box<dyn StyledBoxOverride> {
+    fn from(x: T) -> Box<dyn StyledBoxOverride> {
+        Box::new(x)
+    }
+}
 
 /// A set of arguments for [`StyledBoxOverride::modify_arrangement`].
 #[derive(Debug)]
@@ -197,8 +203,14 @@ impl StyledBox {
 
     /// Set a new [`StyledBoxOverride`]  object.
     #[momo]
-    pub fn set_override(&self, new_override: impl Into<Rc<dyn StyledBoxOverride>>) {
-        let new_override = new_override.into();
+    pub fn set_override(&self, new_override: impl Into<Box<dyn StyledBoxOverride>>) {
+        // `impl Into<Box<_>>` → `Box<_>` → `Rc<_>`
+        // (We can't blanket-implement `From<impl Trait>` on `Rc<dyn Trait>`.
+        // It looks like `Box` is special-cased to make this possible. This is
+        // unfortunate because, as a result, every conversion here involves
+        // dynamic memory allocation.)
+        let new_override: Box<dyn StyledBoxOverride> = new_override.into();
+        let new_override: Rc<dyn StyledBoxOverride> = Rc::from(new_override);
 
         let mut override_cell = self.shared.overrider.borrow_mut();
 
