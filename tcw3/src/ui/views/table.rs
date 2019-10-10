@@ -102,6 +102,7 @@
 use as_any::AsAny;
 use bitflags::bitflags;
 use cgmath::Vector2;
+use iterpool::{Pool, PoolPtr};
 use ndarray::Array2;
 use std::{
     any::Any,
@@ -111,7 +112,6 @@ use std::{
     ops::Range,
     rc::Rc,
 };
-use iterpool::{PoolPtr, Pool};
 use subscriber_list::SubscriberList;
 
 use crate::ui::scrolling::{
