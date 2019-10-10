@@ -1,7 +1,12 @@
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::{layouts::FillLayout, theming, views::Label},
+    ui::{
+        layouts::TableLayout,
+        theming,
+        views::{Label, Scrollbar},
+        AlignFlags,
+    },
     uicore::{HWnd, WndListener},
 };
 
@@ -26,8 +31,15 @@ fn main() {
     let mut label = Label::new(style_manager);
     label.set_text("Hello, world! «coi ro do .ui» Saluton! nuqneH");
 
+    let mut scrollbar = Scrollbar::new(style_manager, false);
+
+    let cells = vec![
+        (label.view().clone(), [0, 0], AlignFlags::JUSTIFY),
+        (scrollbar.view().clone(), [0, 1], AlignFlags::JUSTIFY),
+    ];
+
     wnd.content_view()
-        .set_layout(FillLayout::new(label.view().clone()).with_uniform_margin(20.0));
+        .set_layout(TableLayout::new(cells).with_uniform_margin(20.0));
 
     wm.enter_main_loop();
 }

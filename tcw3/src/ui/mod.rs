@@ -17,12 +17,14 @@ pub mod mixins {
 pub mod views {
     mod button;
     mod label;
+    pub mod scrollbar;
     mod spacer;
     pub mod split;
     pub mod table;
     pub use self::{
         button::Button,
         label::Label,
+        scrollbar::Scrollbar,
         spacer::{new_spacer, Spacer},
         split::Split,
         table::Table,

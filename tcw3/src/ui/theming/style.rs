@@ -20,6 +20,10 @@ bitflags! {
         const BUTTON = 1 << 2;
         /// The element is a label.
         const LABEL = 1 << 3;
+        /// The element is a scrollbar.
+        const SCROLLBAR = 1 << 4;
+        /// The element is vertical.
+        const VERTICAL = 1 << 5;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff0000;

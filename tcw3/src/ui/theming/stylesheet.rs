@@ -453,6 +453,44 @@ lazy_static! {
         ([] < [.BUTTON.ACTIVE]) (priority = 200) {
             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
+        // Scrollbar
+        ([.SCROLLBAR]) (priority = 100) {
+            num_layers: 1,
+            layer_img[0]: Some(himg_from_rounded_rect(
+                RGBAF32::new(0.5, 0.5, 0.5, 0.2), [[2.0; 2]; 4]
+            )),
+            layer_metrics[0]: Metrics {
+                margin: [4.0; 4],
+                .. Metrics::default()
+            },
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+        },
+        ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [4.0; 4],
+                size: [std::f32::NAN, 8.0].into(),
+            },
+        },
+        ([.SCROLLBAR.VERTICAL]) (priority = 100) {
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [4.0; 4],
+                size: [std::f32::NAN, 8.0].into(),
+            },
+        },
+        // Scrollbar thumb
+        ([] < [.SCROLLBAR]) (priority = 100) {
+            num_layers: 1,
+            layer_img[0]: Some(himg_from_rounded_rect(
+                RGBAF32::new(0.5, 0.5, 0.5, 0.6), [[2.0; 2]; 4]
+            )),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+        },
+        ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
+            min_size: [20.0, 0.0].into(),
+        },
+        ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
+            min_size: [0.0, 20.0].into(),
+        },
     };
 }
 
