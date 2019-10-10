@@ -82,7 +82,8 @@ pub trait ScrollbarDragListener {
     /// The thumb was moved.
     fn up(&self, _: pal::Wm) {}
 
-    /// The drag gesture was cancelled.
+    /// The drag gesture was cancelled. The implementation is responsible for
+    /// updating `Scrollbar` with an original value.
     fn cancel(&self, _: pal::Wm) {}
 }
 
@@ -281,13 +282,15 @@ struct SbViewListener {
 impl ViewListener for SbViewListener {
     fn mouse_drag(
         &self,
-        _: pal::Wm,
+        wm: pal::Wm,
         _: &HView,
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
         Box::new(SbMouseDragListener {
             shared: Rc::clone(&self.shared),
+            drag_start: Cell::new(None),
+            listener: self.shared.on_drag.borrow()(wm),
         })
     }
 }
@@ -295,12 +298,46 @@ impl ViewListener for SbViewListener {
 /// Implements `MouseDragListener` for `Scrollbar`.
 struct SbMouseDragListener {
     shared: Rc<Shared>,
+    drag_start: Cell<Option<(f32, f64)>>,
+    listener: Box<dyn ScrollbarDragListener>,
 }
 
 impl MouseDragListener for SbMouseDragListener {
-    // TODO
-    fn mouse_motion(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) {}
-    fn mouse_down(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
-    fn mouse_up(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
-    fn cancel(&self, _: pal::Wm, _: &HView) {}
+    fn mouse_motion(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>) {
+        if let Some((init_pos, init_value)) = self.drag_start.get() {
+            let pri = self.shared.vertical as usize;
+            let clearance = self.shared.layout_state.get().clearance;
+
+            if clearance == 0.0 {
+                return;
+            }
+
+            let new_value = (init_value + (loc[pri] - init_pos) as f64 / clearance)
+                .fmax(0.0)
+                .fmin(1.0);
+
+            self.listener.motion(wm, new_value);
+        }
+    }
+    fn mouse_down(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>, button: u8) {
+        if button == 0 {
+            // TODO: check clicking the trough
+
+            let pri = self.shared.vertical as usize;
+            self.drag_start
+                .set(Some((loc[pri], self.shared.value.get())));
+
+            self.listener.down(wm, self.shared.value.get());
+        }
+    }
+    fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
+        if button == 0 {
+            if let Some(_) = self.drag_start.take() {
+                self.listener.up(wm);
+            }
+        }
+    }
+    fn cancel(&self, wm: pal::Wm, _: &HView) {
+        self.listener.cancel(wm);
+    }
 }
