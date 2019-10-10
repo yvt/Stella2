@@ -271,6 +271,16 @@ macro_rules! prop {
         )
     };
 
+    (@kind layer_opacity[$i:expr]) => {
+        $crate::ui::theming::PropKindFlags::LAYER_OPACITY
+    };
+    (layer_opacity[$i:expr]: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::LayerOpacity($i),
+            $crate::ui::theming::PropValue::Float($val),
+        )
+    };
+
     (@kind layer_bg_color[$i:expr]) => {
         $crate::ui::theming::PropKindFlags::LAYER_BG_COLOR
     };
