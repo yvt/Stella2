@@ -494,12 +494,17 @@ lazy_static! {
                 RGBAF32::new(0.5, 0.5, 0.5, 0.6), [[2.0; 2]; 4]
             )),
             layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.8,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             min_size: [20.0, 0.0].into(),
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
             min_size: [0.0, 20.0].into(),
+        },
+
+        ([] < [.SCROLLBAR.ACTIVE]) (priority = 150) {
+            layer_opacity[0]: 1.0,
         },
     };
 }

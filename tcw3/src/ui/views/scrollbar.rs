@@ -206,6 +206,16 @@ impl Shared {
             shared: Rc::clone(this),
         })
     }
+
+    fn set_active(&self, active: bool) {
+        let (frame, thumb) = (&self.frame, &self.thumb);
+
+        let mut class_set = frame.class_set();
+        class_set.set(ClassSet::ACTIVE, active);
+        frame.set_class_set(class_set);
+
+        thumb.set_parent_class_path(Some(frame.class_path().clone()));
+    }
 }
 
 /// Implements `StyledBoxOverride` for `Scrollbar`.
@@ -327,17 +337,23 @@ impl MouseDragListener for SbMouseDragListener {
             self.drag_start
                 .set(Some((loc[pri], self.shared.value.get())));
 
+            self.shared.set_active(true);
+
             self.listener.down(wm, self.shared.value.get());
         }
     }
     fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
         if button == 0 {
             if let Some(_) = self.drag_start.take() {
+                self.shared.set_active(false);
                 self.listener.up(wm);
             }
         }
     }
     fn cancel(&self, wm: pal::Wm, _: &HView) {
+        if let Some(_) = self.drag_start.take() {
+            self.shared.set_active(false);
+        }
         self.listener.cancel(wm);
     }
 }
