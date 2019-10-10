@@ -308,7 +308,17 @@ impl Layout for SbLayout {
 
         for ((_, metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let margin = &metrics.margin;
-            let sv_traits = ctx.subview_size_traits(sv);
+            let mut sv_traits = ctx.subview_size_traits(sv);
+
+            if !metrics.size.x.is_nan() {
+                sv_traits.min.x = metrics.size.x;
+                sv_traits.max.x = metrics.size.x;
+            }
+
+            if !metrics.size.y.is_nan() {
+                sv_traits.min.y = metrics.size.y;
+                sv_traits.max.y = metrics.size.y;
+            }
 
             let margin_x = margin[1] + margin[3];
             let margin_y = margin[0] + margin[2];
