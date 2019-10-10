@@ -220,6 +220,8 @@ impl StyledBox {
         // Replace `overrider`
         *override_cell = new_override;
 
+        drop(override_cell);
+
         self.shared.set_dirty(dirty_flags);
     }
 
