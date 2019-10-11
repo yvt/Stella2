@@ -28,11 +28,19 @@ pub struct Scrollbar {
     shared: Rc<Shared>,
 }
 
+/// Specifies the direction of page step scrolling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Dir {
+    Incr = 1,
+    Decr = -1,
+}
+
 struct Shared {
     vertical: bool,
     value: Cell<f64>,
     page_step: Cell<f64>,
     on_drag: RefCell<Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>>,
+    on_page_step: RefCell<Box<dyn Fn(pal::Wm, Dir)>>,
     wrapper: HView,
     frame: StyledBox,
     thumb: StyledBox,
@@ -46,6 +54,7 @@ impl fmt::Debug for Shared {
             .field("value", &self.value)
             .field("page_step", &self.page_step)
             .field("on_drag", &())
+            .field("on_page_step", &())
             .field("frame", &self.frame)
             .field("thumb", &self.thumb)
             .field("layout_state", &self.layout_state)
@@ -56,8 +65,8 @@ impl fmt::Debug for Shared {
 /// Information obtained from the actual geometry of the scrollbar's elements.
 #[derive(Copy, Clone, Debug, Default)]
 struct LayoutState {
-    thumb_start: f64,
-    thumb_end: f64,
+    thumb_start: f32,
+    thumb_end: f32,
     clearance: f64,
 }
 
@@ -110,6 +119,7 @@ impl Scrollbar {
             value: Cell::new(0.0),
             page_step: Cell::new(0.1),
             on_drag: RefCell::new(Box::new(|_| Box::new(()))),
+            on_page_step: RefCell::new(Box::new(|_, _| {})),
             wrapper,
             frame,
             thumb,
@@ -192,6 +202,12 @@ impl Scrollbar {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
 
+    /// Set the handler function called when the user clicks the trough (the
+    /// region outside the thumb).
+    pub fn set_on_page_step(&mut self, handler: impl Fn(pal::Wm, Dir) + 'static) {
+        *self.shared.on_page_step.borrow_mut() = Box::new(handler);
+    }
+
     /// Get the view representing a styled box.
     pub fn view(&self) -> &HView {
         &self.shared.wrapper
@@ -264,8 +280,8 @@ impl StyledBoxOverride for SbStyledBoxOverride {
 
         // Layout feedback
         self.shared.layout_state.set(LayoutState {
-            thumb_start,
-            thumb_end,
+            thumb_start: thumb_start as f32,
+            thumb_end: thumb_end as f32,
             clearance,
         });
     }
@@ -329,17 +345,33 @@ impl MouseDragListener for SbMouseDragListener {
             self.listener.motion(wm, new_value);
         }
     }
-    fn mouse_down(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: pal::Wm, view: &HView, loc: Point2<f32>, button: u8) {
         if button == 0 {
-            // TODO: check clicking the trough
-
             let pri = self.shared.vertical as usize;
-            self.drag_start
-                .set(Some((loc[pri], self.shared.value.get())));
+            let loc = loc[pri];
 
-            self.shared.set_active(true);
+            // Detect trough clicking
+            let layout_state = self.shared.layout_state.get();
+            let local_loc = loc - view.global_frame().min[pri];
 
-            self.listener.down(wm, self.shared.value.get());
+            let page_step_dir = if local_loc > layout_state.thumb_end {
+                Some(Dir::Incr)
+            } else if local_loc < layout_state.thumb_start {
+                Some(Dir::Decr)
+            } else {
+                None
+            };
+
+            if let Some(dir) = page_step_dir {
+                // Trough clicked
+                // TODO: Support cancellation?
+                self.shared.on_page_step.borrow()(wm, dir);
+            } else {
+                // Dragging the thumb
+                self.drag_start.set(Some((loc, self.shared.value.get())));
+                self.shared.set_active(true);
+                self.listener.down(wm, self.shared.value.get());
+            }
         }
     }
     fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {

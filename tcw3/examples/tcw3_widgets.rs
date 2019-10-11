@@ -42,6 +42,15 @@ fn main() {
             Box::new(MyScrollbarDragListener { value, scrollbar })
         });
     }
+    {
+        let scrollbar_weak = Rc::downgrade(&scrollbar);
+        scrollbar.borrow_mut().set_on_page_step(move |_, dir| {
+            let scrollbar = scrollbar_weak.upgrade().unwrap();
+            let mut scrollbar = scrollbar.borrow_mut();
+            let value = scrollbar.value() + dir as i8 as f64 * scrollbar.page_step();
+            scrollbar.set_value(value.max(0.0).min(1.0));
+        });
+    }
 
     let cells = vec![
         (label.view().clone(), [0, 0], AlignFlags::JUSTIFY),
