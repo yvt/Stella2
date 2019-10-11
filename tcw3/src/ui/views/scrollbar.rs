@@ -262,12 +262,11 @@ impl StyledBoxOverride for SbStyledBoxOverride {
         // `page_step`. Calculate the size of the thumb based on this parallel.
         let thumb_ratio_1 = self.page_step / (1.0 + self.page_step);
         // `thumb_ratio_1` asymptotically approaches `1` as `thumb_ratio_1` → ∞
-        // but it doesn't with floating-point arithmetic
-        let thumb_ratio = if thumb_ratio_1.is_finite() {
-            thumb_ratio_1
-        } else {
-            1.0
-        };
+        // but it might generate NaN with floating-point arithmetic. (And even
+        // 0 with a non-default rounding mode, which we assume never happens)
+        // `x.fmin(1.0)` returns `1.0` if `x` is NaN. Bonus: `fmin` lowers to
+        // `minsd` in x86_64
+        let thumb_ratio = thumb_ratio_1.fmin(1.0);
 
         let min_thumb_len = size_traits.min[pri] as f64;
         let thumb_len = (bar_len * thumb_ratio).fmax(min_thumb_len);
