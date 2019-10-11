@@ -47,7 +47,7 @@ pub struct Wm {
 }
 
 mt_lazy_static! {
-    static ref COMP: comp::Compositor => |wm| comp::Compositor::new(wm);
+    static <Wm> ref COMP: comp::Compositor => |wm| comp::Compositor::new(wm);
 }
 
 impl Wm {

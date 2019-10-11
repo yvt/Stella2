@@ -2,7 +2,11 @@
 use cfg_if::cfg_if;
 use std::marker::PhantomData;
 
-use super::{iface, LayerAttrs, WndAttrs};
+use super::iface;
+
+pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
+pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
+pub type MtSticky<T> = super::MtSticky<T, Wm>;
 
 mod bitmap;
 mod drawutils;

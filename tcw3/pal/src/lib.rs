@@ -89,9 +89,9 @@ pub type TextLayout = native::TextLayout;
 // Type aliases/re-exports from `iface` specialized for the default backend are
 // defined below.
 //
-// Implementation notes: It's okay to use the following types in the backend
-// code. In other words, enabled backends can assume that they are the default
-// backend. TODO: This will be no longer true once we have a test driver
+// Implementation notes: It's *not* okay to use the following types in the
+// backend code. In other words, enabled backends must not assume that they are
+// the default backend.
 
 pub use self::iface::{
     BadThread, LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags, RGBAF32,

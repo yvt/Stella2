@@ -30,11 +30,10 @@ use std::{
     rc::Rc,
 };
 
-use super::super::{
-    iface::{self, Wm as _},
-    WndAttrs,
+use super::super::iface::{self, Wm as _};
+use super::{
+    drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, Wm, WndAttrs,
 };
-use super::{drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, Wm};
 
 #[derive(Debug, Clone)]
 pub struct HWnd {

@@ -9,18 +9,18 @@ use iterpool::{Pool, PoolPtr};
 use objc::{class, msg_send, sel, sel_impl};
 use std::cell::{Cell, RefCell};
 
-use super::super::{LayerAttrs, LayerFlags, MtSticky};
+use super::super::iface::LayerFlags;
 use super::{
     drawutils::{
         ca_transform_3d_from_matrix4, cg_color_from_rgbaf32, cg_rect_from_box2,
         extend_matrix3_with_identity_z,
     },
-    Wm,
+    LayerAttrs, MtSticky, Wm,
 };
 
-static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>, Wm> = MtSticky::new(RefCell::new(Pool::new()));
+static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>> = MtSticky::new(RefCell::new(Pool::new()));
 
-static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>, Wm> = MtSticky::new(RefCell::new(Vec::new()));
+static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>> = MtSticky::new(RefCell::new(Vec::new()));
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {

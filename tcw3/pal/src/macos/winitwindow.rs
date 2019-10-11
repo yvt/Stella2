@@ -5,13 +5,10 @@ use cocoa::{
 use objc::{msg_send, sel, sel_impl};
 use winit::{platform::macos::WindowExtMacOS, window::Window};
 
-use super::super::{
-    winit::{HWndCore, WinitWm, WinitWmCore, WndContent as WndContentTrait},
-    WndAttrs,
-};
+use super::super::winit::{HWndCore, WinitWm, WinitWmCore, WndContent as WndContentTrait};
 use super::{
     utils::{with_autorelease_pool, IdRef},
-    HLayer, Wm,
+    HLayer, Wm, WndAttrs,
 };
 
 #[derive(Debug, Clone)]
