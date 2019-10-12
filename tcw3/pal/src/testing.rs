@@ -90,6 +90,8 @@ use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{
+    cell::RefCell,
+    collections::LinkedList,
     marker::PhantomData,
     panic,
     sync::{
@@ -99,7 +101,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use super::{iface, iface::Wm as _, native};
+use super::{cells::MtLazyStatic, iface, iface::Wm as _, native};
 
 mod wmapi;
 pub use self::wmapi::TestingWm;
@@ -153,6 +155,11 @@ pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send + panic::UnwindSafe + 'st
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
+}
+
+mt_lazy_static! {
+    static <Wm> ref UNSEND_DISPATCHES: RefCell<LinkedList<Box<dyn FnOnce(Wm)>>> =>
+        |_| RefCell::new(LinkedList::new());
 }
 
 // ============================================================================
@@ -266,6 +273,16 @@ fn try_start_testing_main_thread() {
         // If successful, that means we are on the main thread.
         while let Ok(fun) = recv.recv() {
             fun(wm);
+
+            // `fun` might push dispatches to `UNSEND_DISPATCHES`
+            loop {
+                let e = UNSEND_DISPATCHES.get_with_wm(wm).borrow_mut().pop_front();
+                if let Some(e) = e {
+                    e(wm);
+                } else {
+                    break;
+                }
+            }
         }
     });
 
@@ -315,7 +332,17 @@ impl iface::Wm for Wm {
     }
 
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
-        unimplemented!()
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => wm.invoke(move |native_wm| {
+                f(Self::from_native_wm(native_wm));
+            }),
+            BackendAndWm::Testing { .. } => {
+                UNSEND_DISPATCHES
+                    .get_with_wm(self)
+                    .borrow_mut()
+                    .push_back(Box::new(f));
+            }
+        }
     }
 
     fn enter_main_loop(self) -> ! {
