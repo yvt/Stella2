@@ -95,13 +95,19 @@ use std::{
     marker::PhantomData,
     panic,
     sync::{
-        mpsc::{channel, sync_channel, Sender},
+        mpsc::{channel, sync_channel, Receiver, RecvTimeoutError, Sender},
         Mutex,
     },
     thread::{self, ThreadId},
+    time::Duration,
 };
 
-use super::{cells::MtLazyStatic, iface, iface::Wm as _, native};
+use super::{
+    cells::{MtLazyStatic, MtLock},
+    iface,
+    iface::Wm as _,
+    native,
+};
 
 mod wmapi;
 pub use self::wmapi::TestingWm;
@@ -268,26 +274,82 @@ fn try_start_testing_main_thread() {
             return;
         }
 
-        let wm = Wm::global();
-
         // If successful, that means we are on the main thread.
-        while let Ok(fun) = recv.recv() {
-            fun(wm);
+        let wm = Wm::global();
+        *DISPATCH_RECV.get_with_wm(wm).borrow_mut() = Some(recv);
+
+        wm.enter_main_loop();
+    });
+
+    // Proceed when `BACKEND_CHOICE` is finalized
+    let () = ready_recv.recv().unwrap();
+}
+
+// ============================================================================
+//
+// Event loop
+
+static DISPATCH_RECV: MtLock<RefCell<Option<Receiver<Dispatch>>>> = MtLock::new(RefCell::new(None));
+
+impl Wm {
+    fn dispatch_receiver(self) -> impl std::ops::Deref<Target = Receiver<Dispatch>> {
+        use owning_ref::OwningRef;
+        OwningRef::new(DISPATCH_RECV.get_with_wm(self).borrow()).map(|refr| {
+            // If `Backend::Testing` is active, we should never observe
+            // `DISPATCH_RECV` containing `None` because it's set before the
+            // main thread enters the main loop.
+            refr.as_ref()
+                .expect("Could not get a dispatch receiver. Perhaps the native backend is in use?")
+        })
+    }
+
+    fn enter_main_loop(self) {
+        while let Ok(fun) = self.dispatch_receiver().recv() {
+            fun(self);
 
             // `fun` might push dispatches to `UNSEND_DISPATCHES`
             loop {
-                let e = UNSEND_DISPATCHES.get_with_wm(wm).borrow_mut().pop_front();
+                let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
                 if let Some(e) = e {
-                    e(wm);
+                    e(self);
                 } else {
                     break;
                 }
             }
         }
-    });
+    }
 
-    // Proceed when `BACKEND_CHOICE` is finalized
-    let () = ready_recv.recv().unwrap();
+    fn step_timeout(self, timeout: Option<std::time::Duration>) {
+        // Check the thread-local queue first because there is no possibility
+        // that it can get enqueued by us waiting
+        let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
+        if let Some(e) = e {
+            e(self);
+            return;
+        }
+
+        // Wait for `invoke_on_main_thread`
+        let recv = self.dispatch_receiver();
+        let result = if let Some(timeout) = timeout {
+            match recv.recv_timeout(timeout) {
+                Ok(x) => Some(x),
+                Err(RecvTimeoutError::Timeout) => return,
+                Err(RecvTimeoutError::Disconnected) => None,
+            }
+        } else {
+            recv.recv().ok()
+        };
+
+        if let Some(fun) = result {
+            fun(self);
+            return;
+        }
+
+        // We are not receving events anymore, sleep indefinitely
+        loop {
+            thread::sleep(Duration::from_secs(256));
+        }
+    }
 }
 
 // ============================================================================
@@ -298,15 +360,12 @@ impl wmapi::TestingWm for Wm {
     }
 
     fn step(&self) {
-        // TODO
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(60));
-        }
+        self.step_timeout(None);
     }
 
     fn step_until(&self, till: std::time::Instant) {
-        // TODO
-        std::thread::sleep(till.saturating_duration_since(std::time::Instant::now()));
+        let duration = till.saturating_duration_since(std::time::Instant::now());
+        self.step_timeout(Some(duration));
     }
 }
 
@@ -354,11 +413,23 @@ impl iface::Wm for Wm {
     }
 
     fn enter_main_loop(self) -> ! {
-        unimplemented!()
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => wm.enter_main_loop(),
+            BackendAndWm::Testing { .. } => {
+                // This is not very useful during testing because
+                // it blocks the current thread indefinitely.
+                panic!("this operation is not allowed for the testing backend");
+            }
+        }
     }
 
     fn terminate(self) {
-        unimplemented!()
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => wm.terminate(),
+            BackendAndWm::Testing { .. } => {
+                panic!("this operation is not allowed for the testing backend");
+            }
+        }
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
