@@ -4,7 +4,8 @@ use pango::{FontDescription, FontMapExt, Layout};
 use rgb::RGBA16;
 
 use super::super::iface;
-use super::CharStyleAttrs;
+
+type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
 #[derive(Debug, Clone)]
 pub struct CharStyle {

@@ -16,7 +16,7 @@ macos_winit = ["winit"]
 
 # Enables the testing backend. Note that the testing backend needs to be
 # activated at runtime before use.
-testing = []
+testing = ["cairo-rs", "pangocairo", "pango", "rayon"]
 
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
@@ -39,6 +39,12 @@ svgbobdoc = "0.2"
 winit = { version = "0.20.0-alpha3", optional = true }
 zerocopy = "0.2.8"
 
+# testing backend (borrows some implementation from `unix`)
+cairo-rs = { version = "0.7.1", optional = true }
+pangocairo = { version = "0.8.0", optional = true }
+pango = { version = "0.7.0", optional = true }
+rayon = { version = "1.2.0", optional = true }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.19.0"
 core-foundation = "0.6"
@@ -52,9 +58,6 @@ objc = "0.2.3"
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 winit = "0.20.0-alpha3"
 swsurface = "0.1.2"
-
-# `unix` and testing backends
-[target.'cfg(any(not(target_os = "macos"), feature = "testing"))'.dependencies]
 cairo-rs = "0.7.1"
 pangocairo = "0.8.0"
 pango = "0.7.0"

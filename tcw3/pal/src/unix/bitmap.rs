@@ -3,7 +3,7 @@ use cgmath::{Matrix3, Point2};
 use std::{cell::UnsafeCell, sync::Arc};
 
 use super::super::{iface, swrast};
-use super::TextLayout;
+use super::text::TextLayout;
 
 #[derive(Debug, Clone)]
 pub struct Bitmap {

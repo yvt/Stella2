@@ -50,12 +50,12 @@ pub use unix as native;
 
 // TODO: Windows
 
-// And here is the supporting module, which is shared between the
+// And here are supporting modules, which are shared between the
 // platform-specific modules.
 #[cfg(feature = "winit")]
 mod winit;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(any(not(target_os = "macos"), feature = "testing"))]
 mod swrast;
 
 // ============================================================================

@@ -98,6 +98,12 @@ pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
+// Borrow some modules from `unix` backend
+#[path = "unix/bitmap.rs"]
+mod bitmap;
+#[path = "unix/text.rs"]
+mod text;
+
 // The following items are all TODO
 
 /// Activate the testing backend and call the given function on the main thread.
