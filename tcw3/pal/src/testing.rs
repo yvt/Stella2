@@ -297,7 +297,15 @@ impl wmapi::TestingWm for Wm {
         *self
     }
 
+    fn step(&self) {
+        // TODO
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+        }
+    }
+
     fn step_until(&self, till: std::time::Instant) {
+        // TODO
         std::thread::sleep(till.saturating_duration_since(std::time::Instant::now()));
     }
 }

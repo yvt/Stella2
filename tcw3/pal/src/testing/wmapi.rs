@@ -11,7 +11,10 @@ pub trait TestingWm: 'static {
     /// [`tcw3::pal::Wm`]: crate::Wm
     fn wm(&self) -> crate::Wm;
 
-    /// Process events until some finite number of events are processed or
+    /// Process events until at least one event is processed.
+    fn step(&self);
+
+    /// Process events until at least one event is processed or
     /// until the specified instant.
     fn step_until(&self, till: Instant);
 }
