@@ -290,6 +290,10 @@ macro_rules! mt_lazy_static {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! WmOrDefault {
-    () => { $crate::Wm };
-    ($t:ty) => { $t };
+    () => {
+        $crate::Wm
+    };
+    ($t:ty) => {
+        $t
+    };
 }
