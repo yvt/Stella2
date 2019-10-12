@@ -16,12 +16,13 @@ macos_winit = ["winit"]
 
 # Enables the testing backend. Note that the testing backend needs to be
 # activated at runtime before use.
-testing = ["cairo-rs", "pangocairo", "pango", "rayon"]
+testing = ["atom2", "cairo-rs", "pangocairo", "pango", "rayon"]
 
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
 array = "0.0.1"
 arrayvec = "0.5"
+atom2 = { path = "../../support/atom2", optional = true }
 bitflags = "1.1.0"
 cfg-if = "0.1.7"
 cggeom = { path = "../../support/cggeom", features = ["quickcheck"] }

@@ -86,10 +86,20 @@
 //!
 //! [`run_test`]: crate::testing::run_test
 //! [`TestingWm`]: crate::testing::TestingWm
-use super::iface;
+use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    panic,
+    sync::{
+        mpsc::{channel, sync_channel, Sender},
+        Mutex,
+    },
+    thread::{self, ThreadId},
+};
+
+use super::{iface, iface::Wm as _, native};
 
 mod wmapi;
 pub use self::wmapi::TestingWm;
@@ -104,21 +114,37 @@ mod bitmap;
 #[path = "unix/text.rs"]
 mod text;
 
-// The following items are all TODO
-
 /// Activate the testing backend and call the given function on the main thread.
 ///
 /// Panics if the native backend has already been initialized.
 /// See [the module documentation](index.html) for more.
-pub fn with_testing_wm<R: Send>(_cb: impl FnOnce(Wm) -> R + Send) -> R {
-    unimplemented!()
+pub fn with_testing_wm<R: Send + 'static>(
+    cb: impl FnOnce(Wm) -> R + Send + panic::UnwindSafe + 'static,
+) -> R {
+    boot_testing_backend();
+
+    if let Some(&Backend::Native) = Wm::backend_or_none() {
+        panic!("Cannot start the testing backend; the native backend is already active.");
+    }
+
+    let (send, recv) = sync_channel(1);
+    Wm::invoke_on_main_thread(move |wm| {
+        let result = panic::catch_unwind(|| cb(wm));
+
+        send.send(result).unwrap();
+    });
+
+    match recv.recv().unwrap() {
+        Ok(x) => x,
+        Err(x) => panic::resume_unwind(x),
+    }
 }
 
 /// Call `with_testing_wm` if the testing backend is enabled. Otherwise,
 /// output a warning message and return without calling the givne function.
 ///
 /// This function is available even if the `testing` feature flag is disabled.
-pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send) {
+pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send + panic::UnwindSafe + 'static) {
     with_testing_wm(|wm| cb(&wm));
 }
 
@@ -128,6 +154,126 @@ pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send) {
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
+
+// ============================================================================
+//
+// Backend choice and main thread
+
+enum Backend {
+    Native,
+    Testing {
+        main_thread: ThreadId,
+        sender: Mutex<Sender<Dispatch>>,
+    },
+}
+
+enum BackendAndWm {
+    Native {
+        wm: native::Wm,
+    },
+    Testing {
+        wm: Wm,
+        sender: &'static Mutex<Sender<Dispatch>>,
+    },
+}
+
+type Dispatch = Box<dyn FnOnce(Wm) + Send>;
+
+/// The currently chosen backend. This can be set only once throughout
+/// a program's lifetime.
+static BACKEND_CHOICE: SetOnceAtom<Box<Backend>> = SetOnceAtom::empty();
+
+impl Wm {
+    /// Get the current choice of a backend. If none are chosen, the native
+    /// backend will be initialized.
+    fn backend() -> &'static Backend {
+        if BACKEND_CHOICE.get().is_none() {
+            // Try setting the native backend. This might fail.
+            let _ = BACKEND_CHOICE.store(Some(Box::new(Backend::Native)));
+        }
+        &**BACKEND_CHOICE.get().unwrap()
+    }
+
+    fn backend_or_none() -> Option<&'static Backend> {
+        BACKEND_CHOICE.get().map(|x| &**x)
+    }
+
+    fn backend_and_wm(self) -> BackendAndWm {
+        match Self::backend() {
+            // If we have `Wm`, its usage is congruent with `native::Wm`,
+            // so this is safe
+            Backend::Native => BackendAndWm::Native {
+                wm: unsafe { native::Wm::global_unchecked() },
+            },
+            Backend::Testing { sender, .. } => BackendAndWm::Testing { wm: self, sender },
+        }
+    }
+
+    /// Convert `native::Wm` to our `Wm`. This is an inverse of `backend_and_wm`,
+    /// assuming the current backend is `Backend::Native`.
+    fn from_native_wm(native_wm: native::Wm) -> Self {
+        // `Wm::backend()` is okay actually, but generates extra code. The cases
+        // handled only by `Wm::backend()` are pathological and artificial, I
+        // don't know how they can be produced
+        if let Some(&Backend::Native) = Wm::backend_or_none() {
+            unsafe { Self::global_unchecked() }
+        } else {
+            panic!("`testing` is not configured (currently or anymore) to use the native backend");
+        }
+    }
+}
+
+impl BackendAndWm {
+    fn native_wm(&self) -> Option<native::Wm> {
+        match self {
+            &BackendAndWm::Native { wm } => Some(wm),
+            &BackendAndWm::Testing { .. } => None,
+        }
+    }
+}
+
+/// Initialize the testing backend. Does nothing if some backend has already
+/// been chosen and initialized.
+fn boot_testing_backend() {
+    if BACKEND_CHOICE.get().is_none() {
+        try_start_testing_main_thread();
+    }
+}
+
+/// Try initializing the testing backend. Does nothing if some backend has
+/// already been chosen and initialized. `BACKEND_CHOICE` is guaranteed to
+/// contain some value when the function returns.
+#[cold]
+fn try_start_testing_main_thread() {
+    let (ready_send, ready_recv) = sync_channel(1);
+
+    thread::spawn(move || {
+        // Try setting the backend. This might fail if there is already one set.
+        let (send, recv) = channel();
+        let backend = Backend::Testing {
+            main_thread: thread::current().id(),
+            sender: Mutex::new(send),
+        };
+
+        let fail = BACKEND_CHOICE.store(Some(Box::new(backend))).is_err();
+        ready_send.send(()).unwrap();
+        if fail {
+            return;
+        }
+
+        let wm = Wm::global();
+
+        // If successful, that means we are on the main thread.
+        while let Ok(fun) = recv.recv() {
+            fun(wm);
+        }
+    });
+
+    // Proceed when `BACKEND_CHOICE` is finalized
+    let () = ready_recv.recv().unwrap();
+}
+
+// ============================================================================
 
 impl wmapi::TestingWm for Wm {
     fn wm(&self) -> crate::Wm {
@@ -151,11 +297,21 @@ impl iface::Wm for Wm {
     }
 
     fn is_main_thread() -> bool {
-        unimplemented!()
+        match Self::backend() {
+            Backend::Native => native::Wm::is_main_thread(),
+            Backend::Testing { main_thread, .. } => thread::current().id() == *main_thread,
+        }
     }
 
     fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
-        unimplemented!()
+        match Self::backend() {
+            Backend::Native => native::Wm::invoke_on_main_thread(move |native_wm| {
+                f(Self::from_native_wm(native_wm));
+            }),
+            Backend::Testing { sender, .. } => {
+                sender.lock().unwrap().send(Box::new(f)).unwrap();
+            }
+        }
     }
 
     fn invoke(self, f: impl FnOnce(Self) + 'static) {

@@ -13,6 +13,7 @@ members = [
     "stvg/tcw3",
     "support/alt_fp",
     "support/as_any",
+    "support/atom2",
     "support/cggeom",
     "support/iterpool",
     "support/rope",

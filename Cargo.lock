@@ -88,6 +88,10 @@ name = "as_any"
 version = "0.1.0"
 
 [[package]]
+name = "atom2"
+version = "0.1.0"
+
+[[package]]
 name = "atty"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1909,6 +1913,7 @@ dependencies = [
  "arg_enum_proc_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "array 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "arrayvec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atom2 0.1.0",
  "bitflags 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-rs 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.45 (registry+https://github.com/rust-lang/crates.io-index)",
