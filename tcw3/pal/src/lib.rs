@@ -60,29 +60,47 @@ mod swrast;
 
 // ============================================================================
 //
+// If the testing backend is enabled, it wraps and replaces the default native
+// backend.
+
+#[cfg(feature = "testing")]
+pub mod testing;
+
+#[cfg(not(feature = "testing"))]
+#[path = "testing_dis.rs"]
+pub mod testing;
+
+#[cfg(feature = "testing")]
+pub use self::testing as current;
+
+#[cfg(not(feature = "testing"))]
+pub use self::native as current;
+
+// ============================================================================
+//
 // Type aliases for the default backend.
 
 // TODO: A test driver, which replaces the following type aliases, allowing
 //       UI tests to provide stimuli
 
 /// The default window manager type for the target platform.
-pub type Wm = native::Wm;
+pub type Wm = current::Wm;
 
 /// The default bitmap type for the target platform implementing
 /// `Bitmap`.
-pub type Bitmap = native::Bitmap;
+pub type Bitmap = current::Bitmap;
 
 /// The default bitmap builder type for the target platform implementing
 /// `BitmapBuilderNew` and `CanvasText<TextLayout>`.
-pub type BitmapBuilder = native::BitmapBuilder;
+pub type BitmapBuilder = current::BitmapBuilder;
 
 /// The default character style type for the target platform
 /// implementing `CharStyle`.
-pub type CharStyle = native::CharStyle;
+pub type CharStyle = current::CharStyle;
 
 /// The default text layout type for the target platform
 /// implementing `TextLayout`.
-pub type TextLayout = native::TextLayout;
+pub type TextLayout = current::TextLayout;
 
 // ============================================================================
 //

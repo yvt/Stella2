@@ -5,6 +5,9 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 license = "MIT"
 
+[features]
+testing = ["tcw3_pal/testing"]
+
 [dependencies]
 arrayvec = "0.5"
 cgmath = "0.17.0"

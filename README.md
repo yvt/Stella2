@@ -25,11 +25,17 @@ TODO
      │
      └╴support          An assortment of supporting libraries
 
+## Testing
+
+TCW3 includes a headless backend named `testing` which is provided for testing purposes. You need to add a feature flag `tcw3_pal/testing` or `tcw3/testing` to use it:
+
+     cargo test --features tcw3/testing
+
 ## Prerequisites
 
 The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work.
 
-When building for a Linux system, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system.
+When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system.
 
 Fedora:
 

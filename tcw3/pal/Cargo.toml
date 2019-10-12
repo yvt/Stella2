@@ -14,6 +14,10 @@ default = ["macos_winit"]
 # remove.
 macos_winit = ["winit"]
 
+# Enables the testing backend. Note that the testing backend needs to be
+# activated at runtime before use.
+testing = []
+
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
 array = "0.0.1"
@@ -48,6 +52,9 @@ objc = "0.2.3"
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 winit = "0.20.0-alpha3"
 swsurface = "0.1.2"
+
+# `unix` and testing backends
+[target.'cfg(any(not(target_os = "macos"), feature = "testing"))'.dependencies]
 cairo-rs = "0.7.1"
 pangocairo = "0.8.0"
 pango = "0.7.0"
