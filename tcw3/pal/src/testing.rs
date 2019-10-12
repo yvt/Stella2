@@ -86,6 +86,10 @@
 //!
 //! [`run_test`]: crate::testing::run_test
 //! [`TestingWm`]: crate::testing::TestingWm
+//!
+//! If it uses other PAL objects such as `Bitmap` and doesn't use `Wm`, the
+//! testing code should still use [`run_test`] because they are also subject to
+//! the backend selection.
 use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
@@ -386,21 +390,89 @@ pub struct HWnd;
 #[derive(Debug, Clone)]
 pub struct HLayer;
 
+macro_rules! forward_args {
+    ($expr:expr, $name:ident, self $( , $pname:ident: $t:ty )*) => { $expr.$name($($pname),*) };
+    ($expr:expr, $name:ident, &self $( , $pname:ident: $t:ty )*) => { $expr.$name($($pname),*) };
+    ($expr:expr, $name:ident, &mut self $( , $pname:ident: $t:ty )*) => { $expr.$name($($pname),*) };
+}
+
+/// `&mut self, pname: Ty, ...` → `&mut self.inner`
+macro_rules! get_inner {
+    (&mut $self:ident $($rest:tt)*) => {
+        &mut $self.inner
+    };
+    (&$self:ident $($rest:tt)*) => {
+        &$self.inner
+    };
+    ($self:ident $($rest:tt)*) => {
+        $self.inner
+    };
+}
+
+/// Forward methods to inner types. This macro is used for types like `Bitmap`
+/// that there already is a type for each `Backend`.
+macro_rules! forward {
+    {
+        inner_type: $inner_type:tt;
+        fn $name:ident($($args:tt)*) $(-> $ret:ty)? ;
+        $($rest:tt)*
+    } => {
+        fn $name($($args)*) $(-> $ret)? {
+            match get_inner!($($args)*) {
+                $inner_type::Native(inner) => forward_args!(inner, $name, $($args)*),
+                $inner_type::Testing(inner) => forward_args!(inner, $name, $($args)*),
+            }
+        }
+        forward! {
+            inner_type: $inner_type;
+            $($rest)*
+        }
+    };
+    {
+        inner_type: $inner_type:tt;
+    } => {};
+}
+
 #[derive(Debug, Clone)]
-pub struct Bitmap;
+pub struct Bitmap {
+    inner: BitmapInner,
+}
+
+#[derive(Debug, Clone)]
+enum BitmapInner {
+    Native(native::Bitmap),
+    Testing(bitmap::Bitmap),
+}
 
 impl iface::Bitmap for Bitmap {
-    fn size(&self) -> [u32; 2] {
-        unimplemented!()
+    forward! {
+        inner_type: BitmapInner;
+        fn size(&self) -> [u32; 2];
     }
 }
 
 #[derive(Debug)]
-pub struct BitmapBuilder;
+pub struct BitmapBuilder {
+    inner: BitmapBuilderInner,
+}
+
+#[derive(Debug)]
+enum BitmapBuilderInner {
+    Native(native::BitmapBuilder),
+    Testing(bitmap::BitmapBuilder),
+}
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
-        unimplemented!()
+        // Use the same backend as `Wm`
+        match Wm::backend() {
+            Backend::Native { .. } => Self {
+                inner: BitmapBuilderInner::Native(native::BitmapBuilder::new(size)),
+            },
+            Backend::Testing { .. } => Self {
+                inner: BitmapBuilderInner::Testing(bitmap::BitmapBuilder::new(size)),
+            },
+        }
     }
 }
 
@@ -408,104 +480,144 @@ impl iface::BitmapBuilder for BitmapBuilder {
     type Bitmap = Bitmap;
 
     fn into_bitmap(self) -> Self::Bitmap {
-        unimplemented!()
+        match self.inner {
+            BitmapBuilderInner::Native(bmp_builder) => Bitmap {
+                inner: BitmapInner::Native(bmp_builder.into_bitmap()),
+            },
+            BitmapBuilderInner::Testing(bmp_builder) => Bitmap {
+                inner: BitmapInner::Testing(bmp_builder.into_bitmap()),
+            },
+        }
     }
 }
 
 impl iface::Canvas for BitmapBuilder {
-    fn save(&mut self) {
-        unimplemented!()
-    }
-    fn restore(&mut self) {
-        unimplemented!()
-    }
-    fn begin_path(&mut self) {
-        unimplemented!()
-    }
-    fn close_path(&mut self) {
-        unimplemented!()
-    }
-    fn move_to(&mut self, p: Point2<f32>) {
-        unimplemented!()
-    }
-    fn line_to(&mut self, p: Point2<f32>) {
-        unimplemented!()
-    }
-    fn cubic_bezier_to(&mut self, cp1: Point2<f32>, cp2: Point2<f32>, p: Point2<f32>) {
-        unimplemented!()
-    }
-    fn quad_bezier_to(&mut self, cp: Point2<f32>, p: Point2<f32>) {
-        unimplemented!()
-    }
-    fn fill(&mut self) {
-        unimplemented!()
-    }
-    fn stroke(&mut self) {
-        unimplemented!()
-    }
-    fn clip(&mut self) {
-        unimplemented!()
-    }
-    fn set_fill_rgb(&mut self, rgb: iface::RGBAF32) {
-        unimplemented!()
-    }
-    fn set_stroke_rgb(&mut self, rgb: iface::RGBAF32) {
-        unimplemented!()
-    }
-    fn set_line_cap(&mut self, cap: iface::LineCap) {
-        unimplemented!()
-    }
-    fn set_line_join(&mut self, join: iface::LineJoin) {
-        unimplemented!()
-    }
-    fn set_line_dash(&mut self, phase: f32, lengths: &[f32]) {
-        unimplemented!()
-    }
-    fn set_line_width(&mut self, width: f32) {
-        unimplemented!()
-    }
-    fn set_line_miter_limit(&mut self, miter_limit: f32) {
-        unimplemented!()
-    }
-    fn mult_transform(&mut self, m: Matrix3<f32>) {
-        unimplemented!()
+    forward! {
+        inner_type: BitmapBuilderInner;
+        fn save(&mut self);
+        fn restore(&mut self);
+        fn begin_path(&mut self);
+        fn close_path(&mut self);
+        fn move_to(&mut self, p: Point2<f32>);
+        fn line_to(&mut self, p: Point2<f32>);
+        fn cubic_bezier_to(&mut self, cp1: Point2<f32>, cp2: Point2<f32>, p: Point2<f32>);
+        fn quad_bezier_to(&mut self, cp: Point2<f32>, p: Point2<f32>);
+        fn fill(&mut self);
+        fn stroke(&mut self);
+        fn clip(&mut self);
+        fn set_fill_rgb(&mut self, rgb: iface::RGBAF32);
+        fn set_stroke_rgb(&mut self, rgb: iface::RGBAF32);
+        fn set_line_cap(&mut self, cap: iface::LineCap);
+        fn set_line_join(&mut self, join: iface::LineJoin);
+        fn set_line_dash(&mut self, phase: f32, lengths: &[f32]);
+        fn set_line_width(&mut self, width: f32);
+        fn set_line_miter_limit(&mut self, miter_limit: f32);
+        fn mult_transform(&mut self, m: Matrix3<f32>);
     }
 }
 
 impl iface::CanvasText<TextLayout> for BitmapBuilder {
     fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
-        unimplemented!()
+        match (&mut self.inner, &layout.inner) {
+            (BitmapBuilderInner::Native(bmp_builder), TextLayoutInner::Native(layout)) => {
+                bmp_builder.draw_text(layout, origin, color)
+            }
+            (BitmapBuilderInner::Testing(bmp_builder), TextLayoutInner::Testing(layout)) => {
+                bmp_builder.draw_text(layout, origin, color)
+            }
+            _ => panic!("Given BitmapBuilder and TextLayout belong to different backends"),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct CharStyle;
+pub struct CharStyle {
+    inner: CharStyleInner,
+}
+
+#[derive(Debug, Clone)]
+enum CharStyleInner {
+    Native(native::CharStyle),
+    Testing(text::CharStyle),
+}
+
+#[derive(Debug, Clone)]
+enum OptionCharStyleInner {
+    Native(Option<native::CharStyle>),
+    Testing(Option<text::CharStyle>),
+}
 
 impl iface::CharStyle for CharStyle {
     fn new(attrs: CharStyleAttrs) -> Self {
-        unimplemented!()
+        let template = if let Some(template) = attrs.template {
+            match template.inner {
+                CharStyleInner::Native(style) => OptionCharStyleInner::Native(Some(style)),
+                CharStyleInner::Testing(style) => OptionCharStyleInner::Testing(Some(style)),
+            }
+        } else {
+            // Use the same backend as `Wm`
+            match Wm::backend() {
+                Backend::Native { .. } => OptionCharStyleInner::Native(None),
+                Backend::Testing { .. } => OptionCharStyleInner::Testing(None),
+            }
+        };
+
+        match template {
+            OptionCharStyleInner::Native(style) => Self {
+                inner: CharStyleInner::Native(native::CharStyle::new(iface::CharStyleAttrs {
+                    template: style,
+                    sys: attrs.sys,
+                    size: attrs.size,
+                    decor: attrs.decor,
+                    color: attrs.color,
+                })),
+            },
+            OptionCharStyleInner::Testing(style) => Self {
+                inner: CharStyleInner::Testing(text::CharStyle::new(iface::CharStyleAttrs {
+                    template: style,
+                    sys: attrs.sys,
+                    size: attrs.size,
+                    decor: attrs.decor,
+                    color: attrs.color,
+                })),
+            },
+        }
     }
 
-    fn size(&self) -> f32 {
-        unimplemented!()
+    forward! {
+        inner_type: CharStyleInner;
+        fn size(&self) -> f32;
     }
 }
 
 #[derive(Debug)]
-pub struct TextLayout;
+pub struct TextLayout {
+    inner: TextLayoutInner,
+}
+
+#[derive(Debug)]
+enum TextLayoutInner {
+    Native(native::TextLayout),
+    Testing(text::TextLayout),
+}
 
 impl iface::TextLayout for TextLayout {
     type CharStyle = CharStyle;
 
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
-        unimplemented!()
+        match &style.inner {
+            CharStyleInner::Native(style) => Self {
+                inner: TextLayoutInner::Native(native::TextLayout::from_text(text, style, width)),
+            },
+            CharStyleInner::Testing(style) => Self {
+                inner: TextLayoutInner::Testing(text::TextLayout::from_text(text, style, width)),
+            },
+        }
     }
 
-    fn visual_bounds(&self) -> Box2<f32> {
-        unimplemented!()
-    }
-
-    fn layout_bounds(&self) -> Box2<f32> {
-        unimplemented!()
+    forward! {
+        inner_type: TextLayoutInner;
+        fn visual_bounds(&self) -> Box2<f32>;
+        fn layout_bounds(&self) -> Box2<f32>;
     }
 }
