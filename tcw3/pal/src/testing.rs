@@ -90,25 +90,15 @@ use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{
-    cell::RefCell,
-    collections::LinkedList,
     marker::PhantomData,
     panic,
-    sync::{
-        mpsc::{channel, sync_channel, Receiver, RecvTimeoutError, Sender},
-        Mutex,
-    },
+    sync::mpsc::sync_channel,
     thread::{self, ThreadId},
-    time::Duration,
 };
 
-use super::{
-    cells::{MtLazyStatic, MtLock},
-    iface,
-    iface::Wm as _,
-    native,
-};
+use super::{iface, iface::Wm as _, native};
 
+mod eventloop;
 mod wmapi;
 pub use self::wmapi::TestingWm;
 
@@ -163,11 +153,6 @@ pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
-mt_lazy_static! {
-    static <Wm> ref UNSEND_DISPATCHES: RefCell<LinkedList<Box<dyn FnOnce(Wm)>>> =>
-        |_| RefCell::new(LinkedList::new());
-}
-
 // ============================================================================
 //
 // Backend choice and main thread
@@ -176,7 +161,7 @@ enum Backend {
     Native,
     Testing {
         main_thread: ThreadId,
-        sender: Mutex<Sender<Dispatch>>,
+        sender: eventloop::DispatchSender,
     },
 }
 
@@ -186,11 +171,9 @@ enum BackendAndWm {
     },
     Testing {
         wm: Wm,
-        sender: &'static Mutex<Sender<Dispatch>>,
+        sender: &'static eventloop::DispatchSender,
     },
 }
-
-type Dispatch = Box<dyn FnOnce(Wm) + Send>;
 
 /// The currently chosen backend. This can be set only once throughout
 /// a program's lifetime.
@@ -262,10 +245,10 @@ fn try_start_testing_main_thread() {
 
     thread::spawn(move || {
         // Try setting the backend. This might fail if there is already one set.
-        let (send, recv) = channel();
+        let (send, recv) = eventloop::dispatch_channel();
         let backend = Backend::Testing {
             main_thread: thread::current().id(),
-            sender: Mutex::new(send),
+            sender: send,
         };
 
         let fail = BACKEND_CHOICE.store(Some(Box::new(backend))).is_err();
@@ -276,80 +259,13 @@ fn try_start_testing_main_thread() {
 
         // If successful, that means we are on the main thread.
         let wm = Wm::global();
-        *DISPATCH_RECV.get_with_wm(wm).borrow_mut() = Some(recv);
+        wm.set_dispatch_receiver(recv);
 
         wm.enter_main_loop();
     });
 
     // Proceed when `BACKEND_CHOICE` is finalized
     let () = ready_recv.recv().unwrap();
-}
-
-// ============================================================================
-//
-// Event loop
-
-static DISPATCH_RECV: MtLock<RefCell<Option<Receiver<Dispatch>>>> = MtLock::new(RefCell::new(None));
-
-impl Wm {
-    fn dispatch_receiver(self) -> impl std::ops::Deref<Target = Receiver<Dispatch>> {
-        use owning_ref::OwningRef;
-        OwningRef::new(DISPATCH_RECV.get_with_wm(self).borrow()).map(|refr| {
-            // If `Backend::Testing` is active, we should never observe
-            // `DISPATCH_RECV` containing `None` because it's set before the
-            // main thread enters the main loop.
-            refr.as_ref()
-                .expect("Could not get a dispatch receiver. Perhaps the native backend is in use?")
-        })
-    }
-
-    fn enter_main_loop(self) {
-        while let Ok(fun) = self.dispatch_receiver().recv() {
-            fun(self);
-
-            // `fun` might push dispatches to `UNSEND_DISPATCHES`
-            loop {
-                let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
-                if let Some(e) = e {
-                    e(self);
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
-    fn step_timeout(self, timeout: Option<std::time::Duration>) {
-        // Check the thread-local queue first because there is no possibility
-        // that it can get enqueued by us waiting
-        let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
-        if let Some(e) = e {
-            e(self);
-            return;
-        }
-
-        // Wait for `invoke_on_main_thread`
-        let recv = self.dispatch_receiver();
-        let result = if let Some(timeout) = timeout {
-            match recv.recv_timeout(timeout) {
-                Ok(x) => Some(x),
-                Err(RecvTimeoutError::Timeout) => return,
-                Err(RecvTimeoutError::Disconnected) => None,
-            }
-        } else {
-            recv.recv().ok()
-        };
-
-        if let Some(fun) = result {
-            fun(self);
-            return;
-        }
-
-        // We are not receving events anymore, sleep indefinitely
-        loop {
-            thread::sleep(Duration::from_secs(256));
-        }
-    }
 }
 
 // ============================================================================
@@ -393,7 +309,7 @@ impl iface::Wm for Wm {
                 f(Self::from_native_wm(native_wm));
             }),
             Backend::Testing { sender, .. } => {
-                sender.lock().unwrap().send(Box::new(f)).unwrap();
+                sender.invoke_on_main_thread(f);
             }
         }
     }
@@ -404,10 +320,7 @@ impl iface::Wm for Wm {
                 f(Self::from_native_wm(native_wm));
             }),
             BackendAndWm::Testing { .. } => {
-                UNSEND_DISPATCHES
-                    .get_with_wm(self)
-                    .borrow_mut()
-                    .push_back(Box::new(f));
+                self.invoke_unsend(f);
             }
         }
     }
