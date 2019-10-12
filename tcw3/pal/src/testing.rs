@@ -61,10 +61,38 @@
 //!    this can be circumvented by having `HashMap<TypeId, T>`, but this comes
 //!    with a runtime cost, code size cost, and extra code complexity.
 //!
+//! # Writing tests
+//!
+//! Testing code should use [`run_test`] to use the testing backend. A passed
+//! closure receives `&dyn `[`TestingWm`], through which methods specific to
+//! the backend can be called. Testing code will compile fine whether the
+//! feature flag is set or not as long as it does not access other APIs which
+//! are only available if the backend is enabled.
+//!
+//!     use tcw3_pal::{testing, prelude::*};
+//!     use std::time::{Instant, Duration};
+//!
+//!     #[test]
+//!     fn create_wnd() {
+//!         testing::run_test(|twm| {
+//!             // This block might or might not run depending on whether
+//!             // the feature flag is set
+//!             let wm = twm.wm();
+//!             let wnd = wm.new_wnd(Default::default());
+//!
+//!             twm.step_until(Instant::now() + Duration::from_millis(100));
+//!         });
+//!     }
+//!
+//! [`run_test`]: crate::testing::run_test
+//! [`TestingWm`]: crate::testing::TestingWm
 use super::iface;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::marker::PhantomData;
+
+mod wmapi;
+pub use self::wmapi::TestingWm;
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -84,8 +112,8 @@ pub fn with_testing_wm<R: Send>(_cb: impl FnOnce(Wm) -> R + Send) -> R {
 /// output a warning message and return without calling the givne function.
 ///
 /// This function is available even if the `testing` feature flag is disabled.
-pub fn run_test(cb: impl FnOnce(crate::Wm) + Send) {
-    with_testing_wm(cb);
+pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send) {
+    with_testing_wm(|wm| cb(&wm));
 }
 
 // TODO: Add artificial inputs and outputs
@@ -93,6 +121,16 @@ pub fn run_test(cb: impl FnOnce(crate::Wm) + Send) {
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
+}
+
+impl wmapi::TestingWm for Wm {
+    fn wm(&self) -> crate::Wm {
+        *self
+    }
+
+    fn step_until(&self, till: std::time::Instant) {
+        std::thread::sleep(till.saturating_duration_since(std::time::Instant::now()));
+    }
 }
 
 impl iface::Wm for Wm {
