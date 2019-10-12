@@ -2,6 +2,7 @@
 //!
 //! [atom]: https://crates.io/crates/atom
 #![feature(box_into_raw_non_null)]
+#![feature(const_fn)] // `const fn` with a constrained type parameter (e.g., `T: PtrSized`)
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Arc, Weak};
@@ -320,9 +321,9 @@ pub struct SetOnceAtom<T: PtrSized> {
 
 impl<T: PtrSized> SetOnceAtom<T> {
     /// Construct an empty `SetOnceAtom`.
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self {
-            ptr: AtomicPtr::default(),
+            ptr: AtomicPtr::new(ptr::null_mut()),
             phantom: PhantomData,
         }
     }
