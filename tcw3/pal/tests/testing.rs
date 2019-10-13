@@ -1,5 +1,5 @@
-use cggeom::prelude::*;
-use cgmath::{Deg, Matrix3};
+use cggeom::{box2, prelude::*};
+use cgmath::{Deg, Matrix3, Point2};
 use std::{
     cell::Cell,
     rc::Rc,
@@ -132,5 +132,124 @@ fn bitmap_text() {
         dbg!(layout.visual_bounds());
 
         b.draw_text(&layout, [10.0, 10.0].into(), [0.3, 0.5, 0.6, 1.0].into());
+    });
+}
+
+#[test]
+fn empty_wnd() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        const SIZE: [u32; 2] = [100, 200];
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            caption: Some("Hello world".into()),
+            visible: Some(true),
+            size: Some(SIZE),
+            min_size: Some([50, 100]),
+            max_size: Some([300, 300]),
+            ..Default::default()
+        });
+
+        assert_eq!(dbg!(wm.get_wnd_size(&hwnd)), SIZE);
+
+        wm.update_wnd(&hwnd);
+
+        // TODO: change window size
+        // TODO: change DPI scale
+        // TODO: examine rendered contents
+
+        wm.remove_wnd(&hwnd);
+    });
+}
+
+#[test]
+fn plain_layer() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            ..Default::default()
+        });
+        wm.remove_layer(&hlayer);
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
+            flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
+            transform: Some(Matrix3::from_angle(Deg(30.0))),
+            ..Default::default()
+        });
+        wm.remove_layer(&hlayer);
+    });
+}
+
+#[test]
+fn bitmap_layer() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        let bmp = {
+            let mut bmp_builder = pal::BitmapBuilder::new([100, 100]);
+            bmp_builder.set_stroke_rgb([0.0, 0.0, 0.0, 1.0].into());
+            bmp_builder.move_to(Point2::new(20.0, 20.0));
+            bmp_builder.line_to(Point2::new(80.0, 20.0));
+            bmp_builder.line_to(Point2::new(20.0, 80.0));
+            bmp_builder.line_to(Point2::new(80.0, 80.0));
+            bmp_builder.quad_bezier_to(Point2::new(80.0, 20.0), Point2::new(20.0, 20.0));
+            bmp_builder.stroke();
+            bmp_builder.into_bitmap()
+        };
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            contents: Some(Some(bmp.clone())),
+            ..Default::default()
+        });
+        wm.remove_layer(&hlayer);
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            contents: Some(Some(bmp.clone())),
+            bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
+            flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
+            contents_scale: Some(1.5),
+            contents_center: Some(box2! {
+                min: [0.3, 0.3], max: [0.8, 0.8],
+            }),
+            ..Default::default()
+        });
+        wm.remove_layer(&hlayer);
+    });
+}
+
+#[test]
+fn wnd_with_layer() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
+            flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
+            transform: Some(Matrix3::from_angle(Deg(30.0))),
+            ..Default::default()
+        });
+
+        const SIZE: [u32; 2] = [100, 200];
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            caption: Some("Hello world".into()),
+            visible: Some(true),
+            size: Some(SIZE),
+            min_size: Some([50, 100]),
+            max_size: Some([300, 300]),
+            layer: Some(Some(hlayer.clone())),
+            ..Default::default()
+        });
+
+        wm.update_wnd(&hwnd);
+
+        // TODO: change window size
+        // TODO: change DPI scale
+
+        wm.remove_wnd(&hwnd);
+        wm.remove_layer(&hlayer);
     });
 }

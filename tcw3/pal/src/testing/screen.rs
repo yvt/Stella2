@@ -1,12 +1,9 @@
 //! Compositor for the testing backend.
-use cggeom::{box2, prelude::*, Box2};
+use cggeom::{box2, Box2};
 use iterpool::{Pool, PoolPtr};
 use std::cell::RefCell;
 
-use super::super::{
-    iface, swrast,
-    winit::{WinitWmCore, WndContent as WndContentTrait},
-};
+use super::super::{iface, swrast};
 use super::{bitmap::Bitmap, Wm};
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
@@ -36,8 +33,8 @@ struct State {
 pub struct Wnd {
     sr_wnd: swrast::HWnd,
 
-    surf_size: [u32; 2],
-    surf_dpi_scale: f32,
+    size: [u32; 2],
+    dpi_scale: f32,
 
     dirty_rect: Option<Box2<usize>>,
 }
@@ -62,10 +59,12 @@ impl Screen {
 
         let wnd = Wnd {
             sr_wnd: state.sr_scrn.new_wnd(),
-            surf_size: [0, 0],
-            surf_dpi_scale: 1.0,
+            size: attrs.size.unwrap_or([100, 100]),
+            dpi_scale: 1.0, // TODO
             dirty_rect: None,
         };
+
+        // TODO
 
         state
             .sr_scrn
@@ -76,19 +75,86 @@ impl Screen {
     }
 
     pub(super) fn set_wnd_attr(&self, hwnd: &HWnd, attrs: WndAttrs<'_>) {
-        unimplemented!()
+        let mut state = self.state.borrow_mut();
+        let state = &mut *state; // enable split borrow
+
+        let wnd = &mut state.wnds[hwnd.ptr];
+
+        if let Some(value) = attrs.size {
+            wnd.size = value;
+        }
+
+        // TODO:
+        // - `min_size`
+        // - `max_size`
+        // - `flags`
+        // - `caption`
+        // - `visible`
+        // - `listener`
+
+        if let Some(layer) = attrs.layer {
+            state
+                .sr_scrn
+                .set_wnd_layer(&wnd.sr_wnd, layer.map(|hl| hl.sr_layer));
+        }
     }
     pub(super) fn remove_wnd(&self, hwnd: &HWnd) {
-        unimplemented!()
+        let mut state = self.state.borrow_mut();
+        let state = &mut *state; // enable split borrow
+
+        let wnd = state.wnds.deallocate(hwnd.ptr).expect("invalid hwnd");
+
+        state.sr_scrn.remove_wnd(&wnd.sr_wnd);
     }
     pub(super) fn update_wnd(&self, hwnd: &HWnd) {
-        unimplemented!()
+        let mut state = self.state.borrow_mut();
+        let state = &mut *state; // enable split borrow
+        let wnd = &mut state.wnds[hwnd.ptr];
+
+        // Calculate the surface size
+        let [size_w, size_h] = wnd.size;
+        let dpi_scale = wnd.dpi_scale;
+        let surf_size = [
+            (size_w as f32 * dpi_scale) as usize,
+            (size_h as f32 * dpi_scale) as usize,
+        ];
+        if surf_size[0] == 0 || surf_size[1] == 0 {
+            // Suspend update if one of the surface dimensions is zero
+            return;
+        }
+
+        // TODO: Preserve surface image
+        let img_stride = 4usize.checked_mul(surf_size[0]).unwrap();
+        let num_bytes = img_stride.checked_mul(surf_size[1]).unwrap();
+        let mut img = vec![0u8; num_bytes];
+
+        wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size });
+        state.sr_scrn.set_wnd_size(&wnd.sr_wnd, surf_size);
+        state.sr_scrn.set_wnd_dpi_scale(&wnd.sr_wnd, wnd.dpi_scale);
+
+        let dirty_rect = if let Some(x) = wnd.dirty_rect.take() {
+            x
+        } else {
+            return;
+        };
+
+        state.sr_scrn.render_wnd(
+            &wnd.sr_wnd,
+            &mut img,
+            img_stride,
+            dirty_rect,
+            &mut state.binner,
+        );
+
+        // TODO: Let the clients observe the rendered image
     }
     pub(super) fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
-        unimplemented!()
+        let state = self.state.borrow();
+        state.wnds[hwnd.ptr].size
     }
     pub(super) fn get_wnd_dpi_scale(&self, hwnd: &HWnd) -> f32 {
-        unimplemented!()
+        let state = self.state.borrow();
+        state.wnds[hwnd.ptr].dpi_scale
     }
 
     pub(super) fn new_layer(&self, attrs: LayerAttrs) -> HLayer {
