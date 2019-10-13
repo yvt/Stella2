@@ -100,10 +100,12 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use super::{iface, iface::Wm as _, native};
+use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
 
 mod eventloop;
+mod screen;
 mod wmapi;
+mod wndlistenershim;
 pub use self::wmapi::TestingWm;
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
@@ -274,6 +276,10 @@ fn try_start_testing_main_thread() {
 
 // ============================================================================
 
+mt_lazy_static! {
+    static <Wm> ref SCREEN: screen::Screen => screen::Screen::new;
+}
+
 impl wmapi::TestingWm for Wm {
     fn wm(&self) -> crate::Wm {
         *self
@@ -350,45 +356,251 @@ impl iface::Wm for Wm {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        unimplemented!()
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => {
+                let attrs = wnd_attrs_to_native(attrs);
+                HWnd {
+                    inner: HWndInner::Native(wm.new_wnd(attrs)),
+                }
+            }
+            BackendAndWm::Testing { .. } => {
+                let attrs = wnd_attrs_to_testing(attrs);
+                let screen = SCREEN.get_with_wm(self);
+                HWnd {
+                    inner: HWndInner::Testing(screen.new_wnd(attrs)),
+                }
+            }
+        }
     }
 
-    fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        unimplemented!()
+    fn set_wnd_attr(self, hwnd: &Self::HWnd, attrs: WndAttrs<'_>) {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
+                let attrs = wnd_attrs_to_native(attrs);
+                wm.set_wnd_attr(hwnd, attrs);
+            }
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+                let attrs = wnd_attrs_to_testing(attrs);
+                SCREEN.get_with_wm(self).set_wnd_attr(hwnd, attrs);
+            }
+            _ => unreachable!(),
+        }
     }
 
-    fn remove_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+    fn remove_wnd(self, hwnd: &Self::HWnd) {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
+                wm.remove_wnd(hwnd);
+            }
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+                SCREEN.get_with_wm(self).remove_wnd(hwnd);
+            }
+            _ => unreachable!(),
+        }
     }
 
-    fn update_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+    fn update_wnd(self, hwnd: &Self::HWnd) {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
+                wm.update_wnd(hwnd);
+            }
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+                SCREEN.get_with_wm(self).update_wnd(hwnd);
+            }
+            _ => unreachable!(),
+        }
     }
 
-    fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2] {
-        unimplemented!()
+    fn get_wnd_size(self, hwnd: &Self::HWnd) -> [u32; 2] {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.get_wnd_size(hwnd),
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+                SCREEN.get_with_wm(self).get_wnd_size(hwnd)
+            }
+            _ => unreachable!(),
+        }
     }
 
-    fn get_wnd_dpi_scale(self, window: &Self::HWnd) -> f32 {
-        unimplemented!()
+    fn get_wnd_dpi_scale(self, hwnd: &Self::HWnd) -> f32 {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.get_wnd_dpi_scale(hwnd),
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+                SCREEN.get_with_wm(self).get_wnd_dpi_scale(hwnd)
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        unimplemented!()
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => {
+                let attrs = layer_attrs_to_native(attrs);
+                HLayer {
+                    inner: HLayerInner::Native(wm.new_layer(attrs)),
+                }
+            }
+            BackendAndWm::Testing { .. } => {
+                let attrs = layer_attrs_to_testing(attrs);
+                let screen = SCREEN.get_with_wm(self);
+                HLayer {
+                    inner: HLayerInner::Testing(screen.new_layer(attrs)),
+                }
+            }
+        }
     }
-    fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        unimplemented!()
+    fn set_layer_attr(self, hlayer: &Self::HLayer, attrs: LayerAttrs) {
+        match (self.backend_and_wm(), &hlayer.inner) {
+            (BackendAndWm::Native { wm }, HLayerInner::Native(hlayer)) => {
+                let attrs = layer_attrs_to_native(attrs);
+                wm.set_layer_attr(hlayer, attrs);
+            }
+            (BackendAndWm::Testing { .. }, HLayerInner::Testing(hlayer)) => {
+                let attrs = layer_attrs_to_testing(attrs);
+                SCREEN.get_with_wm(self).set_layer_attr(hlayer, attrs);
+            }
+            _ => unreachable!(),
+        }
     }
-    fn remove_layer(self, layer: &Self::HLayer) {
-        unimplemented!()
+    fn remove_layer(self, hlayer: &Self::HLayer) {
+        match (self.backend_and_wm(), &hlayer.inner) {
+            (BackendAndWm::Native { wm }, HLayerInner::Native(hlayer)) => {
+                wm.remove_layer(hlayer);
+            }
+            (BackendAndWm::Testing { .. }, HLayerInner::Testing(hlayer)) => {
+                SCREEN.get_with_wm(self).remove_layer(hlayer);
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct HWnd;
+pub struct HWnd {
+    inner: HWndInner,
+}
 
 #[derive(Debug, Clone)]
-pub struct HLayer;
+enum HWndInner {
+    Native(native::HWnd),
+    Testing(screen::HWnd),
+}
+
+#[derive(Debug, Clone)]
+pub struct HLayer {
+    inner: HLayerInner,
+}
+
+#[derive(Debug, Clone)]
+enum HLayerInner {
+    Native(native::HLayer),
+    Testing(screen::HLayer),
+}
+
+/// Convert `WndAttrs<'_>` to `native::WndAttrs<'_>`. Panics if some fields
+/// are incompatible with the target backend.
+fn wnd_attrs_to_native(attrs: WndAttrs<'_>) -> native::WndAttrs<'_> {
+    let layer = attrs.layer.map(|layer_or_none| {
+        layer_or_none.map(|hlayer| match hlayer.inner {
+            HLayerInner::Native(hlayer) => hlayer,
+            HLayerInner::Testing(_) => unreachable!(),
+        })
+    });
+    native::WndAttrs {
+        size: attrs.size,
+        min_size: attrs.min_size,
+        max_size: attrs.max_size,
+        flags: attrs.flags,
+        caption: attrs.caption,
+        visible: attrs.visible,
+        listener: attrs
+            .listener
+            .map(|listener| Box::new(wndlistenershim::NativeWndListener(listener)) as _),
+        layer,
+    }
+}
+
+/// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
+/// are incompatible with the target backend.
+fn wnd_attrs_to_testing(attrs: WndAttrs<'_>) -> screen::WndAttrs<'_> {
+    let layer = attrs.layer.map(|layer_or_none| {
+        layer_or_none.map(|hlayer| match hlayer.inner {
+            HLayerInner::Native(_) => unreachable!(),
+            HLayerInner::Testing(hlayer) => hlayer,
+        })
+    });
+    screen::WndAttrs {
+        size: attrs.size,
+        min_size: attrs.min_size,
+        max_size: attrs.max_size,
+        flags: attrs.flags,
+        caption: attrs.caption,
+        visible: attrs.visible,
+        listener: attrs.listener,
+        layer,
+    }
+}
+
+/// Convert `LayerAttrs` to `native::LayerAttrs`. Panics if some fields
+/// are incompatible with the target backend.
+fn layer_attrs_to_native(attrs: LayerAttrs) -> native::LayerAttrs {
+    let sublayers = attrs.sublayers.map(|sublayers| {
+        sublayers
+            .into_iter()
+            .map(|hlayer| match hlayer.inner {
+                HLayerInner::Native(hlayer) => hlayer,
+                HLayerInner::Testing(_) => unreachable!(),
+            })
+            .collect()
+    });
+    let contents = attrs.contents.map(|contents_or_none| {
+        contents_or_none.map(|contents| match contents.inner {
+            BitmapInner::Native(bitmap) => bitmap,
+            BitmapInner::Testing(_) => panic!("Bitmap was created by the wrong backend"),
+        })
+    });
+    native::LayerAttrs {
+        transform: attrs.transform,
+        contents,
+        bounds: attrs.bounds,
+        contents_center: attrs.contents_center,
+        contents_scale: attrs.contents_scale,
+        bg_color: attrs.bg_color,
+        sublayers,
+        opacity: attrs.opacity,
+        flags: attrs.flags,
+    }
+}
+
+/// Convert `LayerAttrs` to `screen::LayerAttrs`. Panics if some fields
+/// are incompatible with the target backend.
+fn layer_attrs_to_testing(attrs: LayerAttrs) -> screen::LayerAttrs {
+    let sublayers = attrs.sublayers.map(|sublayers| {
+        sublayers
+            .into_iter()
+            .map(|hlayer| match hlayer.inner {
+                HLayerInner::Native(_) => unreachable!(),
+                HLayerInner::Testing(hlayer) => hlayer,
+            })
+            .collect()
+    });
+    let contents = attrs.contents.map(|contents_or_none| {
+        contents_or_none.map(|contents| match contents.inner {
+            BitmapInner::Native(_) => panic!("Bitmap was created by the wrong backend"),
+            BitmapInner::Testing(bitmap) => bitmap,
+        })
+    });
+    screen::LayerAttrs {
+        transform: attrs.transform,
+        contents,
+        bounds: attrs.bounds,
+        contents_center: attrs.contents_center,
+        contents_scale: attrs.contents_scale,
+        bg_color: attrs.bg_color,
+        sublayers,
+        opacity: attrs.opacity,
+        flags: attrs.flags,
+    }
+}
 
 macro_rules! forward_args {
     ($expr:expr, $name:ident, self $( , $pname:ident: $t:ty )*) => { $expr.$name($($pname),*) };
