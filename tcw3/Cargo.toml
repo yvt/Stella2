@@ -6,7 +6,7 @@ edition = "2018"
 license = "MIT"
 
 [features]
-testing = ["tcw3_pal/testing"]
+testing = ["tcw3_pal/testing", "tcw3_testing/testing"]
 
 [dependencies]
 arrayvec = "0.5"
@@ -28,6 +28,7 @@ ndarray = "0.13.0"
 
 tcw3_images = { path = "images" }
 tcw3_pal = { path = "pal" }
+tcw3_testing = { path = "testing" }
 
 [dependencies.momo]
 git = "https://github.com/llogiq/momo.git"

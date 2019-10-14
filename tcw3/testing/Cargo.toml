@@ -1,0 +1,12 @@
+[package]
+name = "tcw3_testing"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[features]
+testing = ["tcw3_pal/testing"]
+
+[dependencies]
+tcw3_pal = { path = "../pal" }
+tcw3_testing_macros = { path = "./macros" }

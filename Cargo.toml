@@ -5,6 +5,7 @@ members = [
     "stella2",
     "stella2_assets",
     "tcw3",
+    "tcw3/testing",
     "tcw3/pal",
     "tcw3/images",
     "harmony",

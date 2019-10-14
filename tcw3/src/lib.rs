@@ -10,6 +10,7 @@
 
 pub use tcw3_images as images;
 pub use tcw3_pal as pal;
+pub use tcw3_testing as testing;
 
 pub mod ui;
 pub mod uicore;

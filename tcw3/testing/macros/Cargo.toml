@@ -1,0 +1,15 @@
+[package]
+name = "tcw3_testing_macros"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+syn = { version = "1", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
+proc-macro-error = "0.3.1"
+
+[lib]
+path = "src/lib.rs"
+proc-macro = true
