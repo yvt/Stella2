@@ -286,6 +286,10 @@ impl wmapi::TestingWm for Wm {
         *self
     }
 
+    fn step_unsend(&self) {
+        self.step_unsend();
+    }
+
     fn step(&self) {
         self.step_timeout(None);
     }

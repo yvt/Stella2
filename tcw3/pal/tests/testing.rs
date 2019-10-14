@@ -34,6 +34,20 @@ fn invoke() {
 }
 
 #[test]
+fn step_unsend() {
+    testing::run_test(|twm| {
+        let flag = Rc::new(Cell::new(false));
+        {
+            let flag = Rc::clone(&flag);
+            twm.wm().invoke(move |_| flag.set(true));
+        }
+
+        twm.step_unsend();
+        assert!(!flag.get());
+    });
+}
+
+#[test]
 fn invoke_on_main_thread() {
     testing::run_test(|twm| {
         let flag = Arc::new(MtLock::<_, Wm>::new(Cell::new(false)));

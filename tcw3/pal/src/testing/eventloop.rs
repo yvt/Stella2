@@ -65,13 +65,17 @@ impl Wm {
             fun(self);
 
             // `fun` might push dispatches to `UNSEND_DISPATCHES`
-            loop {
-                let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
-                if let Some(e) = e {
-                    e(self);
-                } else {
-                    break;
-                }
+            self.step_unsend();
+        }
+    }
+
+    pub(super) fn step_unsend(self) {
+        loop {
+            let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
+            if let Some(e) = e {
+                e(self);
+            } else {
+                break;
             }
         }
     }
