@@ -8,6 +8,7 @@ use std::{
     thread,
     time::Duration,
 };
+use log::trace;
 
 use super::Wm;
 use crate::{prelude::*, MtLock};
@@ -31,7 +32,9 @@ pub fn dispatch_channel() -> (DispatchSender, DispatchReceiver) {
 
 impl DispatchSender {
     pub(super) fn invoke_on_main_thread(&self, f: impl FnOnce(Wm) + Send + 'static) {
-        self.0.lock().unwrap().send(Box::new(f)).unwrap();
+        let boxed: Dispatch = Box::new(f);
+        trace!("invoke_on_main_thread({:?})", (&*boxed) as *const _);
+        self.0.lock().unwrap().send(boxed).unwrap();
     }
 }
 
@@ -54,10 +57,12 @@ impl Wm {
     }
 
     pub(super) fn invoke_unsend(self, f: impl FnOnce(Self) + 'static) {
+        let boxed: Box<dyn FnOnce(Wm)> = Box::new(f);
+        trace!("invoke_unsend({:?})", (&*boxed) as *const _);
         UNSEND_DISPATCHES
             .get_with_wm(self)
             .borrow_mut()
-            .push_back(Box::new(f));
+            .push_back(boxed);
     }
 
     pub(super) fn enter_main_loop(self) {

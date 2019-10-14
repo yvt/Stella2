@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, fmt::Debug, fmt};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -173,6 +173,21 @@ bitflags! {
 impl Default for WndFlags {
     fn default() -> Self {
         WndFlags::RESIZABLE
+    }
+}
+
+impl<T: Wm, TLayer: Debug> Debug for WndAttrs<'_, T, TLayer> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("WndAttrs")
+            .field("size", &self.size)
+            .field("min_size", &self.min_size)
+            .field("max_size", &self.max_size)
+            .field("flags", &self.flags)
+            .field("caption", &self.caption)
+            .field("visible", &self.visible)
+            .field("listener", &self.listener.as_ref().map(|bx| (&*bx) as *const _))
+            .field("layer", &self.layer)
+            .finish()
     }
 }
 

@@ -90,9 +90,19 @@
 //! If it uses other PAL objects such as `Bitmap` and doesn't use `Wm`, the
 //! testing code should still use [`run_test`] because they are also subject to
 //! the backend selection.
+//!
+//! # Logging
+//!
+//! When the testing backend is active, API calls are traced using `log` crate.
+//!
+//!  - `trace`: Querying methods (e.g., `get_wnd_size`) and deferred
+//!    invocations (e.g., `invoke_on_main_thread`)
+//!  - `debug`: Updating methods (e.g. `new_wnd`)
+//!
 use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
+use log::{debug, trace};
 use std::{
     marker::PhantomData,
     panic,
@@ -250,6 +260,8 @@ fn boot_testing_backend() {
 fn try_start_testing_main_thread() {
     let (ready_send, ready_recv) = sync_channel(1);
 
+    trace!("Starting a main thread");
+
     thread::spawn(move || {
         // Try setting the backend. This might fail if there is already one set.
         let (send, recv) = eventloop::dispatch_channel();
@@ -261,6 +273,7 @@ fn try_start_testing_main_thread() {
         let fail = BACKEND_CHOICE.store(Some(Box::new(backend))).is_err();
         ready_send.send(()).unwrap();
         if fail {
+            trace!("There already is a main thread, giving up");
             return;
         }
 
@@ -291,11 +304,13 @@ impl wmapi::TestingWm for Wm {
     }
 
     fn step(&self) {
+        trace!("step");
         self.step_timeout(None);
     }
 
     fn step_until(&self, till: std::time::Instant) {
         let duration = till.saturating_duration_since(std::time::Instant::now());
+        trace!("step_until({:?} [{:?} from now])", till, duration);
         self.step_timeout(Some(duration));
     }
 
@@ -390,9 +405,12 @@ impl iface::Wm for Wm {
             BackendAndWm::Testing { .. } => {
                 let attrs = wnd_attrs_to_testing(attrs);
                 let screen = SCREEN.get_with_wm(self);
-                HWnd {
+                debug!("new_wnd({:?})", attrs);
+                let hwnd = HWnd {
                     inner: HWndInner::Testing(screen.new_wnd(attrs)),
-                }
+                };
+                debug!("... -> {:?}", hwnd);
+                hwnd
             }
         }
     }
@@ -403,9 +421,10 @@ impl iface::Wm for Wm {
                 let attrs = wnd_attrs_to_native(attrs);
                 wm.set_wnd_attr(hwnd, attrs);
             }
-            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(ts_hwnd)) => {
                 let attrs = wnd_attrs_to_testing(attrs);
-                SCREEN.get_with_wm(self).set_wnd_attr(hwnd, attrs);
+                debug!("set_wnd_attr({:?}, {:?})", hwnd, attrs);
+                SCREEN.get_with_wm(self).set_wnd_attr(ts_hwnd, attrs);
             }
             _ => unreachable!(),
         }
@@ -416,8 +435,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
                 wm.remove_wnd(hwnd);
             }
-            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
-                SCREEN.get_with_wm(self).remove_wnd(hwnd);
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(ts_hwnd)) => {
+                debug!("remove_wnd({:?})", hwnd);
+                SCREEN.get_with_wm(self).remove_wnd(ts_hwnd);
             }
             _ => unreachable!(),
         }
@@ -428,8 +448,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
                 wm.update_wnd(hwnd);
             }
-            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
-                SCREEN.get_with_wm(self).update_wnd(hwnd);
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(ts_hwnd)) => {
+                debug!("update_wnd({:?})", hwnd);
+                SCREEN.get_with_wm(self).update_wnd(ts_hwnd);
             }
             _ => unreachable!(),
         }
@@ -438,8 +459,10 @@ impl iface::Wm for Wm {
     fn get_wnd_size(self, hwnd: &Self::HWnd) -> [u32; 2] {
         match (self.backend_and_wm(), &hwnd.inner) {
             (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.get_wnd_size(hwnd),
-            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
-                SCREEN.get_with_wm(self).get_wnd_size(hwnd)
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(tc_hwnd)) => {
+                let size = SCREEN.get_with_wm(self).get_wnd_size(tc_hwnd);
+                trace!("get_wnd_size({:?}) -> {:?}", hwnd, size);
+                size
             }
             _ => unreachable!(),
         }
@@ -448,8 +471,10 @@ impl iface::Wm for Wm {
     fn get_wnd_dpi_scale(self, hwnd: &Self::HWnd) -> f32 {
         match (self.backend_and_wm(), &hwnd.inner) {
             (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.get_wnd_dpi_scale(hwnd),
-            (BackendAndWm::Testing { .. }, HWndInner::Testing(hwnd)) => {
-                SCREEN.get_with_wm(self).get_wnd_dpi_scale(hwnd)
+            (BackendAndWm::Testing { .. }, HWndInner::Testing(tc_hwnd)) => {
+                let scale = SCREEN.get_with_wm(self).get_wnd_dpi_scale(tc_hwnd);
+                trace!("get_wnd_dpi_scale({:?}) -> {:?}", hwnd, scale);
+                scale
             }
             _ => unreachable!(),
         }
@@ -466,9 +491,12 @@ impl iface::Wm for Wm {
             BackendAndWm::Testing { .. } => {
                 let attrs = layer_attrs_to_testing(attrs);
                 let screen = SCREEN.get_with_wm(self);
-                HLayer {
+                debug!("new_layer({:?})", attrs);
+                let hlayer = HLayer {
                     inner: HLayerInner::Testing(screen.new_layer(attrs)),
-                }
+                };
+                debug!("... -> {:?}", hlayer);
+                hlayer
             }
         }
     }
@@ -478,9 +506,10 @@ impl iface::Wm for Wm {
                 let attrs = layer_attrs_to_native(attrs);
                 wm.set_layer_attr(hlayer, attrs);
             }
-            (BackendAndWm::Testing { .. }, HLayerInner::Testing(hlayer)) => {
+            (BackendAndWm::Testing { .. }, HLayerInner::Testing(tc_hlayer)) => {
+                debug!("set_layer_attr({:?}, {:?})", hlayer, attrs);
                 let attrs = layer_attrs_to_testing(attrs);
-                SCREEN.get_with_wm(self).set_layer_attr(hlayer, attrs);
+                SCREEN.get_with_wm(self).set_layer_attr(tc_hlayer, attrs);
             }
             _ => unreachable!(),
         }
@@ -490,8 +519,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HLayerInner::Native(hlayer)) => {
                 wm.remove_layer(hlayer);
             }
-            (BackendAndWm::Testing { .. }, HLayerInner::Testing(hlayer)) => {
-                SCREEN.get_with_wm(self).remove_layer(hlayer);
+            (BackendAndWm::Testing { .. }, HLayerInner::Testing(tc_hlayer)) => {
+                debug!("remove_layer({:?})", hlayer);
+                SCREEN.get_with_wm(self).remove_layer(tc_hlayer);
             }
             _ => unreachable!(),
         }
