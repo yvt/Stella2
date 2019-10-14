@@ -294,6 +294,25 @@ impl wmapi::TestingWm for Wm {
         let duration = till.saturating_duration_since(std::time::Instant::now());
         self.step_timeout(Some(duration));
     }
+
+    fn hwnds(&self) -> Vec<HWnd> {
+        SCREEN
+            .get_with_wm(*self)
+            .hwnds()
+            .into_iter()
+            .map(|hwnd| HWnd {
+                inner: HWndInner::Testing(hwnd),
+            })
+            .collect()
+    }
+
+    fn wnd_attrs(&self, hwnd: &HWnd) -> Option<wmapi::WndAttrs> {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN.get_with_wm(*self).wnd_attrs(hwnd)
+    }
 }
 
 impl iface::Wm for Wm {

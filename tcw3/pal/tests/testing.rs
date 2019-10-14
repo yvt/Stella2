@@ -140,18 +140,29 @@ fn empty_wnd() {
     testing::run_test(|twm| {
         let wm = twm.wm();
 
+        const CAPTION: &str = "Hello world";
+        const VIS: bool = true;
         const SIZE: [u32; 2] = [100, 200];
+        const MIN_SIZE: [u32; 2] = [50, 100];
+        const MAX_SIZE: [u32; 2] = [300, 300];
 
         let hwnd = wm.new_wnd(pal::WndAttrs {
-            caption: Some("Hello world".into()),
-            visible: Some(true),
+            caption: Some(CAPTION.into()),
+            visible: Some(VIS),
             size: Some(SIZE),
-            min_size: Some([50, 100]),
-            max_size: Some([300, 300]),
+            min_size: Some(MIN_SIZE),
+            max_size: Some(MAX_SIZE),
             ..Default::default()
         });
 
         assert_eq!(dbg!(wm.get_wnd_size(&hwnd)), SIZE);
+        let attrs = twm.wnd_attrs(&hwnd).unwrap();
+        assert_eq!(attrs.caption, CAPTION);
+        assert_eq!(attrs.visible, VIS);
+        assert_eq!(attrs.size, SIZE);
+        assert_eq!(attrs.min_size, MIN_SIZE);
+        assert_eq!(attrs.max_size, MAX_SIZE);
+        assert_eq!(attrs.flags, pal::WndFlags::default());
 
         wm.update_wnd(&hwnd);
 
@@ -160,6 +171,8 @@ fn empty_wnd() {
         // TODO: examine rendered contents
 
         wm.remove_wnd(&hwnd);
+
+        assert!(twm.wnd_attrs(&hwnd).is_none());
     });
 }
 

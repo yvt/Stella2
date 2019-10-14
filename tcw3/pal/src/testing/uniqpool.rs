@@ -92,6 +92,18 @@ impl<T> UniqPool<T> {
     pub fn iter(&self) -> impl Iterator<Item = &'_ T> + '_ {
         self.pool.iter().map(|entry| &entry.data)
     }
+
+    pub fn ptr_iter(&self) -> impl Iterator<Item = (PoolPtr, &'_ T)> + '_ {
+        self.pool.ptr_iter().map(|(ptr, entry)| {
+            (
+                PoolPtr {
+                    inner: ptr,
+                    token: entry.token,
+                },
+                &entry.data,
+            )
+        })
+    }
 }
 
 impl<T> ops::Index<PoolPtr> for UniqPool<T> {

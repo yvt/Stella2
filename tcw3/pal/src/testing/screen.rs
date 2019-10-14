@@ -6,7 +6,7 @@ use super::super::{iface, swrast};
 use super::{
     bitmap::Bitmap,
     uniqpool::{PoolPtr, UniqPool},
-    Wm,
+    wmapi, Wm,
 };
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
@@ -36,8 +36,8 @@ struct State {
 pub struct Wnd {
     sr_wnd: swrast::HWnd,
 
-    size: [u32; 2],
     dpi_scale: f32,
+    attrs: wmapi::WndAttrs,
 
     dirty_rect: Option<Box2<usize>>,
 }
@@ -62,12 +62,17 @@ impl Screen {
 
         let wnd = Wnd {
             sr_wnd: state.sr_scrn.new_wnd(),
-            size: attrs.size.unwrap_or([100, 100]),
             dpi_scale: 1.0, // TODO
             dirty_rect: None,
+            attrs: wmapi::WndAttrs {
+                size: attrs.size.unwrap_or([100, 100]),
+                min_size: attrs.min_size.unwrap_or([0; 2]),
+                max_size: attrs.max_size.unwrap_or([u32::max_value(); 2]),
+                flags: attrs.flags.unwrap_or(iface::WndFlags::default()),
+                caption: attrs.caption.unwrap_or("Default title".into()).into_owned(),
+                visible: attrs.visible.unwrap_or(false),
+            },
         };
-
-        // TODO
 
         state
             .sr_scrn
@@ -83,17 +88,19 @@ impl Screen {
 
         let wnd = &mut state.wnds[hwnd.ptr];
 
-        if let Some(value) = attrs.size {
-            wnd.size = value;
+        macro_rules! apply {
+            ($name:ident) => {
+                if let Some(value) = attrs.$name {
+                    wnd.attrs.$name = value.into();
+                }
+            };
         }
-
-        // TODO:
-        // - `min_size`
-        // - `max_size`
-        // - `flags`
-        // - `caption`
-        // - `visible`
-        // - `listener`
+        apply!(size);
+        apply!(min_size);
+        apply!(max_size);
+        apply!(flags);
+        apply!(caption);
+        apply!(visible);
 
         if let Some(layer) = attrs.layer {
             state
@@ -115,7 +122,7 @@ impl Screen {
         let wnd = &mut state.wnds[hwnd.ptr];
 
         // Calculate the surface size
-        let [size_w, size_h] = wnd.size;
+        let [size_w, size_h] = wnd.attrs.size;
         let dpi_scale = wnd.dpi_scale;
         let surf_size = [
             (size_w as f32 * dpi_scale) as usize,
@@ -153,7 +160,7 @@ impl Screen {
     }
     pub(super) fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
         let state = self.state.borrow();
-        state.wnds[hwnd.ptr].size
+        state.wnds[hwnd.ptr].attrs.size
     }
     pub(super) fn get_wnd_dpi_scale(&self, hwnd: &HWnd) -> f32 {
         let state = self.state.borrow();
@@ -180,6 +187,20 @@ impl Screen {
         let mut state = self.state.borrow_mut();
 
         state.sr_scrn.remove_layer(&layer.sr_layer);
+    }
+
+    /// Implements `TestingWm::hwnds`.
+    pub(super) fn hwnds(&self) -> Vec<HWnd> {
+        let state = self.state.borrow();
+
+        state.wnds.ptr_iter().map(|(ptr, _)| HWnd { ptr }).collect()
+    }
+
+    /// Implements `TestingWm::wnd_attrs`.
+    pub(super) fn wnd_attrs(&self, hwnd: &HWnd) -> Option<wmapi::WndAttrs> {
+        let state = self.state.borrow();
+
+        state.wnds.get(hwnd.ptr).map(|wnd| wnd.attrs.clone())
     }
 }
 
