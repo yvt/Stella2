@@ -104,6 +104,7 @@ use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
 
 mod eventloop;
 mod screen;
+mod uniqpool;
 mod wmapi;
 mod wndlistenershim;
 pub use self::wmapi::TestingWm;

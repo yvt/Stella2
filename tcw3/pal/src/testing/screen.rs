@@ -1,10 +1,13 @@
 //! Compositor for the testing backend.
 use cggeom::{box2, Box2};
-use iterpool::{Pool, PoolPtr};
 use std::cell::RefCell;
 
 use super::super::{iface, swrast};
-use super::{bitmap::Bitmap, Wm};
+use super::{
+    bitmap::Bitmap,
+    uniqpool::{PoolPtr, UniqPool},
+    Wm,
+};
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -27,7 +30,7 @@ pub struct HLayer {
 struct State {
     binner: swrast::Binner<Bitmap>,
     sr_scrn: swrast::Screen<Bitmap>,
-    wnds: Pool<Wnd>,
+    wnds: UniqPool<Wnd>,
 }
 
 pub struct Wnd {
@@ -44,7 +47,7 @@ impl Screen {
         let state = State {
             binner: swrast::Binner::new(),
             sr_scrn: swrast::Screen::new(),
-            wnds: Pool::new(),
+            wnds: UniqPool::new(),
         };
 
         Self {
