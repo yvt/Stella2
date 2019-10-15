@@ -300,7 +300,7 @@ impl wmapi::TestingWm for Wm {
     }
 
     fn step_unsend(&self) {
-        self.step_unsend();
+        (*self).step_unsend();
     }
 
     fn step(&self) {

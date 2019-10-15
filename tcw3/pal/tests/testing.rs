@@ -42,8 +42,9 @@ fn step_unsend() {
             twm.wm().invoke(move |_| flag.set(true));
         }
 
-        twm.step_unsend();
         assert!(!flag.get());
+        twm.step_unsend();
+        assert!(flag.get());
     });
 }
 
