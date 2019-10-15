@@ -183,6 +183,8 @@ fn empty_wnd() {
             ..Default::default()
         });
 
+        assert_eq!(twm.hwnds().len(), 1);
+
         assert_eq!(dbg!(wm.get_wnd_size(&hwnd)), SIZE);
         let attrs = twm.wnd_attrs(&hwnd).unwrap();
         assert_eq!(attrs.caption, CAPTION);
