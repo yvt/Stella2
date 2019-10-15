@@ -1,5 +1,6 @@
 //! Compositor for the testing backend.
 use cggeom::{box2, Box2};
+use log::warn;
 use std::{cell::RefCell, fmt};
 
 use super::super::{iface, swrast};
@@ -65,6 +66,17 @@ impl Screen {
         Self {
             state: RefCell::new(state),
         }
+    }
+
+    pub(super) fn reset(&self) {
+        let mut state = self.state.borrow_mut();
+
+        if state.wnds.iter().next().is_some() {
+            warn!("Deleting {} stray window(s)", state.wnds.iter().count());
+        }
+
+        state.sr_scrn = swrast::Screen::new();
+        state.wnds = UniqPool::new();
     }
 
     pub(super) fn new_wnd(&self, attrs: WndAttrs<'_>) -> HWnd {

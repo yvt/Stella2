@@ -134,6 +134,8 @@ mod text;
 
 /// Activate the testing backend and call the given function on the main thread.
 ///
+/// The backend is automatically reset every time `with_testing_wm` is called.
+///
 /// Panics if the native backend has already been initialized.
 /// See [the module documentation](index.html) for more.
 pub fn with_testing_wm<R: Send + 'static>(
@@ -168,7 +170,9 @@ pub fn with_testing_wm<R: Send + 'static>(
             }));
         }
 
+        wm.reset();
         let result = panic::catch_unwind(|| cb(wm));
+        wm.reset();
 
         send.send(Event::End(result)).unwrap();
         // `send` is dropped here. This stops the log redirection immediately.
@@ -320,6 +324,13 @@ fn try_start_testing_main_thread() {
 
 mt_lazy_static! {
     static <Wm> ref SCREEN: screen::Screen => screen::Screen::new;
+}
+
+impl Wm {
+    fn reset(self) {
+        SCREEN.get_with_wm(self).reset();
+        self.eradicate_events();
+    }
 }
 
 impl wmapi::TestingWm for Wm {

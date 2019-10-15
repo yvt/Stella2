@@ -1,3 +1,4 @@
+use log::{trace, warn};
 use std::{
     cell::RefCell,
     collections::LinkedList,
@@ -8,7 +9,6 @@ use std::{
     thread,
     time::Duration,
 };
-use log::trace;
 
 use super::Wm;
 use crate::{prelude::*, MtLock};
@@ -114,6 +114,17 @@ impl Wm {
         // We are not receving events anymore, sleep indefinitely
         loop {
             thread::sleep(Duration::from_secs(256));
+        }
+    }
+
+    pub(super) fn eradicate_events(self) {
+        let mut queue = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut();
+        if !queue.is_empty() {
+            warn!("Dropping {} unprocessed unsend dispatch(es)", queue.len());
+            // Using `queue.clear()` here causes a linker error.
+            // Maybe a bug in the compiler?
+            // Rust version: rustc 1.40.0-nightly (1721c9685 2019-10-12)
+            while let Some(_) = queue.pop_front() {}
         }
     }
 }

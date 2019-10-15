@@ -151,6 +151,19 @@ fn bitmap_text() {
 }
 
 #[test]
+fn run_test_reset() {
+    testing::run_test(|twm| {
+        twm.wm().new_wnd(Default::default());
+        assert_eq!(twm.hwnds().len(), 1);
+    });
+    // The backend is automatically reset between test runs
+    testing::run_test(|twm| {
+        twm.wm().new_wnd(Default::default());
+        assert_eq!(twm.hwnds().len(), 1);
+    });
+}
+
+#[test]
 fn empty_wnd() {
     testing::run_test(|twm| {
         let wm = twm.wm();
