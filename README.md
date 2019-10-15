@@ -27,7 +27,7 @@ TODO
 
 ## Testing
 
-TCW3 includes a headless backend named `testing` which is provided for testing purposes. You need to add a feature flag `tcw3_pal/testing` or `tcw3/testing` to use it:
+TCW3 includes a headless backend named `testing`, which is provided for testing purposes. It's disabled by default because of the additional dependencies it introduces. Use the feature flag `tcw3/testing` to enable it:
 
      cargo test --features tcw3/testing
 

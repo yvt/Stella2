@@ -1977,6 +1977,8 @@ dependencies = [
 name = "tcw3_testing"
 version = "0.1.0"
 dependencies = [
+ "env_logger 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tcw3_pal 0.1.0",
  "tcw3_testing_macros 0.1.0",
 ]

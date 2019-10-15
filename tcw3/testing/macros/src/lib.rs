@@ -107,6 +107,7 @@ pub fn use_testing_wm(args: TokenStream, input: TokenStream) -> TokenStream {
             quote::quote! {
                 #(#attrs)*
                 #vis fn #ident(#(#outer_args),*) {
+                    #testing_path::try_init_logger();
                     #item_fn
                     #testing_path::pal_testing::run_test(move |__testing_wm| {
                         #ident(__testing_wm, #(#call_args),*)

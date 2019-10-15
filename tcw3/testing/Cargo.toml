@@ -5,8 +5,11 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [features]
-testing = ["tcw3_pal/testing"]
+testing = ["tcw3_pal/testing", "env_logger", "log"]
 
 [dependencies]
+env_logger = { version = "0.7.0", optional = true }
+log = { version = "0.4", optional = true }
+
 tcw3_pal = { path = "../pal" }
 tcw3_testing_macros = { path = "./macros" }
