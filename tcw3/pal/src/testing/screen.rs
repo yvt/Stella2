@@ -1,5 +1,5 @@
 //! Compositor for the testing backend.
-use cggeom::{box2, Box2};
+use cggeom::{box2, prelude::*, Box2};
 use log::warn;
 use std::{cell::RefCell, fmt};
 
@@ -144,6 +144,15 @@ impl Screen {
         let mut state = self.state.borrow_mut();
         let state = &mut *state; // enable split borrow
         let wnd = &mut state.wnds[hwnd.ptr];
+
+        // Compute the dirty region
+        if let Some(new_dirty) = state.sr_scrn.update_wnd(&wnd.sr_wnd) {
+            if let Some(x) = &mut wnd.dirty_rect {
+                x.union_assign(&new_dirty);
+            } else {
+                wnd.dirty_rect = Some(new_dirty);
+            }
+        }
 
         // Calculate the surface size
         let [size_w, size_h] = wnd.attrs.size;
