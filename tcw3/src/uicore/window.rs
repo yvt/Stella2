@@ -273,20 +273,21 @@ impl Wnd {
         {
             let view: HView = self.content_view.borrow_mut().take().unwrap();
 
-            debug_assert!(std::ptr::eq(
-                self,
-                // Get the superview
-                &*view
-                    .view
-                    .superview
-                    .borrow()
-                    // Assuming it's a window...
-                    .wnd()
-                    .unwrap()
-                    // It should be still valid...
-                    .upgrade()
-                    .unwrap()
-            ));
+            debug_assert!({
+                // Get the superview of the content view
+                let sv = &*view.view.superview.borrow();
+
+                // ... which must be a window
+                let wnd = sv.wnd().unwrap();
+
+                // ... that is identical to `self`
+                if let Some(wnd) = wnd.upgrade() {
+                    std::ptr::eq(self, &*wnd)
+                } else {
+                    // This happens if `close` was called from `Wnd::drop`
+                    true
+                }
+            });
 
             *view.view.superview.borrow_mut() = Superview::empty();
 
