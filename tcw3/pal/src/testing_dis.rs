@@ -5,7 +5,10 @@ use std::panic;
 
 #[path = "testing/wmapi.rs"]
 mod wmapi;
-pub use self::wmapi::TestingWm;
+#[path = "testing/logging.rs"]
+#[allow(dead_code)]
+mod logging;
+pub use self::{wmapi::TestingWm, logging::Logger};
 
 /// Call `with_testing_wm` if the testing backend is enabled. Otherwise,
 /// output a warning message and return without calling the givne function.

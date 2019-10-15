@@ -106,18 +106,20 @@ use log::{debug, trace};
 use std::{
     marker::PhantomData,
     panic,
-    sync::mpsc::sync_channel,
+    rc::Rc,
+    sync::mpsc::{channel, sync_channel},
     thread::{self, ThreadId},
 };
 
 use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
 
 mod eventloop;
+mod logging;
 mod screen;
 mod uniqpool;
 mod wmapi;
 mod wndlistenershim;
-pub use self::wmapi::TestingWm;
+pub use self::{logging::Logger, wmapi::TestingWm};
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -142,16 +144,41 @@ pub fn with_testing_wm<R: Send + 'static>(
         panic!("Cannot start the testing backend; the native backend is already active.");
     }
 
-    let (send, recv) = sync_channel(1);
+    enum Event<R> {
+        Log(logging::LoggerEvent),
+        End(std::thread::Result<R>),
+    }
+
+    let (send, recv) = channel();
     Wm::invoke_on_main_thread(move |wm| {
+        let send = Rc::new(send);
+
+        // Configure `logging::Logger` to redirect log messages to
+        // the calling thread
+        {
+            let send = Rc::downgrade(&send);
+            logging::set_log_delegate(Box::new(move |e| {
+                if let Some(send) = send.upgrade() {
+                    send.send(Event::Log(e)).unwrap();
+                    true
+                } else {
+                    false
+                }
+            }));
+        }
+
         let result = panic::catch_unwind(|| cb(wm));
 
-        send.send(result).unwrap();
+        send.send(Event::End(result)).unwrap();
+        // `send` is dropped here. This stops the log redirection immediately.
     });
 
-    match recv.recv().unwrap() {
-        Ok(x) => x,
-        Err(x) => panic::resume_unwind(x),
+    loop {
+        match recv.recv().unwrap() {
+            Event::Log(e) => e.process(),
+            Event::End(Ok(x)) => break x,
+            Event::End(Err(x)) => panic::resume_unwind(x),
+        }
     }
 }
 
