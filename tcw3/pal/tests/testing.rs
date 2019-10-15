@@ -70,7 +70,7 @@ fn invoke_on_main_thread() {
 #[test]
 #[should_panic]
 fn panicking() {
-    testing::run_test(|twm| {
+    testing::run_test(|_| {
         panic!("this panic should be contained to this test case");
     });
 }

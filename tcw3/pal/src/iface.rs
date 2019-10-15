@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{borrow::Cow, fmt::Debug, fmt};
+use std::{borrow::Cow, fmt, fmt::Debug};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -185,7 +185,10 @@ impl<T: Wm, TLayer: Debug> Debug for WndAttrs<'_, T, TLayer> {
             .field("flags", &self.flags)
             .field("caption", &self.caption)
             .field("visible", &self.visible)
-            .field("listener", &self.listener.as_ref().map(|bx| (&*bx) as *const _))
+            .field(
+                "listener",
+                &self.listener.as_ref().map(|bx| (&*bx) as *const _),
+            )
             .field("layer", &self.layer)
             .finish()
     }

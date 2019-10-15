@@ -56,7 +56,7 @@ pub struct Wnd {
 }
 
 impl Screen {
-    pub(super) fn new(wm: Wm) -> Self {
+    pub(super) fn new() -> Self {
         let state = State {
             binner: swrast::Binner::new(),
             sr_scrn: swrast::Screen::new(),

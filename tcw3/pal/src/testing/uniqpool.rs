@@ -1,8 +1,7 @@
 use iterpool::{self, Pool};
 use std::{
-    ops,
+    fmt, ops,
     sync::atomic::{AtomicUsize, Ordering},
-    fmt,
 };
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
