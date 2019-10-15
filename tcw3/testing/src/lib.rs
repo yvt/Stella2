@@ -46,6 +46,7 @@
 //!         let _hwnd = twm.wm().new_wnd(Default::default());
 //!     }
 //!
+#[doc(hidden)]
 pub use tcw3_pal::testing as pal_testing;
 pub use tcw3_testing_macros::use_testing_wm;
 
@@ -65,5 +66,6 @@ pub fn try_init_logger() {
 pub fn try_init_logger() {}
 
 pub mod prelude {
+    #[doc(no_inline)]
     pub use crate::pal_testing::TestingWm;
 }
