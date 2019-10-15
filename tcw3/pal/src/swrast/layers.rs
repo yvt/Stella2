@@ -14,6 +14,7 @@ use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Vector2};
 use iterpool::{Pool, PoolPtr};
+use std::fmt;
 
 use super::super::iface;
 
@@ -27,15 +28,27 @@ use super::{
 };
 
 /// The window handle type of [`Screen`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HWnd {
     ptr: PoolPtr,
 }
 
+impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("HWnd").field(&self.ptr).finish()
+    }
+}
+
 /// The layer handle type of [`Screen`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct HLayer {
     ptr: PoolPtr,
+}
+
+impl fmt::Debug for HLayer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("HLayer").field(&self.ptr).finish()
+    }
 }
 
 /// Manages layers and windows.

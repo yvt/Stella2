@@ -1,6 +1,6 @@
 //! Compositor for the testing backend.
 use cggeom::{box2, Box2};
-use std::cell::RefCell;
+use std::{cell::RefCell, fmt};
 
 use super::super::{iface, swrast};
 use super::{
@@ -16,15 +16,27 @@ pub(super) struct Screen {
     state: RefCell<State>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HWnd {
     /// A pointer into `State::wnds`.
     ptr: PoolPtr,
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("HWnd").field(&self.ptr).finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct HLayer {
     sr_layer: swrast::HLayer,
+}
+
+impl fmt::Debug for HLayer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.sr_layer)
+    }
 }
 
 struct State {

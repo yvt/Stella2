@@ -2,14 +2,24 @@ use iterpool::{self, Pool};
 use std::{
     ops,
     sync::atomic::{AtomicUsize, Ordering},
+    fmt,
 };
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PoolPtr {
     token: usize,
     inner: iterpool::PoolPtr,
+}
+
+impl fmt::Debug for PoolPtr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("UniqPoolPtr")
+            .field(&self.token)
+            .field(&self.inner.0)
+            .finish()
+    }
 }
 
 /// Like `Pool<T>`, but `PoolPtr` is guaranteed to be unique.

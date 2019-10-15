@@ -104,6 +104,7 @@ use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use log::{debug, trace};
 use std::{
+    fmt,
     marker::PhantomData,
     panic,
     rc::Rc,
@@ -555,23 +556,41 @@ impl iface::Wm for Wm {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HWnd {
     inner: HWndInner,
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            HWndInner::Native(imp) => write!(f, "{:?}", imp),
+            HWndInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone)]
 enum HWndInner {
     Native(native::HWnd),
     Testing(screen::HWnd),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HLayer {
     inner: HLayerInner,
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Debug for HLayer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            HLayerInner::Native(imp) => write!(f, "{:?}", imp),
+            HLayerInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone)]
 enum HLayerInner {
     Native(native::HLayer),
     Testing(screen::HLayer),
@@ -726,12 +745,21 @@ macro_rules! forward {
     } => {};
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Bitmap {
     inner: BitmapInner,
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Debug for Bitmap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            BitmapInner::Native(imp) => write!(f, "{:?}", imp),
+            BitmapInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone)]
 enum BitmapInner {
     Native(native::Bitmap),
     Testing(bitmap::Bitmap),
@@ -823,12 +851,21 @@ impl iface::CanvasText<TextLayout> for BitmapBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CharStyle {
     inner: CharStyleInner,
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Debug for CharStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            CharStyleInner::Native(imp) => write!(f, "{:?}", imp),
+            CharStyleInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone)]
 enum CharStyleInner {
     Native(native::CharStyle),
     Testing(text::CharStyle),
@@ -883,12 +920,19 @@ impl iface::CharStyle for CharStyle {
     }
 }
 
-#[derive(Debug)]
 pub struct TextLayout {
     inner: TextLayoutInner,
 }
 
-#[derive(Debug)]
+impl fmt::Debug for TextLayout {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            TextLayoutInner::Native(imp) => write!(f, "{:?}", imp),
+            TextLayoutInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
 enum TextLayoutInner {
     Native(native::TextLayout),
     Testing(text::TextLayout),
