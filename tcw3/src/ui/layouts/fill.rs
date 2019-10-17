@@ -61,3 +61,41 @@ impl Layout for FillLayout {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use cggeom::box2;
+
+    use super::*;
+    use crate::{
+        testing::{prelude::*, use_testing_wm},
+        ui::layouts::EmptyLayout,
+        uicore::HWnd,
+    };
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn test(twm: &dyn TestingWm) {
+        let wm = twm.wm();
+
+        let sv = HView::new(Default::default());
+        sv.set_layout(EmptyLayout::new(SizeTraits {
+            min: [20.0; 2].into(),
+            max: [50.0; 2].into(),
+            preferred: [30.0; 2].into(),
+        }));
+
+        let wnd = HWnd::new(wm);
+        wnd.content_view()
+            .set_layout(FillLayout::new(sv.clone()).with_uniform_margin(10.0));
+        wnd.set_visibility(true);
+        twm.step_unsend();
+
+        // preferred size
+        assert_eq!(sv.global_frame(), box2! { min: [10.0; 2], max: [40.0; 2] });
+        assert_eq!(
+            wnd.content_view().global_frame(),
+            box2! { min: [0.0; 2], max: [50.0; 2] }
+        );
+    }
+}

@@ -50,3 +50,58 @@ impl Layout for AbsLayout {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use cggeom::box2;
+
+    use super::*;
+    use crate::{
+        testing::{prelude::*, use_testing_wm},
+        uicore::HWnd,
+    };
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn test(twm: &dyn TestingWm) {
+        let wm = twm.wm();
+
+        let sv1 = HView::new(Default::default());
+
+        let sv2 = HView::new(Default::default());
+        sv2.set_layout(AbsLayout::new(
+            SizeTraits {
+                min: [20.0; 2].into(),
+                max: [20.0; 2].into(),
+                preferred: [20.0; 2].into(),
+            },
+            std::iter::empty(),
+        ));
+
+        let wnd = HWnd::new(wm);
+        wnd.content_view().set_layout(AbsLayout::new(
+            SizeTraits {
+                min: [100.0; 2].into(),
+                max: [100.0; 2].into(),
+                preferred: [100.0; 2].into(),
+            },
+            vec![
+                (
+                    sv1.clone(),
+                    box2! { min: [10.0; 2], max: [30.0; 2] },
+                    AlignFlags::JUSTIFY,
+                ),
+                (
+                    sv2.clone(),
+                    box2! { min: [50.0; 2], max: [90.0; 2] },
+                    AlignFlags::CENTER,
+                ),
+            ],
+        ));
+        wnd.set_visibility(true);
+        twm.step_unsend();
+
+        assert_eq!(sv1.global_frame(), box2! { min: [10.0; 2], max: [30.0; 2] });
+        assert_eq!(sv2.global_frame(), box2! { min: [60.0; 2], max: [80.0; 2] });
+    }
+}
