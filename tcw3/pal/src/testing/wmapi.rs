@@ -1,3 +1,4 @@
+use cgmath::Point2;
 use std::time::Instant;
 
 use crate::{iface, HWnd};
@@ -29,6 +30,15 @@ pub trait TestingWm: 'static {
 
     /// Get the attributes of a window.
     fn wnd_attrs(&self, hwnd: &HWnd) -> Option<WndAttrs>;
+
+    /// Trigger `WndListener::mouse_motion`.
+    fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>);
+
+    /// Trigger `WndListener::mouse_leave`.
+    fn raise_mouse_leave(&self, hwnd: &HWnd);
+
+    /// Trigger `WndListener::mouse_drag`.
+    fn raise_mouse_drag(&self, hwnd: &HWnd, loc: Point2<f32>, button: u8) -> Box<dyn MouseDrag>;
 }
 
 /// A snapshot of window attributes.
@@ -40,4 +50,20 @@ pub struct WndAttrs {
     pub flags: iface::WndFlags,
     pub caption: String,
     pub visible: bool,
+}
+
+/// Provides an interface for simulating a mouse drag geature.
+///
+/// See [`MouseDragListener`] for the semantics of the methods.
+///
+/// [`MouseDragListener`]: crate::iface::MouseDragListener
+pub trait MouseDrag {
+    /// Trigger `MouseDragListener::mouse_motion`.
+    fn mouse_motion(&self, _loc: Point2<f32>);
+    /// Trigger `MouseDragListener::mouse_down`.
+    fn mouse_down(&self, _loc: Point2<f32>, _button: u8);
+    /// Trigger `MouseDragListener::mouse_up`.
+    fn mouse_up(&self, _loc: Point2<f32>, _button: u8);
+    /// Trigger `MouseDragListener::cancel`.
+    fn cancel(&self);
 }

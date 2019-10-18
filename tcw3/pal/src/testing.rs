@@ -357,6 +357,39 @@ impl wmapi::TestingWm for Wm {
         };
         SCREEN.get_with_wm(*self).wnd_attrs(hwnd)
     }
+
+    fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>) {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN
+            .get_with_wm(*self)
+            .raise_mouse_motion(*self, hwnd, loc)
+    }
+
+    fn raise_mouse_leave(&self, hwnd: &HWnd) {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN.get_with_wm(*self).raise_mouse_leave(*self, hwnd)
+    }
+
+    fn raise_mouse_drag(
+        &self,
+        hwnd: &HWnd,
+        loc: Point2<f32>,
+        button: u8,
+    ) -> Box<dyn wmapi::MouseDrag> {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN
+            .get_with_wm(*self)
+            .raise_mouse_drag(*self, hwnd, loc, button)
+    }
 }
 
 impl iface::Wm for Wm {
@@ -563,6 +596,14 @@ impl fmt::Debug for HWnd {
         match &self.inner {
             HWndInner::Native(imp) => write!(f, "{:?}", imp),
             HWndInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+impl From<&screen::HWnd> for HWnd {
+    fn from(hwnd: &screen::HWnd) -> HWnd {
+        HWnd {
+            inner: HWndInner::Testing(hwnd.clone()),
         }
     }
 }

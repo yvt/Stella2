@@ -296,3 +296,84 @@ fn wnd_with_layer() {
         wm.remove_layer(&hlayer);
     });
 }
+
+#[test]
+fn wnd_mouse_events() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, _loc: Point2<f32>) {
+                assert_eq!(self.0.get(), 1);
+                self.0.set(2);
+            }
+
+            fn mouse_leave(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 0);
+                self.0.set(1);
+            }
+
+            fn mouse_drag(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                _loc: Point2<f32>,
+                _button: u8,
+            ) -> Box<dyn MouseDragListener<pal::Wm>> {
+                assert_eq!(self.0.get(), 2);
+                self.0.set(3);
+                Box::new(self.clone())
+            }
+        }
+
+        impl MouseDragListener<pal::Wm> for Listener {
+            fn mouse_motion(&self, _: pal::Wm, _: &pal::HWnd, _loc: Point2<f32>) {
+                assert_eq!(self.0.get(), 4);
+                self.0.set(5);
+            }
+            fn mouse_down(&self, _: pal::Wm, _: &pal::HWnd, _loc: Point2<f32>, _button: u8) {
+                assert_eq!(self.0.get(), 3);
+                self.0.set(4);
+            }
+            fn mouse_up(&self, _: pal::Wm, _: &pal::HWnd, _loc: Point2<f32>, _button: u8) {
+                assert_eq!(self.0.get(), 5);
+                self.0.set(6);
+            }
+            fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 4);
+                self.0.set(7);
+            }
+        }
+
+        let state = Rc::new(Cell::new(0));
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            size: Some([100; 2]),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        assert_eq!(state.get(), 0);
+        twm.raise_mouse_leave(&hwnd);
+        assert_eq!(state.get(), 1);
+        twm.raise_mouse_motion(&hwnd, [20.0; 2].into());
+        assert_eq!(state.get(), 2);
+        let drag = twm.raise_mouse_drag(&hwnd, [20.0; 2].into(), 0);
+        assert_eq!(state.get(), 3);
+        drag.mouse_down([20.0; 2].into(), 0);
+        assert_eq!(state.get(), 4);
+        drag.mouse_motion([30.0; 2].into());
+        assert_eq!(state.get(), 5);
+        drag.mouse_up([20.0; 2].into(), 0);
+        assert_eq!(state.get(), 6);
+
+        state.set(3);
+        drag.mouse_down([20.0; 2].into(), 1);
+        assert_eq!(state.get(), 4);
+        drag.cancel();
+        assert_eq!(state.get(), 7);
+    });
+}

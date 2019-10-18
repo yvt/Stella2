@@ -1,7 +1,8 @@
 //! Compositor for the testing backend.
 use cggeom::{box2, prelude::*, Box2};
+use cgmath::Point2;
 use log::warn;
-use std::{cell::RefCell, fmt};
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use super::super::{iface, swrast};
 use super::{
@@ -51,6 +52,7 @@ pub struct Wnd {
 
     dpi_scale: f32,
     attrs: wmapi::WndAttrs,
+    listener: Rc<dyn iface::WndListener<Wm>>,
 
     dirty_rect: Option<Box2<usize>>,
 }
@@ -96,6 +98,7 @@ impl Screen {
                 caption: attrs.caption.unwrap_or("Default title".into()).into_owned(),
                 visible: attrs.visible.unwrap_or(false),
             },
+            listener: Rc::from(attrs.listener.unwrap_or_else(|| Box::new(()))),
         };
 
         state
@@ -130,6 +133,10 @@ impl Screen {
             state
                 .sr_scrn
                 .set_wnd_layer(&wnd.sr_wnd, layer.map(|hl| hl.sr_layer));
+        }
+
+        if let Some(value) = attrs.listener {
+            wnd.listener = Rc::from(value);
         }
     }
     pub(super) fn remove_wnd(&self, hwnd: &HWnd) {
@@ -235,7 +242,53 @@ impl Screen {
 
         state.wnds.get(hwnd.ptr).map(|wnd| wnd.attrs.clone())
     }
+
+    /// Get a `WndListener`.
+    fn wnd_listener(&self, hwnd: &HWnd) -> Result<Rc<dyn iface::WndListener<Wm>>, BadHWndError> {
+        let state = self.state.borrow();
+        state
+            .wnds
+            .get(hwnd.ptr)
+            .ok_or(BadHWndError)
+            .map(|wnd| Rc::clone(&wnd.listener))
+    }
+
+    /// Implements `TestingWm::raise_mouse_motion`.
+    pub(super) fn raise_mouse_motion(&self, wm: Wm, hwnd: &HWnd, loc: Point2<f32>) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        listener.mouse_motion(wm, &hwnd.into(), loc);
+    }
+
+    /// Implements `TestingWm::raise_mouse_leave`.
+    pub(super) fn raise_mouse_leave(&self, wm: Wm, hwnd: &HWnd) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        listener.mouse_leave(wm, &hwnd.into());
+    }
+
+    /// Implements `TestingWm::raise_mouse_drag`.
+    pub(super) fn raise_mouse_drag(
+        &self,
+        wm: Wm,
+        hwnd: &HWnd,
+        loc: Point2<f32>,
+        button: u8,
+    ) -> Box<dyn wmapi::MouseDrag> {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        let inner = listener.mouse_drag(wm, &hwnd.into(), loc, button);
+
+        Box::new(MouseDrag {
+            wm,
+            hwnd: hwnd.into(),
+            inner,
+        })
+    }
 }
+
+#[derive(Debug)]
+struct BadHWndError;
 
 /// Convert the `LayerAttrs` of `Wm` to the `LayerAttrs` of `swrast`.
 /// Copied straight from `unix/comp.rs`.
@@ -255,5 +308,26 @@ fn layer_attrs_to_sr_layer_attrs(attrs: LayerAttrs) -> iface::LayerAttrs<Bitmap,
         }),
         opacity: attrs.opacity,
         flags: attrs.flags,
+    }
+}
+
+struct MouseDrag {
+    wm: Wm,
+    hwnd: super::HWnd,
+    inner: Box<dyn iface::MouseDragListener<Wm>>,
+}
+
+impl wmapi::MouseDrag for MouseDrag {
+    fn mouse_motion(&self, loc: Point2<f32>) {
+        self.inner.mouse_motion(self.wm, &self.hwnd, loc)
+    }
+    fn mouse_down(&self, loc: Point2<f32>, button: u8) {
+        self.inner.mouse_down(self.wm, &self.hwnd, loc, button)
+    }
+    fn mouse_up(&self, loc: Point2<f32>, button: u8) {
+        self.inner.mouse_up(self.wm, &self.hwnd, loc, button)
+    }
+    fn cancel(&self) {
+        self.inner.cancel(self.wm, &self.hwnd)
     }
 }
