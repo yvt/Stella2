@@ -358,6 +358,14 @@ impl wmapi::TestingWm for Wm {
         SCREEN.get_with_wm(*self).wnd_attrs(hwnd)
     }
 
+    fn raise_close_requested(&self, hwnd: &HWnd) {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN.get_with_wm(*self).raise_close_requested(*self, hwnd)
+    }
+
     fn set_wnd_dpi_scale(&self, hwnd: &HWnd, dpi_scale: f32) {
         let hwnd = match &hwnd.inner {
             HWndInner::Testing(hwnd) => hwnd,

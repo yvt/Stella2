@@ -298,6 +298,34 @@ fn wnd_with_layer() {
 }
 
 #[test]
+fn wnd_close_event() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn close_requested(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 0);
+                self.0.set(1);
+            }
+        }
+
+        let state = Rc::new(Cell::new(0));
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        assert_eq!(state.get(), 0);
+        twm.raise_close_requested(&hwnd);
+        assert_eq!(state.get(), 1);
+    });
+}
+
+#[test]
 fn wnd_size_events() {
     testing::run_test(|twm| {
         let wm = twm.wm();

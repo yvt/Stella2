@@ -253,6 +253,13 @@ impl Screen {
             .map(|wnd| Rc::clone(&wnd.listener))
     }
 
+    /// Implements `TestingWm::raise_close_requested`.
+    pub(super) fn raise_close_requested(&self, wm: Wm, hwnd: &HWnd) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        listener.close_requested(wm, &hwnd.into());
+    }
+
     /// Implements `TestingWm::set_wnd_dpi_scale`.
     pub(super) fn set_wnd_dpi_scale(&self, wm: Wm, hwnd: &HWnd, dpi_scale: f32) {
         assert!(dpi_scale > 0.0);

@@ -31,6 +31,9 @@ pub trait TestingWm: 'static {
     /// Get the attributes of a window.
     fn wnd_attrs(&self, hwnd: &HWnd) -> Option<WndAttrs>;
 
+    /// Trigger `WndListener::close_requested`.
+    fn raise_close_requested(&self, hwnd: &HWnd);
+
     /// Set a given window's DPI scale and trigger
     /// `WndListener::dpi_scale_changed`.
     ///
