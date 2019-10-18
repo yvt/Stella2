@@ -298,6 +298,46 @@ fn wnd_with_layer() {
 }
 
 #[test]
+fn wnd_size_events() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn resize(&self, wm: pal::Wm, hwnd: &pal::HWnd) {
+                assert_eq!(self.0.get(), 0);
+                self.0.set(1);
+
+                // Should match the value given to `set_wnd_size`. It shouldn't
+                // be clipped by `max_size`.
+                assert_eq!(wm.get_wnd_size(hwnd), [200; 2]);
+            }
+            fn dpi_scale_changed(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 1);
+                self.0.set(2);
+            }
+        }
+
+        let state = Rc::new(Cell::new(0));
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            size: Some([100; 2]),
+            max_size: Some([150; 2]),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        assert_eq!(state.get(), 0);
+        twm.set_wnd_size(&hwnd, [200; 2]);
+        assert_eq!(state.get(), 1);
+        twm.set_wnd_dpi_scale(&hwnd, 2.0);
+        assert_eq!(state.get(), 2);
+    });
+}
+
+#[test]
 fn wnd_mouse_events() {
     testing::run_test(|twm| {
         let wm = twm.wm();

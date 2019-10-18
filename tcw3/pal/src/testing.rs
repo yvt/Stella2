@@ -358,6 +358,24 @@ impl wmapi::TestingWm for Wm {
         SCREEN.get_with_wm(*self).wnd_attrs(hwnd)
     }
 
+    fn set_wnd_dpi_scale(&self, hwnd: &HWnd, dpi_scale: f32) {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN
+            .get_with_wm(*self)
+            .set_wnd_dpi_scale(*self, hwnd, dpi_scale)
+    }
+
+    fn set_wnd_size(&self, hwnd: &HWnd, size: [u32; 2]) {
+        let hwnd = match &hwnd.inner {
+            HWndInner::Testing(hwnd) => hwnd,
+            HWndInner::Native(_) => unreachable!(),
+        };
+        SCREEN.get_with_wm(*self).set_wnd_size(*self, hwnd, size)
+    }
+
     fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>) {
         let hwnd = match &hwnd.inner {
             HWndInner::Testing(hwnd) => hwnd,

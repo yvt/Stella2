@@ -253,6 +253,29 @@ impl Screen {
             .map(|wnd| Rc::clone(&wnd.listener))
     }
 
+    /// Implements `TestingWm::set_wnd_dpi_scale`.
+    pub(super) fn set_wnd_dpi_scale(&self, wm: Wm, hwnd: &HWnd, dpi_scale: f32) {
+        assert!(dpi_scale > 0.0);
+        assert!(dpi_scale.is_finite());
+
+        let mut state = self.state.borrow_mut();
+        state.wnds[hwnd.ptr].dpi_scale = dpi_scale;
+        drop(state);
+
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.dpi_scale_changed(wm, &hwnd.into());
+    }
+
+    /// Implements `TestingWm::set_wnd_size`.
+    pub(super) fn set_wnd_size(&self, wm: Wm, hwnd: &HWnd, size: [u32; 2]) {
+        let mut state = self.state.borrow_mut();
+        state.wnds[hwnd.ptr].attrs.size = size;
+        drop(state);
+
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.resize(wm, &hwnd.into());
+    }
+
     /// Implements `TestingWm::raise_mouse_motion`.
     pub(super) fn raise_mouse_motion(&self, wm: Wm, hwnd: &HWnd, loc: Point2<f32>) {
         let listener = self.wnd_listener(hwnd).unwrap();

@@ -31,6 +31,19 @@ pub trait TestingWm: 'static {
     /// Get the attributes of a window.
     fn wnd_attrs(&self, hwnd: &HWnd) -> Option<WndAttrs>;
 
+    /// Set a given window's DPI scale and trigger
+    /// `WndListener::dpi_scale_changed`.
+    ///
+    /// `dpi_scale` must be positive and finite.
+    ///
+    /// TODO: Add a method to set the default DPI scale
+    fn set_wnd_dpi_scale(&self, hwnd: &HWnd, dpi_scale: f32);
+
+    /// Set a given window's size and trigger `WndListener::resize`.
+    ///
+    /// `size` is not automatically clipped by `min_size` or `max_size`.
+    fn set_wnd_size(&self, hwnd: &HWnd, size: [u32; 2]);
+
     /// Trigger `WndListener::mouse_motion`.
     fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>);
 
