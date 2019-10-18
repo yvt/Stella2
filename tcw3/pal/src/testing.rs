@@ -340,65 +340,43 @@ impl wmapi::TestingWm for Wm {
     }
 
     fn hwnds(&self) -> Vec<HWnd> {
-        SCREEN
-            .get_with_wm(*self)
-            .hwnds()
-            .into_iter()
-            .map(|hwnd| HWnd {
-                inner: HWndInner::Testing(hwnd),
-            })
+        (SCREEN.get_with_wm(*self).hwnds())
+            .iter()
+            .map(Into::into)
             .collect()
     }
 
     fn wnd_attrs(&self, hwnd: &HWnd) -> Option<wmapi::WndAttrs> {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN.get_with_wm(*self).wnd_attrs(hwnd)
     }
 
     fn raise_close_requested(&self, hwnd: &HWnd) {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN.get_with_wm(*self).raise_close_requested(*self, hwnd)
     }
 
     fn set_wnd_dpi_scale(&self, hwnd: &HWnd, dpi_scale: f32) {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN
             .get_with_wm(*self)
             .set_wnd_dpi_scale(*self, hwnd, dpi_scale)
     }
 
     fn set_wnd_size(&self, hwnd: &HWnd, size: [u32; 2]) {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN.get_with_wm(*self).set_wnd_size(*self, hwnd, size)
     }
 
     fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>) {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN
             .get_with_wm(*self)
             .raise_mouse_motion(*self, hwnd, loc)
     }
 
     fn raise_mouse_leave(&self, hwnd: &HWnd) {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN.get_with_wm(*self).raise_mouse_leave(*self, hwnd)
     }
 
@@ -408,10 +386,7 @@ impl wmapi::TestingWm for Wm {
         loc: Point2<f32>,
         button: u8,
     ) -> Box<dyn wmapi::MouseDrag> {
-        let hwnd = match &hwnd.inner {
-            HWndInner::Testing(hwnd) => hwnd,
-            HWndInner::Native(_) => unreachable!(),
-        };
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN
             .get_with_wm(*self)
             .raise_mouse_drag(*self, hwnd, loc, button)
@@ -630,6 +605,15 @@ impl From<&screen::HWnd> for HWnd {
     fn from(hwnd: &screen::HWnd) -> HWnd {
         HWnd {
             inner: HWndInner::Testing(hwnd.clone()),
+        }
+    }
+}
+
+impl HWnd {
+    fn testing_hwnd_ref(&self) -> Option<&screen::HWnd> {
+        match &self.inner {
+            HWndInner::Native(_) => None,
+            HWndInner::Testing(imp) => Some(imp),
         }
     }
 }
