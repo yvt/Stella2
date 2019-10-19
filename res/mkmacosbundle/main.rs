@@ -9,7 +9,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 struct Opt {
     /// A path to the executable file. Defaults to
-    /// `(project root)/target/release/stella2`.
+    /// `(project root)/target/x86_64-apple-darwin/release/stella2`.
     #[structopt(short = "x")]
     exe_path: Option<PathBuf>,
 
@@ -26,7 +26,7 @@ fn main() {
 
     let exe_path = opt
         .exe_path
-        .unwrap_or_else(|| manifest_dir.join("../../target/release/stella2"));
+        .unwrap_or_else(|| manifest_dir.join("../../target/x86_64-apple-darwin/release/stella2"));
     let out_path = opt
         .out_path
         .unwrap_or_else(|| manifest_dir.join("../../publish"));
