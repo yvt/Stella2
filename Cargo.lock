@@ -1913,6 +1913,7 @@ dependencies = [
  "tcw3_images 0.1.0",
  "tcw3_pal 0.1.0",
  "tcw3_testing 0.1.0",
+ "try_match 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2016,6 +2017,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "try_match"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "ttf-parser"
@@ -2543,6 +2549,7 @@ dependencies = [
 "checksum termcolor 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "96d6098003bde162e4277c70665bd87c326f5a0c3f3fbfb285787fa482d54e6e"
 "checksum textwrap 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
+"checksum try_match 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "16621f8d5be82394d33e6715f26e35a10dbe8c4f53227e5dcce7d3e772163948"
 "checksum ttf-parser 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2efc0a53b6497df87f6a12b428a3d78b45c2916c70cd212138ca4781b02f4c0e"
 "checksum unicode-bidi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "49f2bd0c6468a8230e1db229cff8029217cf623c767ea5d60bfbd42729ea54d5"
 "checksum unicode-script 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "09f03ad95feb4fde244d79985bfd79eb34ff2702fedb441d2ba3f4ff813efd19"
