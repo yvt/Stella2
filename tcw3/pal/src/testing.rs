@@ -629,6 +629,22 @@ pub struct HLayer {
     inner: HLayerInner,
 }
 
+impl HLayer {
+    fn native_hlayer(self) -> Option<native::HLayer> {
+        match self.inner {
+            HLayerInner::Native(imp) => Some(imp),
+            HLayerInner::Testing(_) => None,
+        }
+    }
+
+    fn testing_hlayer(self) -> Option<screen::HLayer> {
+        match self.inner {
+            HLayerInner::Native(_) => None,
+            HLayerInner::Testing(imp) => Some(imp),
+        }
+    }
+}
+
 impl fmt::Debug for HLayer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.inner {
@@ -647,12 +663,9 @@ enum HLayerInner {
 /// Convert `WndAttrs<'_>` to `native::WndAttrs<'_>`. Panics if some fields
 /// are incompatible with the target backend.
 fn wnd_attrs_to_native(attrs: WndAttrs<'_>) -> native::WndAttrs<'_> {
-    let layer = attrs.layer.map(|layer_or_none| {
-        layer_or_none.map(|hlayer| match hlayer.inner {
-            HLayerInner::Native(hlayer) => hlayer,
-            HLayerInner::Testing(_) => unreachable!(),
-        })
-    });
+    let layer = attrs
+        .layer
+        .map(|layer_or_none| layer_or_none.map(|hlayer| hlayer.native_hlayer().unwrap()));
     native::WndAttrs {
         size: attrs.size,
         min_size: attrs.min_size,
@@ -670,12 +683,9 @@ fn wnd_attrs_to_native(attrs: WndAttrs<'_>) -> native::WndAttrs<'_> {
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
 /// are incompatible with the target backend.
 fn wnd_attrs_to_testing(attrs: WndAttrs<'_>) -> screen::WndAttrs<'_> {
-    let layer = attrs.layer.map(|layer_or_none| {
-        layer_or_none.map(|hlayer| match hlayer.inner {
-            HLayerInner::Native(_) => unreachable!(),
-            HLayerInner::Testing(hlayer) => hlayer,
-        })
-    });
+    let layer = attrs
+        .layer
+        .map(|layer_or_none| layer_or_none.map(|hlayer| hlayer.testing_hlayer().unwrap()));
     screen::WndAttrs {
         size: attrs.size,
         min_size: attrs.min_size,
@@ -694,10 +704,8 @@ fn layer_attrs_to_native(attrs: LayerAttrs) -> native::LayerAttrs {
     let sublayers = attrs.sublayers.map(|sublayers| {
         sublayers
             .into_iter()
-            .map(|hlayer| match hlayer.inner {
-                HLayerInner::Native(hlayer) => hlayer,
-                HLayerInner::Testing(_) => unreachable!(),
-            })
+            .map(HLayer::native_hlayer)
+            .map(Option::unwrap)
             .collect()
     });
     let contents = attrs.contents.map(|contents_or_none| {
@@ -725,10 +733,8 @@ fn layer_attrs_to_testing(attrs: LayerAttrs) -> screen::LayerAttrs {
     let sublayers = attrs.sublayers.map(|sublayers| {
         sublayers
             .into_iter()
-            .map(|hlayer| match hlayer.inner {
-                HLayerInner::Native(_) => unreachable!(),
-                HLayerInner::Testing(hlayer) => hlayer,
-            })
+            .map(HLayer::testing_hlayer)
+            .map(Option::unwrap)
             .collect()
     });
     let contents = attrs.contents.map(|contents_or_none| {
