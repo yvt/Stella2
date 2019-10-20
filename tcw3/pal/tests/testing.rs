@@ -3,7 +3,10 @@ use cgmath::{Deg, Matrix3, Point2};
 use std::{
     cell::Cell,
     rc::Rc,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     thread::spawn,
     time::{Duration, Instant},
 };
@@ -30,6 +33,60 @@ fn invoke() {
         while !flag.get() {
             twm.step();
         }
+    });
+}
+
+#[test]
+fn invoke_eradication() {
+    let obj = Arc::new(());
+
+    let obj2 = Arc::clone(&obj);
+    testing::run_test(move |twm| {
+        twm.wm().invoke(move |_| {
+            let _ = obj2;
+        });
+
+        // Don't `step`, just return. The closure should be dropped by
+        // `eradicate_events` automatically after we return the control
+    });
+
+    testing::run_test(move |_| {
+        assert_eq!(Arc::strong_count(&obj), 1);
+    });
+}
+
+#[test]
+fn invoke_during_eradication() {
+    let flag = Arc::new(AtomicBool::new(false));
+
+    let flag2 = Arc::clone(&flag);
+    testing::run_test(move |twm| {
+        struct SetOnDrop(pal::Wm, Arc<AtomicBool>);
+        impl Drop for SetOnDrop {
+            fn drop(&mut self) {
+                let flag = Arc::clone(&self.1);
+                flag.store(true, Ordering::Relaxed);
+
+                // `invoke` is allowed here (shouldn't panic), though the
+                // closure might not actually be called
+                self.0.invoke(move |_| {});
+            }
+        }
+
+        let sod = SetOnDrop(twm.wm(), flag2);
+        twm.wm().invoke(move |_| {
+            let _ = sod;
+        });
+
+        // Don't `step`, just return. The closure should be dropped by
+        // `eradicate_events` automatically after we return the control
+        // When the closure is dropped, `SetOnDrop::drop` is called to
+        // set the flag.
+    });
+
+    testing::run_test(move |wm| {
+        wm.step_unsend();
+        assert!(flag.load(Ordering::Relaxed));
     });
 }
 

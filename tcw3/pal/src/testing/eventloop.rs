@@ -118,13 +118,30 @@ impl Wm {
     }
 
     pub(super) fn eradicate_events(self) {
-        let mut queue = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut();
-        if !queue.is_empty() {
-            warn!("Dropping {} unprocessed unsend dispatch(es)", queue.len());
-            // Using `queue.clear()` here causes a linker error.
-            // Maybe a bug in the compiler?
-            // Rust version: rustc 1.40.0-nightly (1721c9685 2019-10-12)
-            while let Some(_) = queue.pop_front() {}
+        let queue = UNSEND_DISPATCHES.get_with_wm(self);
+        if !queue.borrow().is_empty() {
+            warn!(
+                "Executing {} unprocessed unsend dispatch(es)",
+                queue.borrow().len()
+            );
+
+            let mut num_actually_dropped = 0;
+            loop {
+                let e = queue.borrow_mut().pop_front();
+                if let Some(e) = e {
+                    // `queue` must be unborrowed before dropping `e` because
+                    // `e`'s drop handler might generate even more dispatches.
+                    num_actually_dropped += 1;
+                    drop(e);
+                } else {
+                    break;
+                }
+            }
+
+            warn!(
+                "Executed {} unprocessed unsend dispatch(es)",
+                num_actually_dropped
+            );
         }
     }
 }
