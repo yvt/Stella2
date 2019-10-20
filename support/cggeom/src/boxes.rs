@@ -55,6 +55,29 @@ pub trait AxisAlignedBox<T>: Sized {
         point.element_wise_ge(&self.min()).all() && point.element_wise_lt(&self.max()).all()
     }
 
+    /// Return `true` if `other` is entirely inside `self`.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{prelude::*, box2};
+    ///
+    ///     let b = box2! { min: [0.0, 0.0], max: [1.0, 1.0] };
+    ///     assert!(b.contains_box(&box2!{ min: [0.2, 0.0], max: [1.0, 0.5] }));
+    ///
+    ///     assert!(!b.contains_box(&box2!{ min: [0.2, 0.0], max: [1.2, 0.5] }));
+    ///     assert!(!b.contains_box(&box2!{ min: [1.2, 0.3], max: [1.5, 0.8] }));
+    ///     assert!(!b.contains_box(&box2!{ min: [0.3, 1.2], max: [0.8, 1.5] }));
+    ///     assert!(!b.contains_box(&box2!{ min: [0.3, -0.5], max: [0.8, 0.3] }));
+    ///
+    #[inline]
+    fn contains_box(&self, other: &Self) -> bool
+    where
+        T: PartialOrd,
+    {
+        other.min().element_wise_ge(&self.min()).all()
+            && other.max().element_wise_le(&self.max()).all()
+    }
+
     /// Return `true` iff at least one of the box's dimensions is < 0.
     ///
     /// # Examples
