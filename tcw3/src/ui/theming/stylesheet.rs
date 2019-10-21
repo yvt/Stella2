@@ -484,7 +484,7 @@ lazy_static! {
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [4.0; 4],
-                size: [std::f32::NAN, 8.0].into(),
+                size: [8.0, std::f32::NAN].into(),
             },
         },
         // Scrollbar thumb
