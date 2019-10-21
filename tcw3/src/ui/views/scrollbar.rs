@@ -388,3 +388,71 @@ impl MouseDragListener for SbMouseDragListener {
         self.listener.cancel(wm);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use try_match::try_match;
+
+    use super::*;
+    use crate::{
+        pal,
+        testing::{prelude::*, use_testing_wm},
+        ui::layouts::FillLayout,
+        uicore::HWnd,
+    };
+
+    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Scrollbar, HWnd, pal::HWnd) {
+        let wm = twm.wm();
+
+        let style_manager = Manager::global(wm);
+        let sb = Scrollbar::new(style_manager, vertical);
+
+        let wnd = HWnd::new(wm);
+        wnd.content_view()
+            .set_layout(FillLayout::new(sb.view().clone()));
+        wnd.set_visibility(true);
+
+        twm.step_unsend();
+
+        let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+            .expect("could not get a single window");
+
+        (sb, wnd, pal_hwnd)
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn thumb_size_horz(twm: &dyn TestingWm) {
+        let (mut sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
+        sb.set_page_step(0.02);
+        twm.step_unsend();
+        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]]);
+        twm.step_unsend();
+
+        let fr1 = sb.shared.frame.view().global_frame();
+        let fr2 = sb.shared.thumb.view().global_frame();
+
+        assert!(fr2.size().x < fr1.size().x * 0.2);
+        assert!(fr2.size().y > fr1.size().y * 0.4);
+        assert!(fr1.contains_box(&fr2));
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn thumb_size_vert(twm: &dyn TestingWm) {
+        let (mut sb, _hwnd, pal_hwnd) = make_wnd(twm, true);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
+        sb.set_page_step(0.02);
+        twm.step_unsend();
+        twm.set_wnd_size(&pal_hwnd, [min_size[0], 400]);
+        twm.step_unsend();
+
+        let fr1 = sb.shared.frame.view().global_frame();
+        let fr2 = sb.shared.thumb.view().global_frame();
+
+        assert!(fr2.size().x > fr1.size().x * 0.4);
+        assert!(fr2.size().y < fr1.size().y * 0.2);
+        assert!(fr1.contains_box(&fr2));
+    }
+}
