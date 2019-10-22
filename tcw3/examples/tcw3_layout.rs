@@ -94,7 +94,7 @@ fn main() {
 
         view.set_listener(MyViewListener::new(size_traits));
 
-        let mut label = Label::new(style_manager);
+        let label = Label::new(style_manager);
         label.set_text(format!(
             "[{}, {}]",
             size_traits.preferred.x, size_traits.preferred.y

@@ -15,9 +15,9 @@ pub struct ToolbarView {
     container: HView,
     wnd_state: RefCell<Elem<model::WndState>>,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
-    toggle_sidebar_button: RefCell<Button>,
-    go_back_button: RefCell<Button>,
-    go_forward_button: RefCell<Button>,
+    toggle_sidebar_button: Button,
+    go_back_button: Button,
+    go_forward_button: Button,
 }
 
 impl ToolbarView {
@@ -27,7 +27,7 @@ impl ToolbarView {
     ) -> Rc<Self> {
         let container = HView::new(ViewFlags::default());
 
-        let mut toggle_sidebar_button = Button::new(style_manager);
+        let toggle_sidebar_button = Button::new(style_manager);
         toggle_sidebar_button.set_class_set(
             theming::ClassSet::BUTTON
                 | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
@@ -36,10 +36,10 @@ impl ToolbarView {
         // TODO: Display a dropdown list when the sidebar is hidden
 
         // TODO: Use toolbar button style
-        let mut go_back_button = Button::new(style_manager);
+        let go_back_button = Button::new(style_manager);
         go_back_button.set_class_set(theming::ClassSet::BUTTON | elem_id::GO_BACK);
 
-        let mut go_forward_button = Button::new(style_manager);
+        let go_forward_button = Button::new(style_manager);
         go_forward_button.set_class_set(theming::ClassSet::BUTTON | elem_id::GO_FORWARD);
 
         // TODO: Search bar
@@ -70,16 +70,15 @@ impl ToolbarView {
             container,
             wnd_state: RefCell::new(wnd_state),
             dispatch: RefCell::new(Box::new(|_| {})),
-            toggle_sidebar_button: RefCell::new(toggle_sidebar_button),
-            go_back_button: RefCell::new(go_back_button),
-            go_forward_button: RefCell::new(go_forward_button),
+            toggle_sidebar_button,
+            go_back_button,
+            go_forward_button,
         });
 
         // Register event handlers
         let this_weak = Rc::downgrade(&this);
 
         this.toggle_sidebar_button
-            .borrow_mut()
             .set_on_activate(enclose!((this_weak) move |_| {
                 if let Some(this) = this_weak.upgrade() {
                     // Toggle the sidebar
@@ -87,10 +86,10 @@ impl ToolbarView {
                     this.dispatch.borrow()(model::WndAction::ToggleSidebar(!visible));
                 }
             }));
-        this.go_back_button.borrow_mut().set_on_activate(|_| {
+        this.go_back_button.set_on_activate(|_| {
             dbg!();
         });
-        this.go_forward_button.borrow_mut().set_on_activate(|_| {
+        this.go_forward_button.set_on_activate(|_| {
             dbg!();
         });
 
@@ -116,7 +115,7 @@ impl ToolbarView {
 
         // Update the appearance of the "toggle sidebar" button
         {
-            let mut button = self.toggle_sidebar_button.borrow_mut();
+            let button = &self.toggle_sidebar_button;
             let class_set = button.class_set();
             let new_class_set = class_set - theming::ClassSet::ID_MASK
                 | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]

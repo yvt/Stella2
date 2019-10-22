@@ -73,12 +73,12 @@ impl Button {
     }
 
     /// Set the text displayed in a push button widget.
-    pub fn set_caption(&mut self, value: impl Into<String>) {
+    pub fn set_caption(&self, value: impl Into<String>) {
         self.inner.label.borrow_mut().set_text(value);
     }
 
     /// Set the parent class path.
-    pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
         let styled_box = self.inner.styled_box.borrow_mut();
         styled_box.set_parent_class_path(parent_class_path);
 
@@ -92,7 +92,7 @@ impl Button {
     ///
     /// It defaults to `ClassSet::BUTTON`. Some bits (e.g., `ACTIVE`) are
     /// internally enforced and cannot be modified.
-    pub fn set_class_set(&mut self, mut class_set: ClassSet) {
+    pub fn set_class_set(&self, mut class_set: ClassSet) {
         let styled_box = self.inner.styled_box.borrow_mut();
 
         // Protected bits
@@ -107,7 +107,7 @@ impl Button {
     }
 
     /// Get the class set of the inner `StyledBox`.
-    pub fn class_set(&mut self) -> ClassSet {
+    pub fn class_set(&self) -> ClassSet {
         self.inner.styled_box.borrow().class_set()
     }
 
@@ -116,7 +116,7 @@ impl Button {
     /// The function is called via `Wm::invoke`, thus allowed to modify
     /// view hierarchy and view attributes. However, it's not allowed to call
     /// `set_on_activate` on the activated `Button`.
-    pub fn set_on_activate(&mut self, cb: impl Fn(pal::Wm) + 'static) {
+    pub fn set_on_activate(&self, cb: impl Fn(pal::Wm) + 'static) {
         *self.inner.activate_handler.borrow_mut() = Box::new(cb);
     }
 }

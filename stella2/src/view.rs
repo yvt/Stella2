@@ -91,8 +91,8 @@ struct WndView {
     _hwnd: HWnd,
     wnd_state: RefCell<Elem<model::WndState>>,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
-    split_editor: RefCell<Split>,
-    split_side: RefCell<Split>,
+    split_editor: Split,
+    split_side: Split,
     toolbar: Rc<toolbar::ToolbarView>,
 }
 
@@ -120,14 +120,14 @@ impl WndView {
 
         let editor_view = new_test_view("editor: todo!");
 
-        let mut split_editor = Split::new(true, Some(1));
+        let split_editor = Split::new(true, Some(1));
         split_editor.set_value(wnd_state.editor_height);
         split_editor.set_subviews([log_view, editor_view]);
 
         // TODO: Toogle sidebar based on `WndState::sidebar_visible`
         let sidebar_view = new_test_view("sidebar: todo!");
 
-        let mut split_side = Split::new(false, Some(0));
+        let split_side = Split::new(false, Some(0));
         split_side.set_value(wnd_state.sidebar_width);
         split_side.set_subviews([sidebar_view, split_editor.view().clone()]);
 
@@ -145,8 +145,8 @@ impl WndView {
             _hwnd: hwnd,
             wnd_state: RefCell::new(wnd_state),
             dispatch: RefCell::new(Box::new(|_| {})),
-            split_editor: RefCell::new(split_editor),
-            split_side: RefCell::new(split_side),
+            split_editor,
+            split_side,
             toolbar,
         });
 
@@ -161,11 +161,11 @@ impl WndView {
         }
         {
             let this_weak = Rc::downgrade(&this);
-            this.split_editor.borrow_mut().set_on_drag(move |_| {
+            this.split_editor.set_on_drag(move |_| {
                 let this_weak = this_weak.clone();
                 Box::new(OnDrop::new(move || {
                     if let Some(this) = this_weak.upgrade() {
-                        let new_size = this.split_editor.borrow().value();
+                        let new_size = this.split_editor.value();
                         this.dispatch.borrow()(model::WndAction::SetEditorHeight(new_size));
                     }
                 }))
@@ -173,11 +173,11 @@ impl WndView {
         }
         {
             let this_weak = Rc::downgrade(&this);
-            this.split_side.borrow_mut().set_on_drag(move |_| {
+            this.split_side.set_on_drag(move |_| {
                 let this_weak = this_weak.clone();
                 Box::new(OnDrop::new(move || {
                     if let Some(this) = this_weak.upgrade() {
-                        let new_size = this.split_side.borrow().value();
+                        let new_size = this.split_side.value();
                         this.dispatch.borrow()(model::WndAction::SetSidebarWidth(new_size));
                     }
                 }))
@@ -203,10 +203,8 @@ impl WndView {
         *wnd_state = Elem::clone(new_wnd_state);
 
         self.split_editor
-            .borrow_mut()
             .set_value(new_wnd_state.editor_height);
         self.split_side
-            .borrow_mut()
             .set_value(new_wnd_state.sidebar_width);
 
         self.toolbar.poll(new_wnd_state);

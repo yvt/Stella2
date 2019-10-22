@@ -152,12 +152,12 @@ impl Split {
     /// See [`value`] for the interpretation of the value.
     ///
     /// [`value`]: self::Split::value
-    pub fn set_value(&mut self, new_value: f32) {
+    pub fn set_value(&self, new_value: f32) {
         self.shared.set_value(new_value);
     }
 
     /// Set the views placed in the panels.
-    pub fn set_subviews(&mut self, subviews: [HView; 2]) {
+    pub fn set_subviews(&self, subviews: [HView; 2]) {
         *self.shared.subviews.borrow_mut() = subviews;
         self.shared.container.set_layout(self.shared.layout());
     }
@@ -166,10 +166,7 @@ impl Split {
     /// resizes the panels.
     ///
     /// The function is called when the user starts a mouse drag gesture.
-    pub fn set_on_drag(
-        &mut self,
-        handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static,
-    ) {
+    pub fn set_on_drag(&self, handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static) {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
 }

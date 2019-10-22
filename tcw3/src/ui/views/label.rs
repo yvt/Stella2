@@ -86,7 +86,7 @@ impl Label {
 
     /// Set the text displayed in a label widget.
     #[momo]
-    pub fn set_text(&mut self, value: impl Into<String>) {
+    pub fn set_text(&self, value: impl Into<String>) {
         let value = value.into();
         {
             let mut state = self.inner.state.borrow_mut();
@@ -107,13 +107,13 @@ impl Label {
     ///
     /// This method is useful for constructing `Label` using the builder
     /// pattern.
-    pub fn with_text(mut self, value: impl Into<String>) -> Self {
+    pub fn with_text(self, value: impl Into<String>) -> Self {
         self.set_text(value);
         self
     }
 
     /// Set the parent class path.
-    pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
         self.inner
             .style_elem
             .set_parent_class_path(parent_class_path);

@@ -136,7 +136,7 @@ impl Scrollbar {
     }
 
     /// Set the parent class path.
-    pub fn set_parent_class_path(&mut self, parent_class_path: Option<Rc<ElemClassPath>>) {
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
         let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
 
         frame.set_parent_class_path(parent_class_path);
@@ -147,7 +147,7 @@ impl Scrollbar {
     ///
     /// It defaults to `ClassSet::SCROLLBAR`. Some bits (e.g., `ACTIVE`) are
     /// internally enforced and cannot be modified.
-    pub fn set_class_set(&mut self, mut class_set: ClassSet) {
+    pub fn set_class_set(&self, mut class_set: ClassSet) {
         let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
 
         // Protected bits
@@ -159,7 +159,7 @@ impl Scrollbar {
     }
 
     /// Get the class set of the inner `StyledBox`.
-    pub fn class_set(&mut self) -> ClassSet {
+    pub fn class_set(&self) -> ClassSet {
         self.shared.frame.class_set()
     }
 
@@ -169,7 +169,7 @@ impl Scrollbar {
     }
 
     /// Set the current value in range `[0, 1]`.
-    pub fn set_value(&mut self, new_value: f64) {
+    pub fn set_value(&self, new_value: f64) {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
         debug_assert!(new_value <= 1.0, "{} <= 1.0", new_value);
 
@@ -184,7 +184,7 @@ impl Scrollbar {
 
     /// Set the page step size. Must be greater than or equal to zero. Can be
     /// infinity, in which case the scrollbar is disabled.
-    pub fn set_page_step(&mut self, new_value: f64) {
+    pub fn set_page_step(&self, new_value: f64) {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
 
         self.shared.page_step.set(new_value);
@@ -196,7 +196,7 @@ impl Scrollbar {
     ///
     /// The function is called when the user starts a mouse drag gesture.
     pub fn set_on_drag(
-        &mut self,
+        &self,
         handler: impl Fn(pal::Wm) -> Box<dyn ScrollbarDragListener> + 'static,
     ) {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
@@ -204,7 +204,7 @@ impl Scrollbar {
 
     /// Set the handler function called when the user clicks the trough (the
     /// region outside the thumb).
-    pub fn set_on_page_step(&mut self, handler: impl Fn(pal::Wm, Dir) + 'static) {
+    pub fn set_on_page_step(&self, handler: impl Fn(pal::Wm, Dir) + 'static) {
         *self.shared.on_page_step.borrow_mut() = Box::new(handler);
     }
 
@@ -423,7 +423,7 @@ mod tests {
     #[use_testing_wm(testing = "crate::testing")]
     #[test]
     fn thumb_size_horz(twm: &dyn TestingWm) {
-        let (mut sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
         let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
         sb.set_page_step(0.02);
         twm.step_unsend();
@@ -441,7 +441,7 @@ mod tests {
     #[use_testing_wm(testing = "crate::testing")]
     #[test]
     fn thumb_size_vert(twm: &dyn TestingWm) {
-        let (mut sb, _hwnd, pal_hwnd) = make_wnd(twm, true);
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, true);
         let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
         sb.set_page_step(0.02);
         twm.step_unsend();

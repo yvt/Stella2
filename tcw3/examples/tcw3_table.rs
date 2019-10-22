@@ -25,7 +25,7 @@ struct TableModelQuery {
 
 impl table::TableModelQuery for TableModelQuery {
     fn new_view(&mut self, cell: table::CellIdx) -> (HView, Box<dyn table::CellCtrler>) {
-        let mut label = Label::new(self.style_manager);
+        let label = Label::new(self.style_manager);
         label.set_text(format!("{:?}", cell));
 
         (label.view().clone(), Box::new(()))
