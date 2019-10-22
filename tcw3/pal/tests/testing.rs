@@ -127,9 +127,19 @@ fn invoke_on_main_thread() {
 #[test]
 #[should_panic]
 fn panicking() {
-    testing::run_test(|_| {
+    let flag = Arc::new(AtomicBool::new(false));
+
+    let flag2 = Arc::clone(&flag);
+    testing::run_test(move |_| {
+        flag2.store(true, Ordering::Relaxed);
         panic!("this panic should be contained to this test case");
     });
+
+    if !flag.load(Ordering::Relaxed) {
+        // The closure did not run because `testing` backend is disabled.
+        // Cause a panic here to prevent the false test failure.
+        panic!("skipping this test because `testing` is apparently disabled");
+    }
 }
 
 #[test]
