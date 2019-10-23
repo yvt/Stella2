@@ -98,6 +98,12 @@ pub trait ScrollbarDragListener {
 
 impl ScrollbarDragListener for () {}
 
+impl<T: ScrollbarDragListener + 'static> From<T> for Box<dyn ScrollbarDragListener> {
+    fn from(x: T) -> Box<dyn ScrollbarDragListener> {
+        Box::new(x)
+    }
+}
+
 impl Scrollbar {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
         let frame = StyledBox::new(style_manager, ViewFlags::default());
