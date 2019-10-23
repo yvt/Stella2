@@ -411,6 +411,40 @@ mod tests {
         uicore::HWnd,
     };
 
+    trait Transpose: Sized {
+        fn t(self) -> Self;
+        fn t_if(self, cond: bool) -> Self {
+            if cond {
+                self.t()
+            } else {
+                self
+            }
+        }
+    }
+
+    impl<T> Transpose for [T; 2] {
+        fn t(self) -> Self {
+            let [x, y] = self;
+            [y, x]
+        }
+    }
+
+    impl<T> Transpose for Point2<T> {
+        fn t(self) -> Self {
+            let Self { x: y, y: x } = self;
+            Self { x, y }
+        }
+    }
+
+    impl<T> Transpose for cggeom::Box2<T> {
+        fn t(self) -> Self {
+            Self {
+                min: self.min.t(),
+                max: self.max.t(),
+            }
+        }
+    }
+
     fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Scrollbar>, HWnd, pal::HWnd) {
         let wm = twm.wm();
 
@@ -430,39 +464,30 @@ mod tests {
         (sb, wnd, pal_hwnd)
     }
 
-    #[use_testing_wm(testing = "crate::testing")]
     #[test]
-    fn thumb_size_horz(twm: &dyn TestingWm) {
-        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
-        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
-        sb.set_page_step(0.02);
-        twm.step_unsend();
-        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]]);
-        twm.step_unsend();
+    fn thumb_size_horizontal() {
+        thumb_size(false);
+    }
 
-        let fr1 = sb.shared.frame.view().global_frame();
-        let fr2 = sb.shared.thumb.view().global_frame();
-
-        assert!(fr2.size().x < fr1.size().x * 0.2);
-        assert!(fr2.size().y > fr1.size().y * 0.4);
-        assert!(fr1.contains_box(&fr2));
+    #[test]
+    fn thumb_size_vertical() {
+        thumb_size(true);
     }
 
     #[use_testing_wm(testing = "crate::testing")]
-    #[test]
-    fn thumb_size_vert(twm: &dyn TestingWm) {
-        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, true);
-        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
+    fn thumb_size(twm: &dyn TestingWm, vert: bool) {
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
         sb.set_page_step(0.02);
         twm.step_unsend();
-        twm.set_wnd_size(&pal_hwnd, [min_size[0], 400]);
+        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
         twm.step_unsend();
 
-        let fr1 = sb.shared.frame.view().global_frame();
-        let fr2 = sb.shared.thumb.view().global_frame();
+        let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
 
-        assert!(fr2.size().x > fr1.size().x * 0.4);
-        assert!(fr2.size().y < fr1.size().y * 0.2);
+        assert!(fr2.size().x < fr1.size().x * 0.2);
+        assert!(fr2.size().y > fr1.size().y * 0.4);
         assert!(fr1.contains_box(&fr2));
     }
 
@@ -487,12 +512,21 @@ mod tests {
         }
     }
 
-    #[use_testing_wm(testing = "crate::testing")]
     #[test]
-    fn thumb_drag(twm: &dyn TestingWm) {
-        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
-        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
-        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]]);
+    fn thumb_drag_horizontal() {
+        thumb_drag(false);
+    }
+
+    #[test]
+    fn thumb_drag_vertical() {
+        thumb_drag(true);
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    fn thumb_drag(twm: &dyn TestingWm, vert: bool) {
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
+        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
         sb.set_page_step(0.1);
         sb.set_value(0.0);
         sb.set_on_drag(enc!((sb) move |_| {
@@ -500,8 +534,8 @@ mod tests {
         }));
         twm.step_unsend();
 
-        let fr1 = sb.shared.frame.view().global_frame();
-        let fr2 = sb.shared.thumb.view().global_frame();
+        let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
 
         debug!("fr1 = {:?}", fr1);
         debug!("fr2 = {:?}", fr2);
@@ -509,16 +543,16 @@ mod tests {
         let [st_x, y]: [f32; 2] = fr2.mid().into();
         let mut x = st_x;
         let mut value = sb.value();
-        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].into(), 0);
+        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
 
         // Grab the thumb
-        drag.mouse_down([x, y].into(), 0);
+        drag.mouse_down([x, y].t_if(vert).into(), 0);
 
         assert!(sb.class_set().contains(ClassSet::ACTIVE));
 
         loop {
             x += 50.0;
-            drag.mouse_motion([x, y].into());
+            drag.mouse_motion([x, y].t_if(vert).into());
             twm.step_unsend();
 
             let new_value = sb.value();
@@ -532,7 +566,7 @@ mod tests {
                 break;
             }
 
-            let fr2b = sb.shared.thumb.view().global_frame();
+            let fr2b = sb.shared.thumb.view().global_frame().t_if(vert);
             debug!("fr2b = {:?}", fr2b);
 
             // The movement of the thumb must follow the mouse pointer
@@ -549,7 +583,7 @@ mod tests {
         }
 
         // Release the thumb
-        drag.mouse_up([x, y].into(), 0);
+        drag.mouse_up([x, y].t_if(vert).into(), 0);
 
         assert!(!sb.class_set().contains(ClassSet::ACTIVE));
     }
