@@ -397,6 +397,10 @@ impl MouseDragListener for SbMouseDragListener {
 
 #[cfg(test)]
 mod tests {
+    use cgmath::assert_abs_diff_eq;
+    use enclose::enc;
+    use log::debug;
+    use std::rc::Weak;
     use try_match::try_match;
 
     use super::*;
@@ -407,11 +411,11 @@ mod tests {
         uicore::HWnd,
     };
 
-    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Scrollbar, HWnd, pal::HWnd) {
+    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Scrollbar>, HWnd, pal::HWnd) {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Scrollbar::new(style_manager, vertical);
+        let sb = Rc::new(Scrollbar::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
         wnd.content_view()
@@ -460,5 +464,93 @@ mod tests {
         assert!(fr2.size().x > fr1.size().x * 0.4);
         assert!(fr2.size().y < fr1.size().y * 0.2);
         assert!(fr1.contains_box(&fr2));
+    }
+
+    struct ValueUpdatingDragListener(Weak<Scrollbar>, f64);
+
+    impl ValueUpdatingDragListener {
+        fn new(sb: &Rc<Scrollbar>) -> Self {
+            Self(Rc::downgrade(sb), sb.value())
+        }
+    }
+
+    impl ScrollbarDragListener for ValueUpdatingDragListener {
+        fn motion(&self, _: pal::Wm, new_value: f64) {
+            if let Some(sb) = self.0.upgrade() {
+                sb.set_value(new_value);
+            }
+        }
+        fn cancel(&self, _: pal::Wm) {
+            if let Some(sb) = self.0.upgrade() {
+                sb.set_value(self.1);
+            }
+        }
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn thumb_drag(twm: &dyn TestingWm) {
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, false);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size;
+        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]]);
+        sb.set_page_step(0.1);
+        sb.set_value(0.0);
+        sb.set_on_drag(enc!((sb) move |_| {
+            ValueUpdatingDragListener::new(&sb).into()
+        }));
+        twm.step_unsend();
+
+        let fr1 = sb.shared.frame.view().global_frame();
+        let fr2 = sb.shared.thumb.view().global_frame();
+
+        debug!("fr1 = {:?}", fr1);
+        debug!("fr2 = {:?}", fr2);
+
+        let [st_x, y]: [f32; 2] = fr2.mid().into();
+        let mut x = st_x;
+        let mut value = sb.value();
+        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].into(), 0);
+
+        // Grab the thumb
+        drag.mouse_down([x, y].into(), 0);
+
+        assert!(sb.class_set().contains(ClassSet::ACTIVE));
+
+        loop {
+            x += 50.0;
+            drag.mouse_motion([x, y].into());
+            twm.step_unsend();
+
+            let new_value = sb.value();
+            debug!("new_value = {}", new_value);
+            assert!(new_value > value);
+            assert!(new_value <= 1.0);
+
+            value = new_value;
+
+            if value >= 1.0 {
+                break;
+            }
+
+            let fr2b = sb.shared.thumb.view().global_frame();
+            debug!("fr2b = {:?}", fr2b);
+
+            // The movement of the thumb must follow the mouse pointer
+            let offset = fr2b.min.x - fr2.min.x;
+            assert_abs_diff_eq!(offset, x - st_x, epsilon = 0.1);
+
+            // The length of the thumb must not change
+            assert_abs_diff_eq!(fr2b.size().x, fr2.size().x, epsilon = 0.1);
+
+            assert!(
+                x < 1000.0,
+                "loop did not terminate within an expected duration"
+            );
+        }
+
+        // Release the thumb
+        drag.mouse_up([x, y].into(), 0);
+
+        assert!(!sb.class_set().contains(ClassSet::ACTIVE));
     }
 }

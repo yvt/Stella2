@@ -37,5 +37,7 @@ rev = "3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40"
 [dev-dependencies]
 lipsum = "0.6.0"
 structopt = "0.3.0"
+enclose = "1.1.8"
 env_logger = "0.7.0"
+log = "0.4"
 try_match = { version = "0.2.1", default-features = false, features = ["std"] }
