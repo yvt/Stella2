@@ -314,8 +314,8 @@ mt_lazy_static! {
 
 impl Wm {
     fn reset(self) {
-        SCREEN.get_with_wm(self).reset();
         self.eradicate_events();
+        SCREEN.get_with_wm(self).reset();
     }
 }
 
