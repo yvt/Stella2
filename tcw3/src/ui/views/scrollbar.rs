@@ -644,6 +644,7 @@ mod tests {
 
         drag.mouse_up([x, y].t_if(vert).into(), 0);
         twm.step_unsend();
+        drop(drag);
 
         value = new_value;
 
