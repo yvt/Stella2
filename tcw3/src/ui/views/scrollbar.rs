@@ -313,7 +313,7 @@ struct SbViewListener {
 impl ViewListener for SbViewListener {
     fn mouse_drag(
         &self,
-        wm: pal::Wm,
+        _: pal::Wm,
         _: &HView,
         _loc: Point2<f32>,
         _button: u8,
@@ -321,7 +321,7 @@ impl ViewListener for SbViewListener {
         Box::new(SbMouseDragListener {
             shared: Rc::clone(&self.shared),
             drag_start: Cell::new(None),
-            listener: self.shared.on_drag.borrow()(wm),
+            listener: RefCell::new(None),
         })
     }
 }
@@ -330,7 +330,7 @@ impl ViewListener for SbViewListener {
 struct SbMouseDragListener {
     shared: Rc<Shared>,
     drag_start: Cell<Option<(f32, f64)>>,
-    listener: Box<dyn ScrollbarDragListener>,
+    listener: RefCell<Option<Box<dyn ScrollbarDragListener>>>,
 }
 
 impl MouseDragListener for SbMouseDragListener {
@@ -347,7 +347,10 @@ impl MouseDragListener for SbMouseDragListener {
                 .fmax(0.0)
                 .fmin(1.0);
 
-            self.listener.motion(wm, new_value);
+            let listener = self.listener.borrow();
+            if let Some(listener) = &*listener {
+                listener.motion(wm, new_value);
+            }
         }
     }
     fn mouse_down(&self, wm: pal::Wm, view: &HView, loc: Point2<f32>, button: u8) {
@@ -375,7 +378,12 @@ impl MouseDragListener for SbMouseDragListener {
                 // Dragging the thumb
                 self.drag_start.set(Some((loc, self.shared.value.get())));
                 self.shared.set_active(true);
-                self.listener.down(wm, self.shared.value.get());
+
+                if self.listener.borrow().is_none() {
+                    *self.listener.borrow_mut() = Some(self.shared.on_drag.borrow()(wm));
+                }
+
+                (self.listener.borrow().as_ref().unwrap()).down(wm, self.shared.value.get());
             }
         }
     }
@@ -383,7 +391,7 @@ impl MouseDragListener for SbMouseDragListener {
         if button == 0 {
             if let Some(_) = self.drag_start.take() {
                 self.shared.set_active(false);
-                self.listener.up(wm);
+                self.listener.borrow().as_ref().unwrap().up(wm);
             }
         }
     }
@@ -391,7 +399,7 @@ impl MouseDragListener for SbMouseDragListener {
         if let Some(_) = self.drag_start.take() {
             self.shared.set_active(false);
         }
-        self.listener.cancel(wm);
+        self.listener.borrow().as_ref().unwrap().cancel(wm);
     }
 }
 
@@ -399,7 +407,7 @@ impl MouseDragListener for SbMouseDragListener {
 mod tests {
     use cgmath::assert_abs_diff_eq;
     use enclose::enc;
-    use log::debug;
+    use log::{debug, info};
     use std::rc::Weak;
     use try_match::try_match;
 
@@ -532,6 +540,7 @@ mod tests {
         sb.set_on_drag(enc!((sb) move |_| {
             ValueUpdatingDragListener::new(&sb).into()
         }));
+        sb.set_on_page_step(|_, _| unreachable!());
         twm.step_unsend();
 
         let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
@@ -586,5 +595,70 @@ mod tests {
         drag.mouse_up([x, y].t_if(vert).into(), 0);
 
         assert!(!sb.class_set().contains(ClassSet::ACTIVE));
+    }
+
+    #[test]
+    fn trough_scroll_horizontal() {
+        trough_scroll(false);
+    }
+
+    #[test]
+    fn trough_scroll_vertical() {
+        trough_scroll(true);
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    fn trough_scroll(twm: &dyn TestingWm, vert: bool) {
+        let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
+        let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
+        twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
+        sb.set_page_step(0.1);
+        sb.set_value(0.4);
+        sb.set_on_drag(|_| unreachable!());
+        sb.set_on_page_step(enc!((sb) move |_, dir| {
+            debug!("on_page_step({:?})", dir);
+            let new_value = sb.value() + sb.page_step() * dir as i8 as f64;
+            sb.set_value(new_value.fmax(0.0).fmin(1.0));
+        }));
+        twm.step_unsend();
+
+        let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
+
+        debug!("fr1 = {:?}", fr1);
+        debug!("fr2 = {:?}", fr2);
+
+        let y = fr2.mid().y;
+        let mut value = sb.value();
+
+        // Click the trough to lower the value
+        let x = fr1.min.x.average2(&fr2.min.x);
+        info!("clicking at {:?}", [x, y]);
+        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
+        drag.mouse_down([x, y].t_if(vert).into(), 0);
+        twm.step_unsend();
+
+        let new_value = sb.value();
+        debug!("new_value = {}", new_value);
+        assert!(new_value < value);
+
+        drag.mouse_up([x, y].t_if(vert).into(), 0);
+        twm.step_unsend();
+
+        value = new_value;
+
+        // Click the trough to raise the value
+        let x = fr1.max.x.average2(&fr2.max.x);
+        info!("clicking at {:?}", [x, y]);
+        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
+        drag.mouse_down([x, y].t_if(vert).into(), 0);
+        twm.step_unsend();
+
+        let new_value = sb.value();
+        debug!("new_value = {}", new_value);
+        assert!(new_value > value);
+
+        drag.mouse_up([x, y].t_if(vert).into(), 0);
+        twm.step_unsend();
     }
 }
