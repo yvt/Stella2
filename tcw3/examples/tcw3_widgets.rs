@@ -1,4 +1,4 @@
-use std::{rc::Rc};
+use std::rc::Rc;
 use tcw3::{
     pal,
     pal::prelude::*,

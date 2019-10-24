@@ -2,8 +2,8 @@ use as_any::AsAny;
 use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
 use flags_macro::flags;
-use std::{fmt, rc::Rc};
 use log::trace;
+use std::{fmt, rc::Rc};
 
 use super::{HView, ViewDirtyFlags, ViewFlags};
 use crate::pal::Wm;
