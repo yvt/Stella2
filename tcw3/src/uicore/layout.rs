@@ -3,6 +3,7 @@ use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
 use flags_macro::flags;
 use std::{fmt, rc::Rc};
+use log::trace;
 
 use super::{HView, ViewDirtyFlags, ViewFlags};
 use crate::pal::Wm;
@@ -411,6 +412,8 @@ impl<'a> LayoutCtx<'a> {
             hview.set_dirty_flags(ViewDirtyFlags::POSITION_EVENT);
             self.active_view
                 .set_dirty_flags(ViewDirtyFlags::DESCENDANT_POSITION_EVENT);
+
+            trace!("Reframing {:?} with {:?}", hview, frame);
         }
 
         hview.view.frame.set(frame);

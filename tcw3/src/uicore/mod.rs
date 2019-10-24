@@ -18,6 +18,7 @@ use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
 use derive_more::From;
 use flags_macro::flags;
+use log::trace;
 use momo::momo;
 use std::{
     cell::{Cell, RefCell},
@@ -46,9 +47,28 @@ pub use crate::pal::WndFlags as WndStyleFlags;
 /// A window is automatically closed when there is no longer a handle associated
 /// with the window. The application must maintain a `HWnd` to keep a window
 /// displayed, and drop it when [`WndListener::close`] is called.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HWnd {
     wnd: Rc<Wnd>,
+}
+
+impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            return f.debug_tuple("HWnd").field(&self.wnd).finish();
+        }
+
+        let style_attrs = self.wnd.style_attrs.borrow();
+
+        write!(
+            f,
+            "HWnd({:?} {:?} {:?}{})",
+            &*self.wnd as *const _,
+            style_attrs.caption,
+            style_attrs.flags,
+            if style_attrs.visible { "" } else { " <hidden>" }
+        )
+    }
 }
 
 pub trait WndListener {
@@ -163,7 +183,7 @@ impl Wnd {
 // TODO: keyboard focus management
 
 /// A view handle type.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HView {
     view: Rc<View>,
 }
@@ -172,6 +192,43 @@ pub struct HView {
 #[derive(Debug, Clone)]
 pub struct WeakHView {
     view: Weak<View>,
+}
+
+impl fmt::Debug for HView {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            return f.debug_tuple("HView").field(&self.view).finish();
+        }
+
+        write!(
+            f,
+            "HView({:?} [{}]",
+            &*self.view as *const _,
+            self.view.global_frame.get().display_im()
+        )?;
+
+        // Display the path
+        let mut view = Rc::clone(&self.view);
+        loop {
+            if let Some(sv) = { view }.superview.borrow().upgrade() {
+                match sv {
+                    SuperviewStrong::View(superview) => {
+                        write!(f, " ← {:?}", &*superview as *const _)?;
+                        view = superview;
+                    }
+                    SuperviewStrong::Window(wnd) => {
+                        write!(f, " ← {:?}", HWnd { wnd })?;
+                        break;
+                    }
+                }
+            } else {
+                write!(f, " ← (orphaned)")?;
+                break;
+            }
+        }
+
+        write!(f, ")")
+    }
 }
 
 bitflags! {
@@ -412,6 +469,8 @@ impl HWnd {
         // `tcw3_images` wants to know DPI scale values.
         images::handle_new_wnd(&hwnd);
 
+        trace!("HWnd::new -> {:?}", hwnd);
+
         hwnd
     }
 
@@ -578,9 +637,13 @@ impl Eq for HWnd {}
 impl HView {
     /// Construct a view object and return a handle to it.
     pub fn new(flags: ViewFlags) -> Self {
-        Self {
+        let this = Self {
             view: Rc::new(View::new(flags)),
-        }
+        };
+
+        trace!("HView::new -> {:?}", this);
+
+        this
     }
 
     /// Construct a weak handle.

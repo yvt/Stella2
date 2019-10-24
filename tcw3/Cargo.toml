@@ -25,6 +25,7 @@ sorted_diff = { path = "../support/sorted_diff" }
 lazy_static = "1"
 itertools = "0.8.0"
 ndarray = "0.13.0"
+log = "0.4"
 
 tcw3_images = { path = "images" }
 tcw3_pal = { path = "pal" }
@@ -39,5 +40,4 @@ lipsum = "0.6.0"
 structopt = "0.3.0"
 enclose = "1.1.8"
 env_logger = "0.7.0"
-log = "0.4"
 try_match = { version = "0.2.1", default-features = false, features = ["std"] }
