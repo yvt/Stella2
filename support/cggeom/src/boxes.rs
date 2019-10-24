@@ -2,7 +2,7 @@ use cgmath::prelude::*;
 use cgmath::{
     num_traits::NumCast, AbsDiffEq, BaseFloat, BaseNum, Point2, Point3, UlpsEq, Vector2, Vector3,
 };
-use std::ops::Add;
+use std::{fmt, ops::Add};
 
 use super::{Average2, BoolArray, ElementWiseOp, ElementWisePartialOrd};
 
@@ -281,6 +281,54 @@ impl<S: NumCast + Copy> Box3<S> {
             None => return None,
         };
         Some(Box3 { min, max })
+    }
+}
+
+/// ImageMagick-like formatting
+#[derive(Debug)]
+pub struct DisplayIm<'a, T>(&'a T);
+
+impl<S> Box2<S> {
+    /// Get an object implementing `Display` for printing `self` with
+    /// ImageMagick-like formatting.
+    ///
+    ///     use cggeom::box2;
+    ///
+    ///     let bx = box2!{ top_left: [-1i32, 2], size: [4, 8] };
+    ///     let st = format!("{}", bx.display_im());
+    ///     assert_eq!(st, "4x8-1+2");
+    ///
+    pub fn display_im(&self) -> DisplayIm<'_, Self> {
+        DisplayIm(self)
+    }
+}
+
+impl<S> Box3<S> {
+    /// Get an object implementing `Display` for printing `self` with
+    /// ImageMagick-like formatting.
+    pub fn display_im(&self) -> DisplayIm<'_, Self> {
+        DisplayIm(self)
+    }
+}
+
+impl<T: BaseNum + Average2 + fmt::Display> fmt::Display for DisplayIm<'_, Box2<T>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let size = self.0.size();
+        let min = self.0.min();
+        write!(f, "{}x{}{:+}{:+}", size.x, size.y, min.x, min.y)
+    }
+}
+
+/// Display dimensions in a ImageMagick-like format (`wxhxd+x+y+z`).
+impl<T: BaseNum + Average2 + fmt::Display> fmt::Display for DisplayIm<'_, Box3<T>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let size = self.0.size();
+        let min = self.0.min();
+        write!(
+            f,
+            "{}x{}x{}{:+}{:+}{:+}",
+            size.x, size.y, size.z, min.x, min.y, min.z
+        )
     }
 }
 
