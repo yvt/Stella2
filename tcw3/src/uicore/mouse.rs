@@ -1,4 +1,5 @@
 use cgmath::Point2;
+use log::{trace, warn};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
@@ -79,6 +80,13 @@ impl HWnd {
         if st.drag_gestures.is_some() {
             // Can't have more than one active drag gesture
             // (Is that even possible?)
+
+            warn!(
+                "{:?}: Rejecting mouse click at {:?} (button = {:?}) because \
+                 there already is an active drag gesture",
+                self, loc, button
+            );
+
             return Box::new(());
         }
 
@@ -90,6 +98,14 @@ impl HWnd {
                 ViewFlags::DENY_MOUSE,
             )
         };
+
+        trace!(
+            "{:?}: Mouse click at {:?} (button = {:?}) is handled by {:?}",
+            self,
+            loc,
+            button,
+            hit_view
+        );
 
         if let Some(hit_view) = hit_view {
             // Call the view's drag event handler
@@ -183,8 +199,12 @@ impl PalDragListener {
 impl Drop for PalDragListener {
     fn drop(&mut self) {
         if let Some(hwnd) = self.hwnd() {
+            trace!("{:?}: Mouse drag gesture ended", hwnd);
+
             let mut st = hwnd.wnd.mouse_state.borrow_mut();
             st.drag_gestures = None;
+        } else {
+            trace!("Mouse drag gesture ended, but the owner is gone");
         }
     }
 }
