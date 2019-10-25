@@ -88,7 +88,7 @@ impl HLayer {
         this
     }
 
-    pub(super) fn remove(&self, wm: Wm) {
+    pub(super) fn remove(self, wm: Wm) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
 
         let this_layer: &Layer = &layer_pool[self.ptr];
@@ -114,7 +114,7 @@ impl HLayer {
     /// The method doesn't actually do the deletion - it just adds the layers to
     /// be deleted to `deletion_queue`.
     fn handle_pending_deletion(
-        &self,
+        self,
         layer_pool: &Pool<Layer>,
         wm: Wm,
         deletion_queue: &mut Vec<HLayer>,
@@ -125,7 +125,7 @@ impl HLayer {
             return;
         }
 
-        deletion_queue.push(*self);
+        deletion_queue.push(self);
 
         let attrs_diff = this_layer.attrs_diff.borrow();
         let committed_sublayers = this_layer.sublayers.borrow();
@@ -139,7 +139,7 @@ impl HLayer {
         }
     }
 
-    pub(super) fn set_attrs(&self, wm: Wm, attrs: LayerAttrs) {
+    pub(super) fn set_attrs(self, wm: Wm, attrs: LayerAttrs) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
         let layer_pool = &mut *layer_pool; // enable split borrow
 
@@ -159,7 +159,7 @@ impl HLayer {
             debug_assert!(deletion_queue.is_empty());
 
             for hlayer in sublayers.iter() {
-                debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(*self));
+                debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(self));
                 layer_pool[hlayer.ptr].superlayer.set(None);
                 hlayer.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
             }
@@ -181,7 +181,7 @@ impl HLayer {
                     None,
                     "layers only can have up to one parents."
                 );
-                layer_pool[hlayer.ptr].superlayer.set(Some(*self));
+                layer_pool[hlayer.ptr].superlayer.set(Some(self));
             }
         }
 
@@ -211,7 +211,7 @@ impl HLayer {
     /// Apply deferred property updates to the underlying `CALayer`.
     ///
     /// The operation is performed recursively on sublayers.
-    fn flush_with_layer_pool(&self, layer_pool: &Pool<Layer>) {
+    fn flush_with_layer_pool(self, layer_pool: &Pool<Layer>) {
         let this_layer: &Layer = &layer_pool[self.ptr];
 
         // Update this layer's local properties
@@ -325,14 +325,14 @@ impl HLayer {
     ///
     /// The operation is performed recursively on sublayers.
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn flush(&self, wm: Wm) {
+    pub(super) fn flush(self, wm: Wm) {
         self.flush_with_layer_pool(&LAYER_POOL.get_with_wm(wm).borrow());
     }
 
     /// Get the `CALayer` of a layer.
     ///
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn ca_layer(&self, wm: Wm) -> id {
+    pub(super) fn ca_layer(self, wm: Wm) -> id {
         LAYER_POOL.get_with_wm(wm).borrow()[self.ptr].ca_layer.id()
     }
 }

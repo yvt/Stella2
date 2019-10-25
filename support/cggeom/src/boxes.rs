@@ -151,10 +151,7 @@ pub trait AxisAlignedBox<T>: Sized {
 
     #[inline]
     fn translate(&self, displacement: Self::Vector) -> Self {
-        Self::new(
-            self.min() + displacement.clone(),
-            self.max() + displacement.clone(),
-        )
+        Self::new(self.min() + displacement.clone(), self.max() + displacement)
     }
 }
 
@@ -186,7 +183,7 @@ impl<T: BaseNum + Average2> AxisAlignedBox<T> for Box2<T> {
 
     #[inline]
     fn new(min: Self::Point, max: Self::Point) -> Self {
-        Self { min: min, max: max }
+        Self { min, max }
     }
 
     #[inline]
@@ -222,7 +219,7 @@ impl<T: BaseNum + Average2> AxisAlignedBox<T> for Box3<T> {
 
     #[inline]
     fn new(min: Self::Point, max: Self::Point) -> Self {
-        Self { min: min, max: max }
+        Self { min, max }
     }
 
     #[inline]
@@ -408,12 +405,7 @@ impl<T: Arbitrary + BaseNum + Average2> Arbitrary for Box2<T> {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(
-            (
-                self.min.x.clone(),
-                self.min.y.clone(),
-                self.max.x.clone(),
-                self.max.y.clone(),
-            )
+            (self.min.x, self.min.y, self.max.x, self.max.y)
                 .shrink()
                 .map(|(x1, x2, x3, x4)| Box2::new(Point2::new(x1, x2), Point2::new(x3, x4))),
         )
@@ -430,12 +422,7 @@ impl<T: Arbitrary + BaseNum + Average2> Arbitrary for Box3<T> {
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(
             (
-                self.min.x.clone(),
-                self.min.y.clone(),
-                self.min.z.clone(),
-                self.max.x.clone(),
-                self.max.y.clone(),
-                self.max.z.clone(),
+                self.min.x, self.min.y, self.min.z, self.max.x, self.max.y, self.max.z,
             )
                 .shrink()
                 .map(|(x1, x2, x3, x4, x5, x6)| {

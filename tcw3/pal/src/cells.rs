@@ -34,6 +34,12 @@ impl<T: 'static + fmt::Debug, TWM: WMTrait> fmt::Debug for MtSticky<T, TWM> {
 #[allow(dead_code)]
 impl<T: 'static, TWM: WMTrait> MtSticky<T, TWM> {
     /// Construct a `MtSticky` without thread checking.
+    ///
+    /// # Safety
+    ///
+    /// This method allows you to send an unsendable value to a main thread
+    /// without checking the calling thread.
+    ///
     #[inline]
     pub const unsafe fn new_unchecked(x: T) -> Self {
         Self {
@@ -191,6 +197,19 @@ pub trait MtLazyStatic<TWM: WMTrait = Wm> {
     fn get_with_wm(&self, _: TWM) -> &Self::Target;
 
     /// Initialize and get the inner value without thread checking.
+    ///
+    /// # Safety
+    ///
+    /// The calling thread must be a main thread. Calling from a different
+    /// thread is unsafe in many ways including:
+    ///
+    ///  - This method is implemented using `Wm::global_unchecked()`, which
+    ///    includes the above condition as its prerequisite.
+    ///
+    ///  - This method provides unconditional access to the contents regardless
+    ///    of the thread safety of the inner type. Getting a reference itself is
+    ///    safe, but using it in some ways might cause undefined behaviour.
+    ///
     unsafe fn get_unchecked(&self) -> &Self::Target {
         self.get_with_wm(TWM::global_unchecked())
     }

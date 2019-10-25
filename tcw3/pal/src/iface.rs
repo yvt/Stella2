@@ -41,6 +41,11 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     }
 
     /// Get the default instance of [`Wm`] without checking the calling thread.
+    ///
+    /// # Safety
+    ///
+    /// The calling thread should be a main thread, i.e., the thread
+    /// wherein `Self::is_main_thread()` returns `true`.
     unsafe fn global_unchecked() -> Self;
 
     fn try_global() -> Result<Self, BadThread> {
@@ -136,6 +141,7 @@ impl std::fmt::Display for BadThread {
 
 impl std::error::Error for BadThread {}
 
+#[allow(clippy::option_option)] // for consistency between fields
 pub struct WndAttrs<'a, T: Wm, TLayer> {
     /// The size of the content region.
     pub size: Option<[u32; 2]>,
@@ -165,7 +171,7 @@ impl<'a, T: Wm, TLayer> Default for WndAttrs<'a, T, TLayer> {
 
 bitflags! {
     pub struct WndFlags: u32 {
-        const RESIZABLE = 1 << 0;
+        const RESIZABLE = 1;
         const BORDERLESS = 1 << 1;
     }
 }
@@ -196,6 +202,7 @@ impl<T: Wm, TLayer: Debug> Debug for WndAttrs<'_, T, TLayer> {
 
 #[cfg_attr(rustdoc, svgbobdoc::transform)]
 /// Specifies layer attributes.
+#[allow(clippy::option_option)] // for consistency between fields
 #[derive(Debug, Clone)]
 pub struct LayerAttrs<TBitmap, TLayer> {
     /// The 2D transformation applied to the contents of the layer.
@@ -596,6 +603,7 @@ pub trait CharStyle: Clone + Send + Sync + Sized {
     fn size(&self) -> f32;
 }
 
+#[allow(clippy::option_option)] // for consistency between fields
 #[derive(Debug, Clone)]
 pub struct CharStyleAttrs<TCharStyle> {
     pub template: Option<TCharStyle>,
@@ -623,7 +631,7 @@ impl<TCharStyle> Default for CharStyleAttrs<TCharStyle> {
 
 bitflags! {
     pub struct TextDecorFlags: u8 {
-        const UNDERLINE = 1 << 0;
+        const UNDERLINE = 1;
         const OVERLINE = 1 << 1;
         const STRIKETHROUGH = 1 << 2;
     }

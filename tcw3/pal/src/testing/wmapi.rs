@@ -88,7 +88,7 @@ pub trait MouseDrag {
 }
 
 /// An RGBA8 image created from the contents of a window.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WndSnapshot {
     /// The size of the image.
     pub size: [usize; 2],
@@ -101,10 +101,6 @@ pub struct WndSnapshot {
 impl WndSnapshot {
     /// Create an empty `WndSnapshot`.
     pub fn new() -> Self {
-        Self {
-            size: [0, 0],
-            data: Vec::new(),
-            stride: 0,
-        }
+        Self::default()
     }
 }

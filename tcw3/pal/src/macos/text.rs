@@ -65,7 +65,7 @@ impl iface::CharStyle for CharStyle {
                 if let Some(size) = attrs.size.take() {
                     old_style.font.clone_with_font_size(size as f64)
                 } else {
-                    old_style.font.clone()
+                    old_style.font
                 }
             })
         });

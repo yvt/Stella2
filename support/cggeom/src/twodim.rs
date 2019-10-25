@@ -29,8 +29,8 @@ pub trait Matrix3TwoDimExt<S>: Sized {
 
 impl<S: BaseFloat> Matrix3TwoDimExt<S> for Matrix3<S> {
     #[inline]
+    #[rustfmt::skip]
     fn from_translation(v: Vector2<S>) -> Self {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         Self::new(
             S::one(), S::zero(), S::zero(),
             S::zero(), S::one(), S::zero(),
@@ -44,8 +44,8 @@ impl<S: BaseFloat> Matrix3TwoDimExt<S> for Matrix3<S> {
     }
 
     #[inline]
+    #[rustfmt::skip]
     fn from_nonuniform_scale_2d(x: S, y: S) -> Self {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         Self::new(
             x, S::zero(), S::zero(),
             S::zero(), y, S::zero(),

@@ -158,7 +158,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                     .redraw_requested(self, &wnd.winit_wnd);
             }
             WindowEvent::CloseRequested => {
-                let _ = listener.close_requested(self.wm(), &hwnd);
+                listener.close_requested(self.wm(), &hwnd);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 wnd.mouse_pos.set(log_pos_to_point2(position));

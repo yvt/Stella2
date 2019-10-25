@@ -15,10 +15,13 @@ pub use self::{logging::Logger, wmapi::TestingWm};
 ///
 /// This function is available even if the `testing` feature flag is disabled.
 pub fn run_test(_cb: impl FnOnce(&dyn TestingWm) + Send + panic::UnwindSafe + 'static) {
-    use std::io::Write;
-    writeln!(
-        std::io::stderr(),
-        "warning: testing backend is disabled, skipping some tests"
-    )
-    .unwrap();
+    #[allow(clippy::explicit_write)] // bypass output redirection
+    {
+        use std::io::Write;
+        writeln!(
+            std::io::stderr(),
+            "warning: testing backend is disabled, skipping some tests"
+        )
+        .unwrap();
+    }
 }

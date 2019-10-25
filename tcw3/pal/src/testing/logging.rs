@@ -51,9 +51,7 @@ pub struct Logger {
 
 impl Logger {
     pub fn new(inner: Box<dyn Log>) -> Self {
-        Self {
-            inner: inner.into(),
-        }
+        Self { inner }
     }
 
     /// Set the global logger to `self`.
