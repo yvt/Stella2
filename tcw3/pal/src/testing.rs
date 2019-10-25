@@ -118,7 +118,7 @@ mod eventloop;
 mod logging;
 mod screen;
 mod uniqpool;
-mod wmapi;
+pub mod wmapi;
 mod wndlistenershim;
 pub use self::{logging::Logger, wmapi::TestingWm};
 

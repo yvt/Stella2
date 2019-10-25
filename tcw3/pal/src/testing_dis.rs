@@ -7,7 +7,7 @@ use std::panic;
 #[allow(dead_code)]
 mod logging;
 #[path = "testing/wmapi.rs"]
-mod wmapi;
+pub mod wmapi;
 pub use self::{logging::Logger, wmapi::TestingWm};
 
 /// Call `with_testing_wm` if the testing backend is enabled. Otherwise,
