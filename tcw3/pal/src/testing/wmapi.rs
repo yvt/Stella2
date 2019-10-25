@@ -47,6 +47,9 @@ pub trait TestingWm: 'static {
     /// `size` is not automatically clipped by `min_size` or `max_size`.
     fn set_wnd_size(&self, hwnd: &HWnd, size: [u32; 2]);
 
+    /// Render the content of a given window and update `out` with it.
+    fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut WndSnapshot);
+
     /// Trigger `WndListener::mouse_motion`.
     fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>);
 
@@ -82,4 +85,26 @@ pub trait MouseDrag {
     fn mouse_up(&self, _loc: Point2<f32>, _button: u8);
     /// Trigger `MouseDragListener::cancel`.
     fn cancel(&self);
+}
+
+/// An RGBA8 image created from the contents of a window.
+#[derive(Debug, Clone)]
+pub struct WndSnapshot {
+    /// The size of the image.
+    pub size: [usize; 2],
+    /// Image data.
+    pub data: Vec<u8>,
+    /// The byte offset between adjacent rows.
+    pub stride: usize,
+}
+
+impl WndSnapshot {
+    /// Create an empty `WndSnapshot`.
+    pub fn new() -> Self {
+        Self {
+            size: [0, 0],
+            data: Vec::new(),
+            stride: 0,
+        }
+    }
 }

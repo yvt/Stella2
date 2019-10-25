@@ -10,7 +10,7 @@ use std::{
     thread::spawn,
     time::{Duration, Instant},
 };
-use tcw3_pal::{self as pal, iface::Wm as _, prelude::*, testing, MtLock, Wm};
+use tcw3_pal::{self as pal, iface::Wm as _, prelude::*, testing, testing::wmapi, MtLock, Wm};
 
 #[test]
 fn create_testing_wm() {
@@ -263,14 +263,58 @@ fn empty_wnd() {
 
         wm.update_wnd(&hwnd);
 
-        // TODO: change window size
-        // TODO: change DPI scale
-        // TODO: examine rendered contents
+        let mut ss = wmapi::WndSnapshot::new();
+
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+
+        assert_eq!(ss.size, [SIZE[0] as usize, SIZE[1] as usize]);
+        assert!(ss.stride >= ss.size[0] * 4);
+
+        twm.set_wnd_size(&hwnd, [50, 200]);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+
+        twm.set_wnd_dpi_scale(&hwnd, 1.5);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
 
         wm.remove_wnd(&hwnd);
 
         assert!(twm.wnd_attrs(&hwnd).is_none());
     });
+}
+
+fn snapshot_find_nontransparent_pixel(
+    wmapi::WndSnapshot { size, data, stride }: &wmapi::WndSnapshot,
+) -> Option<[usize; 2]> {
+    for y in 0..size[1] {
+        let row = &data[y * stride..];
+
+        for (x, pixel) in row[..size[0] * 4].chunks_exact(4).enumerate() {
+            if pixel[3] != 0 {
+                return Some([x, y]);
+            }
+        }
+    }
+
+    None
+}
+
+fn assert_snapshot_empty(ss: &wmapi::WndSnapshot) {
+    if let Some(p) = snapshot_find_nontransparent_pixel(ss) {
+        panic!("Found a non-transparent pixel at {:?}", p);
+    }
+}
+
+fn assert_snapshot_nonempty(ss: &wmapi::WndSnapshot) {
+    snapshot_find_nontransparent_pixel(ss).expect("Did not find a non-transparent pixel");
 }
 
 #[test]
@@ -339,6 +383,7 @@ fn wnd_with_layer() {
             bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
             flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
             transform: Some(Matrix3::from_angle(Deg(30.0))),
+            bounds: Some(box2! { top_left: [10.0; 2], size: [30.0; 2] }),
             ..Default::default()
         });
 
@@ -354,10 +399,87 @@ fn wnd_with_layer() {
             ..Default::default()
         });
 
+        let mut ss = wmapi::WndSnapshot::new();
+
         wm.update_wnd(&hwnd);
 
-        // TODO: change window size
-        // TODO: change DPI scale
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+
+        twm.set_wnd_size(&hwnd, [200, 200]);
+
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+
+        wm.update_wnd(&hwnd);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+
+        twm.set_wnd_dpi_scale(&hwnd, 2.0);
+
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
+
+        wm.remove_wnd(&hwnd);
+        wm.remove_layer(&hlayer);
+    });
+}
+
+#[test]
+fn defer_layer_changes_until_update_wnd() {
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        let hlayer = wm.new_layer(pal::LayerAttrs {
+            bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
+            flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
+            transform: Some(Matrix3::from_angle(Deg(30.0))),
+            // Off-screen
+            bounds: Some(box2! { top_left: [-40.0; 2], size: [30.0; 2] }),
+            ..Default::default()
+        });
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            size: Some([100, 100]),
+            layer: Some(Some(hlayer.clone())),
+            ..Default::default()
+        });
+
+        wm.update_wnd(&hwnd);
+
+        let mut ss = wmapi::WndSnapshot::new();
+
+        // The layer is off-screen
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+
+        // Move the layer to inside the window
+        wm.set_layer_attr(
+            &hlayer,
+            pal::LayerAttrs {
+                bounds: Some(box2! { top_left: [10.0; 2], size: [30.0; 2] }),
+                ..Default::default()
+            },
+        );
+
+        // The layer is still off-screen since we haven't called `update_wnd` yet
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_empty(&ss);
+
+        wm.update_wnd(&hwnd);
+
+        // Now the layer is visible
+        twm.read_wnd_snapshot(&hwnd, &mut ss);
+        assert_snapshot_nonempty(&ss);
 
         wm.remove_wnd(&hwnd);
         wm.remove_layer(&hlayer);

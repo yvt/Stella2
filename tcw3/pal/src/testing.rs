@@ -368,6 +368,11 @@ impl wmapi::TestingWm for Wm {
         SCREEN.get_with_wm(*self).set_wnd_size(*self, hwnd, size)
     }
 
+    fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut wmapi::WndSnapshot) {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN.get_with_wm(*self).read_wnd_snapshot(hwnd, out)
+    }
+
     fn raise_mouse_motion(&self, hwnd: &HWnd, loc: Point2<f32>) {
         let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN

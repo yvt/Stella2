@@ -55,6 +55,9 @@ pub struct Wnd {
     listener: Rc<dyn iface::WndListener<Wm>>,
 
     dirty_rect: Option<Box2<usize>>,
+    img_size: [usize; 2],
+    img_data: Vec<u8>,
+    img_dpi_scale: f32,
 }
 
 impl Screen {
@@ -99,6 +102,9 @@ impl Screen {
                 visible: attrs.visible.unwrap_or(false),
             },
             listener: Rc::from(attrs.listener.unwrap_or_else(|| Box::new(()))),
+            img_size: [0, 0],
+            img_data: Vec::new(),
+            img_dpi_scale: 1.0,
         };
 
         state
@@ -150,9 +156,9 @@ impl Screen {
     pub(super) fn update_wnd(&self, hwnd: &HWnd) {
         let mut state = self.state.borrow_mut();
         let state = &mut *state; // enable split borrow
-        let wnd = &mut state.wnds[hwnd.ptr];
+        let wnd: &mut Wnd = &mut state.wnds[hwnd.ptr];
 
-        // Compute the dirty region
+        // Apply deferred changes and compute the dirty region
         if let Some(new_dirty) = state.sr_scrn.update_wnd(&wnd.sr_wnd) {
             if let Some(x) = &mut wnd.dirty_rect {
                 x.union_assign(&new_dirty);
@@ -160,43 +166,6 @@ impl Screen {
                 wnd.dirty_rect = Some(new_dirty);
             }
         }
-
-        // Calculate the surface size
-        let [size_w, size_h] = wnd.attrs.size;
-        let dpi_scale = wnd.dpi_scale;
-        let surf_size = [
-            (size_w as f32 * dpi_scale) as usize,
-            (size_h as f32 * dpi_scale) as usize,
-        ];
-        if surf_size[0] == 0 || surf_size[1] == 0 {
-            // Suspend update if one of the surface dimensions is zero
-            return;
-        }
-
-        // TODO: Preserve surface image
-        let img_stride = 4usize.checked_mul(surf_size[0]).unwrap();
-        let num_bytes = img_stride.checked_mul(surf_size[1]).unwrap();
-        let mut img = vec![0u8; num_bytes];
-
-        wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size });
-        state.sr_scrn.set_wnd_size(&wnd.sr_wnd, surf_size);
-        state.sr_scrn.set_wnd_dpi_scale(&wnd.sr_wnd, wnd.dpi_scale);
-
-        let dirty_rect = if let Some(x) = wnd.dirty_rect.take() {
-            x
-        } else {
-            return;
-        };
-
-        state.sr_scrn.render_wnd(
-            &wnd.sr_wnd,
-            &mut img,
-            img_stride,
-            dirty_rect,
-            &mut state.binner,
-        );
-
-        // TODO: Let the clients observe the rendered image
     }
     pub(super) fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
         let state = self.state.borrow();
@@ -281,6 +250,59 @@ impl Screen {
 
         let listener = self.wnd_listener(hwnd).unwrap();
         listener.resize(wm, &hwnd.into());
+    }
+
+    /// Implements `TestingWm::read_wnd_snapshot`.
+    pub(super) fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut wmapi::WndSnapshot) {
+        let mut state = self.state.borrow_mut();
+        let state = &mut *state; // enable split borrow
+        let wnd: &mut Wnd = &mut state.wnds[hwnd.ptr];
+
+        // Calculate the surface size
+        let [size_w, size_h] = wnd.attrs.size;
+        let dpi_scale = wnd.dpi_scale;
+        let surf_size = [
+            (size_w as f32 * dpi_scale) as usize,
+            (size_h as f32 * dpi_scale) as usize,
+        ];
+
+        if surf_size[0] == 0 || surf_size[1] == 0 {
+            // Suspend update if one of the surface dimensions is zero
+            out.size = [0, 0];
+            out.data.clear();
+            out.stride = 0;
+            return;
+        }
+
+        let img_stride = 4usize.checked_mul(surf_size[0]).unwrap();
+        let img_stride = img_stride.checked_add(63).unwrap() & !63;
+        let num_bytes = img_stride.checked_mul(surf_size[1]).unwrap();
+
+        if (surf_size, dpi_scale) != (wnd.img_size, wnd.img_dpi_scale) {
+            wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size });
+            wnd.img_size = surf_size;
+            wnd.img_data.resize(num_bytes, 0);
+
+            state.sr_scrn.set_wnd_size(&wnd.sr_wnd, surf_size);
+            state.sr_scrn.set_wnd_dpi_scale(&wnd.sr_wnd, wnd.dpi_scale);
+        }
+
+        // Update the backing store
+        if let Some(dirty_rect) = wnd.dirty_rect.take() {
+            state.sr_scrn.render_wnd(
+                &wnd.sr_wnd,
+                &mut wnd.img_data,
+                img_stride,
+                dirty_rect,
+                &mut state.binner,
+            );
+        }
+
+        // Copy that to the given buffer, `out`
+        out.size = surf_size;
+        out.stride = img_stride;
+        out.data.clear();
+        out.data.extend(&wnd.img_data[..]);
     }
 
     /// Implements `TestingWm::raise_mouse_motion`.
