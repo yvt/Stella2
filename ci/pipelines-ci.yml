@@ -5,12 +5,7 @@ trigger:
     include: ['*']
 
 variables:
-  rustVersion: nightly-2019-10-13
-  linuxPrestep: |
-    sudo apt-get update &&
-    sudo apt-get install -y \
-      libglib2.0-dev libcairo2-dev libcairo-gobject2 libpango1.0-dev
-  linuxVmImage: ubuntu-18.04
+- template: ./common.yml
 
 stages:
 - stage: check
@@ -18,7 +13,7 @@ stages:
   jobs:
   - template: ./jobs/cargo-check.yml
     parameters:
-      rust: $(rustVersion)
+      rust: ${{ variables.rustVersion }}
       all: true
       benches: true
       job_pool:
@@ -28,12 +23,12 @@ stages:
           displayName: Install native dependencies
   - template: ./jobs/rustfmt.yml
     parameters:
-      rust: $(rustVersion)
+      rust: ${{ variables.rustVersion }}
       job_pool:
         vmImage: ${{ variables.linuxVmImage }}
   - template: ./jobs/cargo-clippy.yml
     parameters:
-      rust: $(rustVersion)
+      rust: ${{ variables.rustVersion }}
       all: true
       job_pool:
         vmImage: ${{ variables.linuxVmImage }}
@@ -46,7 +41,7 @@ stages:
   jobs:
   - template: ./jobs/cargo-test.yml
     parameters:
-      rust: $(rustVersion)
+      rust: ${{ variables.rustVersion }}
       all: true
       job_strategy:
         matrix:
