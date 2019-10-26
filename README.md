@@ -8,6 +8,8 @@ TODO
 
     stella2
      │
+     ├╴ci               CI configuration
+     │
      ├╴stella2          The main program
      │
      ├╴stellca2_assets
