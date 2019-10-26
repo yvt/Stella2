@@ -81,7 +81,7 @@ pub trait WinitWm: Wm {
 }
 
 /// The window handle type used by `WinitWmCore`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWndCore {
     ptr: PoolPtr,
 }

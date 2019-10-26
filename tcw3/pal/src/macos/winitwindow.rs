@@ -11,7 +11,7 @@ use super::{
     HLayer, Wm, WndAttrs,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct HWnd {
     winit_hwnd: HWndCore,
 }
@@ -53,7 +53,7 @@ impl WndContentTrait for WndContent {
         _: &Window,
         layer: Option<Self::HLayer>,
     ) {
-        let ca_layer = if let Some(hlayer) = layer {
+        let ca_layer = if let Some(hlayer) = &layer {
             hlayer.ca_layer(wm_core.wm())
         } else {
             nil

@@ -592,7 +592,7 @@ impl iface::Wm for Wm {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
     inner: HWndInner,
 }
@@ -623,13 +623,13 @@ impl HWnd {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum HWndInner {
     Native(native::HWnd),
     Testing(screen::HWnd),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     inner: HLayerInner,
 }
@@ -659,7 +659,7 @@ impl fmt::Debug for HLayer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum HLayerInner {
     Native(native::HLayer),
     Testing(screen::HLayer),

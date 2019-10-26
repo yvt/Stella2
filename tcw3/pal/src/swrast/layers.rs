@@ -28,7 +28,7 @@ use super::{
 };
 
 /// The window handle type of [`Screen`].
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
     ptr: PoolPtr,
 }
@@ -40,7 +40,7 @@ impl fmt::Debug for HWnd {
 }
 
 /// The layer handle type of [`Screen`].
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     ptr: PoolPtr,
 }

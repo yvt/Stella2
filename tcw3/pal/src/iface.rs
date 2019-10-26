@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{borrow::Cow, fmt, fmt::Debug};
+use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -23,14 +23,14 @@ pub type RGBAF32 = RGBA<f32>;
 /// All methods are reentrant with some exceptions.
 pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// A window handle type.
-    type HWnd: Debug + Clone;
+    type HWnd: Debug + Clone + PartialEq + Eq + Hash;
 
     /// A layer handle type.
     ///
     /// A layer only can appear in a single window throughout its lifetime.
     /// I.e., after a layer is added to a window, it must never moved to another
     /// window.
-    type HLayer: Debug + Clone;
+    type HLayer: Debug + Clone + PartialEq + Eq + Hash;
 
     /// A bitmap type.
     type Bitmap: Bitmap;

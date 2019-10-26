@@ -22,7 +22,7 @@ static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>> = MtSticky::new(RefCell::new(P
 
 static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>> = MtSticky::new(RefCell::new(Vec::new()));
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     /// The pointer to a `Layer` in `LAYER_POOL`.
     ptr: PoolPtr,
@@ -51,7 +51,9 @@ struct Layer {
     /// It's immediately updated when `set_attrs` is called.
     /// Thus, it's based on the reverse mapping of
     /// `attrs_diff.sublayers.unwrap_or(sublayers)`.
-    superlayer: Cell<Option<HLayer>>,
+    ///
+    /// Stores `HLayer::ptr` because `HLayer` itself is not `Copy`.
+    superlayer: Cell<Option<PoolPtr>>,
 
     /// `true` if `remove` was called, but the layer can't be deleted because
     /// `superlayer` is not `None`. It'll be deleted when its detached from the
@@ -88,7 +90,7 @@ impl HLayer {
         this
     }
 
-    pub(super) fn remove(self, wm: Wm) {
+    pub(super) fn remove(&self, wm: Wm) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
 
         let this_layer: &Layer = &layer_pool[self.ptr];
@@ -114,7 +116,7 @@ impl HLayer {
     /// The method doesn't actually do the deletion - it just adds the layers to
     /// be deleted to `deletion_queue`.
     fn handle_pending_deletion(
-        self,
+        &self,
         layer_pool: &Pool<Layer>,
         wm: Wm,
         deletion_queue: &mut Vec<HLayer>,
@@ -125,7 +127,7 @@ impl HLayer {
             return;
         }
 
-        deletion_queue.push(self);
+        deletion_queue.push(self.clone());
 
         let attrs_diff = this_layer.attrs_diff.borrow();
         let committed_sublayers = this_layer.sublayers.borrow();
@@ -139,7 +141,7 @@ impl HLayer {
         }
     }
 
-    pub(super) fn set_attrs(self, wm: Wm, attrs: LayerAttrs) {
+    pub(super) fn set_attrs(&self, wm: Wm, attrs: LayerAttrs) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
         let layer_pool = &mut *layer_pool; // enable split borrow
 
@@ -159,7 +161,7 @@ impl HLayer {
             debug_assert!(deletion_queue.is_empty());
 
             for hlayer in sublayers.iter() {
-                debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(self));
+                debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(self.ptr));
                 layer_pool[hlayer.ptr].superlayer.set(None);
                 hlayer.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
             }
@@ -181,7 +183,7 @@ impl HLayer {
                     None,
                     "layers only can have up to one parents."
                 );
-                layer_pool[hlayer.ptr].superlayer.set(Some(self));
+                layer_pool[hlayer.ptr].superlayer.set(Some(self.ptr));
             }
         }
 
@@ -191,7 +193,7 @@ impl HLayer {
             while !layer.needs_update.get() {
                 layer.needs_update.set(true);
                 if let Some(sup) = layer.superlayer.get() {
-                    layer = &layer_pool[sup.ptr];
+                    layer = &layer_pool[sup];
                 } else {
                     break;
                 }
@@ -211,7 +213,7 @@ impl HLayer {
     /// Apply deferred property updates to the underlying `CALayer`.
     ///
     /// The operation is performed recursively on sublayers.
-    fn flush_with_layer_pool(self, layer_pool: &Pool<Layer>) {
+    fn flush_with_layer_pool(&self, layer_pool: &Pool<Layer>) {
         let this_layer: &Layer = &layer_pool[self.ptr];
 
         // Update this layer's local properties
@@ -325,14 +327,14 @@ impl HLayer {
     ///
     /// The operation is performed recursively on sublayers.
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn flush(self, wm: Wm) {
+    pub(super) fn flush(&self, wm: Wm) {
         self.flush_with_layer_pool(&LAYER_POOL.get_with_wm(wm).borrow());
     }
 
     /// Get the `CALayer` of a layer.
     ///
     /// `wm` is used for compile-time thread checking.
-    pub(super) fn ca_layer(self, wm: Wm) -> id {
+    pub(super) fn ca_layer(&self, wm: Wm) -> id {
         LAYER_POOL.get_with_wm(wm).borrow()[self.ptr].ca_layer.id()
     }
 }

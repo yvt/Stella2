@@ -18,7 +18,7 @@ pub(super) struct Screen {
     state: RefCell<State>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
     /// A pointer into `State::wnds`.
     ptr: PoolPtr,
@@ -30,7 +30,7 @@ impl fmt::Debug for HWnd {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     sr_layer: swrast::HLayer,
 }

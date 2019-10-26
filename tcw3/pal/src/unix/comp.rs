@@ -36,7 +36,7 @@ pub struct WndContent {
     dirty_rect: Vec<Option<Box2<usize>>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct HLayer {
     sr_layer: swrast::HLayer,
 }
