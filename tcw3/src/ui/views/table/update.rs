@@ -434,8 +434,6 @@ impl TableLayout {
         let cells = &state.cells;
         let subviews = Array2::from_shape_fn(cells.dim(), |i| cells[i].view.clone());
 
-        drop(state);
-
         Self {
             subviews,
             inner,

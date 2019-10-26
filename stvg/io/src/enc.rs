@@ -25,6 +25,12 @@ pub struct CmdEncoder {
     points: Vec<(bool, Point2<i16>)>,
 }
 
+impl Default for CmdEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CmdEncoder {
     /// Construct a `CmdEncoder`
     pub fn new() -> Self {

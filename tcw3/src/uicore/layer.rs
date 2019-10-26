@@ -154,7 +154,7 @@ bitflags! {
     /// [`ViewListener::update`]: crate::uicore::ViewListener::update
     pub struct UpdateReason: u32 {
         /// [`View::pend_update`] was called.
-        const PEND_UPDATE = 1 << 0;
+        const PEND_UPDATE = 1;
 
         /// The set of sublayers has changed. [`UpdateCtx::sublayers`] returns
         /// a mutable reference to a `Some` value.

@@ -119,7 +119,7 @@ impl SizeTraits {
     /// Update `min` with a new value and return a new `SizeTraits`.
     pub fn with_min(self, min: Vector2<f32>) -> Self {
         Self {
-            min: min.into(),
+            min,
             ..self
         }
     }
@@ -127,7 +127,7 @@ impl SizeTraits {
     /// Update `max` with a new value and return a new `SizeTraits`.
     pub fn with_max(self, max: Vector2<f32>) -> Self {
         Self {
-            max: max.into(),
+            max,
             ..self
         }
     }
@@ -135,7 +135,7 @@ impl SizeTraits {
     /// Update `preferred` with a new value and return a new `SizeTraits`.
     pub fn with_preferred(self, preferred: Vector2<f32>) -> Self {
         Self {
-            preferred: preferred.into(),
+            preferred,
             ..self
         }
     }

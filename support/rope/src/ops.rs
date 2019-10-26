@@ -266,7 +266,7 @@ where
         x: T,
         x_len: &O,
     ) -> Option<(NodeRef<T, O>, O)> {
-        if at.len() == 0 {
+        if at.is_empty() {
             unreachable!();
         }
 
@@ -512,7 +512,7 @@ where
     ///  - `underflow` indicates if the new child count `node` is less than
     ///    `ORDER` or not.
     fn remove_sub(at: &[u8], node: &mut NodeRef<T, O>) -> (T, O, bool) {
-        if at.len() == 0 {
+        if at.is_empty() {
             unreachable!();
         }
 

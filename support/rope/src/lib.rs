@@ -147,6 +147,16 @@ struct Cursor {
     _pad: [u8; 15 - (CURSOR_LEN + 15) % 16],
 }
 
+impl<T, O> Default for Rope<T, O>
+where
+    T: ToOffset<O>,
+    O: Offset,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, O> Rope<T, O>
 where
     T: ToOffset<O>,

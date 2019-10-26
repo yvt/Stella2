@@ -96,7 +96,7 @@ where
 
         // If `end` < `start`, clamp `end`
         if !iter.start_unbounded && iter.indices2 < iter.indices1 {
-            iter.indices2 = iter.indices1.clone();
+            iter.indices2 = iter.indices1;
             iter.path2 = iter.path1.clone();
             end = start.clone();
         }

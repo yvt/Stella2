@@ -70,7 +70,7 @@ impl<'a> Iterator for CmdDecoder<'a> {
                 3 => Some(Cmd::CubicBezierTo([cps[0], cps[1], cps[2]])),
                 _ => unreachable!(),
             }
-        } else if self.data.len() > 0 {
+        } else if !self.data.is_empty() {
             if self.op == 0 {
                 self.op = self.data[0];
                 self.param_len = 1;
