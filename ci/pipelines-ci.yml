@@ -9,7 +9,7 @@ resources:
     - repository: rust_pipelines
       type: github
       name: yvt/rust-azure-pipelines
-      ref: refs/heads/master
+      ref: refs/tags/stella2-v1
       endpoint: PipelinesTemplates
 
 variables:
