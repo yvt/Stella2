@@ -6,7 +6,7 @@ use std::{
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolPtr {
     token: usize,
     inner: iterpool::PoolPtr,
