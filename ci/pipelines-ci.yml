@@ -4,14 +4,6 @@ trigger:
   tags:
     include: ['*']
 
-resources:
-  repositories:
-    - repository: rust_pipelines
-      type: github
-      name: yvt/rust-azure-pipelines
-      ref: refs/tags/stella2-v1
-      endpoint: PipelinesTemplates
-
 variables:
   rustVersion: nightly-2019-10-13
   linuxPrestep: |
@@ -24,7 +16,7 @@ stages:
 - stage: check
   displayName: "Quick checks"
   jobs:
-  - template: ci/jobs/cargo-check.yml@rust_pipelines
+  - template: ./jobs/cargo-check.yml
     parameters:
       rust: $(rustVersion)
       all: true
@@ -34,12 +26,12 @@ stages:
       job_pre-steps:
         - script: ${{ variables.linuxPrestep }}
           displayName: Install native dependencies
-  - template: ci/jobs/rustfmt.yml@rust_pipelines
+  - template: ./jobs/rustfmt.yml
     parameters:
       rust: $(rustVersion)
       job_pool:
         vmImage: ${{ variables.linuxVmImage }}
-  - template: ci/jobs/cargo-clippy.yml@rust_pipelines
+  - template: ./jobs/cargo-clippy.yml
     parameters:
       rust: $(rustVersion)
       all: true
@@ -52,7 +44,7 @@ stages:
 - stage: test
   displayName: "Multi OS native tests"
   jobs:
-  - template: ci/jobs/cargo-test.yaml@rust_pipelines
+  - template: ./jobs/cargo-test.yml
     parameters:
       rust: $(rustVersion)
       all: true

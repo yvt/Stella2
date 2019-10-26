@@ -1,0 +1,180 @@
+parameters:
+  # azure pipelines paramters
+  job_name: cargo_build             # Default job name
+  job_displayName: Cargo build      # Default displayName
+  job_dependsOn: []                 # Dependencies to for the job to start
+  job_condition: true               # Job condition
+  job_post-steps: []                # Custom steps running after job
+  job_pre-steps: []                 # Custom steps before job start
+  job_pool:
+    vmImage: ubuntu-16.04           # Default vmImage
+
+  # global parameters
+  rust: stable                # Version of rust. Could be [stable, beta, nightly, 1.31, nightly-2018-08-01 ... ]
+
+  # parameters from `cargo check --help`
+  quiet: false                # No output printed to stdout
+  package: []                 # Package(s) to check
+  all: false                  # Check all packages in the workspace
+  exclude: []                 # Exclude packages from the check
+  lib: false                  # Check only this package's library
+  bin: []                     # Check only the specified binary
+  bins: false                 # Check all binaries
+  example: []                 # Check only the specified example
+  examples: false             # Check all examples
+  test: []                    # Check only the specified test target
+  tests: false                # Check all tests
+  benche: []                  # Check only the specified bench target
+  benches: false              # Check all benches
+  all-targets: false          # Check all targets
+  release: false              # Check artifacts in release mode, with optimizations
+  profile: ""                 # Profile to build the selected target for
+  features: ''                # Space-separated list of features to activate
+  all-features: false         # Activate all available features
+  no-default-features: false  # Do not activate the `default` feature
+  target: ''                  # Check for the target triple
+  target-dir: ''              # Directory for all generated artifacts
+  manifest-path: ''           # Path to Cargo.toml
+  message-format: ''          # Error format [default: human]  [possible values: human, json, short]
+  verbose: false              # Use verbose output
+  color: ''                   # Coloring: auto, always, never
+  frozen: false               # Require Cargo.lock and cache are up to date
+  locked: false               # Require Cargo.lock is up to date
+  Z: []                       # Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+jobs:
+- job: ${{ parameters['job_name'] }}
+  displayName: ${{ parameters['job_displayName'] }}
+  condition: ${{ parameters['job_condition'] }}
+  dependsOn: ${{ parameters['job_dependsOn'] }}
+  pool:
+    vmImage: ${{ parameters.job_pool['vmImage'] }}
+  variables:
+    check_flags: ''
+  steps:
+  # Custom pre steps:
+  - ${{ if parameters['job_pre-steps'] }}:
+    - ${{ parameters['job_pre-steps'] }}
+
+  - template: ../steps/install-rust.yml
+    parameters:
+      rustup_toolchain: ${{ parameters['rust'] }}
+      ${{ if ne(parameters['target'], '') }}:
+        targets: 
+        - ${{ parameters['target'] }}
+ 
+  # ##########################################################################################
+  # Order of script modifying `check_flags` is the same as in paramters.
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --quiet'
+    enabled: ${{ parameters['quiet'] }}
+    displayName: "[cli flag modify]No output printed to stdout"
+
+  - ${{ each pkg in parameters['package'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --package ${{ pkg }}'
+      displayName: "[cli flag modify]Add package to check '${{ pkg }}'"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --all'
+    enabled: ${{ parameters['all'] }}
+    displayName: "[cli flag modify]Check all packages in the workspace"
+
+  - ${{ each pkg in parameters['exclude'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --exclude ${{ pkg }}'
+      displayName: "[cli flag modify]Exclude package from check '${{ pkg }}'"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --lib'
+    enabled: ${{ parameters['lib'] }}
+    displayName: "[cli flag modify]Check only this package's library"
+
+  - ${{ each bin in parameters['bin'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --bin ${{ bin }}'
+      displayName: "[cli flag modify]Add binary '${{ bin }}' to check"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --bins'
+    enabled: ${{ parameters['bins'] }}
+    displayName: "[cli flag modify]Check all binaries"
+
+  - ${{ each exa in parameters['example'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --example ${{ exa }}'
+      displayName: "[cli flag modify]Add example '${{ exa }}' to check"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --examples'
+    enabled: ${{ parameters['examples'] }}
+    displayName: "[cli flag modify]check all examples"
+
+  - ${{ each tes in parameters['test'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --test ${{ tes }}'
+      displayName: "[cli flag modify]Add test '${{ tes }}' to check"
+
+  - ${{ each ben in parameters['benche'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --benche ${{ ben }}'
+      displayName: "[cli flag modify]Add benche '${{ ben }}' to check"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --benches'
+    enabled: ${{ parameters['benches'] }}
+    displayName: "[cli flag modify]check all benches"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --release'
+    enabled: ${{ parameters['release'] }}
+    displayName: "[cli flag modify]Set using release mode"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --profile ${{ parameters['profile'] }}"
+    enabled: ${{ ne(parameters['profile'], '') }}
+    displayName: "[cli flag modify]Set profile ('${{ parameters['profile'] }}') to build the selected target for"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --features ${{ parameters['features'] }}"
+    enabled: ${{ ne(parameters['features'], '') }}
+    displayName: "[cli flag modify]Space-separated list of features to activate: ${{ parameters['features'] }}"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --all-features'
+    enabled: ${{ parameters['all-features'] }}
+    displayName: "[cli flag modify]Activate all available features"
+
+  - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --no-default-features'
+    enabled: ${{ parameters['no-default-features'] }}
+    displayName: "[cli flag modify]Do not activate the `default` feature"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --target ${{ parameters['target'] }}"
+    enabled: ${{ ne(parameters['target'], '')  }}
+    displayName: "[cli flag modify]Check for the target triple"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --target-dir ${{ parameters['target-dir'] }}"
+    enabled: ${{ ne(parameters['target-dir'], '') }}
+    displayName: "[cli flag modify]Directory for all generated artifacts"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --manifest-path ${{ parameters['manifest-path'] }}"
+    enabled: ${{ ne(parameters['manifest-path'], '') }}
+    displayName: "[cli flag modify]Set custom path to Cargo.toml"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --message-format ${{ parameters['message-format'] }}"
+    enabled: ${{ ne(parameters['message-format'], '') }}
+    displayName: "[cli flag modify]Set error format to ${{ parameters['message-format'] }}"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --verbose }}"
+    enabled: ${{ parameters['verbose'] }}
+    displayName: "[cli flag modify]use verbose output"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --color ${{ parameters['color'] }}"
+    enabled: ${{ ne(parameters['color'], '') }}
+    displayName: "[cli flag modify]Coloring: ${{ parameters['color'] }}"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --frozen }}"
+    enabled: ${{ parameters['frozen'] }}
+    displayName: "[cli flag modify]Require Cargo.lock and cache are up to date"
+
+  - bash: echo "##vso[task.setvariable variable=check_flags]$(check_flags) --locked }}"
+    enabled: ${{ parameters['locked'] }}
+    displayName: "[cli flag modify]Require Cargo.lock is up to date"
+
+  - ${{ each z in parameters['Z'] }}:
+    - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --Z ${{ z }}'
+      displayName: "[cli flag modify]Add Z flag ${{ z }}"
+  # ##########################################################################################
+
+  # Final run
+  - bash: cargo build $(check_flags)
+    displayName: Run cargo build with defined flags 
+
+  # Custom steps:
+  - ${{ if parameters['job_post-steps'] }}:
+    - ${{ parameters['job_post-steps'] }}
+

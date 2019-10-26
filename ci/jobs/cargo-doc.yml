@@ -1,0 +1,155 @@
+parameters:
+  # azure pipelines paramters
+  job_name: cargo_doc               # Default job name
+  job_displayName: Cargo doc        # Default displayName
+  job_dependsOn: []                 # Dependencies to for the job to start
+  job_condition: true               # Job condition
+  job_post-steps: []                # Custom steps running after job
+  job_pre-steps: []                 # Custom steps before job start
+  job_pool:
+    vmImage: ubuntu-16.04           # Default vmImage
+
+  # global parameters
+  rust: stable                # Version of rust. Could be [stable, beta, nightly, 1.31, nightly-2018-08-01 ... ]
+
+  # parameters from `cargo doc --help`
+  quiet: false                # No output printed to stdout
+  # open                      Opens the docs in a browser after the operation (no sense in CI)
+  package: []                 # Package(s) to check
+  all: false                  # Check all packages in the workspace
+  exclude: []                 # Exclude packages from the check
+  no-deps: false              # Don't build documentation for dependencies
+  document-private-items: false # Document private items
+  lib: false                  # Check only this package's library
+  bin: []                     # Check only the specified binary
+  bins: false                 # Check all binaries
+  release: false              # Check artifacts in release mode, with optimizations
+  features: ''                # Space-separated list of features to activate
+  all-features: false         # Activate all available features
+  no-default-features: false  # Do not activate the `default` feature
+  target: ''                  # Check for the target triple
+  target-dir: ''              # Directory for all generated artifacts
+  manifest-path: ''           # Path to Cargo.toml
+  message-format: ''          # Error format [default: human]  [possible values: human, json, short]
+  verbose: false              # Use verbose output
+  color: ''                   # Coloring: auto, always, never
+  frozen: false               # Require Cargo.lock and cache are up to date
+  locked: false               # Require Cargo.lock is up to date
+  Z: []                       # Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+jobs:
+- job: ${{ parameters['job_name'] }}
+  displayName: ${{ parameters['job_displayName'] }}
+  condition: ${{ parameters['job_condition'] }}
+  dependsOn: ${{ parameters['job_dependsOn'] }}
+  pool:
+    vmImage: ${{ parameters.job_pool['vmImage'] }}
+  variables:
+    doc_flags: ''
+  steps:
+  # Custom pre steps:
+  - ${{ if parameters['job_pre-steps'] }}:
+    - ${{ parameters['job_pre-steps'] }}
+
+  - template: ../steps/install-rust.yml
+    parameters:
+      rustup_toolchain: ${{ parameters['rust'] }}
+
+  # ##########################################################################################
+  # Order of script modifying `doc_flags` is the same as in paramters.
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --quiet'
+    enabled: ${{ parameters['quiet'] }}
+    displayName: "[cli flag modify]No output printed to stdout"
+
+  - ${{ each pkg in parameters['package'] }}:
+    - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --package ${{ pkg }}'
+      displayName: "[cli flag modify]Add package to check '${{ pkg }}'"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --all'
+    enabled: ${{ parameters['all'] }}
+    displayName: "[cli flag modify]Check all packages in the workspace"
+
+  - ${{ each pkg in parameters['exclude'] }}:
+    - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --exclude ${{ pkg }}'
+      displayName: "[cli flag modify]Exclude package from check '${{ pkg }}'"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --no-deps'
+    enabled: ${{ parameters['no-deps'] }}
+    displayName: "[cli flag modify]Don't build documentation for dependencies"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --document-private-items'
+    enabled: ${{ parameters['document-private-items'] }}
+    displayName: "[cli flag modify]Document private items"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --lib'
+    enabled: ${{ parameters['lib'] }}
+    displayName: "[cli flag modify]Check only this package's library"
+
+  - ${{ each bin in parameters['bin'] }}:
+    - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --bin ${{ bin }}'
+      displayName: "[cli flag modify]Add binary '${{ bin }}' to check"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --bins'
+    enabled: ${{ parameters['bins'] }}
+    displayName: "[cli flag modify]Check all binaries"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --release'
+    enabled: ${{ parameters['release'] }}
+    displayName: "[cli flag modify]Set using release mode"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --features ${{ parameters['features'] }}"
+    enabled: ${{ ne(parameters['features'], '') }}
+    displayName: "[cli flag modify]Space-separated list of features to activate: ${{ parameters['features'] }}"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --all-features'
+    enabled: ${{ parameters['all-features'] }}
+    displayName: "[cli flag modify]Activate all available features"
+
+  - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --no-default-features'
+    enabled: ${{ parameters['no-default-features'] }}
+    displayName: "[cli flag modify]Do not activate the `default` feature"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --target ${{ parameters['target'] }}"
+    enabled: ${{ ne(parameters['target'], '')  }}
+    displayName: "[cli flag modify]Check for the target triple"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --target-dir ${{ parameters['target-dir'] }}"
+    enabled: ${{ ne(parameters['target-dir'], '') }}
+    displayName: "[cli flag modify]Directory for all generated artifacts"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --manifest-path ${{ parameters['manifest-path'] }}"
+    enabled: ${{ ne(parameters['manifest-path'], '') }}
+    displayName: "[cli flag modify]Set custom path to Cargo.toml"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --message-format ${{ parameters['message-format'] }}"
+    enabled: ${{ ne(parameters['message-format'], '') }}
+    displayName: "[cli flag modify]Set error format to ${{ parameters['message-format'] }}"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --verbose }}"
+    enabled: ${{ parameters['verbose'] }}
+    displayName: "[cli flag modify]use verbose output"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --color ${{ parameters['color'] }}"
+    enabled: ${{ ne(parameters['color'], '') }}
+    displayName: "[cli flag modify]Coloring: ${{ parameters['color'] }}"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --frozen }}"
+    enabled: ${{ parameters['frozen'] }}
+    displayName: "[cli flag modify]Require Cargo.lock and cache are up to date"
+
+  - script: echo "##vso[task.setvariable variable=doc_flags]$(doc_flags) --locked }}"
+    enabled: ${{ parameters['locked'] }}
+    displayName: "[cli flag modify]Require Cargo.lock is up to date"
+
+  - ${{ each z in parameters['Z'] }}:
+    - script: echo '##vso[task.setvariable variable=doc_flags]$(doc_flags) --Z ${{ z }}'
+      displayName: "[cli flag modify]Add Z flag ${{ z }}"
+  # ##########################################################################################
+
+  # Final run
+  - script: cargo doc $(doc_flags)
+    displayName: Run cargo doc with defined flags
+
+  # Custom steps:
+  - ${{ if parameters['job_post-steps'] }}:
+    - ${{ parameters['job_post-steps'] }}
