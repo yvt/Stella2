@@ -55,18 +55,24 @@ stages:
   - template: ci/jobs/cargo-test.yaml@rust_pipelines
     parameters:
       rust: $(rustVersion)
-      test-flags:
-        nocapture: true
       all: true
       job_strategy:
         matrix:
           Linux:
             vmImage: ${{ variables.linuxVmImage }}
-            prepareScript: ${{ variables.linuxPrestep }}
+            prepareScript: |
+              ${{ variables.linuxPrestep }}
+
+              # Enable tests that depend on the testing backend. This needs
+              # additional native dependencies (included in `linuxPrestep`) and
+              # adds too much a hassle for other platforms, especially
+              # Windows + MSVC.
+              echo '##vso[task.setvariable variable=test_build_flags]$(test_build_flags) --features testing'
           MacOS:
             vmImage: macOS-10.13
-            prepareScript: ""    # TODO
-          Windows:
-            vmImage: vs2017-win2016
-            prepareScript: ""    # TODO
+            prepareScript: ""
+          # TODO: Windows does not have its own backend at the moment
+          # Windows:
+          #   vmImage: vs2017-win2016
+          #   prepareScript: ""
 
