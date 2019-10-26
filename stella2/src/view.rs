@@ -202,10 +202,8 @@ impl WndView {
 
         *wnd_state = Elem::clone(new_wnd_state);
 
-        self.split_editor
-            .set_value(new_wnd_state.editor_height);
-        self.split_side
-            .set_value(new_wnd_state.sidebar_width);
+        self.split_editor.set_value(new_wnd_state.editor_height);
+        self.split_side.set_value(new_wnd_state.sidebar_width);
 
         self.toolbar.poll(new_wnd_state);
     }
