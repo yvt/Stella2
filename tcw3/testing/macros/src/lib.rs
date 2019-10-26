@@ -87,7 +87,7 @@ pub fn use_testing_wm(args: TokenStream, input: TokenStream) -> TokenStream {
                                 }
                                 .into(),
                             ),
-                            colon_token: arg.colon_token.clone(),
+                            colon_token: arg.colon_token,
                             ty: arg.ty.clone(),
                         });
 

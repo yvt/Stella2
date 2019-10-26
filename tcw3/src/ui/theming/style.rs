@@ -26,7 +26,7 @@ bitflags! {
         const VERTICAL = 1 << 5;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
-        const ID_MASK = 0xffff0000;
+        const ID_MASK = 0xffff_0000;
     }
 }
 

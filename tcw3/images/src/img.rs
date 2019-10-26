@@ -404,7 +404,7 @@ impl DpiScale {
         }
     }
 
-    fn value(&self) -> f32 {
+    fn value(self) -> f32 {
         <f32>::from_bits(self.0)
     }
 }

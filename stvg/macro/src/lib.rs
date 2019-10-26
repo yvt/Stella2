@@ -117,7 +117,7 @@ impl Converter {
     fn process_node(&mut self, node: &usvg::Node, xform: &usvg::Transform, opacity: f32) {
         use usvg::{NodeExt, NodeKind, PathSegment};
 
-        let mut node_xform = xform.clone();
+        let mut node_xform = *xform;
         node_xform.append(&node.transform());
 
         match &*node.borrow() {

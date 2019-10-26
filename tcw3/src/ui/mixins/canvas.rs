@@ -45,6 +45,12 @@ pub struct PaintContext<'a> {
     pub dpi_scale: f32,
 }
 
+impl Default for CanvasMixin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CanvasMixin {
     /// Construct a `CanvasMixin`.
     pub fn new() -> Self {

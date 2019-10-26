@@ -202,7 +202,7 @@ impl HWnd {
             // like "xdg_toplevel@31: error 4: invalid negative max size
             // requested -256 x -226". As a work-around, we limit the maximum
             // size so that it won't cause a problem.
-            const SIZE_MAX: f32 = 16777216.0;
+            const SIZE_MAX: f32 = 16_777_216.0;
 
             let min_s = [
                 size_traits.min.x.ceil() as u32,

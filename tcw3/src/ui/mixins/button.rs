@@ -35,8 +35,14 @@ struct Inner {
 
 bitflags! {
     struct StateFlags: u8 {
-        const DRAG = 1 << 0;
+        const DRAG = 1;
         const PRESS = 1 << 1;
+    }
+}
+
+impl Default for ButtonMixin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -89,7 +95,7 @@ impl MouseDragListener for MouseDragListenerImpl {
             // Display the button in the pressed state only if the mouse cursor
             // is inside
             state.set(StateFlags::PRESS, hit_test(view, loc));
-            inner.set_state(&self.client_listener, wm, view, state);
+            inner.set_state(&*self.client_listener, wm, view, state);
         }
     }
 
@@ -100,7 +106,7 @@ impl MouseDragListener for MouseDragListenerImpl {
 
         let inner = &self.inner;
         inner.set_state(
-            &self.client_listener,
+            &*self.client_listener,
             wm,
             view,
             flags![StateFlags::{PRESS | DRAG}],
@@ -113,7 +119,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         }
 
         let inner = &self.inner;
-        inner.set_state(&self.client_listener, wm, view, StateFlags::empty());
+        inner.set_state(&*self.client_listener, wm, view, StateFlags::empty());
 
         if hit_test(view, loc) {
             self.client_listener.activate(wm, view);
@@ -122,7 +128,7 @@ impl MouseDragListener for MouseDragListenerImpl {
 
     fn cancel(&self, wm: Wm, view: &HView) {
         self.inner
-            .set_state(&self.client_listener, wm, view, StateFlags::empty());
+            .set_state(&*self.client_listener, wm, view, StateFlags::empty());
     }
 }
 
@@ -134,7 +140,7 @@ impl Inner {
     /// Update `state`. Call `ButtonListener::update` as necessary.
     fn set_state(
         &self,
-        listener: &Box<dyn ButtonListener + 'static>,
+        listener: &dyn ButtonListener,
         wm: Wm,
         view: &HView,
         new_flags: StateFlags,

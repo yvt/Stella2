@@ -44,10 +44,13 @@ fn main() {
 
     // The executable
     let out_exe_path = bundle_path.join("Contents/MacOS/stella2");
-    copy(&exe_path, &out_exe_path).expect(&format!(
-        "failed to copy the executable from '{}'",
-        exe_path.display()
-    ));
+    if let Err(e) = copy(&exe_path, &out_exe_path) {
+        panic!(
+            "failed to copy the executable from '{}': {}",
+            exe_path.display(),
+            e
+        )
+    }
 
     // The appllcation icon
     // TODO: `icon_baker` pulls too many dependencies. (Three different

@@ -52,11 +52,9 @@ impl HView {
 
         // If this is a layer group, then changes in the subtree of layers are
         // handled here
-        if self.view.flags.get().contains(ViewFlags::LAYER_GROUP) {
-            if layers_changed {
-                self.set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
-                layers_changed = false;
-            }
+        if self.view.flags.get().contains(ViewFlags::LAYER_GROUP) && layers_changed {
+            self.set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
+            layers_changed = false;
         }
 
         let update_flags = flags![ViewDirtyFlags::{UPDATE_EVENT | SUBLAYERS}];
