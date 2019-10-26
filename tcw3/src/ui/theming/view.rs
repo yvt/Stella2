@@ -440,7 +440,7 @@ impl ViewListener for SbListener {
     fn unmount(&self, wm: pal::Wm, _: &HView) {
         let layers = self.layers.borrow_mut().take().unwrap();
 
-        for layer in layers.clip {
+        if let Some(layer) = layers.clip {
             wm.remove_layer(&layer);
         }
         for layer in layers.styled {

@@ -132,11 +132,9 @@ pub trait FloatOrdSet {
     type Item;
 
     /// Compute the minimum value of the set. Panics if the set is empty.
-    #[inline]
     fn fmin(&self) -> Self::Item;
 
     /// Compute the maximum value of the set. Panics if the set is empty.
-    #[inline]
     fn fmax(&self) -> Self::Item;
 }
 
