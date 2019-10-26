@@ -24,7 +24,7 @@ jobs:
     inputs:
       rootFolderOrFile: ./publish
       archiveType: zip
-      archiveFile: $(Build.ArtifactStagingDirectory)/Stella2-nightly-macOS.zip
+      archiveFile: $(Build.ArtifactStagingDirectory)/Stella2-$(Build.SourceVersion)-macOS.zip
   - task: PublishBuildArtifacts@1
     displayName: "Publish"
     inputs:
