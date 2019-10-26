@@ -7,6 +7,7 @@
 //!
 #![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
+#![allow(clippy::float_cmp)] // this lint is ridiculous
 
 pub use tcw3_images as images;
 pub use tcw3_pal as pal;

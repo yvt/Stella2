@@ -4,6 +4,7 @@
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(doc_cfg)] // `cfg(rustdoc)`
 #![feature(is_sorted)] // `<[_]>::is_sorted`
+#![allow(clippy::float_cmp)] // this lint is ridiculous
 
 mod canvas;
 pub mod iface;

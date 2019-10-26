@@ -77,11 +77,8 @@ extern "C" {
 
 /// Convert a `Matrix3` into `CGAffineTransform`, ignoring a projective component.
 pub fn cg_affine_transform_from_matrix3(mut m: Matrix3<f64>) -> CGAffineTransform {
-    #[allow(clippy::float_cmp)] // why would I want this to be approx comparison?
-    {
-        if m.z.z != 1.0 {
-            m /= m.z.z;
-        }
+    if m.z.z != 1.0 {
+        m /= m.z.z;
     }
     CGAffineTransform::new(m.x.x, m.x.y, m.y.x, m.y.y, m.z.x, m.z.y)
 }
