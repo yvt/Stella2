@@ -1,4 +1,5 @@
 use packed_simd::f32x4;
+#[allow(unused_imports)]
 use std::{
     mem::transmute,
     ops::{Add, Mul},
