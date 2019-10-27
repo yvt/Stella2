@@ -4,7 +4,7 @@
 
 TODO
 
-## Directory structutre
+## Directory structure
 
     stella2
      │
