@@ -117,7 +117,7 @@ impl ToolbarView {
         {
             let button = &self.toggle_sidebar_button;
             let class_set = button.class_set();
-            let new_class_set = class_set - theming::ClassSet::ID_MASK
+            let new_class_set = (class_set - theming::ClassSet::ID_MASK)
                 | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
                     [wnd_state.sidebar_visible as usize];
             if class_set != new_class_set {

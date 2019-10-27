@@ -189,7 +189,7 @@ pub struct HView {
 }
 
 /// A weak view handle type.
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct WeakHView {
     view: Weak<View>,
 }
@@ -243,7 +243,7 @@ bitflags! {
         /// a client-provided PAL layer as sublayers.
         ///
         /// This flag cannot be added or removed once a view is created.
-        const LAYER_GROUP = 1 << 0;
+        const LAYER_GROUP = 1;
 
         /// Clip hit testing (e.g., the one performed when the user presses
         /// a mouse button) by the view's frame.
@@ -795,7 +795,7 @@ impl Eq for HView {}
 impl WeakHView {
     /// Construct a `WeakHView` that doesn't reference any view.
     pub fn new() -> Self {
-        Self { view: Weak::new() }
+        Default::default()
     }
 
     /// Attempt to upgrade this weak handle to a `HView`.
@@ -829,7 +829,7 @@ bitflags! {
         // placed next to their non-`DESCENDANT` counterparts.
 
         /// `layout.size_traits()` of a view might have changed.
-        const SIZE_TRAITS = 1 << 0;
+        const SIZE_TRAITS = 1;
 
         /// Some of the descendants have `SIZE_TRAITS`.
         const DESCENDANT_SIZE_TRAITS = 1 << 1;

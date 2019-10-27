@@ -4,7 +4,11 @@
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(doc_cfg)] // `cfg(rustdoc)`
 #![feature(is_sorted)] // `<[_]>::is_sorted`
-#![allow(clippy::float_cmp)] // this lint is ridiculous
+#![allow(clippy::float_cmp)]
+// this lint is ridiculous
+// When never type (`!`) is stabilized, `msg_send![ ... ];` will be no longer
+// deduced to `()`. Thus a call to `msg_send!` needs a unit value binding
+#![allow(clippy::let_unit_value)]
 
 mod canvas;
 pub mod iface;

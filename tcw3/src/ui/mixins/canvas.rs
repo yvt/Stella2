@@ -145,7 +145,7 @@ impl CanvasMixin {
                 max(phys_vis_bounds[0].y + 1, phys_vis_bounds[1].y),
             ),
         ];
-        let bmp_size: Vector2<i32> = (phys_vis_bounds[1] - phys_vis_bounds[0]).into();
+        let bmp_size: Vector2<i32> = phys_vis_bounds[1] - phys_vis_bounds[0];
         let bmp_size: [u32; 2] = bmp_size.cast::<u32>().unwrap().into();
         let bmp_pt_size = Vector2::from(bmp_size).cast::<f32>().unwrap() / dpi_scale;
 

@@ -1,3 +1,7 @@
+#![allow(clippy::range_plus_one)] // rust-lang/rust-clippy#3307
+#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::len_zero)] // rust-lang/rust-clippy#3807
+
 use derive_more::{Add, AddAssign, Neg};
 use rope::{self, Rope};
 use std::{
@@ -269,7 +273,7 @@ impl Lineset {
             let (mut iter, range) = self
                 .line_grs
                 .range(range_by_key(LineOff::index, Floor(range.start)..));
-            (iter.nth(0).unwrap().clone(), range.start)
+            (*iter.nth(0).unwrap(), range.start)
         };
 
         // Endpoints of the line group (pre-insertion)
@@ -1193,9 +1197,9 @@ impl Lineset {
             check_presplit(
                 out_lod_grs,
                 lod - 1,
-                vp_range.clone(),  // `range` (where a LOD group is generated)
-                vp_range2.clone(), // `vp_range` (the portion we want to be subdivided)
-                vp_pos_range.clone(),
+                vp_range.clone(), // `range` (where a LOD group is generated)
+                vp_range2,        // `vp_range` (the portion we want to be subdivided)
+                vp_pos_range,
                 line_grs,
                 model,
             );
@@ -1372,7 +1376,7 @@ impl Lineset {
             let mut i = range.start;
 
             loop {
-                let mut cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
+                let mut cur_goal_lod_gr = *goal_lod_gr_it.peek().unwrap();
                 if subdiv_decim.should_process_lod(lod, cur_goal_lod_gr.0.lod) {
                     let mut sub_goal_lod_gr_it = goal_lod_gr_it.clone();
 
@@ -1399,7 +1403,7 @@ impl Lineset {
                         if cur_goal_lod_gr.1 >= range.end {
                             break;
                         }
-                        cur_goal_lod_gr = goal_lod_gr_it.peek().unwrap().clone();
+                        cur_goal_lod_gr = *goal_lod_gr_it.peek().unwrap();
                     }
 
                     let sub_start_unrounded = max(sub_start_unrounded, i);
@@ -1484,11 +1488,10 @@ impl Lineset {
             if lod_gr.lod == last_lod {
                 // Has the same LOD level as the last one - merge!
                 let lod_size_range = lod_size_range(lod_gr.lod);
-                let last_line_gr = self
+                let last_line_gr = *self
                     .line_grs
                     .get(LastBefore(by_key(LineOff::index, lod_gr.index)))
-                    .unwrap()
-                    .clone();
+                    .unwrap();
 
                 if last_line_gr.num_lines >= *lod_size_range.start() {
                     // Already has a sufficient number of lines for it to be a
@@ -2052,7 +2055,7 @@ fn lod_grs_from_vps(
 /// Create an iterator over a list of `LodGr`s. In addition to `LodGr`s, it
 /// also returns their respective ending points (`LodGr` itself only stores
 /// the starting point).
-fn iter_lod_gr_with_end<'a>(len: Index, lod_grs: &'a [LodGr]) -> IterLodGrWithEnd<'a> {
+fn iter_lod_gr_with_end(len: Index, lod_grs: &[LodGr]) -> IterLodGrWithEnd<'_> {
     IterLodGrWithEnd(lod_grs.iter().peekable(), len)
 }
 

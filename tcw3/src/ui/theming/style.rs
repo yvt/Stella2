@@ -13,7 +13,7 @@ bitflags! {
         /// Be aware that this is a normal styling class like other ones. This
         /// does not get applied automatically like CSS's `:hover` pseudo
         /// selector.
-        const HOVER = 1 << 0;
+        const HOVER = 1;
         /// The element is active, e.g., a button is being pressed down.
         const ACTIVE = 1 << 1;
         /// The element is a button's border.

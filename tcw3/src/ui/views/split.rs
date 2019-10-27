@@ -69,8 +69,10 @@ struct Shared {
     container: HView,
     splitter: HView,
     subviews: RefCell<[HView; 2]>,
-    on_drag: RefCell<Box<dyn Fn(pal::Wm) -> Box<dyn SplitDragListener>>>,
+    on_drag: RefCell<DragHandler>,
 }
+
+type DragHandler = Box<dyn Fn(pal::Wm) -> Box<dyn SplitDragListener>>;
 
 impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

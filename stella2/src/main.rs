@@ -2,6 +2,9 @@
 // value `console`). This prevents a new console window from opening on
 // application launch.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+// When never type (`!`) is stabilized, `msg_send![ ... ];` will be no longer
+// deduced to `()`. Thus a call to `msg_send!` needs a unit value binding
+#![allow(clippy::let_unit_value)]
 
 use log::debug;
 use tcw3::pal::{self, prelude::*};

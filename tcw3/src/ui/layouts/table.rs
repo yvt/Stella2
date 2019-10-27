@@ -149,7 +149,7 @@ impl TableLayout {
         }
 
         Self {
-            subviews: subviews.into(),
+            subviews,
             items,
             margin: 0.0,
             columns,

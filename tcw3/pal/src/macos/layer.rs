@@ -243,10 +243,9 @@ impl HLayer {
         if let Some(value) = attrs_diff.contents.take() {
             // Be careful - Do not drop `value` until `set_contents` because
             // the following `cg_image` is just a `id`, not a smart pointer
-            use std::mem::transmute;
             let cg_image = if let Some(ref bitmap) = value {
                 // `CGImageRef` → `id`
-                unsafe { transmute(&*bitmap.cg_image) }
+                &*bitmap.cg_image as *const _ as id
             } else {
                 nil
             };

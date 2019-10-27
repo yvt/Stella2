@@ -26,6 +26,13 @@ impl HView {
     }
 }
 
+/// A new, min, and max window size based on the `SizeTraits` of the root view.
+struct RootSizeReq {
+    new_size: Option<[u32; 2]>,
+    min_size: Option<[u32; 2]>,
+    max_size: Option<[u32; 2]>,
+}
+
 impl HWnd {
     fn ensure_materialized(&self) {
         assert!(!self.wnd.closed.get(), "the window has been already closed");
@@ -98,7 +105,11 @@ impl HWnd {
             return;
         };
 
-        let (new_size, min_size, max_size) = self.update_views();
+        let RootSizeReq {
+            new_size,
+            min_size,
+            max_size,
+        } = self.update_views();
 
         // Clear the flag. Beyond this point, when `self.pend_update` is called,
         // a fresh update request will be enqueued.
@@ -159,7 +170,7 @@ impl HWnd {
 
     /// Perform pending updates. Also, returns a new, min, and max window size
     /// based on the `SizeTraits` of the root view.
-    fn update_views(&self) -> (Option<[u32; 2]>, Option<[u32; 2]>, Option<[u32; 2]>) {
+    fn update_views(&self) -> RootSizeReq {
         let pal_wnd = self.wnd.pal_wnd.borrow();
         let pal_wnd = pal_wnd.as_ref().unwrap();
 
@@ -174,7 +185,11 @@ impl HWnd {
             let view: HView = self.wnd.content_view.borrow().clone().unwrap();
 
             if !view.view.dirty.get().is_dirty() {
-                return (new_size, min_size, max_size);
+                return RootSizeReq {
+                    new_size,
+                    min_size,
+                    max_size,
+                };
             }
 
             view.call_pending_mount_if_dirty(self.wnd.wm, self);
@@ -184,14 +199,14 @@ impl HWnd {
 
             // Constrain the window size
             let size_traits = view.view.size_traits.get();
-            let mut wnd_size = self.wnd.wm.get_wnd_size(pal_wnd);
-
-            if resize_to_preferred {
-                wnd_size = [
+            let wnd_size = if resize_to_preferred {
+                [
                     size_traits.preferred.x as u32,
                     size_traits.preferred.y as u32,
-                ];
-            }
+                ]
+            } else {
+                self.wnd.wm.get_wnd_size(pal_wnd)
+            };
 
             // A sensitive limit we set for window sizes.
             //
@@ -442,7 +457,7 @@ bitflags! {
     /// Be aware that the usage is different from that of `ViewDirtyFlags`.
     pub struct WndDirtyFlags: u8 {
         /// The root layer should be updated.
-        const LAYER = 1 << 0;
+        const LAYER = 1;
         /// The window should be resized to the default size.
         const DEFAULT_SIZE = 1 << 1;
 

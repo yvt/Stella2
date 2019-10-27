@@ -245,6 +245,7 @@ impl VpSet {
     }
 
     /// Calculate a range for a given viewport.
+    #[allow(clippy::wrong_self_convention)]
     fn to_vp_range(vp: &[Size; 2], line_ty: LineTy, vp_size: Size) -> Range<Size> {
         let vp = vp[line_ty.i()];
         vp..vp + vp_size

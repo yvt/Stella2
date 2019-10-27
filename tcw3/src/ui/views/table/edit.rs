@@ -175,7 +175,7 @@ impl TableModelEdit for TableEdit<'_> {
             line_ty,
             self.inner.size.get()[line_ty.i()],
             pos_range.start..pos_range.start,
-            pos_range.clone(),
+            pos_range,
         );
 
         self.inner.set_dirty_flags(DirtyFlags::CELLS);

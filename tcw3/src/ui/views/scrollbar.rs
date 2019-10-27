@@ -39,13 +39,16 @@ struct Shared {
     vertical: bool,
     value: Cell<f64>,
     page_step: Cell<f64>,
-    on_drag: RefCell<Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>>,
-    on_page_step: RefCell<Box<dyn Fn(pal::Wm, Dir)>>,
+    on_drag: RefCell<DragHandler>,
+    on_page_step: RefCell<PageStepHandler>,
     wrapper: HView,
     frame: StyledBox,
     thumb: StyledBox,
     layout_state: Cell<LayoutState>,
 }
+
+type DragHandler = Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>;
+type PageStepHandler = Box<dyn Fn(pal::Wm, Dir)>;
 
 impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -114,7 +117,7 @@ impl Scrollbar {
         });
 
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
-        thumb.set_parent_class_path(Some(frame.class_path().clone()));
+        thumb.set_parent_class_path(Some(frame.class_path()));
         frame.set_subview(Role::Generic, Some(thumb.view().clone()));
 
         let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
@@ -146,7 +149,7 @@ impl Scrollbar {
         let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
 
         frame.set_parent_class_path(parent_class_path);
-        thumb.set_parent_class_path(Some(frame.class_path().clone()));
+        thumb.set_parent_class_path(Some(frame.class_path()));
     }
 
     /// Set the class set of the inner `StyledBox`.
@@ -161,7 +164,7 @@ impl Scrollbar {
         class_set |= frame.class_set() & ClassSet::ACTIVE;
         frame.set_class_set(class_set);
 
-        thumb.set_parent_class_path(Some(frame.class_path().clone()));
+        thumb.set_parent_class_path(Some(frame.class_path()));
     }
 
     /// Get the class set of the inner `StyledBox`.
@@ -236,7 +239,7 @@ impl Shared {
         class_set.set(ClassSet::ACTIVE, active);
         frame.set_class_set(class_set);
 
-        thumb.set_parent_class_path(Some(frame.class_path().clone()));
+        thumb.set_parent_class_path(Some(frame.class_path()));
     }
 }
 
@@ -388,15 +391,13 @@ impl MouseDragListener for SbMouseDragListener {
         }
     }
     fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
-        if button == 0 {
-            if let Some(_) = self.drag_start.take() {
-                self.shared.set_active(false);
-                self.listener.borrow().as_ref().unwrap().up(wm);
-            }
+        if button == 0 && self.drag_start.take().is_some() {
+            self.shared.set_active(false);
+            self.listener.borrow().as_ref().unwrap().up(wm);
         }
     }
     fn cancel(&self, wm: pal::Wm, _: &HView) {
-        if let Some(_) = self.drag_start.take() {
+        if self.drag_start.take().is_some() {
             self.shared.set_active(false);
         }
         self.listener.borrow().as_ref().unwrap().cancel(wm);

@@ -28,6 +28,10 @@ pub trait Stylesheet {
 
     /// Get a property value for `Prop` specified by a stylesheet rule in this
     /// `Stylesheet`.
+    ///
+    /// Returns `None` if `id` is invalid; `Some(None)` if the value is not
+    /// provided by the rule; `Some(Some(_))` otherwise.
+    #[allow(clippy::option_option)]
     fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>>;
 }
 

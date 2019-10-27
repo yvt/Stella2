@@ -34,6 +34,10 @@ mod wm;
 /// The user event type.
 type UserEvent<TWM, TWC> = Box<dyn FnOnce(&'static WinitWmCore<TWM, TWC>) + Send>;
 
+type EventLoopWndTargetPtr<TWM, TWC> = NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>;
+
+type UnsendInvoke<TWM, TWC> = Box<dyn FnOnce(&'static WinitWmCore<TWM, TWC>)>;
+
 /// The global state of the window manager, accessible by any threads.
 /// `WinitWmCore` is included in this struct, protected by `MtSticky`. This struct
 /// is also responsible for defining what is the main thread and what is not.
@@ -62,8 +66,8 @@ pub struct WinitWmCore<TWM: Wm, TWC: WndContent> {
     /// This is a handle used to create `winit::window::Window` from the inside
     /// of `run`. It's a reference supplied to the event handler function that
     /// only lives through a single iteration of the main event loop.
-    event_loop_wnd_target: Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>>>,
-    unsend_invoke_events: RefCell<LinkedList<Box<dyn FnOnce(&'static Self)>>>,
+    event_loop_wnd_target: Cell<Option<EventLoopWndTargetPtr<TWM, TWC>>>,
+    unsend_invoke_events: RefCell<LinkedList<UnsendInvoke<TWM, TWC>>>,
 
     /// A list of open windows. To support reentrancy, this must be unborrowed
     /// before calling any user event handlers.

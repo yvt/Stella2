@@ -266,11 +266,7 @@ struct SbLayout {
 }
 
 impl SbLayout {
-    fn new(
-        subviews: &Vec<(Role, HView)>,
-        elem: &Elem,
-        overrider: Rc<dyn StyledBoxOverride>,
-    ) -> Self {
+    fn new(subviews: &[(Role, HView)], elem: &Elem, overrider: Rc<dyn StyledBoxOverride>) -> Self {
         // Evaluate the layout properties now
         Self {
             subview_layout: subviews

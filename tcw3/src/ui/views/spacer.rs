@@ -25,7 +25,7 @@ pub fn new_spacer(size_traits: SizeTraits) -> HView {
 /// use tcw3::ui::views::Spacer;
 /// let view = Spacer::new().with_min([4.0, 0.0]).into_view();
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Spacer {
     size_traits: SizeTraits,
 }
@@ -33,9 +33,7 @@ pub struct Spacer {
 impl Spacer {
     /// Construst a `Spacer`.
     pub fn new() -> Self {
-        Self {
-            size_traits: SizeTraits::default(),
-        }
+        Default::default()
     }
 
     /// Update `SizeTraits::min` and return a new `Spacer`, consuming `self`.

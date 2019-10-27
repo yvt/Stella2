@@ -191,7 +191,7 @@ bitflags! {
     /// track every property, so we categorize the properties into coarse groups
     /// and track changes in this unit.
     pub struct PropKindFlags: u16 {
-        const NUM_LAYERS = 1 << 0;
+        const NUM_LAYERS = 1;
         const LAYER_IMG = 1 << 1;
         const LAYER_BOUNDS = 1 << 2;
         const LAYER_BG_COLOR = 1 << 3;

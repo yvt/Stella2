@@ -227,7 +227,7 @@ bitflags! {
     struct DirtyFlags: u8 {
         /// Indicates that the new values for `cells` and `cells_ranges` must be
         /// calculated based on the up-to-date `linesets` and viewport.
-        const CELLS = 1 << 0;
+        const CELLS = 1;
 
         /// Indicates that the layout of the view is out-dated and must be
         /// replaced with a new layout.
@@ -455,6 +455,12 @@ impl LineTy {
     /// `State::line_idx_maps`, `Vector2`, and `Point2`.
     fn i(self) -> usize {
         self as usize
+    }
+}
+
+impl Default for Table {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -85,7 +85,7 @@ impl Button {
         self.inner
             .label
             .borrow_mut()
-            .set_parent_class_path(Some(styled_box.class_path().clone()));
+            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     /// Set the class set of the inner `StyledBox`.
@@ -103,7 +103,7 @@ impl Button {
         self.inner
             .label
             .borrow_mut()
-            .set_parent_class_path(Some(styled_box.class_path().clone()));
+            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     /// Get the class set of the inner `StyledBox`.
@@ -156,7 +156,7 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
         self.inner
             .label
             .borrow_mut()
-            .set_parent_class_path(Some(styled_box.class_path().clone()));
+            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     fn activate(&self, wm: pal::Wm, _: &HView) {

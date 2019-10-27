@@ -166,11 +166,9 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             .replace(None)
             .expect("can't call enter_main_loop twice");
 
-        struct Guard<'a, TWM: WinitWm, TWC: WndContent>(
-            &'a Cell<Option<NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>>>,
-        );
+        struct Guard<'a, T>(&'a Cell<Option<T>>);
 
-        impl<TWM: WinitWm, TWC: WndContent> Drop for Guard<'_, TWM, TWC> {
+        impl<T> Drop for Guard<'_, T> {
             fn drop(&mut self) {
                 self.0.set(None);
             }
