@@ -13,7 +13,7 @@
 ///
 #[inline]
 pub fn u23_to_f32(x: u32) -> f32 {
-    <f32>::from_bits(x | 0x4b000000) - 8388608.0
+    <f32>::from_bits(x | 0x4b00_0000) - 8_388_608.0
 }
 
 /// Convert a 16-bit unsigned integer to a single-precision floating-point
@@ -54,5 +54,5 @@ pub fn u16_to_f32(x: u16) -> f32 {
 ///
 #[inline]
 pub fn f32_to_u23(x: f32) -> u32 {
-    (x + 8388608.0).to_bits() & 0x7fffff
+    (x + 8_388_608.0).to_bits() & 0x7f_ffff
 }
