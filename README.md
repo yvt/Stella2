@@ -47,6 +47,19 @@ Fedora:
 sudo yum install glib2-devel cairo-devel cairo-gobject-devel pango-devel
 ```
 
+Nix:
+
+```shell
+# Assumes `cargo` and the nightly toolchain are already available.
+#
+# `x11-rs` searches additional paths if non-standard paths are detected during
+# compile time. For this reason, `xorg.*` must be available when building.
+# See <https://github.com/erlepereira/x11-rs/pull/46> for more about this
+# behavior.
+nix-shell -p glib pkgconfig pango xorg.libXcursor xorg.libXrandr xorg.libXi \
+  --command 'cargo build --release -p stella2'
+```
+
 ## Third-party software
 
 This source tree includes the following third-party projects:
