@@ -11,12 +11,13 @@ use std::{
 };
 
 use super::Wm;
-use crate::{prelude::*, MtLock};
+use crate::{MtLock, MtSticky};
 
-mt_lazy_static! {
-    static <Wm> ref UNSEND_DISPATCHES: RefCell<LinkedList<Box<dyn FnOnce(Wm)>>> =>
-        |_| RefCell::new(LinkedList::new());
-}
+static UNSEND_DISPATCHES: MtSticky<RefCell<LinkedList<Box<dyn FnOnce(Wm)>>>> = {
+    // This is safe because the created value does not contain an actual
+    // unsendable content (`Box<dyn FnOnce(Wm)>`) yet
+    unsafe { MtSticky::new_unchecked(RefCell::new(LinkedList::new())) }
+};
 
 static DISPATCH_RECV: MtLock<RefCell<Option<Receiver<Dispatch>>>> = MtLock::new(RefCell::new(None));
 
