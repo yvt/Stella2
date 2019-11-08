@@ -78,7 +78,7 @@ jobs:
   # *********************************************************************************************
   # parameters from `cargo test --help`
 
-  - script: echo '##vso[task.setvariable variable=test_build_flags]$(test_build_flags) --all'
+  - script: echo '##vso[task.setvariable variable=test_build_flags]$(test_build_flags) --workspace'
     enabled: ${{ parameters['all'] }}
     displayName: "[cli flag modify]Test all packages in the workspace"
 

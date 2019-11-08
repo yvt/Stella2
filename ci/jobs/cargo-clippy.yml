@@ -97,7 +97,7 @@ jobs:
     - script: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --package ${{ pkg }}'
       displayName: "[cli flag modify]Add package to check '${{ pkg }}'"
 
-  - script: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --all'
+  - script: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --workspace'
     enabled: ${{ parameters['all'] }}
     displayName: "[cli flag modify]Check all packages in the workspace"
 
