@@ -60,9 +60,9 @@ jobs:
     parameters:
       rustup_toolchain: ${{ parameters['rust'] }}
       ${{ if ne(parameters['target'], '') }}:
-        targets: 
+        targets:
         - ${{ parameters['target'] }}
- 
+
   # ##########################################################################################
   # Order of script modifying `check_flags` is the same as in paramters.
   - bash: echo '##vso[task.setvariable variable=check_flags]$(check_flags) --quiet'
@@ -172,7 +172,7 @@ jobs:
 
   # Final run
   - bash: cargo build $(check_flags)
-    displayName: Run cargo build with defined flags 
+    displayName: Run cargo build with defined flags
 
   # Custom steps:
   - ${{ if parameters['job_post-steps'] }}:
