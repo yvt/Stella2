@@ -33,7 +33,14 @@ TODO
 
 TCW3 includes a headless backend named `testing`, which is provided for testing purposes. It's disabled by default because of the additional dependencies it introduces. Use the feature flag `tcw3/testing` to enable it:
 
-     cargo test --features tcw3/testing
+     cd tcw3
+     cargo test --features testing
+
+When testing the whole workspace, specifying features on individual crates won't work ([rust-lang/cargo#6195]), so pass `--all-features` instead:
+
+     cargo test --workspace --all-features
+
+[rust-lang/cargo#6195]: https://github.com/rust-lang/cargo/issues/6195
 
 ## Prerequisites
 
