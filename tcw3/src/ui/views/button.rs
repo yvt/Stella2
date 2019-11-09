@@ -22,8 +22,8 @@ pub struct Button {
 
 struct Inner {
     button_mixin: ButtonMixin,
-    styled_box: RefCell<StyledBox>,
-    label: RefCell<Label>,
+    styled_box: StyledBox,
+    label: Label,
     activate_handler: RefCell<Box<dyn Fn(pal::Wm)>>,
 }
 
@@ -55,8 +55,8 @@ impl Button {
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
-            styled_box: RefCell::new(styled_box),
-            label: RefCell::new(label),
+            styled_box,
+            label,
             activate_handler: RefCell::new(Box::new(|_| {})),
         });
 
@@ -74,17 +74,16 @@ impl Button {
 
     /// Set the text displayed in a push button widget.
     pub fn set_caption(&self, value: impl Into<String>) {
-        self.inner.label.borrow_mut().set_text(value);
+        self.inner.label.set_text(value);
     }
 
     /// Set the parent class path.
     pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let styled_box = self.inner.styled_box.borrow_mut();
+        let styled_box = &self.inner.styled_box;
         styled_box.set_parent_class_path(parent_class_path);
 
         self.inner
             .label
-            .borrow_mut()
             .set_parent_class_path(Some(styled_box.class_path()));
     }
 
@@ -93,7 +92,7 @@ impl Button {
     /// It defaults to `ClassSet::BUTTON`. Some bits (e.g., `ACTIVE`) are
     /// internally enforced and cannot be modified.
     pub fn set_class_set(&self, mut class_set: ClassSet) {
-        let styled_box = self.inner.styled_box.borrow_mut();
+        let styled_box = &self.inner.styled_box;
 
         // Protected bits
         class_set -= ClassSet::ACTIVE;
@@ -102,13 +101,12 @@ impl Button {
 
         self.inner
             .label
-            .borrow_mut()
             .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     /// Get the class set of the inner `StyledBox`.
     pub fn class_set(&self) -> ClassSet {
-        self.inner.styled_box.borrow().class_set()
+        self.inner.styled_box.class_set()
     }
 
     /// Set the function called when a push button widget is activated.
@@ -147,7 +145,7 @@ struct ButtonMixinListener {
 
 impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
     fn update(&self, _: pal::Wm, _: &HView) {
-        let styled_box = self.inner.styled_box.borrow();
+        let styled_box = &self.inner.styled_box;
 
         let mut class_set = styled_box.class_set();
         class_set.set(ClassSet::ACTIVE, self.inner.button_mixin.is_pressed());
@@ -155,7 +153,6 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
 
         self.inner
             .label
-            .borrow_mut()
             .set_parent_class_path(Some(styled_box.class_path()));
     }
 
