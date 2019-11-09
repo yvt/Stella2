@@ -28,7 +28,7 @@
 //!   `(LineTy::Row, 0)` represents the first row.
 //! - The *line size* of a line is a width or height of the line.
 //!
-//! [`LineTy`]: table::LineTy
+//! [`LineTy`]: crate::ui::views::table::LineTy
 //!
 //! ## Table model
 //!
@@ -63,11 +63,11 @@
 //! implement a functionality such as animation by designing the update code to
 //! operate on generic `TableModelEdit` types, not just `TableEdit`.
 //!
-//! [`Table::edit`]: table::Table::edit
-//! [`CellCtrler`]: table::CellCtrler
-//! [`TableModelQuery`]: table::TableModelQuery
-//! [`TableModelEdit`]: table::TableModelEdit
-//! [`TableEdit`]: table::TableEdit
+//! [`Table::edit`]: crate::ui::views::table::Table::edit
+//! [`CellCtrler`]: crate::ui::views::table::CellCtrler
+//! [`TableModelQuery`]: crate::ui::views::table::TableModelQuery
+//! [`TableModelEdit`]: crate::ui::views::table::TableModelEdit
+//! [`TableEdit`]: crate::ui::views::table::TableEdit
 //!
 //! ## Viewports
 //!
@@ -96,8 +96,8 @@
 //! Viewports can be examined and manipulated by calling [`Table::edit`] and
 //! obtaining a lock guard of type [`TableEdit`].
 //!
-//! [`Table::edit`]: table::Table::edit
-//! [`TableEdit`]: table::TableEdit
+//! [`Table::edit`]: crate::ui::views::table::Table::edit
+//! [`TableEdit`]: crate::ui::views::table::TableEdit
 //!
 use as_any::AsAny;
 use bitflags::bitflags;
