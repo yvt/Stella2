@@ -27,7 +27,7 @@ pub mod views {
         scrollbar::Scrollbar,
         spacer::{new_spacer, Spacer},
         split::Split,
-        table::Table,
+        table::{ScrollableTable, Table},
     };
 }
 

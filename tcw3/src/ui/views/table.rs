@@ -556,6 +556,9 @@ impl Table {
 mod edit;
 mod fixedpoint;
 mod listener;
+mod scrollable;
+pub mod scrollbar;
 mod update;
 
 pub use self::edit::TableEdit;
+pub use self::scrollable::ScrollableTable;

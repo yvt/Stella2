@@ -36,6 +36,7 @@ pub fn piecewise_map(points: impl IntoIterator<Item = (f64, f64)>, x: f64) -> f6
 ///
 /// See `piecewise_map` for the definition of the parameters. `points` must be
 /// sorted by `y` instead.
+#[allow(dead_code)]
 pub fn piecewise_unmap(points: impl IntoIterator<Item = (f64, f64)>, y: f64) -> f64 {
     piecewise_map(points.into_iter().map(|(x, y)| (y, x)), y)
 }

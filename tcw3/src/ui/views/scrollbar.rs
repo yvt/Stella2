@@ -182,6 +182,10 @@ impl Scrollbar {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
         debug_assert!(new_value <= 1.0, "{} <= 1.0", new_value);
 
+        if new_value == self.shared.value.get() {
+            return;
+        }
+
         self.shared.value.set(new_value);
         Shared::update_sb_override(&self.shared);
     }

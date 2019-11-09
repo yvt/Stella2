@@ -6,7 +6,7 @@ use tcw3::{
         layouts::FillLayout,
         prelude::*,
         theming,
-        views::{table, table::LineTy, Label, Table},
+        views::{table, table::LineTy, Label, ScrollableTable},
     },
     uicore::{HView, HWnd, SizeTraits, WndListener},
 };
@@ -50,16 +50,16 @@ fn main() {
     wnd.set_visibility(true);
     wnd.set_listener(MyWndListener);
 
-    let table = Table::new();
+    let table = ScrollableTable::new(style_manager);
 
-    table.set_size_traits(SizeTraits {
+    table.table().set_size_traits(SizeTraits {
         preferred: [200.0, 300.0].into(),
         ..Default::default()
     });
 
     // Set up the table model
     {
-        let mut edit = table.edit().unwrap();
+        let mut edit = table.table().edit().unwrap();
         edit.set_model(TableModelQuery { style_manager });
         edit.insert(LineTy::Row, 0..500_000_000_000_000);
         edit.insert(LineTy::Col, 0..300);

@@ -441,6 +441,7 @@ macro_rules! stylesheet {
 //
 use crate::{images::himg_from_rounded_rect, pal::RGBAF32};
 use cggeom::box2;
+use std::f32::NAN;
 
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
@@ -482,13 +483,13 @@ lazy_static! {
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [4.0; 4],
-                size: [std::f32::NAN, 8.0].into(),
+                size: [NAN, 8.0].into(),
             },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [4.0; 4],
-                size: [8.0, std::f32::NAN].into(),
+                size: [8.0, NAN].into(),
             },
         },
         // Scrollbar thumb
@@ -509,6 +510,24 @@ lazy_static! {
 
         ([] < [.SCROLLBAR.ACTIVE]) (priority = 150) {
             layer_opacity[0]: 1.0,
+        },
+
+        // Scroll container
+        ([.SCROLL_CONTAINER]) (priority = 100) {
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [0.0; 4],
+                .. Metrics::default()
+            },
+            subview_metrics[Role::HorizontalScrollbar]: Metrics {
+                // Dock to the bottom side
+                margin: [NAN, 16.0, 0.0, 0.0],
+                .. Metrics::default()
+            },
+            subview_metrics[Role::VerticalScrollbar]: Metrics {
+                // Dock to the right side
+                margin: [0.0, 0.0, 16.0, NAN],
+                .. Metrics::default()
+            },
         },
     };
 }

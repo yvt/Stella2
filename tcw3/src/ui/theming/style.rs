@@ -24,6 +24,12 @@ bitflags! {
         const SCROLLBAR = 1 << 4;
         /// The element is vertical.
         const VERTICAL = 1 << 5;
+        /// The element is a scrollable container.
+        const SCROLL_CONTAINER = 1 << 6;
+        /// The scrollable container has a horizontal scrollbar.
+        const HAS_HORIZONTAL_SCROLLBAR = 1 << 7;
+        /// The scrollable container has a vertical scrollbar.
+        const HAS_VERTICAL_SCROLLBAR = 1 << 8;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;
@@ -92,6 +98,8 @@ impl Default for ElemClassPath {
 pub enum Role {
     /// The default role.
     Generic,
+    HorizontalScrollbar,
+    VerticalScrollbar,
 }
 
 /// Represents a single styling property.
