@@ -353,6 +353,12 @@ impl Layout for SbLayout {
         traits.preferred.x /= max(num_pref_x, 1) as f32;
         traits.preferred.y /= max(num_pref_y, 1) as f32;
 
+        traits.preferred.x = traits.preferred.x.fmin(traits.max.x);
+        traits.preferred.y = traits.preferred.y.fmin(traits.max.y);
+
+        traits.preferred.x = traits.preferred.x.fmax(traits.min.x);
+        traits.preferred.y = traits.preferred.y.fmax(traits.min.y);
+
         traits
     }
 
