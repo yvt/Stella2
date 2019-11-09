@@ -2,6 +2,7 @@ use alt_fp::FloatOrd;
 use cggeom::{box2, Box2};
 use cgmath::Vector2;
 use flags_macro::flags;
+use log::trace;
 use momo::momo;
 use std::{
     cell::{Cell, RefCell},
@@ -150,6 +151,17 @@ impl StyledBox {
 
     /// Set the class set of the styled element.
     pub fn set_class_set(&self, class_set: ClassSet) {
+        if class_set == self.shared.style_elem.class_set() {
+            return;
+        }
+
+        trace!(
+            "Updating the class set of {:?} from {:?} to {:?}",
+            self.view(),
+            self.shared.style_elem.class_set(),
+            class_set
+        );
+
         self.shared.style_elem.set_class_set(class_set);
     }
 
