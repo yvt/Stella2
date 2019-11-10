@@ -6,7 +6,7 @@ edition = "2018"
 license = "MIT"
 
 [features]
-default = ["macos_winit"]
+default = []
 
 # This flag enables the use of `winit` in the macOS backend for creating
 # windows and handling input events. Whether this should be default or not is
