@@ -57,7 +57,7 @@ pub use unix as native;
 
 // And here are supporting modules, which are shared between the
 // platform-specific modules.
-#[cfg(feature = "winit")]
+#[cfg(any(not(target_os = "macos"), feature = "winit"))]
 mod winit;
 
 #[cfg(any(not(target_os = "macos"), feature = "testing"))]
