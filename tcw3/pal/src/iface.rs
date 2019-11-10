@@ -10,7 +10,7 @@ use bitflags::bitflags;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use rgb::RGBA;
-use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash};
+use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash, ops::Range, time::Duration};
 
 pub type RGBAF32 = RGBA<f32>;
 
@@ -31,6 +31,9 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// I.e., after a layer is added to a window, it must never moved to another
     /// window.
     type HLayer: Debug + Clone + PartialEq + Eq + Hash;
+
+    /// Represents a function call pended by `invoke_after`.
+    type HInvoke: Debug + Clone + PartialEq + Eq + Hash;
 
     /// A bitmap type.
     type Bitmap: Bitmap;
@@ -69,6 +72,19 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
 
     /// Enqueue a call to the specified function on the main thread.
     fn invoke(self, f: impl FnOnce(Self) + 'static);
+
+    /// Enqueue a call to the specified function on the main thread after the
+    /// specified delay.
+    ///
+    /// The delay is specified as a range. The lower bound (`delay.start`) is
+    /// the default delay. To optimize power usage, the system may choose to
+    /// adjust the delay in the specified range.
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke;
+
+    /// Cancel a pending function call enqueued by `invoke_after`. Does nothing
+    /// if the function was already called or is being called. Otherwise, the
+    /// associated function will never be called.
+    fn cancel_invoke(self, hinv: &Self::HInvoke);
 
     /// Enter the main loop. This method will never return.
     ///

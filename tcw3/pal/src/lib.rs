@@ -126,6 +126,9 @@ pub type HWnd = <Wm as iface::Wm>::HWnd;
 /// The layer handle type of [`Wm`].
 pub type HLayer = <Wm as iface::Wm>::HLayer;
 
+/// The invocation handle type of [`Wm`].
+pub type HInvoke = <Wm as iface::Wm>::HInvoke;
+
 /// A specialization of `WndAttrs` for the default backend.
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 
