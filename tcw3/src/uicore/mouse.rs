@@ -41,7 +41,7 @@ impl MouseDragListener for () {}
 
 #[derive(Debug)]
 pub(super) struct WndMouseState {
-    drag_gestures: Option<DragGesture>,
+    drag_gestures: Option<Rc<DragGesture>>,
 }
 
 impl WndMouseState {
@@ -115,10 +115,10 @@ impl HWnd {
             };
 
             // Remember the gesture
-            st.drag_gestures = Some(DragGesture {
+            st.drag_gestures = Some(Rc::new(DragGesture {
                 view: hit_view,
                 listener: view_drag_listener,
-            });
+            }));
 
             // Return `dyn pal::iface::MouseDragListener`
             Box::new(PalDragListener {
@@ -134,17 +134,27 @@ impl HView {
     /// Cancel all active mouse gestures for the specified view and its
     /// subviews.
     pub(super) fn cancel_mouse_gestures_of_subviews(&self, wnd: &Wnd) {
-        wnd.mouse_state
+        let cancelled_drag = wnd
+            .mouse_state
             .borrow_mut()
-            .cancel_drag_gestures(wnd.wm, self, true);
+            .cancel_drag_gestures(self, true);
+
+        if let Some(drag) = cancelled_drag {
+            drag.listener.cancel(wnd.wm, &drag.view);
+        }
     }
 
     /// Cancel active mouse drag gestures for the specified view (but not
     /// subviews).
     pub(super) fn cancel_mouse_drag_gestures(&self, wnd: &Wnd) {
-        wnd.mouse_state
+        let cancelled_drag = wnd
+            .mouse_state
             .borrow_mut()
-            .cancel_drag_gestures(wnd.wm, self, false);
+            .cancel_drag_gestures(self, false);
+
+        if let Some(drag) = cancelled_drag {
+            drag.listener.cancel(wnd.wm, &drag.view);
+        }
     }
 }
 
@@ -152,7 +162,10 @@ impl WndMouseState {
     /// Cancel drag gestures for `view` (if any).
     ///
     /// If `subview` is `true`, the subviews of `view` are also affected.
-    fn cancel_drag_gestures(&mut self, wm: Wm, view: &HView, subview: bool) {
+    ///
+    /// Returns `Some(drag)` if the drag gesture `drag` is cancelled. The caller
+    /// should call `drag.listener.cancel` after unborrowing `Wnd::mouse_state`.
+    fn cancel_drag_gestures(&mut self, view: &HView, subview: bool) -> Option<Rc<DragGesture>> {
         let cancel_drag;
         if let Some(drag) = &self.drag_gestures {
             if subview {
@@ -169,8 +182,9 @@ impl WndMouseState {
         // but that shouldn't be an issue in reality...
 
         if cancel_drag {
-            let drag = self.drag_gestures.take().unwrap();
-            drag.listener.cancel(wm, &drag.view);
+            Some(self.drag_gestures.take().unwrap())
+        } else {
+            None
         }
     }
 }
@@ -188,8 +202,10 @@ impl PalDragListener {
 
     fn with_drag_gesture(&self, cb: impl FnOnce(&DragGesture)) {
         if let Some(hwnd) = self.hwnd() {
-            let st = hwnd.wnd.mouse_state.borrow();
-            if let Some(drag) = &st.drag_gestures {
+            let drag = hwnd.wnd.mouse_state.borrow().drag_gestures.clone();
+            // Make sure `mouse_state` is unborrowed before calling
+            // event handlers
+            if let Some(drag) = &drag {
                 cb(drag);
             }
         }
@@ -201,8 +217,8 @@ impl Drop for PalDragListener {
         if let Some(hwnd) = self.hwnd() {
             trace!("{:?}: Mouse drag gesture ended", hwnd);
 
-            let mut st = hwnd.wnd.mouse_state.borrow_mut();
-            st.drag_gestures = None;
+            let drag = hwnd.wnd.mouse_state.borrow_mut().drag_gestures.take();
+            drop(drag);
         } else {
             trace!("Mouse drag gesture ended, but the owner is gone");
         }
