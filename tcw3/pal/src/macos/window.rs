@@ -35,7 +35,7 @@ use super::{
     drawutils::point2_from_ns_point, utils::with_autorelease_pool, HLayer, IdRef, Wm, WndAttrs,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HWnd {
     /// `TCWWindowController`
     ctrler: IdRef,
@@ -134,7 +134,7 @@ impl HWnd {
         }
 
         if let Some(value) = attrs.layer {
-            let layer = if let Some(hlayer) = value {
+            let layer = if let Some(hlayer) = &value {
                 hlayer.ca_layer(wm)
             } else {
                 nil
@@ -151,13 +151,14 @@ impl HWnd {
     }
 
     pub(super) fn update(&self, wm: Wm) {
-        if let Some(layer) = self.state().layer.get() {
+        if let Some(layer) = self.state().layer.take() {
             with_autorelease_pool(|| {
                 transaction::begin();
                 transaction::set_animation_duration(0.0);
                 layer.flush(wm);
                 transaction::commit();
             });
+            self.state().layer.set(Some(layer));
         }
     }
 
