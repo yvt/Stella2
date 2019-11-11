@@ -11,6 +11,7 @@ use objc::{
 use std::ops::Deref;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct IdRef(id);
 
 impl IdRef {

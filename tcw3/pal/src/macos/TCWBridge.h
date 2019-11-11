@@ -33,3 +33,11 @@ extern void tcw_mousedraglistener_mouse_up(TCWMouseDragListenerUserData ud,
 // These flags must be synchronized with `WndFlags`
 #define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
 #define kTCW3WndFlagsBorderless ((uint32_t)(1 << 1))
+
+// These callbacks are defined in `timer.rs`
+typedef struct _TraitObject {
+    void *__data;
+    void *__vtable;
+} TCWInvokeUserData;
+extern void tcw_invoke_fire(TCWInvokeUserData ud);
+extern void tcw_invoke_cancel(TCWInvokeUserData ud);

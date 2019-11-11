@@ -1,6 +1,6 @@
 //! The backend for macOS, Cocoa, and Core Graphics.
 use cfg_if::cfg_if;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, time::Duration, ops::Range};
 
 use super::iface;
 
@@ -33,7 +33,8 @@ cfg_if! {
         use objc::{msg_send, sel, sel_impl};
 
         mod window;
-        pub use self::window::HWnd;
+        mod timer;
+        pub use self::{window::HWnd, timer::HInvoke};
 
         use self::utils::{is_main_thread, IdRef};
     }
@@ -62,6 +63,7 @@ impl Wm {
 impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
+    type HInvoke = HInvoke;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -92,6 +94,16 @@ impl iface::Wm for Wm {
             let AssertSend(f) = cell;
             f(wm);
         });
+    }
+
+    #[cfg(not(feature = "macos_winit"))]
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
+        timer::invoke_after(self, delay, f)
+    }
+
+    #[cfg(not(feature = "macos_winit"))]
+    fn cancel_invoke(self, hinv: &Self::HInvoke) {
+        timer::cancel_invoke(self, hinv)
     }
 
     #[cfg(not(feature = "macos_winit"))]
@@ -129,6 +141,16 @@ impl iface::Wm for Wm {
     #[cfg(feature = "macos_winit")]
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
         self.winit_wm().invoke(move |winit_wm| f(winit_wm.wm()));
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) {
+        self.winit_wm().invoke_after(delay, move |winit_wm| f(winit_wm.wm()));
+    }
+
+    #[cfg(feature = "macos_winit")]
+    fn cancel_invoke(self, hinv: &Self::HInvoke) {
+        self.winit_wm().cancel_invoke(delay, hinv);
     }
 
     #[cfg(feature = "macos_winit")]
