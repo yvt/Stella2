@@ -70,9 +70,9 @@ jobs:
     test_build_flags: ''
 
     # Time limits for `--ensure-time`
-    RUST_TEST_TIME_UNIT: '2,10'
-    RUST_TEST_TIME_INTEGRATION: '4,30'
-    RUST_TEST_TIME_DOCTEST: '8,40'
+    RUST_TEST_TIME_UNIT: '200,10000'
+    RUST_TEST_TIME_INTEGRATION: '400,30000'
+    RUST_TEST_TIME_DOCTEST: '800,40000'
   steps:
   # Custom pre steps:
   - script: $(prepareScript)
