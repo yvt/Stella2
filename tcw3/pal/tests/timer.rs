@@ -6,8 +6,11 @@ use std::{
 };
 use tcw3_pal::{prelude::Wm as _, prelude::*, Wm};
 
+mod common;
+
 fn main() {
     env_logger::init();
+    common::set_timelimit_default();
 
     if let Some(value) = var_os("ST_SKIP_NATIVE_BACKEND_TESTS") {
         if !value.is_empty() && value != "0" {
