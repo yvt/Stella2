@@ -183,10 +183,13 @@ where
     /// Insert `item` before the position `p` (if `at` is `Some(p)`) or to the
     /// the list's back (if `at` is `None`).
     pub fn insert(&mut self, item: PoolPtr, at: Option<PoolPtr>) {
-        debug_assert!(
-            (self.field)(&mut self.pool[item]).is_none(),
-            "item is already linked"
-        );
+        #[allow(clippy::debug_assert_with_mut_call)]
+        {
+            debug_assert!(
+                (self.field)(&mut self.pool[item]).is_none(),
+                "item is already linked"
+            );
+        }
 
         if let Some(first) = self.head.first {
             let (next, update_first) = if let Some(at) = at {
@@ -226,10 +229,13 @@ where
 
     /// Remove `item` from the list. Returns `item`.
     pub fn remove(&mut self, item: PoolPtr) -> PoolPtr {
-        debug_assert!(
-            (self.field)(&mut self.pool[item]).is_some(),
-            "item is not linked"
-        );
+        #[allow(clippy::debug_assert_with_mut_call)]
+        {
+            debug_assert!(
+                (self.field)(&mut self.pool[item]).is_some(),
+                "item is not linked"
+            );
+        }
 
         let link: Link = {
             let link_ref = (self.field)(&mut self.pool[item]);
