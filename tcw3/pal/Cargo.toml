@@ -80,3 +80,8 @@ arg_enum_proc_macro = "0.3.0"
 name = "futures"
 path = "tests/futures.rs"
 harness = false
+
+[[test]]
+name = "timer"
+path = "tests/timer.rs"
+harness = false

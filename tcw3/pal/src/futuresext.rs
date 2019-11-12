@@ -2,13 +2,17 @@
 use futures::task::{FutureObj, LocalFutureObj, LocalSpawn, Spawn, SpawnError};
 use iterpool::{Pool, PoolPtr};
 use std::{
-    cell::{Cell, RefCell},
+    cell::{Cell, RefCell, UnsafeCell},
+    fmt,
     future::Future,
+    ops::Range,
     pin::Pin,
+    rc::Rc,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
+    time::Duration,
 };
 
-use crate::{iface::Wm as _, MtSticky, Wm};
+use crate::{iface::Wm as _, HInvoke, MtSticky, Wm};
 
 /// Extends [`Wm`] for interoperability with futures (`std::future::Future`).
 ///
@@ -21,11 +25,24 @@ pub trait WmFuturesExt {
     ///
     /// [`Spawn`]: futures::task::Spawn
     fn spawner(self) -> WmSpawner;
+
+    /// Sleep for the specified amount of time with some tolerance specified
+    /// in the form of a range.
+    ///
+    /// This method is a "futures" version of [`Wm::invoke_after`] and is
+    /// internally implemented by this.
+    ///
+    /// [`Wm::invoke_after`]: crate::iface::Wm::invoke_after
+    fn sleep(self, dur: Range<Duration>) -> Sleep;
 }
 
 impl WmFuturesExt for Wm {
     fn spawner(self) -> WmSpawner {
         WmSpawner { wm: self }
+    }
+
+    fn sleep(self, dur: Range<Duration>) -> Sleep {
+        Sleep::new(self, dur)
     }
 }
 
@@ -127,3 +144,131 @@ fn wm_waker(task_id: PoolPtr) -> Waker {
 }
 
 // ============================================================================
+
+/// Represents a sleep operation.
+#[derive(Clone)]
+pub struct Sleep {
+    inner: Rc<SleepInner>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SleepCancelled;
+
+impl Sleep {
+    fn new(wm: Wm, dur: Range<Duration>) -> Self {
+        let inner = Rc::new(SleepInner {
+            wm,
+            waker: Cell::new(None),
+            result: Cell::new(None),
+            hinvoke: UnsafeCell::new(None),
+        });
+
+        let inner_weak = Rc::downgrade(&inner);
+        let hinvoke = wm.invoke_after(dur, move |_| {
+            if let Some(inner) = inner_weak.upgrade() {
+                debug_assert!(inner.result.get().is_none());
+
+                inner.result.set(Some(Ok(())));
+                if let Some(waker) = inner.waker.take() {
+                    waker.wake();
+                }
+            }
+        });
+
+        unsafe {
+            *inner.hinvoke.get() = Some(hinvoke);
+        }
+
+        Self { inner }
+    }
+
+    /// Cancel the operation.
+    ///
+    /// Returns `true` if the operation is successfully cancelled; `false`
+    /// otherwise, e.g., because the operation is already complete or cancelled.
+    pub fn cancel(&self) -> bool {
+        self.inner.cancel()
+    }
+
+    /// Poll the state without registering a `Waker`.
+    pub fn poll_without_context(&self) -> Poll<Result<(), SleepCancelled>> {
+        if let Some(result) = self.inner.result.get() {
+            Poll::Ready(result)
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+struct SleepInner {
+    wm: Wm,
+    waker: Cell<Option<Waker>>,
+    result: Cell<Option<Result<(), SleepCancelled>>>,
+    /// Inited when constructing `Sleep`. Safe to deref immutably because it
+    /// only changes in one way: `None` to `Some(x)`.
+    hinvoke: UnsafeCell<Option<HInvoke>>,
+}
+
+impl fmt::Debug for Sleep {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Sleep")
+            .field("wm", &self.inner.wm)
+            .field("result", &self.inner.result)
+            .field(
+                "hinvoke",
+                unsafe { &*self.inner.hinvoke.get() }.as_ref().unwrap(),
+            )
+            .finish()
+    }
+}
+
+impl Future for Sleep {
+    type Output = Result<(), SleepCancelled>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if let Some(result) = self.inner.result.get() {
+            Poll::Ready(result)
+        } else {
+            let new_waker = cx.waker();
+
+            if let Some(old_waker) = self.inner.waker.take() {
+                if old_waker.will_wake(new_waker) {
+                    self.inner.waker.set(Some(old_waker));
+                    return Poll::Pending;
+                }
+            }
+
+            self.inner.waker.set(Some(new_waker.clone()));
+            Poll::Pending
+        }
+    }
+}
+
+impl Drop for SleepInner {
+    fn drop(&mut self) {
+        if self.result.get().is_none() {
+            // There is no future or task woken up by this, so just cancel
+            // the invocation.
+            let hinvoke = unsafe { &*self.hinvoke.get() }.as_ref().unwrap();
+            self.wm.cancel_invoke(hinvoke);
+        }
+    }
+}
+
+impl SleepInner {
+    fn cancel(&self) -> bool {
+        if self.result.get().is_none() {
+            let hinvoke = unsafe { &*self.hinvoke.get() }.as_ref().unwrap();
+            self.wm.cancel_invoke(hinvoke);
+
+            self.result.set(Some(Err(SleepCancelled)));
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+}
