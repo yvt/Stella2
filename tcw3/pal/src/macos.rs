@@ -21,6 +21,7 @@ cfg_if! {
     if #[cfg(feature = "macos_winit")] {
         mod winitwindow;
         pub use self::winitwindow::HWnd;
+        pub use super::winit::HInvokeCore as HInvoke;
 
         use super::winit::{WinitEnv, WinitWmCore};
         static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
@@ -144,14 +145,14 @@ impl iface::Wm for Wm {
     }
 
     #[cfg(feature = "macos_winit")]
-    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) {
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
         self.winit_wm()
-            .invoke_after(delay, move |winit_wm| f(winit_wm.wm()));
+            .invoke_after(delay, move |winit_wm| f(winit_wm.wm()))
     }
 
     #[cfg(feature = "macos_winit")]
     fn cancel_invoke(self, hinv: &Self::HInvoke) {
-        self.winit_wm().cancel_invoke(delay, hinv);
+        self.winit_wm().cancel_invoke(hinv);
     }
 
     #[cfg(feature = "macos_winit")]

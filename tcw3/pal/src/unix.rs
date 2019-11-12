@@ -7,12 +7,12 @@
 //!  - Cairo for 2D drawing (WIP)
 //!  - FreeType/Pango/fontconfig for text rendering (WIP).
 //!
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Range, time::Duration};
 
 use super::{
     iface,
     prelude::MtLazyStatic,
-    winit::{HWndCore, WinitEnv, WinitWm, WinitWmCore},
+    winit::{HInvokeCore, HWndCore, WinitEnv, WinitWm, WinitWmCore},
 };
 
 // Define a global instance of `WinitEnv`.
@@ -26,6 +26,7 @@ pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
 pub type HWnd = HWndCore;
+pub type HInvoke = HInvokeCore;
 
 mod bitmap;
 mod comp;
@@ -89,6 +90,7 @@ impl WinitWm for Wm {
 impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
+    type HInvoke = HInvoke;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -108,6 +110,15 @@ impl iface::Wm for Wm {
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
         self.winit_wm_core()
             .invoke(move |winit_wm| f(winit_wm.wm()));
+    }
+
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
+        self.winit_wm_core()
+            .invoke_after(delay, move |winit_wm| f(winit_wm.wm()))
+    }
+
+    fn cancel_invoke(self, hinv: &Self::HInvoke) {
+        self.winit_wm_core().cancel_invoke(hinv);
     }
 
     fn enter_main_loop(self) -> ! {

@@ -5,13 +5,15 @@ use owning_ref::OwningRef;
 use std::{
     cell::{Cell, RefCell},
     collections::LinkedList,
+    ops::Range,
     ptr::NonNull,
     sync::Mutex,
+    time::Duration,
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
 use super::super::MtSticky;
-use super::{MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
+use super::{HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
 
 impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
@@ -269,5 +271,19 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         self.unsend_invoke_events
             .borrow_mut()
             .push_back(Box::new(cb));
+    }
+
+    pub fn invoke_after(
+        &self,
+        delay: Range<Duration>,
+        f: impl FnOnce(Self) + 'static,
+    ) -> HInvokeCore {
+        let _ = (delay, f);
+        unimplemented!()
+    }
+
+    pub fn cancel_invoke(&self, hinv: &HInvokeCore) {
+        let _ = hinv;
+        unimplemented!()
     }
 }

@@ -84,6 +84,12 @@ pub trait WinitWm: Wm {
     fn init(self) {}
 }
 
+/// The invocation handle type used by `WinitWmCore`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HInvokeCore {
+    _ptr: PoolPtr,
+}
+
 /// The window handle type used by `WinitWmCore`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWndCore {
