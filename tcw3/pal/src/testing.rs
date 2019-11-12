@@ -106,10 +106,12 @@ use log::{debug, trace};
 use std::{
     fmt,
     marker::PhantomData,
+    ops::Range,
     panic,
     rc::Rc,
     sync::mpsc::{channel, sync_channel},
     thread::{self, ThreadId},
+    time::Duration,
 };
 
 use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
@@ -401,6 +403,7 @@ impl wmapi::TestingWm for Wm {
 impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
+    type HInvoke = HInvoke;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -435,6 +438,31 @@ impl iface::Wm for Wm {
             BackendAndWm::Testing => {
                 self.invoke_unsend(f);
             }
+        }
+    }
+
+    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => {
+                let hinvoke = wm.invoke_after(delay, move |native_wm| {
+                    f(Self::from_native_wm(native_wm));
+                });
+
+                HInvoke {
+                    inner: HInvokeInner::Native(hinvoke),
+                }
+            }
+            BackendAndWm::Testing => unimplemented!(),
+        }
+    }
+
+    fn cancel_invoke(self, hinv: &Self::HInvoke) {
+        match (self.backend_and_wm(), &hinv.inner) {
+            (BackendAndWm::Native { wm }, HInvokeInner::Native(hinvoke)) => {
+                wm.cancel_invoke(hinvoke);
+            }
+            (BackendAndWm::Testing, HInvokeInner::Testing(_)) => unimplemented!(),
+            _ => unreachable!(),
         }
     }
 
@@ -683,6 +711,27 @@ fn wnd_attrs_to_native(attrs: WndAttrs<'_>) -> native::WndAttrs<'_> {
             .map(|listener| Box::new(wndlistenershim::NativeWndListener(listener)) as _),
         layer,
     }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct HInvoke {
+    inner: HInvokeInner,
+}
+
+impl fmt::Debug for HInvoke {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            HInvokeInner::Native(imp) => write!(f, "{:?}", imp),
+            HInvokeInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum HInvokeInner {
+    Native(native::HInvoke),
+    #[allow(dead_code)]
+    Testing(()),
 }
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
