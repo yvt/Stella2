@@ -1,6 +1,6 @@
 //! The backend for macOS, Cocoa, and Core Graphics.
 use cfg_if::cfg_if;
-use std::{marker::PhantomData, time::Duration, ops::Range};
+use std::{marker::PhantomData, ops::Range, time::Duration};
 
 use super::iface;
 
@@ -145,7 +145,8 @@ impl iface::Wm for Wm {
 
     #[cfg(feature = "macos_winit")]
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) {
-        self.winit_wm().invoke_after(delay, move |winit_wm| f(winit_wm.wm()));
+        self.winit_wm()
+            .invoke_after(delay, move |winit_wm| f(winit_wm.wm()));
     }
 
     #[cfg(feature = "macos_winit")]

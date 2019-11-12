@@ -37,13 +37,13 @@
 
 @end
 
-extern id TCWInvokeAfter(double delay, double tolerance, TCWInvokeUserData ud) {
+extern NSTimer *TCWInvokeAfter(double delay, double tolerance, TCWInvokeUserData ud) {
     TCWDeferredInvocation *invocation =
         [[TCWDeferredInvocation alloc] initWithUserData:ud];
 
     NSTimer *timer = [NSTimer timerWithTimeInterval:delay
                                              target:invocation
-                                           selector:@selector(fire)
+                                           selector:@selector(fire:)
                                            userInfo:nil
                                             repeats:NO];
 

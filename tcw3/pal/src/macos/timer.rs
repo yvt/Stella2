@@ -1,7 +1,8 @@
+use cocoa::base::id;
 use objc::{msg_send, sel, sel_impl};
 use std::{ops::Range, time::Duration};
 
-use super::{IdRef, Wm};
+use super::{utils::with_autorelease_pool, IdRef, Wm};
 use crate::iface::Wm as _;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -15,7 +16,12 @@ pub fn invoke_after(_: Wm, delay: Range<Duration>, f: impl FnOnce(Wm) + 'static)
     let start = delay.start.as_secs_f64();
     let end = delay.end.as_secs_f64();
     let ud: TCWInvokeUserDataInner = Box::into_raw(Box::new(f));
-    let timer = unsafe { TCWInvokeAfter(start, end - start, std::mem::transmute(ud)) };
+    let timer = with_autorelease_pool(|| {
+        let timer = unsafe { TCWInvokeAfter(start, end - start, std::mem::transmute(ud)) };
+
+        // `timer` is an autorelease ref, so increase the ref count
+        IdRef::retain(timer)
+    });
     HInvoke { timer }
 }
 
@@ -27,7 +33,7 @@ pub fn cancel_invoke(_: Wm, hinvoke: &HInvoke) {
 }
 
 extern "C" {
-    fn TCWInvokeAfter(delay: f64, tolerance: f64, ud: TCWInvokeUserData) -> IdRef;
+    fn TCWInvokeAfter(delay: f64, tolerance: f64, ud: TCWInvokeUserData) -> id;
 }
 
 /// The FFI-safe representation of `TCWInvokeUserDataInner`
