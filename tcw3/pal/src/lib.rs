@@ -11,6 +11,7 @@
 #![allow(clippy::let_unit_value)]
 
 mod canvas;
+pub mod futuresext;
 pub mod iface;
 
 /// Re-exports traits from `iface`.
@@ -20,6 +21,8 @@ pub mod prelude {
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
         TextLayout, Wm, WndListener,
     };
+
+    pub use super::futuresext::WmFuturesExt;
 }
 
 // TODO: Color theme
