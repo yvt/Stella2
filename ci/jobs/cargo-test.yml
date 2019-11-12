@@ -73,6 +73,9 @@ jobs:
     RUST_TEST_TIME_UNIT: '200,10000'
     RUST_TEST_TIME_INTEGRATION: '400,30000'
     RUST_TEST_TIME_DOCTEST: '800,40000'
+
+    # `env_logger`
+    RUST_LOG: 'debug'
   steps:
   # Custom pre steps:
   - script: $(prepareScript)
