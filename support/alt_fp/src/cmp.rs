@@ -1,6 +1,6 @@
 //! Fast maximum/minimum value functions for floating-point types.
 #[cfg(feature = "packed_simd")]
-use packed_simd::f32x4;
+use packed_simd::{f32x4, f32x8, f64x2, f64x4};
 
 #[cfg(target_feature = "sse")]
 #[cfg(target_arch = "x86")]
@@ -124,6 +124,90 @@ impl FloatOrd for f32x4 {
     #[inline]
     fn fmax(self, x: Self) -> Self {
         unsafe { transmute(_mm_max_ps(transmute(self), transmute(x))) }
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(not(target_feature = "avx"))]
+impl FloatOrd for f32x8 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        self.lt(x).select(self, x)
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        self.gt(x).select(self, x)
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(target_feature = "avx")]
+impl FloatOrd for f32x8 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        unsafe { transmute(_mm256_min_ps(transmute(self), transmute(x))) }
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        unsafe { transmute(_mm256_max_ps(transmute(self), transmute(x))) }
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(not(target_feature = "sse2"))]
+impl FloatOrd for f64x2 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        self.lt(x).select(self, x)
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        self.gt(x).select(self, x)
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(target_feature = "sse2")]
+impl FloatOrd for f64x2 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        unsafe { transmute(_mm_min_pd(transmute(self), transmute(x))) }
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        unsafe { transmute(_mm_max_pd(transmute(self), transmute(x))) }
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(not(target_feature = "avx"))]
+impl FloatOrd for f64x4 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        self.lt(x).select(self, x)
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        self.gt(x).select(self, x)
+    }
+}
+
+#[cfg(feature = "packed_simd")]
+#[cfg(target_feature = "avx")]
+impl FloatOrd for f64x4 {
+    #[inline]
+    fn fmin(self, x: Self) -> Self {
+        unsafe { transmute(_mm256_min_pd(transmute(self), transmute(x))) }
+    }
+
+    #[inline]
+    fn fmax(self, x: Self) -> Self {
+        unsafe { transmute(_mm256_max_pd(transmute(self), transmute(x))) }
     }
 }
 
