@@ -66,6 +66,9 @@ mod winit;
 #[cfg(any(not(target_os = "macos"), feature = "testing"))]
 mod swrast;
 
+#[cfg(any(not(target_os = "macos"), feature = "testing"))]
+mod timerqueue;
+
 // ============================================================================
 //
 // If the testing backend is enabled, it wraps and replaces the default native
