@@ -249,8 +249,10 @@ impl Drop for SleepInner {
         if self.result.get().is_none() {
             // There is no future or task woken up by this, so just cancel
             // the invocation.
-            let hinvoke = unsafe { &*self.hinvoke.get() }.as_ref().unwrap();
-            self.wm.cancel_invoke(hinvoke);
+            // `hinvoke` is `None` if `invoke_after` panics.
+            if let Some(hinvoke) = unsafe { &*self.hinvoke.get() }.as_ref() {
+                self.wm.cancel_invoke(hinvoke);
+            }
         }
     }
 }
