@@ -24,6 +24,7 @@ use winit::{
 
 use super::{
     iface::{MouseDragListener, Wm, WndListener},
+    timerqueue::{HTask, TimerQueue},
     MtSticky,
 };
 
@@ -67,7 +68,10 @@ pub struct WinitWmCore<TWM: Wm, TWC: WndContent> {
     /// of `run`. It's a reference supplied to the event handler function that
     /// only lives through a single iteration of the main event loop.
     event_loop_wnd_target: Cell<Option<EventLoopWndTargetPtr<TWM, TWC>>>,
+    // The following two fields must be unborrowed before entering user code.
+    // Perhaps, the runtime checks can be removed by type sorcery...?
     unsend_invoke_events: RefCell<LinkedList<UnsendInvoke<TWM, TWC>>>,
+    timer_queue: RefCell<TimerQueue<UnsendInvoke<TWM, TWC>>>,
 
     /// A list of open windows. To support reentrancy, this must be unborrowed
     /// before calling any user event handlers.
@@ -87,7 +91,7 @@ pub trait WinitWm: Wm {
 /// The invocation handle type used by `WinitWmCore`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvokeCore {
-    _ptr: PoolPtr,
+    htask: HTask,
 }
 
 /// The window handle type used by `WinitWmCore`.

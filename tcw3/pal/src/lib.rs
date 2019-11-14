@@ -66,7 +66,7 @@ mod winit;
 #[cfg(any(not(target_os = "macos"), feature = "testing"))]
 mod swrast;
 
-#[cfg(any(not(target_os = "macos"), feature = "testing"))]
+#[cfg(any(not(target_os = "macos"), feature = "winit", feature = "testing"))]
 mod timerqueue;
 
 // ============================================================================

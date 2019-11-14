@@ -12,7 +12,7 @@ use std::{
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
-use super::super::MtSticky;
+use super::super::{timerqueue::TimerQueue, MtSticky};
 use super::{HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
 
 impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
@@ -150,6 +150,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             should_terminate: Cell::new(false),
             event_loop_wnd_target: Cell::new(None),
             unsend_invoke_events: RefCell::new(LinkedList::new()),
+            timer_queue: RefCell::new(TimerQueue::new()),
             wnds: RefCell::new(Pool::new()),
         }
     }
@@ -209,6 +210,17 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 *control_flow = ControlFlow::Exit;
             } else {
                 *control_flow = ControlFlow::Wait;
+            }
+
+            let htasks = self.timer_queue.borrow().runnable_tasks();
+            for htask in htasks {
+                if let Some(e) = self.timer_queue.borrow_mut().remove(htask) {
+                    e(self);
+                }
+            }
+
+            if let Some(next_wakeup) = self.timer_queue.borrow().suggest_next_wakeup() {
+                *control_flow = ControlFlow::WaitUntil(next_wakeup);
             }
         });
     }
@@ -276,14 +288,18 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     pub fn invoke_after(
         &self,
         delay: Range<Duration>,
-        f: impl FnOnce(Self) + 'static,
+        f: impl FnOnce(&'static Self) + 'static,
     ) -> HInvokeCore {
-        let _ = (delay, f);
-        unimplemented!()
+        let htask = self
+            .timer_queue
+            .borrow_mut()
+            .insert(delay, Box::new(f))
+            .expect("Too many pending delayed invocations");
+
+        HInvokeCore { htask }
     }
 
     pub fn cancel_invoke(&self, hinv: &HInvokeCore) {
-        let _ = hinv;
-        unimplemented!()
+        let _ = self.timer_queue.borrow_mut().remove(hinv.htask);
     }
 }

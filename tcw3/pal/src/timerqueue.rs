@@ -80,12 +80,10 @@ impl<T> TimerQueue<T> {
         self.core.runnable_tasks(self.origin.elapsed().into())
     }
 
-    pub fn suggest_next_wakeup(&self) -> Option<Duration> {
-        let offset = self.origin.elapsed();
-
+    pub fn suggest_next_wakeup(&self) -> Option<Instant> {
         let time: Option<Duration> = self.core.suggest_next_wakeup().map(Into::into);
 
-        time.map(|time| time.checked_sub(offset).unwrap_or(Duration::new(0, 0)))
+        time.map(|time| self.origin + time)
     }
 }
 
@@ -396,7 +394,7 @@ mod utils {
     use std::ops::{Index, IndexMut};
 
     /// Represents a task in `TimerQueue`.
-    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct HTask(u8);
 
     impl HTask {
