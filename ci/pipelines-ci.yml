@@ -59,6 +59,10 @@ stages:
               # workspace (rust-lang/cargo#6195). So we use `--all-features`
               # instead.
               echo '##vso[task.setvariable variable=test_build_flags]$(test_build_flags) --all-features'
+
+              # Disable tests that depend on the native backend because the test
+              # environment has no access to X11 or Wayland.
+              echo '##vso[task.setvariable variable=ST_SKIP_NATIVE_BACKEND_TESTS]1'
           MacOS:
             vmImage: macOS-10.13
             prepareScript: ""
