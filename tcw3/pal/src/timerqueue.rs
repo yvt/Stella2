@@ -56,6 +56,8 @@ pub struct TimerQueue<T> {
 }
 
 impl<T> TimerQueue<T> {
+    pub const CAPACITY: usize = SIZE;
+
     pub fn new() -> Self {
         Self {
             core: TimerQueueCore::new(),
@@ -258,14 +260,8 @@ impl<T> TimerQueueCore<T> {
 
         let mut runnable_bitmap: Bitmap = 0;
 
-        for htask in iter_bits_any_4x(self.bitmap) {
-            // Should be lowered to a single 256-bit load
-            let start = f64x4::new(
-                start[htask.replace_bits(0b11, 0b00)],
-                start[htask.replace_bits(0b11, 0b01)],
-                start[htask.replace_bits(0b11, 0b10)],
-                start[htask.replace_bits(0b11, 0b11)],
-            );
+        for htask_gr in iter_bit_groups4_any(self.bitmap) {
+            let start = f64x4::from_slice_unaligned(&start[htask_gr]);
 
             // `[i]` = `start[htask + i]` ≤ `time` for `i` ∈ `0..4`
             //         `false` if task `i` does not exist
@@ -273,7 +269,7 @@ impl<T> TimerQueueCore<T> {
             //          evaluate to `false` in this case)
             let runnable = start.le(f64x4::splat(time)).bitmask();
 
-            runnable_bitmap |= (runnable as Bitmap) << htask.replace_bits(0b11, 0b00).get();
+            runnable_bitmap |= (runnable as Bitmap) << htask_gr.start().get();
         }
 
         // Must not return a non-existing task
@@ -291,21 +287,10 @@ impl<T> TimerQueueCore<T> {
         }
 
         // Find the closest deadline, which is the upper bound of the solution.
-        let min_end = iter_bits_any_4x(bitmap)
-            .map(|htask| {
-                // Should be lowered to a single 256-bit load
-                f64x4::new(
-                    end[htask.replace_bits(0b11, 0b00)],
-                    end[htask.replace_bits(0b11, 0b01)],
-                    end[htask.replace_bits(0b11, 0b10)],
-                    end[htask.replace_bits(0b11, 0b11)],
-                )
-            })
+        let min_end = iter_bit_groups4_any(bitmap)
+            .map(|htask_gr| f64x4::from_slice_unaligned(&end[htask_gr]))
             // Vacant elements are ignored here because `VACANT_END` is set to +∞.
             .fold(f64x4::splat(std::f64::INFINITY), FloatOrd::fmin);
-        // TODO: Don't use `min_element`. It handles NaN correctly (thus it
-        //       lowers to a native `minpd` + some extra instruction), but
-        //       NaN never appears here.
         let min_end = min_end.min_element();
 
         debug_assert!(min_end.is_finite(), "{:?}", min_end);
@@ -370,19 +355,20 @@ fn iter_bits(mut x: Bitmap) -> impl Iterator<Item = HTask> {
 
 /// Like `iter_bits`, but returns an element for each group of four bits
 /// any of which are set.
-///
-/// Warning: Returned `HTask` must be aligned by `x.replace_bits(0b11, 0b00)`
-/// before using it.
-fn iter_bits_any_4x(mut x: Bitmap) -> impl Iterator<Item = HTask> {
-    std::iter::from_fn(move || {
-        if x == 0 {
-            None
-        } else {
-            let i = trailing_zeros_as_htask(x);
-            x &= !(0b1111u64 << i.replace_bits(0b11, 0b00).get() as u32);
-            Some(i)
-        }
-    })
+fn iter_bit_groups4_any(mut x: Bitmap) -> impl Iterator<Item = HTaskGroup4> {
+    // [3] [2] [1] [0]
+    //  |   |   |   |
+    //  '-> O   '-> O    x |= x >> 1
+    //      |       |
+    //      '-----> O    x |= x >> 2
+    //              |
+    //  0   0   0   v    x &= 0x11…11
+    x |= x >> 1;
+    x |= x >> 2;
+    x &= 0x1111_1111_1111_1111u64; // 0b_0001_0001…0001_0001
+
+    // This is safe because for each group only the first bit is set.
+    iter_bits(x).map(|htask| unsafe { HTaskGroup4::new_unchecked(htask.get()) })
 }
 
 /// Constructing an unchecked `HTask` is `unsafe`, so hide the constructor by
@@ -417,20 +403,29 @@ mod utils {
         pub(super) fn mask(self) -> Bitmap {
             1u64 << self.0
         }
+    }
 
-        /// Replace the bits specified by `mask` with `value`.
-        #[inline]
-        pub(super) fn replace_bits(self, mask: u8, value: u8) -> Self {
-            use std::convert::TryInto;
-            assert!(mask < super::SIZE.try_into().unwrap());
+    /// Represents a group of four consecutive `HTask`s. `HTaskGroup4(i)`
+    /// (where `i % 4 == 0`) represents `HTask(i)` … `HTask(i + 3)`.
+    #[derive(Clone, Copy)]
+    pub struct HTaskGroup4(u8);
 
-            Self((self.0 & !mask) + (value & mask))
+    impl HTaskGroup4 {
+        pub(super) unsafe fn new_unchecked(x: usize) -> Self {
+            debug_assert!(x % 4 == 0);
+            debug_assert!(x < super::SIZE);
+            Self(x as u8)
+        }
+
+        #[allow(dead_code)]
+        pub(super) fn start(self) -> HTask {
+            HTask(self.0)
         }
     }
 
     /// Wraps `[T; SIZE]` to safely skip bound checks when indexed by `HTask`.
     #[derive(Debug, Clone, Copy, Deref, DerefMut)]
-    #[repr(transparent)]
+    #[repr(C, align(32))]
     pub struct Array<T>(pub T);
 
     impl<T> Index<HTask> for Array<[T; SIZE]> {
@@ -445,10 +440,17 @@ mod utils {
             unsafe { self.0.get_unchecked_mut(index.0 as usize) }
         }
     }
+
+    impl<T> Index<HTaskGroup4> for Array<[T; SIZE]> {
+        type Output = [T; 4];
+        fn index(&self, index: HTaskGroup4) -> &Self::Output {
+            unsafe { &*(self.0.as_ptr().offset(index.0 as isize) as *const [T; 4]) }
+        }
+    }
 }
 
-use self::utils::Array;
 pub use self::utils::HTask;
+use self::utils::{Array, HTaskGroup4};
 
 #[cfg(test)]
 mod tests {
@@ -503,18 +505,18 @@ mod tests {
     }
 
     #[quickcheck]
-    fn iter_bits_any_4x_test(mut bits: Vec<usize>) -> bool {
+    fn iter_bit_groups4_any_test(mut bits: Vec<usize>) -> bool {
         for bit in bits.iter_mut() {
             *bit = *bit & 63;
         }
         bits.sort();
 
-        // Simulate `iter_bits_any_4x`
+        // Simulate `iter_bit_groups4_any`
         let mut bits_any_4x = Vec::new();
         let mut min = 0;
         for &bit in bits.iter() {
             if bit >= min {
-                bits_any_4x.push(bit);
+                bits_any_4x.push(bit / 4 * 4);
 
                 // Next four-bit group
                 min = bit / 4 * 4 + 4;
@@ -524,7 +526,10 @@ mod tests {
         let bitmap = bits.iter().fold(0u64, |x, i| x | (1u64 << i));
         debug!("bitmap = 0x{:08x}", bitmap);
 
-        let out_bits = iter_bits_any_4x(bitmap).map(HTask::get).collect::<Vec<_>>();
+        let out_bits = iter_bit_groups4_any(bitmap)
+            .map(HTaskGroup4::start)
+            .map(HTask::get)
+            .collect::<Vec<_>>();
         debug!("got {:?}, expected {:?}", out_bits, bits_any_4x);
 
         out_bits == bits_any_4x

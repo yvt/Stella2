@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use fragile::Fragile;
 use iterpool::Pool;
 use once_cell::sync::OnceCell;
@@ -212,14 +213,26 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 *control_flow = ControlFlow::Wait;
             }
 
-            let htasks = self.timer_queue.borrow().runnable_tasks();
-            for htask in htasks {
-                if let Some(e) = self.timer_queue.borrow_mut().remove(htask) {
-                    e(self);
+            // Process delayed invocations
+            // The usage of `ArrayVec` may seem anti-idiomatic, but the idiomatic
+            // implementation generates two `memcpy`s.
+            let timer_queue_cell = &self.timer_queue;
+            let mut tasks = ArrayVec::<[_; TimerQueue::<()>::CAPACITY]>::new();
+            {
+                let mut timer_queue = timer_queue_cell.borrow_mut();
+
+                for htask in timer_queue.runnable_tasks() {
+                    let task = timer_queue.remove(htask).unwrap();
+                    // This is safe because the capacity is sufficient to hold
+                    // all tasks extracted from `timer_queue`
+                    unsafe { tasks.push_unchecked(task) };
                 }
             }
+            for func in tasks.drain(..) {
+                func(self);
+            }
 
-            if let Some(next_wakeup) = self.timer_queue.borrow().suggest_next_wakeup() {
+            if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
                 *control_flow = ControlFlow::WaitUntil(next_wakeup);
             }
         });
