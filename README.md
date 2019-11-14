@@ -63,8 +63,8 @@ Nix:
 # compile time. For this reason, `xorg.*` must be available when building.
 # See <https://github.com/erlepereira/x11-rs/pull/46> for more about this
 # behavior.
-nix-shell -p glib pkgconfig pango xorg.libXcursor xorg.libXrandr xorg.libXi \
-  --command 'cargo build --release -p stella2'
+nix-shell -p glib pkgconfig pango harfbuzz xorg.libXcursor xorg.libXrandr xorg.libXi \
+  --run 'cargo build --release -p stella2'
 ```
 
 ## Third-party software
