@@ -189,6 +189,7 @@ impl FixTime {
 }
 
 impl<T> TimerQueueCore<T> {
+    #[allow(clippy::uninit_assumed_init)] // allow `assume_init` for `Array<[MaybeUninit<_>; SIZE]>`
     fn new() -> Self {
         Self {
             start: Array([VACANT_START; SIZE]),
