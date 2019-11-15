@@ -51,12 +51,14 @@ use std::{
 // ============================================================================
 
 pub struct TimerQueue<T> {
-    core: TimerQueueCore<T>,
+    core: TimerQueueCore<(u64, T)>,
     origin: Instant,
+    next_id: u64,
 }
 
+/// Represents a task in `TimerQueue`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct HTask(HTaskCore);
+pub struct HTask(u64);
 
 impl<T> TimerQueue<T> {
     pub const CAPACITY: usize = SIZE;
@@ -65,6 +67,7 @@ impl<T> TimerQueue<T> {
         Self {
             core: TimerQueueCore::new(),
             origin: Instant::now(),
+            next_id: 0,
         }
     }
 
@@ -79,22 +82,43 @@ impl<T> TimerQueue<T> {
     }
 
     pub fn insert(&mut self, delay: Range<Duration>, payload: T) -> Result<HTask, CapacityError> {
+        // Allocate a task ID
+        let id = self.next_id;
+        let new_next_id = self
+            .next_id
+            .checked_add(SIZE as u64)
+            .expect("Task ID exhausted");
+        self.next_id = new_next_id;
+
         let offset = self.origin.elapsed();
 
         // Convert `Duration`s to `FixTime`s
         let time: Range<FixTime> = map_range(delay, |dur| (dur + offset).into());
 
-        self.core.insert(time, payload).map(HTask)
+        self.core
+            .insert(time, (id, payload))
+            .map(|core| HTask::new(core, id))
     }
 
     pub fn remove(&mut self, htask: HTask) -> Option<T> {
-        self.core.remove(htask.0)
+        // `htask.core()` must exist in `self.core` and its `id` must match.
+        // If it doesn't match, that means we don't have `htask`.
+        if (self.core.get(htask.core()))
+            .filter(|(id, _)| *id == htask.id())
+            .is_some()
+        {
+            self.core.remove(htask.core()).map(|x| x.1)
+        } else {
+            None
+        }
     }
 
-    pub fn runnable_tasks(&self) -> impl Iterator<Item = HTask> {
+    pub fn runnable_tasks(&self) -> impl Iterator<Item = HTask> + '_ {
+        // TODO: Make this method also return payloads because
+        //       The compiler can't remove existential checks
         self.core
             .runnable_tasks(self.origin.elapsed().into())
-            .map(HTask)
+            .map(move |core| HTask::new(core, self.core.get(core).unwrap().0))
     }
 
     pub fn suggest_next_wakeup(&self) -> Option<Instant> {
@@ -105,13 +129,28 @@ impl<T> TimerQueue<T> {
 
     #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = (HTask, Range<Instant>, &T)> + '_ {
-        self.core.iter().map(move |(htask, time, payload)| {
+        self.core.iter().map(move |(core, time, payload)| {
             (
-                HTask(htask),
+                HTask::new(core, payload.0),
                 map_range(time, |dur| self.origin + Duration::from(dur)),
-                payload,
+                &payload.1,
             )
         })
+    }
+}
+
+impl HTask {
+    fn new(core: HTaskCore, id: u64) -> Self {
+        debug_assert_eq!(id % SIZE as u64, 0);
+        Self(core.get() as u64 | id)
+    }
+
+    fn core(self) -> HTaskCore {
+        HTaskCore::new(self.0 as usize % SIZE)
+    }
+
+    fn id(self) -> u64 {
+        self.0 & !(SIZE as u64 - 1)
     }
 }
 
@@ -119,13 +158,13 @@ impl<T: fmt::Debug> fmt::Debug for TimerQueue<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         struct TaskMap<T>(T);
 
-        impl<T: fmt::Debug> fmt::Debug for TaskMap<&'_ TimerQueueCore<T>> {
+        impl<T: fmt::Debug> fmt::Debug for TaskMap<&'_ TimerQueueCore<(u64, T)>> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.debug_map()
-                    .entries(self.0.iter().map(|(htask, time, payload)| {
+                    .entries(self.0.iter().map(|(core, time, payload)| {
                         (
-                            HTask(htask),
-                            (map_range(time, Into::<Duration>::into), payload),
+                            HTask::new(core, payload.0),
+                            (map_range(time, Into::<Duration>::into), &payload.1),
                         )
                     }))
                     .finish()
@@ -260,6 +299,17 @@ impl<T> TimerQueueCore<T> {
         }
 
         Ok(htask)
+    }
+
+    fn get(&self, htask: HTaskCore) -> Option<&T> {
+        let mask = htask.mask();
+
+        if (self.bitmap & mask) == 0 {
+            // Vacant
+            return None;
+        }
+
+        Some(unsafe { &*self.payloads[htask].as_ptr() })
     }
 
     fn remove(&mut self, htask: HTaskCore) -> Option<T> {
@@ -413,7 +463,7 @@ mod utils {
     use derive_more::{Deref, DerefMut};
     use std::ops::{Index, IndexMut};
 
-    /// Represents a task in `TimerQueue`. Note that the same value may be
+    /// Represents a task in `TimerQueueCore`. Note that the same value may be
     /// reused for multiple tasks with disjoint lifetimes.
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct HTaskCore(u8);
@@ -641,5 +691,21 @@ mod tests {
         }
 
         true
+    }
+
+    #[test]
+    fn htask_identity() {
+        let d = Duration::from_secs(1);
+        let mut queue = TimerQueue::new();
+
+        let htask1 = queue.insert(d..d, ()).unwrap();
+        queue.remove(htask1).unwrap();
+
+        let htask2 = queue.insert(d..d, ()).unwrap();
+
+        // The two tasks are stored to the same slot in `TimerQueueCore`, but
+        // the returned `HTask`s must be distinct
+        assert_ne!(htask1, htask2);
+        assert!(queue.remove(htask1).is_none());
     }
 }

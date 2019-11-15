@@ -221,7 +221,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             {
                 let mut timer_queue = timer_queue_cell.borrow_mut();
 
-                for htask in timer_queue.runnable_tasks() {
+                let mut htasks: ArrayVec<[_; TimerQueue::<()>::CAPACITY]> =
+                    timer_queue.runnable_tasks().collect();
+
+                for htask in htasks.drain(..) {
                     let task = timer_queue.remove(htask).unwrap();
                     // This is safe because the capacity is sufficient to hold
                     // all tasks extracted from `timer_queue`

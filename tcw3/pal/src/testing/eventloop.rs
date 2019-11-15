@@ -146,7 +146,8 @@ impl Wm {
             // And then check the thread-local delayed invocations for the same reason
             let e = {
                 let mut timer_queue = TIMER_QUEUE.get_with_wm(self).borrow_mut();
-                if let Some(htask) = timer_queue.runnable_tasks().nth(0) {
+                let htask = timer_queue.runnable_tasks().nth(0);
+                if let Some(htask) = htask {
                     Some(timer_queue.remove(htask).unwrap())
                 } else {
                     None
