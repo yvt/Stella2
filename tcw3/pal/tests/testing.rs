@@ -12,8 +12,19 @@ use std::{
 };
 use tcw3_pal::{self as pal, iface::Wm as _, prelude::*, testing, testing::wmapi, MtLock, Wm};
 
+fn init_logger() {
+    // Copied from `tcw3/tesing/src/lib.rs`, which can't be imported from here
+    // because of a circular dependency
+    let inner = env_logger::builder().is_test(true).build();
+    let max_level = inner.filter();
+    if testing::Logger::new(Box::new(inner)).try_init().is_ok() {
+        log::set_max_level(max_level);
+    }
+}
+
 #[test]
 fn create_testing_wm() {
+    init_logger();
     testing::run_test(|twm| {
         // This block might or might not run depending on a feature flag
         twm.step_until(Instant::now() + Duration::from_millis(100));
@@ -22,6 +33,7 @@ fn create_testing_wm() {
 
 #[test]
 fn invoke() {
+    init_logger();
     testing::run_test(|twm| {
         let flag = Rc::new(Cell::new(false));
         {
@@ -38,6 +50,7 @@ fn invoke() {
 
 #[test]
 fn invoke_eradication() {
+    init_logger();
     let obj = Arc::new(());
 
     let obj2 = Arc::clone(&obj);
@@ -57,6 +70,7 @@ fn invoke_eradication() {
 
 #[test]
 fn invoke_during_eradication() {
+    init_logger();
     let flag = Arc::new(AtomicBool::new(false));
 
     let flag2 = Arc::clone(&flag);
@@ -92,6 +106,7 @@ fn invoke_during_eradication() {
 
 #[test]
 fn invoke_after_eradication() {
+    init_logger();
     let obj = Arc::new(());
 
     let obj2 = Arc::clone(&obj);
@@ -114,6 +129,7 @@ fn invoke_after_eradication() {
 
 #[test]
 fn step_unsend() {
+    init_logger();
     testing::run_test(|twm| {
         let flag = Rc::new(Cell::new(false));
         {
@@ -129,6 +145,7 @@ fn step_unsend() {
 
 #[test]
 fn invoke_on_main_thread() {
+    init_logger();
     testing::run_test(|twm| {
         let flag = Arc::new(MtLock::<_, Wm>::new(Cell::new(false)));
 
@@ -148,6 +165,7 @@ fn invoke_on_main_thread() {
 
 #[test]
 fn invoke_after() {
+    init_logger();
     testing::run_test(|twm| {
         let d_200_ms = Duration::from_millis(200);
         let d_600_ms = Duration::from_millis(600);
@@ -174,6 +192,7 @@ fn invoke_after() {
 
 #[test]
 fn invoke_after_cancel() {
+    init_logger();
     testing::run_test(|twm| {
         let d_200_ms = Duration::from_millis(200);
         let d_600_ms = Duration::from_millis(600);
@@ -219,6 +238,7 @@ fn panicking() {
 
 #[test]
 fn bitmap_size() {
+    init_logger();
     testing::run_test(|_| {
         const SIZE: [u32; 2] = [12, 34];
         let bitmap = pal::BitmapBuilder::new(SIZE).into_bitmap();
@@ -232,6 +252,7 @@ fn bitmap_size() {
 /// backends.)
 #[test]
 fn bitmap_canvas() {
+    init_logger();
     testing::run_test(|_| {
         let mut b = pal::BitmapBuilder::new([12, 34]);
         b.save();
@@ -267,6 +288,7 @@ fn bitmap_canvas() {
 
 #[test]
 fn char_style() {
+    init_logger();
     testing::run_test(|_| {
         let attrs = pal::CharStyleAttrs {
             sys: Some(pal::SysFontType::SmallEmph),
@@ -278,6 +300,7 @@ fn char_style() {
 
 #[test]
 fn bitmap_text() {
+    init_logger();
     testing::run_test(|_| {
         let mut b = pal::BitmapBuilder::new([12, 34]);
 
@@ -294,6 +317,7 @@ fn bitmap_text() {
 
 #[test]
 fn run_test_reset() {
+    init_logger();
     testing::run_test(|twm| {
         twm.wm().new_wnd(Default::default());
         assert_eq!(twm.hwnds().len(), 1);
@@ -307,6 +331,7 @@ fn run_test_reset() {
 
 #[test]
 fn empty_wnd() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -394,6 +419,7 @@ fn assert_snapshot_nonempty(ss: &wmapi::WndSnapshot) {
 
 #[test]
 fn plain_layer() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -414,6 +440,7 @@ fn plain_layer() {
 
 #[test]
 fn bitmap_layer() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -451,6 +478,7 @@ fn bitmap_layer() {
 
 #[test]
 fn wnd_with_layer() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -510,6 +538,7 @@ fn wnd_with_layer() {
 
 #[test]
 fn defer_layer_changes_until_update_wnd() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -563,6 +592,7 @@ fn defer_layer_changes_until_update_wnd() {
 
 #[test]
 fn wnd_close_event() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -591,6 +621,7 @@ fn wnd_close_event() {
 
 #[test]
 fn wnd_size_events() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
@@ -631,6 +662,7 @@ fn wnd_size_events() {
 
 #[test]
 fn wnd_mouse_events() {
+    init_logger();
     testing::run_test(|twm| {
         let wm = twm.wm();
 
