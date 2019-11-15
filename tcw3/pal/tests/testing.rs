@@ -1,5 +1,6 @@
 use cggeom::{box2, prelude::*};
 use cgmath::{Deg, Matrix3, Point2};
+use log::info;
 use std::{
     cell::Cell,
     rc::Rc,
@@ -308,8 +309,8 @@ fn bitmap_text() {
 
         let layout = pal::TextLayout::from_text("20% cooler", &style, None);
 
-        dbg!(layout.layout_bounds());
-        dbg!(layout.visual_bounds());
+        info!("layout_bounds = {:?}", layout.layout_bounds());
+        info!("visual_bounds = {:?}", layout.visual_bounds());
 
         b.draw_text(&layout, [10.0, 10.0].into(), [0.3, 0.5, 0.6, 1.0].into());
     });
@@ -352,7 +353,8 @@ fn empty_wnd() {
 
         assert_eq!(twm.hwnds().len(), 1);
 
-        assert_eq!(dbg!(wm.get_wnd_size(&hwnd)), SIZE);
+        info!("get_wnd_size({:?}) = {:?}", hwnd, wm.get_wnd_size(&hwnd));
+        assert_eq!(wm.get_wnd_size(&hwnd), SIZE);
         let attrs = twm.wnd_attrs(&hwnd).unwrap();
         assert_eq!(attrs.caption, CAPTION);
         assert_eq!(attrs.visible, VIS);
