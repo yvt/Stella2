@@ -110,7 +110,10 @@ use std::{
     ops::Range,
     panic,
     rc::Rc,
-    sync::{mpsc::{channel, sync_channel}, Mutex},
+    sync::{
+        mpsc::{channel, sync_channel},
+        Mutex,
+    },
     thread::{self, ThreadId},
     time::Duration,
 };
@@ -200,7 +203,7 @@ pub fn with_testing_wm<R: Send + 'static>(
                 drop(guard);
 
                 panic::resume_unwind(x);
-            },
+            }
         }
     }
 }
