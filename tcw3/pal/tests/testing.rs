@@ -91,6 +91,28 @@ fn invoke_during_eradication() {
 }
 
 #[test]
+fn invoke_after_eradication() {
+    let obj = Arc::new(());
+
+    let obj2 = Arc::clone(&obj);
+    testing::run_test(move |twm| {
+        let d_600_ms = Duration::from_millis(600);
+
+        twm.wm().invoke_after(d_600_ms..d_600_ms, move |_| {
+            let _ = obj2;
+            unreachable!();
+        });
+
+        // Don't `step`, just return. The closure should be dropped by
+        // `eradicate_events` automatically after we return the control
+    });
+
+    testing::run_test(move |_| {
+        assert_eq!(Arc::strong_count(&obj), 1);
+    });
+}
+
+#[test]
 fn step_unsend() {
     testing::run_test(|twm| {
         let flag = Rc::new(Cell::new(false));

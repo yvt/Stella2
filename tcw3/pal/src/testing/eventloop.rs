@@ -219,30 +219,47 @@ impl Wm {
     }
 
     pub(super) fn eradicate_events(self) {
-        let queue = UNSEND_DISPATCHES.get_with_wm(self);
-        if !queue.borrow().is_empty() {
-            warn!(
-                "Executing {} unprocessed unsend dispatch(es)",
-                queue.borrow().len()
-            );
+        loop {
+            let timer_queue = TIMER_QUEUE.get_with_wm(self);
+            if !timer_queue.borrow().is_empty() {
+                warn!(
+                    "Dropping {} unprocessed delayed invocation(s)",
+                    timer_queue.borrow().len()
+                );
 
-            let mut num_actually_dropped = 0;
-            loop {
-                let e = queue.borrow_mut().pop_front();
-                if let Some(e) = e {
-                    // `queue` must be unborrowed before dropping `e` because
-                    // `e`'s drop handler might generate even more dispatches.
-                    num_actually_dropped += 1;
-                    drop(e);
-                } else {
-                    break;
-                }
+                // Move out all pending invocations, but do not drop yet!
+                let mut timer_queue = timer_queue.borrow_mut();
+                let htasks: Vec<_> = timer_queue.iter().map(|x| x.0).collect();
+                let tasks: Vec<_> = htasks
+                    .into_iter()
+                    .map(|htask| timer_queue.remove(htask).unwrap())
+                    .collect();
+
+                // `timer_queue` must be unborrowed before dropping `tasks` because
+                // `tasks`'s drop handler might generate even more dispatches.
+                drop(timer_queue);
+                drop(tasks);
+
+                continue;
             }
 
-            warn!(
-                "Executed {} unprocessed unsend dispatch(es)",
-                num_actually_dropped
-            );
+            let queue = UNSEND_DISPATCHES.get_with_wm(self);
+            if !queue.borrow().is_empty() {
+                let count = queue.borrow().len();
+                warn!("Executing {} unprocessed unsend dispatch(es)", count);
+
+                for _ in 0..count {
+                    let e = queue.borrow_mut().pop_front().unwrap();
+                    // `queue` must be unborrowed before dropping `e` because
+                    // `e`'s drop handler might generate even more dispatches.
+                    drop(e);
+                }
+
+                continue;
+            }
+
+            // Reached the fixed point - no more dispatches to process or to drop
+            break;
         }
     }
 }

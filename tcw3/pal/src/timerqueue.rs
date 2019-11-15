@@ -65,6 +65,16 @@ impl<T> TimerQueue<T> {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        self.core.len()
+    }
+
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.core.len() == 0
+    }
+
     pub fn insert(&mut self, delay: Range<Duration>, payload: T) -> Result<HTask, CapacityError> {
         let offset = self.origin.elapsed();
 
@@ -86,6 +96,17 @@ impl<T> TimerQueue<T> {
         let time: Option<Duration> = self.core.suggest_next_wakeup().map(Into::into);
 
         time.map(|time| self.origin + time)
+    }
+
+    #[allow(dead_code)]
+    pub fn iter(&self) -> impl Iterator<Item = (HTask, Range<Instant>, &T)> + '_ {
+        self.core.iter().map(move |(htask, time, payload)| {
+            (
+                htask,
+                map_range(time, |dur| self.origin + Duration::from(dur)),
+                payload,
+            )
+        })
     }
 }
 
@@ -127,10 +148,10 @@ impl From<Duration> for FixTime {
     }
 }
 
-impl Into<Duration> for FixTime {
-    fn into(self) -> Duration {
-        let secs = self.0 >> 20;
-        let nanos = (self.0 & 0xfffff) << 10;
+impl From<FixTime> for Duration {
+    fn from(t: FixTime) -> Duration {
+        let secs = t.0 >> 20;
+        let nanos = (t.0 & 0xfffff) << 10;
         Duration::new(secs, nanos as u32)
     }
 }
@@ -199,6 +220,11 @@ impl<T> TimerQueueCore<T> {
             payloads: unsafe { MaybeUninit::uninit().assume_init() },
             bitmap: 0,
         }
+    }
+
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        self.bitmap.count_ones() as usize
     }
 
     fn insert(&mut self, time: Range<FixTime>, payload: T) -> Result<HTask, CapacityError> {
