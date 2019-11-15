@@ -102,6 +102,7 @@
 use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
+use lazy_static::lazy_static;
 use log::{debug, trace};
 use std::{
     fmt,
@@ -109,7 +110,7 @@ use std::{
     ops::Range,
     panic,
     rc::Rc,
-    sync::mpsc::{channel, sync_channel},
+    sync::{mpsc::{channel, sync_channel}, Mutex},
     thread::{self, ThreadId},
     time::Duration,
 };
@@ -134,15 +135,25 @@ mod bitmap;
 #[path = "unix/text.rs"]
 mod text;
 
+lazy_static! {
+    static ref WM_MUTEX: Mutex<()> = Mutex::new(());
+}
+
 /// Activate the testing backend and call the given function on the main thread.
 ///
 /// The backend is automatically reset every time `with_testing_wm` is called.
+///
+/// Calls to this function are automatically synchronized so that, when the
+/// function is called from multiple threads, one thread cannot affect the
+/// behaviour of another thread.
 ///
 /// Panics if the native backend has already been initialized.
 /// See [the module documentation](index.html) for more.
 pub fn with_testing_wm<R: Send + 'static>(
     cb: impl FnOnce(Wm) -> R + Send + panic::UnwindSafe + 'static,
 ) -> R {
+    let guard = WM_MUTEX.lock().unwrap();
+
     boot_testing_backend();
 
     if let Some(&Backend::Native) = Wm::backend_or_none() {
@@ -184,7 +195,12 @@ pub fn with_testing_wm<R: Send + 'static>(
         match recv.recv().unwrap() {
             Event::Log(e) => e.process(),
             Event::End(Ok(x)) => break x,
-            Event::End(Err(x)) => panic::resume_unwind(x),
+            Event::End(Err(x)) => {
+                // Prevent posioning `guard` with `x`
+                drop(guard);
+
+                panic::resume_unwind(x);
+            },
         }
     }
 }
