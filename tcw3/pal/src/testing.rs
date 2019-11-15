@@ -452,7 +452,13 @@ impl iface::Wm for Wm {
                     inner: HInvokeInner::Native(hinvoke),
                 }
             }
-            BackendAndWm::Testing => unimplemented!(),
+            BackendAndWm::Testing => {
+                let hinvoke = self.invoke_after(delay, f);
+
+                HInvoke {
+                    inner: HInvokeInner::Testing(hinvoke),
+                }
+            }
         }
     }
 
@@ -461,7 +467,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HInvokeInner::Native(hinvoke)) => {
                 wm.cancel_invoke(hinvoke);
             }
-            (BackendAndWm::Testing, HInvokeInner::Testing(_)) => unimplemented!(),
+            (BackendAndWm::Testing, HInvokeInner::Testing(hinvoke)) => {
+                self.cancel_invoke(hinvoke);
+            }
             _ => unreachable!(),
         }
     }
@@ -730,8 +738,7 @@ impl fmt::Debug for HInvoke {
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum HInvokeInner {
     Native(native::HInvoke),
-    #[allow(dead_code)]
-    Testing(()),
+    Testing(eventloop::HInvoke),
 }
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields

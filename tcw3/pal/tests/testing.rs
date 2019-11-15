@@ -125,6 +125,59 @@ fn invoke_on_main_thread() {
 }
 
 #[test]
+fn invoke_after() {
+    testing::run_test(|twm| {
+        let d_200_ms = Duration::from_millis(200);
+        let d_600_ms = Duration::from_millis(600);
+        let d_1200_ms = Duration::from_millis(1200);
+
+        let flag = Rc::new(Cell::new(false));
+        {
+            let flag = Rc::clone(&flag);
+            twm.wm()
+                .invoke_after(d_600_ms..d_1200_ms, move |_| flag.set(true));
+        }
+
+        // The closure shouldn't be called too soon
+        assert!(!flag.get());
+        twm.step_until(Instant::now() + d_200_ms);
+        assert!(!flag.get());
+
+        // Wait until the closure is called and the flag is set
+        while !flag.get() {
+            twm.step_until(Instant::now() + d_200_ms);
+        }
+    });
+}
+
+#[test]
+fn invoke_after_cancel() {
+    testing::run_test(|twm| {
+        let d_200_ms = Duration::from_millis(200);
+        let d_600_ms = Duration::from_millis(600);
+
+        let flag = Rc::new(Cell::new(false));
+        let hinvoke = {
+            let flag = Rc::clone(&flag);
+            twm.wm().invoke_after(d_600_ms..d_600_ms, move |_| {
+                flag.set(true);
+            })
+        };
+
+        // The closure shouldn't be called too soon
+        assert!(Rc::strong_count(&flag) > 1);
+        twm.step_until(Instant::now() + d_200_ms);
+
+        // Cancel the invocation
+        twm.wm().cancel_invoke(&hinvoke);
+
+        // The closure should be dropped without being called
+        assert!(!flag.get());
+        assert!(Rc::strong_count(&flag) == 1);
+    });
+}
+
+#[test]
 #[should_panic]
 fn panicking() {
     let flag = Arc::new(AtomicBool::new(false));
