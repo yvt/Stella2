@@ -214,23 +214,17 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             }
 
             // Process delayed invocations
-            // The usage of `ArrayVec` may seem anti-idiomatic, but the idiomatic
-            // implementation generates two `memcpy`s.
             let timer_queue_cell = &self.timer_queue;
+
             let mut tasks = ArrayVec::<[_; TimerQueue::<()>::CAPACITY]>::new();
-            {
-                let mut timer_queue = timer_queue_cell.borrow_mut();
-
-                let mut htasks: ArrayVec<[_; TimerQueue::<()>::CAPACITY]> =
-                    timer_queue.runnable_tasks().collect();
-
-                for htask in htasks.drain(..) {
-                    let task = timer_queue.remove(htask).unwrap();
-                    // This is safe because the capacity is sufficient to hold
-                    // all tasks extracted from `timer_queue`
-                    unsafe { tasks.push_unchecked(task) };
-                }
+            for (_, task) in timer_queue_cell.borrow_mut().drain_runnable_tasks() {
+                // This is safe because the capacity is sufficient to hold
+                // all tasks extracted from `timer_queue`
+                unsafe { tasks.push_unchecked(task) };
             }
+
+            // Unborrow `timer_queue_cell` first (because `func(self)` may call
+            // `invoke_after`), and call the callback functions
             for func in tasks.drain(..) {
                 func(self);
             }

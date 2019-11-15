@@ -113,12 +113,10 @@ impl<T> TimerQueue<T> {
         }
     }
 
-    pub fn runnable_tasks(&self) -> impl Iterator<Item = HTask> + '_ {
-        // TODO: Make this method also return payloads because
-        //       The compiler can't remove existential checks
+    pub fn drain_runnable_tasks(&mut self) -> impl Iterator<Item = (HTask, T)> + '_ {
         self.core
-            .runnable_tasks(self.origin.elapsed().into())
-            .map(move |core| HTask::new(core, self.core.get(core).unwrap().0))
+            .drain_runnable_tasks(self.origin.elapsed().into())
+            .map(|(htask_core, (id, payload))| (HTask::new(htask_core, id), payload))
     }
 
     pub fn suggest_next_wakeup(&self) -> Option<Instant> {
@@ -332,6 +330,7 @@ impl<T> TimerQueueCore<T> {
         self.start[htask] = VACANT_START;
         self.end[htask] = VACANT_END;
 
+        debug_assert_ne!(self.bitmap & mask, 0);
         self.bitmap &= !mask;
 
         // This is the `unsafe` part of this method
@@ -360,6 +359,13 @@ impl<T> TimerQueueCore<T> {
         debug_assert_eq!(runnable_bitmap & !self.bitmap, 0);
 
         iter_bits(runnable_bitmap)
+    }
+
+    fn drain_runnable_tasks(&mut self, time: FixTime) -> impl Iterator<Item = (HTaskCore, T)> + '_ {
+        self.runnable_tasks(time)
+            // We know this is safe because `runnable_tasks` returns
+            // valid, distinct `HTask`s
+            .map(move |htask| (htask, unsafe { self.remove_unchecked(htask) }))
     }
 
     fn suggest_next_wakeup(&self) -> Option<FixTime> {

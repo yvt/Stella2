@@ -144,17 +144,14 @@ impl Wm {
         // Want to iterate at least once, so don't use `while timeout != ...` here
         loop {
             // And then check the thread-local delayed invocations for the same reason
-            let e = {
+            let runnable_tasks: Vec<_> = {
                 let mut timer_queue = TIMER_QUEUE.get_with_wm(self).borrow_mut();
-                let htask = timer_queue.runnable_tasks().nth(0);
-                if let Some(htask) = htask {
-                    Some(timer_queue.remove(htask).unwrap())
-                } else {
-                    None
-                }
+                timer_queue.drain_runnable_tasks().collect()
             };
-            if let Some(e) = e {
-                e(self);
+            if !runnable_tasks.is_empty() {
+                for (_, e) in runnable_tasks {
+                    e(self);
+                }
                 return;
             }
 
