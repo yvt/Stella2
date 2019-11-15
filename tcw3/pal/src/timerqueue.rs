@@ -55,6 +55,9 @@ pub struct TimerQueue<T> {
     origin: Instant,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HTask(HTaskCore);
+
 impl<T> TimerQueue<T> {
     pub const CAPACITY: usize = SIZE;
 
@@ -81,15 +84,17 @@ impl<T> TimerQueue<T> {
         // Convert `Duration`s to `FixTime`s
         let time: Range<FixTime> = map_range(delay, |dur| (dur + offset).into());
 
-        self.core.insert(time, payload)
+        self.core.insert(time, payload).map(HTask)
     }
 
     pub fn remove(&mut self, htask: HTask) -> Option<T> {
-        self.core.remove(htask)
+        self.core.remove(htask.0)
     }
 
     pub fn runnable_tasks(&self) -> impl Iterator<Item = HTask> {
-        self.core.runnable_tasks(self.origin.elapsed().into())
+        self.core
+            .runnable_tasks(self.origin.elapsed().into())
+            .map(HTask)
     }
 
     pub fn suggest_next_wakeup(&self) -> Option<Instant> {
@@ -102,7 +107,7 @@ impl<T> TimerQueue<T> {
     pub fn iter(&self) -> impl Iterator<Item = (HTask, Range<Instant>, &T)> + '_ {
         self.core.iter().map(move |(htask, time, payload)| {
             (
-                htask,
+                HTask(htask),
                 map_range(time, |dur| self.origin + Duration::from(dur)),
                 payload,
             )
@@ -118,7 +123,10 @@ impl<T: fmt::Debug> fmt::Debug for TimerQueue<T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.debug_map()
                     .entries(self.0.iter().map(|(htask, time, payload)| {
-                        (htask, (map_range(time, Into::<Duration>::into), payload))
+                        (
+                            HTask(htask),
+                            (map_range(time, Into::<Duration>::into), payload),
+                        )
                     }))
                     .finish()
             }
@@ -227,7 +235,7 @@ impl<T> TimerQueueCore<T> {
         self.bitmap.count_ones() as usize
     }
 
-    fn insert(&mut self, time: Range<FixTime>, payload: T) -> Result<HTask, CapacityError> {
+    fn insert(&mut self, time: Range<FixTime>, payload: T) -> Result<HTaskCore, CapacityError> {
         let free_bitmap = !self.bitmap;
 
         if free_bitmap == 0 {
@@ -254,7 +262,7 @@ impl<T> TimerQueueCore<T> {
         Ok(htask)
     }
 
-    fn remove(&mut self, htask: HTask) -> Option<T> {
+    fn remove(&mut self, htask: HTaskCore) -> Option<T> {
         let mask = htask.mask();
 
         if (self.bitmap & mask) == 0 {
@@ -265,7 +273,7 @@ impl<T> TimerQueueCore<T> {
         Some(unsafe { self.remove_unchecked(htask) })
     }
 
-    unsafe fn remove_unchecked(&mut self, htask: HTask) -> T {
+    unsafe fn remove_unchecked(&mut self, htask: HTaskCore) -> T {
         let mask = htask.mask();
 
         // The position is occpied, remove the task
@@ -280,7 +288,7 @@ impl<T> TimerQueueCore<T> {
         self.payloads[htask].as_mut_ptr().read()
     }
 
-    fn runnable_tasks(&self, time: FixTime) -> impl Iterator<Item = HTask> {
+    fn runnable_tasks(&self, time: FixTime) -> impl Iterator<Item = HTaskCore> {
         let start = &self.start;
         let time = time.to_fp();
 
@@ -324,7 +332,7 @@ impl<T> TimerQueueCore<T> {
         Some(FixTime::from_fp(min_end))
     }
 
-    fn iter(&self) -> impl Iterator<Item = (HTask, Range<FixTime>, &T)> + '_ {
+    fn iter(&self) -> impl Iterator<Item = (HTaskCore, Range<FixTime>, &T)> + '_ {
         iter_bits(self.bitmap).map(move |htask| {
             (
                 htask,
@@ -358,16 +366,16 @@ fn map_range<T, S>(x: Range<T>, mut f: impl FnMut(T) -> S) -> Range<S> {
     f(x.start)..f(x.end)
 }
 
-/// Calculate `x.trailing_zeros()` and wrap it in `HTask` (that statically
+/// Calculate `x.trailing_zeros()` and wrap it in `HTaskCore` (that statically
 /// guarantees the value fits in `0..SIZE`).
-fn trailing_zeros_as_htask(x: Bitmap) -> HTask {
+fn trailing_zeros_as_htask(x: Bitmap) -> HTaskCore {
     assert!(std::mem::size_of::<Bitmap>() * 8 == SIZE);
 
     // This is safe because of the assertion above
-    unsafe { HTask::new_unchecked(x.trailing_zeros() as usize) }
+    unsafe { HTaskCore::new_unchecked(x.trailing_zeros() as usize) }
 }
 
-fn iter_bits(mut x: Bitmap) -> impl Iterator<Item = HTask> {
+fn iter_bits(mut x: Bitmap) -> impl Iterator<Item = HTaskCore> {
     std::iter::from_fn(move || {
         if x == 0 {
             None
@@ -397,7 +405,7 @@ fn iter_bit_groups4_any(mut x: Bitmap) -> impl Iterator<Item = HTaskGroup4> {
     iter_bits(x).map(|htask| unsafe { HTaskGroup4::new_unchecked(htask.get()) })
 }
 
-/// Constructing an unchecked `HTask` is `unsafe`, so hide the constructor by
+/// Constructing an unchecked `HTaskCore` is `unsafe`, so hide the constructor by
 /// wrapping it in a module. The unsafety of `get_unchecked[_mut]` is completely
 /// isolated in this module.
 mod utils {
@@ -405,11 +413,12 @@ mod utils {
     use derive_more::{Deref, DerefMut};
     use std::ops::{Index, IndexMut};
 
-    /// Represents a task in `TimerQueue`.
+    /// Represents a task in `TimerQueue`. Note that the same value may be
+    /// reused for multiple tasks with disjoint lifetimes.
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct HTask(u8);
+    pub struct HTaskCore(u8);
 
-    impl HTask {
+    impl HTaskCore {
         #[inline]
         #[allow(dead_code)]
         pub(super) fn new(x: usize) -> Self {
@@ -431,8 +440,8 @@ mod utils {
         }
     }
 
-    /// Represents a group of four consecutive `HTask`s. `HTaskGroup4(i)`
-    /// (where `i % 4 == 0`) represents `HTask(i)` … `HTask(i + 3)`.
+    /// Represents a group of four consecutive `HTaskCore`s. `HTaskGroup4(i)`
+    /// (where `i % 4 == 0`) represents `HTaskCore(i)` … `HTaskCore(i + 3)`.
     #[derive(Clone, Copy)]
     pub struct HTaskGroup4(u8);
 
@@ -444,25 +453,25 @@ mod utils {
         }
 
         #[allow(dead_code)]
-        pub(super) fn start(self) -> HTask {
-            HTask(self.0)
+        pub(super) fn start(self) -> HTaskCore {
+            HTaskCore(self.0)
         }
     }
 
-    /// Wraps `[T; SIZE]` to safely skip bound checks when indexed by `HTask`.
+    /// Wraps `[T; SIZE]` to safely skip bound checks when indexed by `HTaskCore`.
     #[derive(Debug, Clone, Copy, Deref, DerefMut)]
     #[repr(C, align(32))]
     pub struct Array<T>(pub T);
 
-    impl<T> Index<HTask> for Array<[T; SIZE]> {
+    impl<T> Index<HTaskCore> for Array<[T; SIZE]> {
         type Output = T;
-        fn index(&self, index: HTask) -> &Self::Output {
+        fn index(&self, index: HTaskCore) -> &Self::Output {
             unsafe { self.0.get_unchecked(index.0 as usize) }
         }
     }
 
-    impl<T> IndexMut<HTask> for Array<[T; SIZE]> {
-        fn index_mut(&mut self, index: HTask) -> &mut Self::Output {
+    impl<T> IndexMut<HTaskCore> for Array<[T; SIZE]> {
+        fn index_mut(&mut self, index: HTaskCore) -> &mut Self::Output {
             unsafe { self.0.get_unchecked_mut(index.0 as usize) }
         }
     }
@@ -475,8 +484,7 @@ mod utils {
     }
 }
 
-pub use self::utils::HTask;
-use self::utils::{Array, HTaskGroup4};
+use self::utils::{Array, HTaskCore, HTaskGroup4};
 
 #[cfg(test)]
 mod tests {
@@ -524,7 +532,7 @@ mod tests {
         let bitmap = bits.iter().fold(0u64, |x, i| x | (1u64 << i));
         debug!("bitmap = 0x{:08x}", bitmap);
 
-        let out_bits = iter_bits(bitmap).map(HTask::get).collect::<Vec<_>>();
+        let out_bits = iter_bits(bitmap).map(HTaskCore::get).collect::<Vec<_>>();
         debug!("got {:?}, expected {:?}", out_bits, bits);
 
         out_bits == bits
@@ -554,7 +562,7 @@ mod tests {
 
         let out_bits = iter_bit_groups4_any(bitmap)
             .map(HTaskGroup4::start)
-            .map(HTask::get)
+            .map(HTaskCore::get)
             .collect::<Vec<_>>();
         debug!("got {:?}, expected {:?}", out_bits, bits_any_4x);
 
