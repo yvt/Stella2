@@ -10,8 +10,8 @@ use std::{
 };
 
 use super::{
-    HView, HWnd, Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener,
-    Wnd, WndStyleFlags,
+    invocation::process_pending_invocations, HView, HWnd, Superview, SuperviewStrong, UpdateCtx,
+    ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags,
 };
 use crate::pal::{self, prelude::Wm as _, Wm};
 
@@ -182,6 +182,8 @@ impl HWnd {
 
         // Repeat until the update converges...
         for _ in 0..100 {
+            process_pending_invocations(self.wnd.wm);
+
             let view: HView = self.wnd.content_view.borrow().clone().unwrap();
 
             if !view.view.dirty.get().is_dirty() {

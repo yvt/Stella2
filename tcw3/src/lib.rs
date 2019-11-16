@@ -18,3 +18,8 @@ pub use tcw3_testing as testing;
 
 pub mod ui;
 pub mod uicore;
+
+pub mod prelude {
+    #[doc(no_inline)]
+    pub use crate::{pal::prelude::*, uicore::WmExt};
+}

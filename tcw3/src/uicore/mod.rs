@@ -30,6 +30,7 @@ use subscriber_list::{SubscriberList, UntypedSubscription};
 use crate::pal::{self, prelude::Wm as _, Wm};
 
 mod images;
+mod invocation;
 mod layer;
 mod layout;
 mod mount;
@@ -41,6 +42,25 @@ pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::MouseDragListener;
 
 pub use crate::pal::WndFlags as WndStyleFlags;
+
+/// An extension trait for `Wm`.
+pub trait WmExt: Sized {
+    /// Enqueue a call to the specified function. This is similar to
+    /// `Wm::invoke`, but enqueues the call to a queue managed by the UI
+    /// framework.
+    ///
+    /// The framework ensures that the queue is emptied *before* updating window
+    /// contents (by `Wm::update_wnd`). Thus, this method should be preferred
+    /// to `invoke` if you want to defer some calculation but need the result
+    /// to be displayed on next screen update.
+    fn invoke_on_update(self, f: impl FnOnce(Self) + 'static);
+}
+
+impl WmExt for Wm {
+    fn invoke_on_update(self, f: impl FnOnce(Self) + 'static) {
+        invocation::invoke_on_update(self, f);
+    }
+}
 
 /// A window handle type.
 ///
