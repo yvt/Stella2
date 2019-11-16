@@ -40,16 +40,3 @@ debug = true
 # `tcw3_pal`. This isn't as fast as the release build due to lack of LTO, but
 # at least it's usable.
 tcw3_pal = { opt-level = 3 }
-
-# The following two include:
-# “Expose more APIs on CGContext”
-# <https://github.com/servo/core-foundation-rs/pull/313>
-[patch.crates-io.core-graphics]
-git = "https://github.com/servo/core-foundation-rs.git"
-rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
-[patch.crates-io.core-foundation]
-git = "https://github.com/servo/core-foundation-rs.git"
-rev = "673be9f0b53387e806c7a72eef5e9b325917c969"
-[patch.crates-io.core-foundation-sys]
-git = "https://github.com/servo/core-foundation-rs.git"
-rev = "673be9f0b53387e806c7a72eef5e9b325917c969"

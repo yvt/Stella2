@@ -316,7 +316,8 @@ fn ctframe_get_lines(this: &CTFrame) -> CFArray<CTLine> {
     }
 }
 
-fn ctframe_get_line_origins(this: &CTFrame, start_line: i64, out_origins: &mut [CGPoint]) {
+fn ctframe_get_line_origins(this: &CTFrame, start_line: isize, out_origins: &mut [CGPoint]) {
+    use std::convert::TryInto;
     assert!(
         (out_origins.len() as u64) <= <i64>::max_value() as u64,
         "integer overflow"
@@ -324,7 +325,7 @@ fn ctframe_get_line_origins(this: &CTFrame, start_line: i64, out_origins: &mut [
     let range = CFRange::init(
         start_line,
         start_line
-            .checked_add(out_origins.len() as i64)
+            .checked_add(out_origins.len().try_into().expect("integer overflow"))
             .expect("integer overflow"),
     );
     unsafe {
