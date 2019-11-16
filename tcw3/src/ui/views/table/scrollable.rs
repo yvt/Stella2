@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     pal,
-    pal::prelude::*,
+    prelude::*,
     ui::{
         theming::{ClassSet, ElemClassPath, Manager, Role, StyledBox},
         views::Scrollbar,
@@ -73,7 +73,7 @@ impl ScrollableTable {
             if let Some(inner) = inner_weak.upgrade() {
                 // The handler may be called from `Layout`, where most actions
                 // are restricted
-                pal::Wm::global().invoke(move |_| {
+                pal::Wm::global().invoke_on_update(move |_| {
                     inner.update_class_set();
                     inner.update_scrollbar_value();
                 });
