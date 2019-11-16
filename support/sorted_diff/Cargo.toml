@@ -6,3 +6,4 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 
 [dependencies]
+eager_peekable = { path = "../eager_peekable" }

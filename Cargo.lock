@@ -1832,6 +1832,9 @@ dependencies = [
 [[package]]
 name = "sorted_diff"
 version = "0.1.0"
+dependencies = [
+ "eager_peekable 0.1.0",
+]
 
 [[package]]
 name = "stable_deref_trait"
@@ -2087,6 +2090,7 @@ dependencies = [
  "cggeom 0.1.0",
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_more 0.99.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "eager_peekable 0.1.0",
  "enclose 1.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "flags-macro 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",

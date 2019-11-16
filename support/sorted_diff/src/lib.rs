@@ -26,16 +26,14 @@
 //!         ],
 //!     );
 //!
-use std::{
-    cmp::Ordering,
-    iter::{FusedIterator, Peekable},
-};
+use eager_peekable::{EagerPeekable, EagerPeekableExt};
+use std::{cmp::Ordering, iter::FusedIterator};
 
 /// An iterator that outputs the difference between two sorted sequences.
 /// Elements are compared using the [comparer](Cmp) `C`.
 pub struct SortedDiffBy<I1: Iterator, I2: Iterator, C> {
-    it1: Peekable<I1>,
-    it2: Peekable<I2>,
+    it1: EagerPeekable<I1>,
+    it2: EagerPeekable<I2>,
     cmp: C,
 }
 
@@ -95,8 +93,8 @@ where
     /// This is a low-level function of [`sorted_diff_by`].
     pub fn new_by(it1: I1, it2: I2, cmp: C) -> Self {
         Self {
-            it1: it1.peekable(),
-            it2: it2.peekable(),
+            it1: it1.eager_peekable(),
+            it2: it2.eager_peekable(),
             cmp,
         }
     }
@@ -150,8 +148,8 @@ where
     /// This is a low-level function of [`sorted_diff`].
     pub fn new(it1: I1, it2: I2) -> Self {
         Self {
-            it1: it1.peekable(),
-            it2: it2.peekable(),
+            it1: it1.eager_peekable(),
+            it2: it2.eager_peekable(),
             cmp: DefaultCmp,
         }
     }

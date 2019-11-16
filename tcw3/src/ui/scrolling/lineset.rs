@@ -3,11 +3,11 @@
 #![allow(clippy::len_zero)] // rust-lang/rust-clippy#3807
 
 use derive_more::{Add, AddAssign, Neg};
+use eager_peekable::{EagerPeekable, EagerPeekableExt};
 use rope::{self, Rope};
 use std::{
     cmp::{max, min, Ordering},
     collections::BinaryHeap,
-    iter::Peekable,
     ops::{Range, RangeInclusive},
 };
 
@@ -1230,7 +1230,7 @@ impl Lineset {
 
         // Subdivide line groups to lower their LOD levels until the goal is reached
         // -----------------------------------------------------------------
-        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
+        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).eager_peekable();
 
         // For each existing LOD group...
         for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
@@ -1291,7 +1291,7 @@ impl Lineset {
         std::mem::swap(&mut self.lod_grs, &mut lod_grs2);
         lod_grs2.clear();
 
-        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).peekable();
+        let mut goal_lod_gr_it = iter_lod_gr_with_end(num_lines, &goal_lod_grs).eager_peekable();
 
         // For each existing LOD group...
         for (lod_gr, lod_gr_end) in iter_lod_gr_with_end(num_lines, &self.lod_grs) {
@@ -1362,7 +1362,7 @@ impl Lineset {
             out_lod_grs: &mut Vec<LodGr>,
             lod: u8,
             range: Range<Index>,
-            goal_lod_gr_it: &mut Peekable<IterLodGrWithEnd<'_>>,
+            goal_lod_gr_it: &mut EagerPeekable<IterLodGrWithEnd<'_>>,
             line_grs: &mut Rope<LineGr, LineOff>,
             subdiv_decim: &mut impl SubdivDecim,
         ) {
@@ -2056,11 +2056,11 @@ fn lod_grs_from_vps(
 /// also returns their respective ending points (`LodGr` itself only stores
 /// the starting point).
 fn iter_lod_gr_with_end(len: Index, lod_grs: &[LodGr]) -> IterLodGrWithEnd<'_> {
-    IterLodGrWithEnd(lod_grs.iter().peekable(), len)
+    IterLodGrWithEnd(lod_grs.iter().eager_peekable(), len)
 }
 
 #[derive(Clone)]
-struct IterLodGrWithEnd<'a>(Peekable<std::slice::Iter<'a, LodGr>>, Index);
+struct IterLodGrWithEnd<'a>(EagerPeekable<std::slice::Iter<'a, LodGr>>, Index);
 
 impl<'a> Iterator for IterLodGrWithEnd<'a> {
     type Item = (LodGr, Index);
@@ -2122,7 +2122,7 @@ impl Lineset {
 
             let size_range = lod_size_range(lod_gr.lod);
 
-            let mut iter = iter.peekable();
+            let mut iter = iter.eager_peekable();
             while let Some(line_gr) = iter.next() {
                 let is_last = iter.peek().is_none();
 

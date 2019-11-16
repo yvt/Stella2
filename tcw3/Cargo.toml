@@ -23,6 +23,7 @@ owning_ref = "0.4.0"
 rope = { path = "../support/rope" }
 svgbobdoc = "0.2"
 sorted_diff = { path = "../support/sorted_diff" }
+eager_peekable = { path = "../support/eager_peekable" }
 lazy_static = "1"
 itertools = "0.8.0"
 ndarray = "0.13.0"
