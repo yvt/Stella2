@@ -16,6 +16,7 @@ members = [
     "support/as_any",
     "support/atom2",
     "support/cggeom",
+    "support/eager_peekable",
     "support/iterpool",
     "support/rope",
     "support/subscriber_list",
