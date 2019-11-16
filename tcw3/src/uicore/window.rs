@@ -81,11 +81,14 @@ impl HWnd {
         }
         dirty.set(dirty.get() | WndDirtyFlags::UPDATE);
 
-        let hwnd: HWnd = self.clone();
-
-        self.wnd.wm.invoke(move |_| {
-            hwnd.update();
-        });
+        if let Some(ref pal_wnd) = *self.wnd.pal_wnd.borrow() {
+            self.wnd.wm.request_update_ready_wnd(pal_wnd);
+        } else {
+            let hwnd: HWnd = self.clone();
+            self.wnd.wm.invoke(move |_| {
+                hwnd.update();
+            });
+        }
     }
 
     fn update(&self) {
@@ -352,6 +355,12 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
                 listener.close(wm, &hwnd);
                 hwnd.close();
             }
+        }
+    }
+
+    fn update_ready(&self, _: Wm, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.update();
         }
     }
 
