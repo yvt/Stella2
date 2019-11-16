@@ -107,6 +107,10 @@ impl HWnd {
         wm.winit_wm().update_wnd(&self.winit_hwnd)
     }
 
+    pub(super) fn request_update_ready(&self, _wm: Wm) {
+        unimplemented!()
+    }
+
     pub(super) fn get_size(&self, wm: Wm) -> [u32; 2] {
         wm.winit_wm().get_wnd_size(&self.winit_hwnd)
     }

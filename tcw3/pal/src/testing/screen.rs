@@ -167,6 +167,9 @@ impl Screen {
             }
         }
     }
+    pub(super) fn request_update_ready_wnd(&self, _hwnd: &HWnd) {
+        unimplemented!()
+    }
     pub(super) fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
         let state = self.state.borrow();
         state.wnds[hwnd.ptr].attrs.size

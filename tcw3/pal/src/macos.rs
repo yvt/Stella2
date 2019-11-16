@@ -181,6 +181,10 @@ impl iface::Wm for Wm {
         window.update(self);
     }
 
+    fn request_update_ready_wnd(self, window: &Self::HWnd) {
+        window.request_update_ready(self);
+    }
+
     fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2] {
         window.get_size(self)
     }

@@ -147,6 +147,10 @@ impl iface::Wm for Wm {
         self.winit_wm_core().update_wnd(hwnd)
     }
 
+    fn request_update_ready_wnd(self, hwnd: &Self::HWnd) {
+        self.winit_wm_core().request_update_ready_wnd(hwnd)
+    }
+
     fn get_wnd_size(self, hwnd: &Self::HWnd) -> [u32; 2] {
         self.winit_wm_core().get_wnd_size(hwnd)
     }

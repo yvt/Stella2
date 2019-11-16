@@ -112,6 +112,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         wnd.content.borrow_mut().update(self, &wnd.winit_wnd);
     }
 
+    pub fn request_update_ready_wnd(&self, hwnd: &HWndCore) {
+        unimplemented!()
+    }
+
     pub fn get_wnd_size(&self, hwnd: &HWndCore) -> [u32; 2] {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
 

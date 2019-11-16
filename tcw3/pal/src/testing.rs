@@ -575,6 +575,19 @@ impl iface::Wm for Wm {
         }
     }
 
+    fn request_update_ready_wnd(self, hwnd: &Self::HWnd) {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
+                wm.request_update_ready_wnd(hwnd);
+            }
+            (BackendAndWm::Testing, HWndInner::Testing(ts_hwnd)) => {
+                debug!("request_update_ready_wnd({:?})", hwnd);
+                SCREEN.get_with_wm(self).request_update_ready_wnd(ts_hwnd);
+            }
+            _ => unreachable!(),
+        }
+    }
+
     fn get_wnd_size(self, hwnd: &Self::HWnd) -> [u32; 2] {
         match (self.backend_and_wm(), &hwnd.inner) {
             (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.get_wnd_size(hwnd),

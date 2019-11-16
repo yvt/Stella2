@@ -162,6 +162,10 @@ impl HWnd {
         }
     }
 
+    pub(super) fn request_update_ready(&self, _wm: Wm) {
+        unimplemented!()
+    }
+
     pub(super) fn get_size(&self, _: Wm) -> [u32; 2] {
         let size: NSSize = unsafe { msg_send![*self.ctrler, contentSize] };
         [size.width as u32, size.height as u32]

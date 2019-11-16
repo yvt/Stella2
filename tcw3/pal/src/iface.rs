@@ -125,6 +125,17 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// The implementation may call this automatically in the main event loop.
     fn update_wnd(self, window: &Self::HWnd);
 
+    /// Request to have [`WndListener::update_ready`] called when the
+    /// window is ready to accept a new update.
+    ///
+    /// The client may use this method to meter the update of a window in order
+    /// that it does not generate more frames than necessary, but is not
+    /// required to use this.
+    ///
+    /// The implementation of `WndListener::resize` **must not** use this method
+    /// to defer the update.
+    fn request_update_ready_wnd(self, window: &Self::HWnd);
+
     /// Get the size of a window's content region.
     fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2];
 
@@ -347,6 +358,9 @@ bitflags! {
 pub trait WndListener<T: Wm> {
     /// The user has attempted to close a window.
     fn close_requested(&self, _: T, _: &T::HWnd) {}
+
+    /// The window is ready to accept a new update.
+    fn update_ready(&self, _: T, _: &T::HWnd) {}
 
     /// A window is being resized.
     ///
