@@ -119,8 +119,10 @@ pub trait WndContent: 'static + Sized {
     /// Called inside `update_wnd`.
     fn update(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
 
-    /// Called as a response to the `RedrawRequested` event. Note that `WinitWmCore`
-    /// does not automatically call `request_redraw`.
+    /// Called as a response to the `RedrawRequested` event.
+    ///
+    /// This method must be implemented if the window system does not retain
+    /// window contents.
     fn redraw_requested(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
 
     fn close(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
@@ -132,6 +134,7 @@ struct Wnd<TWM: Wm, TWC> {
     listener: RefCell<Box<dyn WndListener<TWM>>>,
     mouse_drag: RefCell<Option<WndMouseDrag<TWM>>>,
     mouse_pos: Cell<Point2<f32>>,
+    waiting_update_ready: Cell<bool>,
 }
 
 struct WndMouseDrag<TWM: Wm> {

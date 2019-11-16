@@ -62,6 +62,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             listener: RefCell::new(listener),
             mouse_drag: RefCell::new(None),
             mouse_pos: Cell::new((0.0, 0.0).into()),
+            waiting_update_ready: Cell::new(false),
         };
 
         let ptr = self.wnds.borrow_mut().allocate(Rc::new(wnd));
@@ -113,7 +114,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     }
 
     pub fn request_update_ready_wnd(&self, hwnd: &HWndCore) {
-        unimplemented!()
+        let wnd = &self.wnds.borrow()[hwnd.ptr];
+        wnd.waiting_update_ready.set(true);
+
+        wnd.winit_wnd.request_redraw();
     }
 
     pub fn get_wnd_size(&self, hwnd: &HWndCore) -> [u32; 2] {
@@ -245,7 +249,11 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 } // match state
             } // WindowEvent::MouseInput
             WindowEvent::RedrawRequested => {
+                if wnd.waiting_update_ready.take() {
+                    listener.update_ready(self.wm(), &hwnd);
+                }
                 drop(listener);
+
                 wnd.content
                     .borrow_mut()
                     .redraw_requested(self, &wnd.winit_wnd);
