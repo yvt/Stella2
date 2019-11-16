@@ -278,17 +278,22 @@ impl<TBmp: Bmp> Screen<TBmp> {
 
         if let Some(new_new_sublayers) = &attrs.sublayers {
             let old_new_sublayers = self.layers[layer.ptr].new_sublayers.take();
+            let sublayers = std::mem::replace(&mut self.layers[layer.ptr].sublayers, Vec::new());
 
-            // If `attrs.sublayers` is set and `layer.new_sublayers` is already set,
-            // detach `layer.new_sublayers` first
-            if let Some(layers) = old_new_sublayers {
-                for hlayer in layers {
-                    let sublayer = &mut self.layers[hlayer.ptr];
-                    debug_assert!(sublayer.superlayer == Some(Superlayer::Layer(layer.clone())));
-
-                    self.release_layer(&hlayer);
+            if let Some(layers) = &old_new_sublayers {
+                for hlayer in layers.iter() {
+                    self.release_layer(hlayer);
                 }
             }
+
+            // detach sublayers first
+            for hlayer in old_new_sublayers.as_ref().unwrap_or(&sublayers) {
+                let sublayer = &mut self.layers[hlayer.ptr];
+                debug_assert!(sublayer.superlayer == Some(Superlayer::Layer(layer.clone())));
+                sublayer.superlayer = None;
+            }
+
+            self.layers[layer.ptr].sublayers = sublayers;
 
             // Link sublayers
             for hlayer in new_new_sublayers.iter() {
@@ -360,6 +365,14 @@ impl<TBmp: Bmp> Screen<TBmp> {
     }
 
     pub fn remove_layer(&mut self, layer: &HLayer) {
+        self.set_layer_attr(
+            layer,
+            iface::LayerAttrs {
+                sublayers: None,
+                ..Default::default()
+            },
+        );
+
         self.release_layer(layer);
     }
 
@@ -375,6 +388,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let layer = self.layers.deallocate(layer.ptr).unwrap();
 
         for sublayer in layer.sublayers {
+            self.layers[sublayer.ptr].superlayer = None;
             self.release_layer(&sublayer);
         }
 
