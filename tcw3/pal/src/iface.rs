@@ -360,6 +360,9 @@ pub trait WndListener<T: Wm> {
     fn close_requested(&self, _: T, _: &T::HWnd) {}
 
     /// The window is ready to accept a new update.
+    ///
+    /// This method gets called after the client calls
+    /// `Wm::request_update_ready_wnd`.
     fn update_ready(&self, _: T, _: &T::HWnd) {}
 
     /// A window is being resized.
