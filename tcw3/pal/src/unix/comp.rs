@@ -152,8 +152,8 @@ impl WndContentTrait for WndContent {
             .set_wnd_layer(&self.sr_wnd, layer.map(|hl| hl.sr_layer));
     }
 
-    fn update(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, winit_wnd: &Window) {
-        winit_wnd.request_redraw();
+    fn update(&mut self, winit_wm_core: &WinitWmCore<Self::Wm, Self>, winit_wnd: &Window) {
+        self.redraw_requested(winit_wm_core, winit_wnd);
     }
 
     fn redraw_requested(
