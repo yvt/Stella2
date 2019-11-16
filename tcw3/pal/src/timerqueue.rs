@@ -61,6 +61,7 @@ pub struct TimerQueue<T> {
 pub struct HTask(u64);
 
 impl<T> TimerQueue<T> {
+    #[allow(dead_code)]
     pub const CAPACITY: usize = SIZE;
 
     pub fn new() -> Self {
