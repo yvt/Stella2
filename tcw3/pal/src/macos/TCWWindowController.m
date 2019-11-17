@@ -1,19 +1,33 @@
-#import "TCWWindowController.h"
+#include <stdatomic.h>
+#include <stdbool.h>
+
 #import "TCWBridge.h"
 #import "TCWGestureHandlerView.h"
+#import "TCWWindowController.h"
 #import "TCWWindowView.h"
 
 @implementation TCWWindowController {
     NSWindow *window;
 
-    TCWGestureHandlerView *inactiveGestureHandler;
+    CVDisplayLinkRef _Nullable displayLink;
+    atomic_bool handlingDisplayLinkEvent;
+    bool windowIsOnscreen;
+    bool displayLinkIsRunning;
+    bool wantsUpdateReadyCallback;
 
+    TCWGestureHandlerView *inactiveGestureHandler;
     NSMutableArray<TCWGestureHandlerView *> *gestureHandlers;
 }
 
 - (id)init {
     if (self) {
         self = [super init];
+
+        self->displayLink = nil;
+        self->handlingDisplayLinkEvent = false;
+        self->windowIsOnscreen = false;
+        self->displayLinkIsRunning = false;
+        self->wantsUpdateReadyCallback = false;
 
         NSRect frame = NSMakeRect(0.0, 0.0, 800.0, 600.0);
 
@@ -44,6 +58,12 @@
 
 - (void)close {
     [self->window close];
+}
+
+- (void)dealloc {
+    if (self->displayLink) {
+        CVDisplayLinkRelease(self->displayLink);
+    }
 }
 
 - (void)setTitle:(NSString *)windowTitle {
@@ -104,6 +124,138 @@
     return (float)self->window.backingScaleFactor;
 }
 
+// Called by `window.rs`
+- (void)requestUpdateReady {
+    if (!self->displayLink) {
+        [self renewDisplayLink];
+    }
+
+    self->wantsUpdateReadyCallback = true;
+
+    if (!self->windowIsOnscreen) {
+        // The window is currently offscreen. We'll try again later when
+        // the window becomes visible.
+        return;
+    }
+
+    if (!self->displayLinkIsRunning) {
+        self->displayLinkIsRunning = true;
+        CVReturn error = CVDisplayLinkStart(self->displayLink);
+        if (error) {
+            NSLog(@"CVDisplayLinkStart failed: %d", (int)error);
+        }
+    }
+}
+
+- (void)renewDisplayLink {
+    CVReturn error;
+
+    NSScreen *screen = self->window.screen;
+
+    if (!screen) {
+        if (self->displayLinkIsRunning) {
+            self->displayLinkIsRunning = false;
+
+            error = CVDisplayLinkStop(self->displayLink);
+            if (error) {
+                NSLog(@"CVDisplayLinkStop failed: %d", (int)error);
+            }
+        }
+        self->windowIsOnscreen = false;
+        return;
+    }
+
+    self->windowIsOnscreen = true;
+
+    NSNumber *displayIDNum =
+        [screen.deviceDescription objectForKey:@"NSScreenNumber"];
+    CGDirectDisplayID displayID =
+        (CGDirectDisplayID)displayIDNum.unsignedIntegerValue;
+
+    if (self->displayLink) {
+        error = CVDisplayLinkSetCurrentCGDisplay(self->displayLink, displayID);
+        if (error) {
+            NSLog(@"CVDisplayLinkSetCurrentCGDisplay failed: %d", (int)error);
+        }
+    } else {
+        error = CVDisplayLinkCreateWithCGDisplay(displayID, &self->displayLink);
+        if (error) {
+            NSLog(@"CVDisplayLinkCreateWithCGDisplay failed: %d", (int)error);
+            return;
+        }
+
+        TCWWindowController __weak *selfWeak = self;
+        CVDisplayLinkOutputHandler handler = ^CVReturn(
+            CVDisplayLinkRef _Nonnull _displayLink,
+            const CVTimeStamp *_Nonnull inNow,
+            const CVTimeStamp *_Nonnull inOutputTime, CVOptionFlags flagsIn,
+            CVOptionFlags *_Nonnull flagsOut) {
+          (void)inNow;
+          (void)inOutputTime;
+          (void)flagsIn;
+          (void)flagsOut;
+
+          TCWWindowController *self = selfWeak;
+          if (!self) {
+              CVDisplayLinkStop(_displayLink);
+              return kCVReturnSuccess;
+          }
+
+          if (atomic_load_explicit(&self->handlingDisplayLinkEvent,
+                                   memory_order_relaxed)) {
+              // The main thread cannot keep up with `CVDisplayLink`,
+              // dropping the frame
+              return kCVReturnSuccess;
+          }
+
+          atomic_store_explicit(&self->handlingDisplayLinkEvent, true,
+                                memory_order_relaxed);
+
+          [self performSelectorOnMainThread:@selector(handleDisplayLinkEvent)
+                                 withObject:nil
+                              waitUntilDone:NO];
+
+          return kCVReturnSuccess;
+        };
+        CVReturn error =
+            CVDisplayLinkSetOutputHandler(self->displayLink, handler);
+        if (error) {
+            NSLog(@"CVDisplayLinkSetOutputHandler failed: %d", (int)error);
+        }
+    }
+
+    if (self->wantsUpdateReadyCallback && !self->displayLinkIsRunning) {
+        self->displayLinkIsRunning = true;
+        CVReturn error = CVDisplayLinkStart(self->displayLink);
+        if (error) {
+            NSLog(@"CVDisplayLinkStart failed: %d", (int)error);
+        }
+    }
+}
+
+- (void)handleDisplayLinkEvent {
+    atomic_store_explicit(&self->handlingDisplayLinkEvent, false,
+                          memory_order_relaxed);
+
+    if (!self->displayLinkIsRunning) {
+        return;
+    }
+
+    if (!self->wantsUpdateReadyCallback) {
+        // The client does not want the callback to be called anymore...
+        // Stop the `CVDisplayLink`.
+        self->displayLinkIsRunning = false;
+        CVReturn error = CVDisplayLinkStop(self->displayLink);
+        if (error) {
+            NSLog(@"CVDisplayLinkStop failed: %d", (int)error);
+        }
+        return;
+    }
+
+    self->wantsUpdateReadyCallback = false;
+    tcw_wndlistener_update_ready(self.listenerUserData);
+}
+
 // Implements `NSWindowDelegate`
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;
@@ -133,6 +285,12 @@
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification {
     (void)notification;
     tcw_wndlistener_dpi_scale_changed(self.listenerUserData);
+}
+
+// Implements `NSWindowDelegate`
+- (void)windowDidChangeScreen:(NSNotification *)notification {
+    (void)notification;
+    [self renewDisplayLink];
 }
 
 /**

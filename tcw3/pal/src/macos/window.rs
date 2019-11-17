@@ -163,7 +163,7 @@ impl HWnd {
     }
 
     pub(super) fn request_update_ready(&self, _wm: Wm) {
-        unimplemented!()
+        let () = unsafe { msg_send![*self.ctrler, requestUpdateReady] };
     }
 
     pub(super) fn get_size(&self, _: Wm) -> [u32; 2] {
@@ -225,6 +225,14 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
 unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         state.listener.borrow().dpi_scale_changed(wm, &state.hwnd);
+    });
+}
+
+#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_update_ready(ud: TCWListenerUserData) {
+    method_impl(ud, |wm, state| {
+        state.listener.borrow().update_ready(wm, &state.hwnd);
     });
 }
 

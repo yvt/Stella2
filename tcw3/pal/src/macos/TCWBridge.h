@@ -16,6 +16,7 @@ extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_resize(TCWListenerUserData ud);
 extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
+extern void tcw_wndlistener_update_ready(TCWListenerUserData ud);
 extern void tcw_wndlistener_mouse_motion(TCWListenerUserData ud, NSPoint loc);
 extern void tcw_wndlistener_mouse_leave(TCWListenerUserData ud);
 extern TCWMouseDragListenerUserData
