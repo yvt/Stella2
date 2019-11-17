@@ -582,7 +582,19 @@ impl iface::Wm for Wm {
             }
             (BackendAndWm::Testing, HWndInner::Testing(ts_hwnd)) => {
                 debug!("request_update_ready_wnd({:?})", hwnd);
-                SCREEN.get_with_wm(self).request_update_ready_wnd(ts_hwnd);
+
+                let hwnd = hwnd.clone();
+                let ts_hwnd = ts_hwnd.clone();
+                // TODO: Add methods to `TestingWm` to customize this behavior
+                self.invoke_unsend(move |_| {
+                    // TODO: Bail out if `ts_hwnd` is not valid anymore
+                    trace!(
+                        "Automatically calling raise_update_ready({:?}) \
+                         (triggererd by request_update_ready_wnd)",
+                        hwnd
+                    );
+                    SCREEN.get_with_wm(self).raise_update_ready(self, &ts_hwnd);
+                });
             }
             _ => unreachable!(),
         }

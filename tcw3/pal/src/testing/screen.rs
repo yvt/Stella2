@@ -167,9 +167,6 @@ impl Screen {
             }
         }
     }
-    pub(super) fn request_update_ready_wnd(&self, _hwnd: &HWnd) {
-        unimplemented!()
-    }
     pub(super) fn get_wnd_size(&self, hwnd: &HWnd) -> [u32; 2] {
         let state = self.state.borrow();
         state.wnds[hwnd.ptr].attrs.size
@@ -230,6 +227,12 @@ impl Screen {
         let listener = self.wnd_listener(hwnd).unwrap();
 
         listener.close_requested(wm, &hwnd.into());
+    }
+
+    pub(super) fn raise_update_ready(&self, wm: Wm, hwnd: &HWnd) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        listener.update_ready(wm, &hwnd.into());
     }
 
     /// Implements `TestingWm::set_wnd_dpi_scale`.
