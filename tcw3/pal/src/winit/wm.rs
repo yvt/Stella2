@@ -187,7 +187,14 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 .set(Some(NonNull::from(event_loop_wnd_target)));
             let _guard = Guard(&self.event_loop_wnd_target);
 
-            use winit::event::Event;
+            use winit::event::{Event, WindowEvent};
+
+            let check_invocations = match event {
+                Event::EventsCleared |
+                // `RedrawRequested` may be generated after `EventsCleared`
+                Event::WindowEvent{ event: WindowEvent::RedrawRequested, .. } => true,
+                _ => false,
+            };
 
             match event {
                 Event::WindowEvent { window_id, event } => {
@@ -199,38 +206,40 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 _ => {}
             }
 
-            *control_flow = ControlFlow::Wait;
-
-            // Process delayed invocations
             let timer_queue_cell = &self.timer_queue;
 
-            let mut tasks = ArrayVec::<[_; TimerQueue::<()>::CAPACITY]>::new();
-            for (_, task) in timer_queue_cell.borrow_mut().drain_runnable_tasks() {
-                // This is safe because the capacity is sufficient to hold
-                // all tasks extracted from `timer_queue`
-                unsafe { tasks.push_unchecked(task) };
-            }
-
-            // Unborrow `timer_queue_cell` first (because `func(self)` may call
-            // `invoke_after`), and call the callback functions
-            for func in tasks.drain(..) {
-                func(self);
-            }
-
-            // Process `!Send` invocations
-            loop {
-                let e = self.unsend_invoke_events.borrow_mut().pop_front();
-                if let Some(e) = e {
-                    e(self);
-                } else {
-                    break;
+            if check_invocations {
+                // Process delayed invocations
+                let mut tasks = ArrayVec::<[_; TimerQueue::<()>::CAPACITY]>::new();
+                for (_, task) in timer_queue_cell.borrow_mut().drain_runnable_tasks() {
+                    // This is safe because the capacity is sufficient to hold
+                    // all tasks extracted from `timer_queue`
+                    unsafe { tasks.push_unchecked(task) };
                 }
-            }
 
-            if self.should_terminate.get() {
-                *control_flow = ControlFlow::Exit;
-            } else if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
-                *control_flow = ControlFlow::WaitUntil(next_wakeup);
+                // Unborrow `timer_queue_cell` first (because `func(self)` may call
+                // `invoke_after`), and call the callback functions
+                for func in tasks.drain(..) {
+                    func(self);
+                }
+
+                // Process `!Send` invocations
+                loop {
+                    let e = self.unsend_invoke_events.borrow_mut().pop_front();
+                    if let Some(e) = e {
+                        e(self);
+                    } else {
+                        break;
+                    }
+                }
+
+                if self.should_terminate.get() {
+                    *control_flow = ControlFlow::Exit;
+                } else if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
+                    *control_flow = ControlFlow::WaitUntil(next_wakeup);
+                } else {
+                    *control_flow = ControlFlow::Wait;
+                }
             }
         });
     }
