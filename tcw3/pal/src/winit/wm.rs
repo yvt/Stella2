@@ -199,6 +199,8 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 _ => {}
             }
 
+            *control_flow = ControlFlow::Wait;
+
             loop {
                 let e = self.unsend_invoke_events.borrow_mut().pop_front();
                 if let Some(e) = e {
@@ -206,12 +208,6 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 } else {
                     break;
                 }
-            }
-
-            if self.should_terminate.get() {
-                *control_flow = ControlFlow::Exit;
-            } else {
-                *control_flow = ControlFlow::Wait;
             }
 
             // Process delayed invocations
@@ -232,6 +228,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
             if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
                 *control_flow = ControlFlow::WaitUntil(next_wakeup);
+            }
+
+            if self.should_terminate.get() {
+                *control_flow = ControlFlow::Exit;
             }
         });
     }

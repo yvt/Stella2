@@ -86,3 +86,8 @@ harness = false
 name = "timer"
 path = "tests/timer.rs"
 harness = false
+
+[[test]]
+name = "terminate_with_pending_invoke"
+path = "tests/terminate_with_pending_invoke.rs"
+harness = false
