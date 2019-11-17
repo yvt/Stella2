@@ -201,15 +201,6 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
             *control_flow = ControlFlow::Wait;
 
-            loop {
-                let e = self.unsend_invoke_events.borrow_mut().pop_front();
-                if let Some(e) = e {
-                    e(self);
-                } else {
-                    break;
-                }
-            }
-
             // Process delayed invocations
             let timer_queue_cell = &self.timer_queue;
 
@@ -226,12 +217,20 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 func(self);
             }
 
-            if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
-                *control_flow = ControlFlow::WaitUntil(next_wakeup);
+            // Process `!Send` invocations
+            loop {
+                let e = self.unsend_invoke_events.borrow_mut().pop_front();
+                if let Some(e) = e {
+                    e(self);
+                } else {
+                    break;
+                }
             }
 
             if self.should_terminate.get() {
                 *control_flow = ControlFlow::Exit;
+            } else if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
+                *control_flow = ControlFlow::WaitUntil(next_wakeup);
             }
         });
     }
