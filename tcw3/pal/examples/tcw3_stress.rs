@@ -2,7 +2,7 @@ use cggeom::{box2, prelude::*};
 use cgmath::{vec2, Deg, Matrix3};
 use std::{cell::RefCell, time::Instant};
 use structopt::StructOpt;
-use tcw3_pal::{self as pal, prelude::*, MtSticky};
+use tcw3_pal::{self as pal, prelude::*};
 
 struct Xorshift32(u32);
 
@@ -49,9 +49,16 @@ enum Shape {
     Circle,
 }
 
-struct Listener {}
+struct Listener {
+    state: RefCell<State>,
+}
 
 impl WndListener<pal::Wm> for Listener {
+    fn update_ready(&self, wm: pal::Wm, hwnd: &pal::HWnd) {
+        self.state.borrow_mut().update(wm, hwnd);
+        wm.request_update_ready_wnd(hwnd);
+    }
+
     fn close_requested(&self, wm: pal::Wm, _: &pal::HWnd) {
         wm.terminate();
     }
@@ -59,7 +66,6 @@ impl WndListener<pal::Wm> for Listener {
 
 struct State {
     opt: Opt,
-    wnd: pal::HWnd,
     layers: Vec<pal::HLayer>,
     particles: Vec<Particle>,
     instant: Instant,
@@ -77,7 +83,7 @@ struct Particle {
 const FBSIZE: [u32; 2] = [1280, 720];
 
 impl State {
-    fn new(wm: pal::Wm, wnd: pal::HWnd, opt: Opt) -> Self {
+    fn new(wm: pal::Wm, opt: Opt) -> Self {
         let mut rng = Xorshift32(14312);
 
         let size = opt.particle_size;
@@ -150,14 +156,13 @@ impl State {
 
         Self {
             opt,
-            wnd,
             layers,
             particles,
             instant: Instant::now(),
         }
     }
 
-    fn update(&mut self, wm: pal::Wm) {
+    fn update(&mut self, wm: pal::Wm, wnd: &pal::HWnd) {
         let t = self.instant.elapsed().as_millis() as u64;
 
         let size = self.opt.particle_size;
@@ -203,7 +208,7 @@ impl State {
             );
         }
 
-        wm.update_wnd(&self.wnd);
+        wm.update_wnd(&wnd);
     }
 }
 
@@ -225,13 +230,11 @@ fn main() {
         visible: Some(true),
         layer: Some(Some(layer.clone())),
         size: Some(FBSIZE),
-        listener: Some(Box::new(Listener {})),
         flags: Some(pal::WndFlags::default() - pal::WndFlags::RESIZABLE),
         ..Default::default()
     });
 
-    let mut state = State::new(wm, wnd.clone(), opt);
-    state.update(wm);
+    let mut state = State::new(wm, opt);
 
     wm.set_layer_attr(
         &layer,
@@ -241,29 +244,18 @@ fn main() {
         },
     );
 
-    let state = MtSticky::with_wm(wm, RefCell::new(state));
-    let state: &'static _ = Box::leak(Box::new(state));
+    state.update(wm, &wnd);
 
-    // Start a timer thread to call `update` periodically
-    // TODO: Use something like `CVDisplayLink` or `wl_surface::frame`
-    let _ = std::thread::spawn(move || {
-        let state = state;
-        let barrier: &'static _ = Box::leak(Box::new(std::sync::Barrier::new(2)));
-        loop {
-            // Invoke `update` on the main thread
-            pal::Wm::invoke_on_main_thread(move |wm| {
-                state.get_with_wm(wm).borrow_mut().update(wm);
+    wm.set_wnd_attr(
+        &wnd,
+        pal::WndAttrs {
+            listener: Some(Box::new(Listener {
+                state: RefCell::new(state),
+            })),
+            ..Default::default()
+        },
+    );
 
-                barrier.wait();
-            });
-
-            // Do not call `invoke_on_main_thread` too fast
-            barrier.wait();
-
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-    });
-
-    wm.update_wnd(&wnd);
+    wm.request_update_ready_wnd(&wnd);
     wm.enter_main_loop();
 }
