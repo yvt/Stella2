@@ -6,6 +6,36 @@
 //! contents. A platform-specific module may delegate window handling to this
 //! module, but should implement window content rendering by themselves by
 //! invoking their respective platform APIs.
+//!
+//! # Window Redraw Interface
+//!
+//! The possible pathways though which an update is done are summarized
+//! in the following quasi-call graph, separated by the types of initiators:
+//!
+//! ```text
+//! Wm::request_update_ready_wnd
+//!  └─ Window::request_redraw
+//!      └─ (event handler of) WindowEvent::RedrawRequested
+//!          ├─ WndListener::update_ready
+//!          │   └─ Wm::update_wnd
+//!          │       └─ WndContent::update
+//!          └─ WndContent::redraw_requested
+//!
+//! (event handler of) WindowEvent::Resized
+//!  ├─ WndListener::resize
+//!  │   └─ Wm::update_wnd
+//!  │       └─ WndContent::update
+//!  └─ WndContent::redraw_requested
+//!
+//! (event handler of) WindowEvent::RedrawRequested
+//!  └─ WndContent::redraw_requested
+//!
+//! Wm::update_wnd
+//!  ├─ WndContent::update
+//!  └─ Window::request_redraw (if update returns true)
+//!      └─ (event handler of) WindowEvent::RedrawRequested
+//!          └─ WndContent::redraw_requested
+//! ```
 use cgmath::Point2;
 use fragile::Fragile;
 use iterpool::{Pool, PoolPtr};
@@ -76,6 +106,8 @@ pub struct WinitWmCore<TWM: Wm, TWC: WndContent> {
     /// A list of open windows. To support reentrancy, this must be unborrowed
     /// before calling any user event handlers.
     wnds: RefCell<Pool<Rc<Wnd<TWM, TWC>>>>,
+
+    suppress_request_redraw: Cell<bool>,
 }
 
 /// Represents a type wrapping `WinitWmCore` to implement `Wm`.
@@ -117,9 +149,18 @@ pub trait WndContent: 'static + Sized {
     );
 
     /// Called inside `update_wnd`.
-    fn update(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) {}
+    ///
+    /// Returns `true` if `winit_wnd::request_redraw` needs to be called (with
+    /// some conditions).
+    /// The implementation should return `false` if the window system provides
+    /// retained-mode rendering and the `RedrawRequested` event does not need to
+    /// be handled.
+    fn update(&mut self, _wm: &WinitWmCore<Self::Wm, Self>, _winit_wnd: &Window) -> bool {
+        true
+    }
 
-    /// Called as a response to the `RedrawRequested` event.
+    /// Called as a response to the `RedrawRequested` event or in a `Resize`
+    /// event handler.
     ///
     /// This method must be implemented if the window system does not retain
     /// window contents.

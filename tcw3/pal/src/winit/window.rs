@@ -110,7 +110,11 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
     pub fn update_wnd(&self, hwnd: &HWndCore) {
         let wnd = &self.wnds.borrow()[hwnd.ptr];
-        wnd.content.borrow_mut().update(self, &wnd.winit_wnd);
+        let wants_request_redraw = wnd.content.borrow_mut().update(self, &wnd.winit_wnd);
+
+        if wants_request_redraw && !self.suppress_request_redraw.get() {
+            wnd.winit_wnd.request_redraw();
+        }
     }
 
     pub fn request_update_ready_wnd(&self, hwnd: &HWndCore) {
@@ -155,7 +159,13 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
         match evt {
             WindowEvent::Resized(_) => {
+                let guard = SuppressRequestRedrawGuard::new(self);
                 listener.resize(self.wm(), &hwnd);
+
+                if wnd.waiting_update_ready.take() {
+                    listener.update_ready(self.wm(), &hwnd);
+                }
+                drop(guard);
 
                 // I thought `Resized` implies `RedrawRequested` is automatically
                 // called. Without this, the window content and the size gets
@@ -250,6 +260,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             } // WindowEvent::MouseInput
             WindowEvent::RedrawRequested => {
                 if wnd.waiting_update_ready.take() {
+                    let _guard = SuppressRequestRedrawGuard::new(self);
                     listener.update_ready(self.wm(), &hwnd);
                 }
                 drop(listener);
@@ -263,5 +274,27 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             }
             _ => {}
         }
+    }
+}
+
+/// An RAII guard to temporarily set `WinitWmCore::suppress_request_redraw`.
+///
+/// `WndListener::update_ready` may call `update_wnd`. Setting
+/// `suppress_request_redraw` prevents `update_wnd` from calling
+/// `request_redraw`.
+struct SuppressRequestRedrawGuard<'a>(&'a Cell<bool>);
+
+impl<'a> SuppressRequestRedrawGuard<'a> {
+    fn new(x: &'a WinitWmCore<impl WinitWm, impl WndContent>) -> Self {
+        let cell = &x.suppress_request_redraw;
+        debug_assert!(!cell.get());
+        cell.set(true);
+        Self(cell)
+    }
+}
+
+impl Drop for SuppressRequestRedrawGuard<'_> {
+    fn drop(&mut self) {
+        self.0.set(false);
     }
 }

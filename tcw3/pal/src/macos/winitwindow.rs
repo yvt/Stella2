@@ -64,7 +64,7 @@ impl WndContentTrait for WndContent {
         self.layer = layer;
     }
 
-    fn update(&mut self, wm_core: &WinitWmCore<Self::Wm, Self>, _: &Window) {
+    fn update(&mut self, wm_core: &WinitWmCore<Self::Wm, Self>, _: &Window) -> bool {
         if let Some(layer) = &self.layer {
             with_autorelease_pool(|| {
                 transaction::begin();
@@ -73,6 +73,9 @@ impl WndContentTrait for WndContent {
                 transaction::commit();
             });
         }
+
+        // This backend does not rely on `RedrawRequested`
+        false
     }
 }
 

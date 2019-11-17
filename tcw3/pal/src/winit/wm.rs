@@ -153,6 +153,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             unsend_invoke_events: RefCell::new(LinkedList::new()),
             timer_queue: RefCell::new(TimerQueue::new()),
             wnds: RefCell::new(Pool::new()),
+            suppress_request_redraw: Cell::new(false),
         }
     }
 

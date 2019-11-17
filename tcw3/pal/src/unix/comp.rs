@@ -152,10 +152,6 @@ impl WndContentTrait for WndContent {
             .set_wnd_layer(&self.sr_wnd, layer.map(|hl| hl.sr_layer));
     }
 
-    fn update(&mut self, winit_wm_core: &WinitWmCore<Self::Wm, Self>, winit_wnd: &Window) {
-        self.redraw_requested(winit_wm_core, winit_wnd);
-    }
-
     fn redraw_requested(
         &mut self,
         winit_wm_core: &WinitWmCore<Self::Wm, Self>,
@@ -214,6 +210,11 @@ impl WndContentTrait for WndContent {
                 if let Some(x) = self.dirty_rect[image_i].take() {
                     x
                 } else {
+                    // Even if the dirty rect is empty, we should present a new
+                    // image because the window system might not retain the
+                    // window contents (albeit this is becoming uncommon these
+                    // days)
+                    sw_surf.present_image(image_i);
                     return;
                 }
             } else {
