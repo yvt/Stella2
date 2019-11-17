@@ -1,5 +1,5 @@
 use futures::{channel::oneshot::channel, task::LocalSpawnExt};
-use std::{env::var_os, time::Duration};
+use std::time::Duration;
 use tcw3_pal::{prelude::Wm as _, prelude::*, Wm};
 
 mod common;
@@ -7,13 +7,7 @@ mod common;
 fn main() {
     env_logger::init();
     common::set_timelimit_default();
-
-    if let Some(value) = var_os("ST_SKIP_NATIVE_BACKEND_TESTS") {
-        if !value.is_empty() && value != "0" {
-            println!("Skipping the test because ST_SKIP_NATIVE_BACKEND_TESTS is set");
-            return;
-        }
-    }
+    common::exit_if_native_backend_tests_are_disabled();
 
     let wm = Wm::global();
 
