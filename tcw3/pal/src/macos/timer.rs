@@ -44,7 +44,6 @@ struct TCWInvokeUserData {
 }
 type TCWInvokeUserDataInner = *mut dyn FnOnce(Wm);
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_invoke_fire(ud: TCWInvokeUserData) {
     let ud: TCWInvokeUserDataInner = std::mem::transmute(ud);
@@ -53,7 +52,6 @@ unsafe extern "C" fn tcw_invoke_fire(ud: TCWInvokeUserData) {
     func(Wm::global_unchecked());
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_invoke_cancel(ud: TCWInvokeUserData) {
     let ud: TCWInvokeUserDataInner = std::mem::transmute(ud);

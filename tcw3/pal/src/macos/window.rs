@@ -189,7 +189,6 @@ unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(Wm, &WndState) 
 
 // TODO: catch panics
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
@@ -199,7 +198,6 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
     NO
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     method_impl(ud, |_wm, state| {
@@ -212,7 +210,6 @@ unsafe extern "C" fn tcw_wndlistener_close(ud: TCWListenerUserData) {
     }
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
@@ -220,7 +217,6 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
@@ -228,7 +224,6 @@ unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) 
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_update_ready(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
@@ -236,7 +231,6 @@ unsafe extern "C" fn tcw_wndlistener_update_ready(ud: TCWListenerUserData) {
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_mouse_motion(ud: TCWListenerUserData, loc: NSPoint) {
     method_impl(ud, |wm, state| {
@@ -248,7 +242,6 @@ unsafe extern "C" fn tcw_wndlistener_mouse_motion(ud: TCWListenerUserData, loc: 
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
@@ -256,7 +249,6 @@ unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData) {
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_mouse_drag(
     ud: TCWListenerUserData,
@@ -299,7 +291,6 @@ unsafe fn drag_method_impl<T>(
     Some(f(wm, &*ud))
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_mousedraglistener_release(ud: TCWMouseDragListenerUserData) {
     if !ud.is_null() {
@@ -307,7 +298,6 @@ unsafe extern "C" fn tcw_mousedraglistener_release(ud: TCWMouseDragListenerUserD
     }
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_mousedraglistener_cancel(ud: TCWMouseDragListenerUserData) {
     drag_method_impl(ud, |wm, state| {
@@ -315,7 +305,6 @@ unsafe extern "C" fn tcw_mousedraglistener_cancel(ud: TCWMouseDragListenerUserDa
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_mousedraglistener_mouse_motion(
     ud: TCWMouseDragListenerUserData,
@@ -328,7 +317,6 @@ unsafe extern "C" fn tcw_mousedraglistener_mouse_motion(
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_mousedraglistener_mouse_down(
     ud: TCWMouseDragListenerUserData,
@@ -345,7 +333,6 @@ unsafe extern "C" fn tcw_mousedraglistener_mouse_down(
     });
 }
 
-#[allow(unused_attributes)] // Work-around <https://github.com/rust-lang/rust/issues/60050>
 #[no_mangle]
 unsafe extern "C" fn tcw_mousedraglistener_mouse_up(
     ud: TCWMouseDragListenerUserData,
