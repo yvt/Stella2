@@ -235,6 +235,15 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
                 if self.should_terminate.get() {
                     *control_flow = ControlFlow::Exit;
+                } else if self
+                    .wnds
+                    .borrow()
+                    .iter()
+                    .any(|w| w.waiting_update_ready.get())
+                {
+                    // Application-generated `RedrawRequested` events do not fire
+                    // unless `ControlFlow::Poll` is chosen for some reason
+                    *control_flow = ControlFlow::Poll;
                 } else if let Some(next_wakeup) = timer_queue_cell.borrow().suggest_next_wakeup() {
                     *control_flow = ControlFlow::WaitUntil(next_wakeup);
                 } else {
