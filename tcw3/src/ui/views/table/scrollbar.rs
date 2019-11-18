@@ -1,12 +1,11 @@
 //! Low-level scrollbar support for `Table`.
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
-use std::{cell::Cell, rc::Rc};
+use std::cell::Cell;
 
 use super::{HVp, LineTy, Table, TableEdit};
 use crate::{
     pal,
-    prelude::*,
     ui::{
         scrolling::piecewise::piecewise_map,
         views::scrollbar::{Scrollbar, ScrollbarDragListener},
@@ -113,13 +112,11 @@ impl TableScrollbarDragState {
 /// Wraps [`TableScrollbarDragState`] and implements [`ScrollbarDragListener`].
 /// `A` is used to get references to a `Table` and `Scrollbar` which are to
 /// be bound.
-///
-/// All operations are rate-limited by `WmExt::invoke_on_update`.
 #[derive(Debug)]
 pub struct TableScrollbarDragListener<A> {
     accessor: A,
     line_ty: LineTy,
-    state: Rc<TableScrollbarDragState>,
+    state: TableScrollbarDragState,
 }
 
 impl<A> TableScrollbarDragListener<A> {
@@ -128,7 +125,7 @@ impl<A> TableScrollbarDragListener<A> {
         Self {
             accessor,
             line_ty,
-            state: Rc::new(TableScrollbarDragState::new()),
+            state: TableScrollbarDragState::new(),
         }
     }
 
@@ -140,51 +137,35 @@ impl<A> TableScrollbarDragListener<A> {
 
 impl<A, T, S> ScrollbarDragListener for TableScrollbarDragListener<A>
 where
-    A: Fn() -> Option<(T, S)> + 'static,
-    T: std::ops::Deref<Target = Table> + 'static,
-    S: std::ops::Deref<Target = Scrollbar> + 'static,
+    A: Fn() -> Option<(T, S)>,
+    T: std::ops::Deref<Target = Table>,
+    S: std::ops::Deref<Target = Scrollbar>,
 {
-    fn down(&self, wm: pal::Wm, _new_value: f64) {
+    fn down(&self, _: pal::Wm, _new_value: f64) {
         if let Some((table, sb)) = (self.accessor)() {
-            let line_ty = self.line_ty;
-            let state = Rc::clone(&self.state);
-            wm.invoke_on_update(move |_| {
-                let mut edit = table.edit().unwrap();
-                state.down(&sb, &mut edit, line_ty);
-            });
+            let mut edit = table.edit().unwrap();
+            self.state.down(&sb, &mut edit, self.line_ty);
         }
     }
 
-    fn motion(&self, wm: pal::Wm, new_value: f64) {
+    fn motion(&self, _: pal::Wm, new_value: f64) {
         if let Some((table, sb)) = (self.accessor)() {
-            let line_ty = self.line_ty;
-            let state = Rc::clone(&self.state);
-            wm.invoke_on_update(move |_| {
-                let mut edit = table.edit().unwrap();
-                state.motion(&sb, &mut edit, line_ty, new_value);
-            });
+            let mut edit = table.edit().unwrap();
+            self.state.motion(&sb, &mut edit, self.line_ty, new_value);
         }
     }
 
-    fn up(&self, wm: pal::Wm) {
+    fn up(&self, _: pal::Wm) {
         if let Some((table, sb)) = (self.accessor)() {
-            let line_ty = self.line_ty;
-            let state = Rc::clone(&self.state);
-            wm.invoke_on_update(move |_| {
-                let mut edit = table.edit().unwrap();
-                state.up(&sb, &mut edit, line_ty);
-            });
+            let mut edit = table.edit().unwrap();
+            self.state.up(&sb, &mut edit, self.line_ty);
         }
     }
 
-    fn cancel(&self, wm: pal::Wm) {
+    fn cancel(&self, _: pal::Wm) {
         if let Some((table, sb)) = (self.accessor)() {
-            let line_ty = self.line_ty;
-            let state = Rc::clone(&self.state);
-            wm.invoke_on_update(move |_| {
-                let mut edit = table.edit().unwrap();
-                state.cancel(&sb, &mut edit, line_ty);
-            });
+            let mut edit = table.edit().unwrap();
+            self.state.cancel(&sb, &mut edit, self.line_ty);
         }
     }
 }
