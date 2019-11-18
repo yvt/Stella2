@@ -476,7 +476,7 @@ lazy_static! {
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.2), [[2.0; 2]; 4]
+                RGBAF32::new(0.5, 0.5, 0.5, 0.12), [[4.0; 2]; 4]
             )),
             layer_metrics[0]: Metrics {
                 margin: [4.0; 4],
@@ -504,7 +504,7 @@ lazy_static! {
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.6), [[2.0; 2]; 4]
+                RGBAF32::new(0.5, 0.5, 0.5, 0.7), [[4.0; 2]; 4]
             )),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
@@ -517,7 +517,7 @@ lazy_static! {
         },
 
         ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
-            layer_opacity[0]: 0.8,
+            layer_opacity[0]: 0.9,
         },
         ([] < [.SCROLLBAR.ACTIVE]) (priority = 200) {
             layer_opacity[0]: 1.0,
