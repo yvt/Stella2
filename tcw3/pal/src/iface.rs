@@ -380,7 +380,7 @@ pub trait WndListener<T: Wm> {
     fn dpi_scale_changed(&self, _: T, _: &T::HWnd) {}
 
     /// The mouse pointer has moved inside a window when none of the mouse
-    /// buttons are pressed.
+    /// buttons are pressed (i.e., there is no active mouse drag gesture).
     fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
 
     /// The mouse pointer has left a window.

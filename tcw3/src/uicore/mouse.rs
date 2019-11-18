@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use cgmath::Point2;
 use log::{trace, warn};
 use std::fmt;
@@ -42,12 +43,14 @@ impl MouseDragListener for () {}
 #[derive(Debug)]
 pub(super) struct WndMouseState {
     drag_gestures: Option<Rc<DragGesture>>,
+    hover_view: Option<HView>,
 }
 
 impl WndMouseState {
     pub fn new() -> Self {
         Self {
             drag_gestures: None,
+            hover_view: None,
         }
     }
 }
@@ -68,6 +71,66 @@ impl fmt::Debug for DragGesture {
 }
 
 impl HWnd {
+    /// The core implementation of `pal::WndListener::mouse_motion` and
+    /// `pal::WndListener::mouse_leave`.
+    pub(super) fn handle_mouse_motion(&self, loc: Option<Point2<f32>>) {
+        let mut st = self.wnd.mouse_state.borrow_mut();
+
+        let new_hover_view = loc.and_then(|loc| {
+            let content_view = self.wnd.content_view.borrow();
+            content_view.as_ref().unwrap().hit_test(
+                loc,
+                ViewFlags::ACCEPT_MOUSE_OVER,
+                ViewFlags::DENY_MOUSE,
+            )
+        });
+
+        if new_hover_view == st.hover_view {
+            return;
+        }
+
+        use super::MAX_VIEW_DEPTH;
+        let mut path1 = ArrayVec::new();
+        let mut path2 = ArrayVec::new();
+
+        get_path(&st.hover_view, &mut path1);
+        get_path(&new_hover_view, &mut path2);
+
+        fn get_path(hview: &Option<HView>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
+            if let Some(hview) = hview {
+                hview.for_each_ancestor(|hview| out_path.push(hview));
+            }
+        }
+
+        // Find the lowest common ancestor
+        use itertools::izip;
+        let lca_depth = izip!(path1.iter().rev(), path2.iter().rev())
+            .take_while(|(v1, v2)| v1 == v2)
+            .count();
+
+        debug_assert!(if lca_depth == 0 {
+            true
+        } else {
+            path1[path1.len() - lca_depth] == path2[path2.len() - lca_depth]
+        });
+
+        // Call the handlers
+        if let Some(hview) = &st.hover_view {
+            hview.view.listener.borrow().mouse_out(self.wnd.wm, hview);
+        }
+        for hview in path1[..path1.len() - lca_depth].iter() {
+            hview.view.listener.borrow().mouse_leave(self.wnd.wm, hview);
+        }
+        for hview in path2[..path2.len() - lca_depth].iter().rev() {
+            hview.view.listener.borrow().mouse_enter(self.wnd.wm, hview);
+        }
+        if let Some(hview) = &new_hover_view {
+            hview.view.listener.borrow().mouse_over(self.wnd.wm, hview);
+        }
+
+        st.hover_view = new_hover_view;
+    }
+
     /// The core implementation of `pal::WndListener::mouse_drag`.
     #[inline]
     pub(super) fn handle_mouse_drag(

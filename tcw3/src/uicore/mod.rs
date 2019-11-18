@@ -43,6 +43,9 @@ pub use self::mouse::MouseDragListener;
 
 pub use crate::pal::WndFlags as WndStyleFlags;
 
+/// The maxiumum supported depth of view hierarchy.
+pub const MAX_VIEW_DEPTH: usize = 32;
+
 /// An extension trait for `Wm`.
 pub trait WmExt: Sized {
     /// Enqueue a call to the specified function. This is similar to
@@ -274,6 +277,9 @@ bitflags! {
 
         /// The view accepts mouse drag events.
         const ACCEPT_MOUSE_DRAG = 1 << 3;
+
+        /// The view accepts mouse over events.
+        const ACCEPT_MOUSE_OVER = 1 << 4;
     }
 }
 
@@ -340,6 +346,22 @@ pub trait ViewListener {
     ) -> Box<dyn MouseDragListener> {
         Box::new(())
     }
+
+    /// `mouse_over` is called for this view or its descendants.
+    fn mouse_enter(&self, _: Wm, _: &HView) {}
+
+    /// `mouse_out` is called for this view or its descendants.
+    fn mouse_leave(&self, _: Wm, _: &HView) {}
+
+    /// The mouse pointer entered the view's region.
+    ///
+    /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
+    fn mouse_over(&self, _: Wm, _: &HView) {}
+
+    /// The mouse pointer left the view's region.
+    ///
+    /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
+    fn mouse_out(&self, _: Wm, _: &HView) {}
 }
 
 /// A no-op implementation of `ViewListener`.
@@ -987,6 +1009,22 @@ impl HView {
             HView { view: sv }.is_improper_subview_of(of_view)
         } else {
             false
+        }
+    }
+
+    fn for_each_ancestor(&self, mut f: impl FnMut(HView)) {
+        let mut cur: Rc<View> = Rc::clone(&self.view);
+        loop {
+            let next = match &*cur.superview.borrow() {
+                Superview::View(view) => view.upgrade(),
+                Superview::Window(_) => None,
+            };
+            f(HView { view: cur });
+            cur = if let Some(x) = next {
+                x
+            } else {
+                break;
+            }
         }
     }
 }

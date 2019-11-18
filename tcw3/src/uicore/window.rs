@@ -406,6 +406,18 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
             Box::new(())
         }
     }
+
+    fn mouse_motion(&self, _: Wm, _: &pal::HWnd, loc: Point2<f32>) {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.handle_mouse_motion(Some(loc));
+        }
+    }
+
+    fn mouse_leave(&self, _: Wm, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.handle_mouse_motion(None);
+        }
+    }
 }
 
 pub(crate) fn new_root_content_view() -> HView {
