@@ -77,7 +77,8 @@ struct LayoutState {
 /// Drag gesture handlers for [`Scrollbar`]. It has semantics similar to
 /// `MouseDragListener`.
 ///
-/// They are all called inside event handlers.
+/// They are all called inside `invoke_on_update`. The event rate is limited by
+/// the screen update rate.
 pub trait ScrollbarDragListener {
     /// The thumb is about to be moved. `new_value` specifies the current
     /// [`value`].
@@ -221,6 +222,8 @@ impl Scrollbar {
 
     /// Set the handler function called when the user clicks the trough (the
     /// region outside the thumb).
+    ///
+    /// The function is called through `invoke_on_update`.
     pub fn set_on_page_step(&self, handler: impl Fn(pal::Wm, Dir) + 'static) {
         *self.shared.on_page_step.borrow_mut() = Box::new(handler);
     }
@@ -404,14 +407,20 @@ impl MouseDragListener for SbMouseDragListener {
             if let Some(dir) = page_step_dir {
                 // Trough clicked
                 // TODO: Support cancellation?
-                self.shared.on_page_step.borrow()(wm, dir);
+                let shared = Rc::clone(&self.shared);
+                wm.invoke_on_update(move |wm| {
+                    shared.on_page_step.borrow()(wm, dir);
+                });
             } else {
                 // Dragging the thumb
                 self.drag_start.set(Some((loc, self.shared.value.get())));
                 self.shared.set_active(true);
 
                 if self.listener.borrow().is_none() {
-                    *self.listener.borrow_mut() = Some(self.shared.on_drag.borrow()(wm));
+                    // TODO: Refactor - extra `Box`, inconsistent uses of `invoke_on_update`
+                    let listener = self.shared.on_drag.borrow()(wm);
+                    let listener = Box::new(ListenerOnUpdateFilter::new(listener));
+                    *self.listener.borrow_mut() = Some(listener);
                 }
 
                 (self.listener.borrow().as_ref().unwrap()).down(wm, self.shared.value.get());
@@ -429,6 +438,70 @@ impl MouseDragListener for SbMouseDragListener {
             self.shared.set_active(false);
         }
         self.listener.borrow().as_ref().unwrap().cancel(wm);
+    }
+}
+
+/// Wraps `ScrollbarDragListener` to limit the event generation rate using
+/// `invoke_on_update`.
+struct ListenerOnUpdateFilter {
+    inner: Rc<ListenerOnUpdateFilterInner>,
+    motion_queued: Cell<bool>,
+}
+
+struct ListenerOnUpdateFilterInner {
+    listener: Box<dyn ScrollbarDragListener>,
+    motion_value: Cell<f64>,
+}
+
+impl ListenerOnUpdateFilter {
+    fn new(listener: Box<dyn ScrollbarDragListener>) -> Self {
+        Self {
+            inner: Rc::new(ListenerOnUpdateFilterInner {
+                listener,
+                motion_value: Cell::new(0.0),
+            }),
+            motion_queued: Cell::new(false),
+        }
+    }
+}
+
+impl ScrollbarDragListener for ListenerOnUpdateFilter {
+    fn down(&self, wm: pal::Wm, new_value: f64) {
+        self.motion_queued.set(false);
+
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |wm| {
+            inner.listener.down(wm, new_value);
+        });
+    }
+
+    fn motion(&self, wm: pal::Wm, new_value: f64) {
+        // Only store the latest value
+        self.inner.motion_value.set(new_value);
+
+        // Do not enqueue more than one `motion` event per frame
+        if self.motion_queued.get() {
+            return;
+        }
+
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |wm| {
+            inner.listener.motion(wm, inner.motion_value.get());
+        });
+    }
+
+    fn up(&self, wm: pal::Wm) {
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |wm| {
+            inner.listener.up(wm);
+        });
+    }
+
+    fn cancel(&self, wm: pal::Wm) {
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |wm| {
+            inner.listener.cancel(wm);
+        });
     }
 }
 
