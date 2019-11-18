@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     pal,
+    prelude::*,
     ui::{
         layouts::FillLayout,
         theming::{
@@ -120,7 +121,9 @@ impl Scrollbar {
         thumb.set_parent_class_path(Some(frame.class_path()));
         frame.set_subview(Role::Generic, Some(thumb.view().clone()));
 
-        let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+        let wrapper = HView::new(
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
+        );
         wrapper.set_layout(FillLayout::new(frame.view().clone()));
 
         let shared = Rc::new(Shared {
@@ -160,8 +163,9 @@ impl Scrollbar {
         let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
 
         // Protected bits
-        class_set -= ClassSet::ACTIVE;
-        class_set |= frame.class_set() & ClassSet::ACTIVE;
+        let protected = ClassSet::ACTIVE | ClassSet::HOVER;
+        class_set -= protected;
+        class_set |= frame.class_set() & protected;
         frame.set_class_set(class_set);
 
         thumb.set_parent_class_path(Some(frame.class_path()));
@@ -318,6 +322,26 @@ struct SbViewListener {
 }
 
 impl ViewListener for SbViewListener {
+    fn mouse_enter(&self, wm: pal::Wm, _: &HView) {
+        let shared = Rc::clone(&self.shared);
+        wm.invoke_on_update(move |_| {
+            let frame = &shared.frame;
+            let thumb = &shared.thumb;
+            frame.set_class_set(frame.class_set() | ClassSet::HOVER);
+            thumb.set_parent_class_path(Some(frame.class_path()));
+        })
+    }
+
+    fn mouse_leave(&self, wm: pal::Wm, _: &HView) {
+        let shared = Rc::clone(&self.shared);
+        wm.invoke_on_update(move |_| {
+            let frame = &shared.frame;
+            let thumb = &shared.thumb;
+            frame.set_class_set(frame.class_set() - ClassSet::HOVER);
+            thumb.set_parent_class_path(Some(frame.class_path()));
+        })
+    }
+
     fn mouse_drag(
         &self,
         _: pal::Wm,

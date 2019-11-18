@@ -483,6 +483,10 @@ lazy_static! {
                 .. Metrics::default()
             },
             layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.0,
+        },
+        ([.SCROLLBAR.HOVER]) (priority = 150) {
+            layer_opacity[0]: 1.0,
         },
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
@@ -503,7 +507,7 @@ lazy_static! {
                 RGBAF32::new(0.5, 0.5, 0.5, 0.6), [[2.0; 2]; 4]
             )),
             layer_center[0]: box2! { point: [0.5, 0.5] },
-            layer_opacity[0]: 0.8,
+            layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             min_size: [20.0, 0.0].into(),
@@ -512,7 +516,10 @@ lazy_static! {
             min_size: [0.0, 20.0].into(),
         },
 
-        ([] < [.SCROLLBAR.ACTIVE]) (priority = 150) {
+        ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
+            layer_opacity[0]: 0.8,
+        },
+        ([] < [.SCROLLBAR.ACTIVE]) (priority = 200) {
             layer_opacity[0]: 1.0,
         },
 
