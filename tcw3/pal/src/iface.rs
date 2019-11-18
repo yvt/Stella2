@@ -183,6 +183,7 @@ pub struct WndAttrs<'a, T: Wm, TLayer> {
     pub visible: Option<bool>,
     pub listener: Option<Box<dyn WndListener<T>>>,
     pub layer: Option<Option<TLayer>>,
+    pub cursor_shape: Option<CursorShape>,
 }
 
 impl<'a, T: Wm, TLayer> Default for WndAttrs<'a, T, TLayer> {
@@ -196,6 +197,7 @@ impl<'a, T: Wm, TLayer> Default for WndAttrs<'a, T, TLayer> {
             visible: None,
             listener: None,
             layer: None,
+            cursor_shape: None,
         }
     }
 }
@@ -445,6 +447,55 @@ pub trait MouseDragListener<T: Wm> {
 
 /// A default implementation of [`MouseDragListener`].
 impl<T: Wm> MouseDragListener<T> for () {}
+
+/// Describes the appearance of the mouse cursor.
+///
+/// This type contains the same set of variants as `winit::window::CursorIcon`
+/// to allow cost-free conversion between these two types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CursorShape {
+    Default,
+    Crosshair,
+    Hand,
+    Arrow,
+    Move,
+    Text,
+    Wait,
+    Help,
+    Progress,
+    NotAllowed,
+    ContextMenu,
+    Cell,
+    VerticalText,
+    Alias,
+    Copy,
+    NoDrop,
+    Grab,
+    Grabbing,
+    AllScroll,
+    ZoomIn,
+    ZoomOut,
+    EResize,
+    NResize,
+    NeResize,
+    NwResize,
+    SResize,
+    SeResize,
+    SwResize,
+    WResize,
+    EwResize,
+    NsResize,
+    NeswResize,
+    NwseResize,
+    ColResize,
+    RowResize,
+}
+
+impl Default for CursorShape {
+    fn default() -> Self {
+        CursorShape::Default
+    }
+}
 
 /// A immutable, ref-counted bitmap image.
 pub trait Bitmap: Clone + Sized + Send + Sync + Debug {

@@ -762,6 +762,7 @@ fn wnd_attrs_to_native(attrs: WndAttrs<'_>) -> native::WndAttrs<'_> {
             .listener
             .map(|listener| Box::new(wndlistenershim::NativeWndListener(listener)) as _),
         layer,
+        cursor_shape: attrs.cursor_shape,
     }
 }
 
@@ -800,6 +801,7 @@ fn wnd_attrs_to_testing(attrs: WndAttrs<'_>) -> screen::WndAttrs<'_> {
         visible: attrs.visible,
         listener: attrs.listener,
         layer,
+        cursor_shape: attrs.cursor_shape,
     }
 }
 
