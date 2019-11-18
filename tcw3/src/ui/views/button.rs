@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     pal,
-    pal::prelude::*,
+    prelude::*,
     ui::{
         layouts::FillLayout,
         mixins::ButtonMixin,
@@ -49,7 +49,9 @@ impl Button {
             styled_box.set_class_set(ClassSet::BUTTON);
         }
 
-        let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+        let view = HView::new(
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
+        );
 
         view.set_layout(FillLayout::new(styled_box.view().clone()));
 
@@ -95,8 +97,9 @@ impl Button {
         let styled_box = &self.inner.styled_box;
 
         // Protected bits
-        class_set -= ClassSet::ACTIVE;
-        class_set |= styled_box.class_set() & ClassSet::ACTIVE;
+        let protected = ClassSet::ACTIVE | ClassSet::HOVER;
+        class_set -= protected;
+        class_set |= styled_box.class_set() & protected;
         styled_box.set_class_set(class_set);
 
         self.inner
@@ -124,6 +127,22 @@ struct ButtonViewListener {
 }
 
 impl ViewListener for ButtonViewListener {
+    fn mouse_enter(&self, wm: pal::Wm, _: &HView) {
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |_| {
+            let styled_box = &inner.styled_box;
+            styled_box.set_class_set(styled_box.class_set() | ClassSet::HOVER);
+        })
+    }
+
+    fn mouse_leave(&self, wm: pal::Wm, _: &HView) {
+        let inner = Rc::clone(&self.inner);
+        wm.invoke_on_update(move |_| {
+            let styled_box = &inner.styled_box;
+            styled_box.set_class_set(styled_box.class_set() - ClassSet::HOVER);
+        })
+    }
+
     fn mouse_drag(
         &self,
         _: pal::Wm,

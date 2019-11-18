@@ -451,10 +451,14 @@ lazy_static! {
                 RGBAF32::new(0.7, 0.7, 0.7, 1.0), [[4.0; 2]; 4]
             )),
             layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.8,
             subview_metrics[Role::Generic]: Metrics {
                 margin: [4.0; 4],
                 .. Metrics::default()
             },
+        },
+        ([.BUTTON.HOVER]) (priority = 200) {
+            layer_opacity[0]: 1.0,
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
             layer_img[0]: Some(himg_from_rounded_rect(
