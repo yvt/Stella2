@@ -71,6 +71,7 @@ rayon = "1.2.0"
 cc = "1.0.35"
 
 [dev-dependencies]
+demotools = { path = "../../support/demotools" }
 env_logger = "0.7.0"
 quickcheck = "0.9"
 quickcheck_macros = "0.8"

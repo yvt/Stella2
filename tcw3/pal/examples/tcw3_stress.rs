@@ -1,5 +1,6 @@
 use cggeom::{box2, prelude::*};
 use cgmath::{vec2, Deg, Matrix3};
+use demotools::RateCounter;
 use std::{cell::RefCell, time::Instant};
 use structopt::StructOpt;
 use tcw3_pal::{self as pal, prelude::*};
@@ -69,6 +70,7 @@ struct State {
     layers: Vec<pal::HLayer>,
     particles: Vec<Particle>,
     instant: Instant,
+    rate_counter: RateCounter,
 }
 
 struct Particle {
@@ -159,6 +161,7 @@ impl State {
             layers,
             particles,
             instant: Instant::now(),
+            rate_counter: RateCounter::new(),
         }
     }
 
@@ -206,6 +209,18 @@ impl State {
                     ..Default::default()
                 },
             );
+        }
+
+        if self.rate_counter.log(1.0) {
+            wm.set_wnd_attr(
+                &wnd,
+                pal::WndAttrs {
+                    caption: Some(
+                        format!("tcw3_stress [{:.02}fps]", self.rate_counter.rate()).into(),
+                    ),
+                    ..Default::default()
+                },
+            )
         }
 
         wm.update_wnd(&wnd);
