@@ -4,10 +4,10 @@ use std::{
 };
 use winit::{
     event::{ElementState, WindowEvent},
-    window::{Window, WindowBuilder, WindowId},
+    window::{CursorIcon, Window, WindowBuilder, WindowId},
 };
 
-use super::super::iface::{WndAttrs, WndFlags};
+use super::super::iface::{CursorShape, WndAttrs, WndFlags};
 use super::{
     utils::{log_pos_to_point2, mouse_button_to_id},
     HWndCore, WinitWm, WinitWmCore, Wnd, WndContent, WndMouseDrag,
@@ -51,6 +51,10 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                 .expect("could not create a window")
         });
 
+        winit_wnd.set_cursor_icon(translate_cursor_shape(
+            attrs.cursor_shape.unwrap_or_default(),
+        ));
+
         let layer = attrs.layer.unwrap_or_default();
         let listener = attrs.listener.unwrap_or_else(|| Box::new(()));
 
@@ -92,6 +96,9 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
         }
         if let Some(x) = attrs.visible {
             winit_wnd.set_visible(x);
+        }
+        if let Some(x) = attrs.cursor_shape {
+            winit_wnd.set_cursor_icon(translate_cursor_shape(x));
         }
         if let Some(x) = attrs.layer {
             wnd.content.borrow_mut().set_layer(self, &wnd.winit_wnd, x);
@@ -296,5 +303,45 @@ impl<'a> SuppressRequestRedrawGuard<'a> {
 impl Drop for SuppressRequestRedrawGuard<'_> {
     fn drop(&mut self) {
         self.0.set(false);
+    }
+}
+
+fn translate_cursor_shape(x: CursorShape) -> CursorIcon {
+    match x {
+        CursorShape::Default => CursorIcon::Default,
+        CursorShape::Crosshair => CursorIcon::Crosshair,
+        CursorShape::Hand => CursorIcon::Hand,
+        CursorShape::Arrow => CursorIcon::Arrow,
+        CursorShape::Move => CursorIcon::Move,
+        CursorShape::Text => CursorIcon::Text,
+        CursorShape::Wait => CursorIcon::Wait,
+        CursorShape::Help => CursorIcon::Help,
+        CursorShape::Progress => CursorIcon::Progress,
+        CursorShape::NotAllowed => CursorIcon::NotAllowed,
+        CursorShape::ContextMenu => CursorIcon::ContextMenu,
+        CursorShape::Cell => CursorIcon::Cell,
+        CursorShape::VerticalText => CursorIcon::VerticalText,
+        CursorShape::Alias => CursorIcon::Alias,
+        CursorShape::Copy => CursorIcon::Copy,
+        CursorShape::NoDrop => CursorIcon::NoDrop,
+        CursorShape::Grab => CursorIcon::Grab,
+        CursorShape::Grabbing => CursorIcon::Grabbing,
+        CursorShape::AllScroll => CursorIcon::AllScroll,
+        CursorShape::ZoomIn => CursorIcon::ZoomIn,
+        CursorShape::ZoomOut => CursorIcon::ZoomOut,
+        CursorShape::EResize => CursorIcon::EResize,
+        CursorShape::NResize => CursorIcon::NResize,
+        CursorShape::NeResize => CursorIcon::NeResize,
+        CursorShape::NwResize => CursorIcon::NwResize,
+        CursorShape::SResize => CursorIcon::SResize,
+        CursorShape::SeResize => CursorIcon::SeResize,
+        CursorShape::SwResize => CursorIcon::SwResize,
+        CursorShape::WResize => CursorIcon::WResize,
+        CursorShape::EwResize => CursorIcon::EwResize,
+        CursorShape::NsResize => CursorIcon::NsResize,
+        CursorShape::NeswResize => CursorIcon::NeswResize,
+        CursorShape::NwseResize => CursorIcon::NwseResize,
+        CursorShape::ColResize => CursorIcon::ColResize,
+        CursorShape::RowResize => CursorIcon::RowResize,
     }
 }
