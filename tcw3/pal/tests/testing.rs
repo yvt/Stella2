@@ -341,6 +341,7 @@ fn empty_wnd() {
         const SIZE: [u32; 2] = [100, 200];
         const MIN_SIZE: [u32; 2] = [50, 100];
         const MAX_SIZE: [u32; 2] = [300, 300];
+        const CURSOR: pal::CursorShape = pal::CursorShape::Hand;
 
         let hwnd = wm.new_wnd(pal::WndAttrs {
             caption: Some(CAPTION.into()),
@@ -348,6 +349,7 @@ fn empty_wnd() {
             size: Some(SIZE),
             min_size: Some(MIN_SIZE),
             max_size: Some(MAX_SIZE),
+            cursor_shape: Some(CURSOR),
             ..Default::default()
         });
 
@@ -361,6 +363,7 @@ fn empty_wnd() {
         assert_eq!(attrs.size, SIZE);
         assert_eq!(attrs.min_size, MIN_SIZE);
         assert_eq!(attrs.max_size, MAX_SIZE);
+        assert_eq!(attrs.cursor_shape, CURSOR);
         assert_eq!(attrs.flags, pal::WndFlags::default());
 
         wm.update_wnd(&hwnd);

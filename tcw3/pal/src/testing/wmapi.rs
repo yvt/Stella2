@@ -69,6 +69,7 @@ pub struct WndAttrs {
     pub flags: iface::WndFlags,
     pub caption: String,
     pub visible: bool,
+    pub cursor_shape: iface::CursorShape,
 }
 
 /// Provides an interface for simulating a mouse drag geature.

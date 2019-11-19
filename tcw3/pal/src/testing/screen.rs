@@ -100,6 +100,7 @@ impl Screen {
                 flags: attrs.flags.unwrap_or(iface::WndFlags::default()),
                 caption: attrs.caption.unwrap_or("Default title".into()).into_owned(),
                 visible: attrs.visible.unwrap_or(false),
+                cursor_shape: attrs.cursor_shape.unwrap_or_default(),
             },
             listener: Rc::from(attrs.listener.unwrap_or_else(|| Box::new(()))),
             img_size: [0, 0],
@@ -134,6 +135,7 @@ impl Screen {
         apply!(flags);
         apply!(caption);
         apply!(visible);
+        apply!(cursor_shape);
 
         if let Some(layer) = attrs.layer {
             state
