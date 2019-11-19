@@ -111,6 +111,12 @@
     self->window.styleMask = masks;
 }
 
+- (void)setCursorShape:(uint32_t)shape {
+    TCWWindowView *view = self->window.contentView;
+
+    [view setCursorShape:(TCW3CursorShape)shape];
+}
+
 /** Called by `window.rs` */
 - (void)makeKeyAndOrderFront {
     [self->window makeKeyAndOrderFront:nil];

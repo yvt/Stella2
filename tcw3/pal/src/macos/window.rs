@@ -142,6 +142,11 @@ impl HWnd {
             let () = unsafe { msg_send![*self.ctrler, setLayer: layer] };
             state.layer.set(value);
         }
+
+        if let Some(value) = attrs.cursor_shape {
+            let value = value as u32;
+            let () = unsafe { msg_send![*self.ctrler, setCursorShape: value] };
+        }
     }
 
     pub(super) fn remove(&self, _: Wm) {

@@ -42,3 +42,42 @@ typedef struct _TraitObject {
 } TCWInvokeUserData;
 extern void tcw_invoke_fire(TCWInvokeUserData ud);
 extern void tcw_invoke_cancel(TCWInvokeUserData ud);
+
+// These variants must be synchronized with `CursorShape`
+typedef enum TCW3CursorShape {
+    kTCW3CursorShapeDefault,
+    kTCW3CursorShapeCrosshair,
+    kTCW3CursorShapeHand,
+    kTCW3CursorShapeArrow,
+    kTCW3CursorShapeMove,
+    kTCW3CursorShapeText,
+    kTCW3CursorShapeWait,
+    kTCW3CursorShapeHelp,
+    kTCW3CursorShapeProgress,
+    kTCW3CursorShapeNotAllowed,
+    kTCW3CursorShapeContextMenu,
+    kTCW3CursorShapeCell,
+    kTCW3CursorShapeVerticalText,
+    kTCW3CursorShapeAlias,
+    kTCW3CursorShapeCopy,
+    kTCW3CursorShapeNoDrop,
+    kTCW3CursorShapeGrab,
+    kTCW3CursorShapeGrabbing,
+    kTCW3CursorShapeAllScroll,
+    kTCW3CursorShapeZoomIn,
+    kTCW3CursorShapeZoomOut,
+    kTCW3CursorShapeEResize,
+    kTCW3CursorShapeNResize,
+    kTCW3CursorShapeNeResize,
+    kTCW3CursorShapeNwResize,
+    kTCW3CursorShapeSResize,
+    kTCW3CursorShapeSeResize,
+    kTCW3CursorShapeSwResize,
+    kTCW3CursorShapeWResize,
+    kTCW3CursorShapeEwResize,
+    kTCW3CursorShapeNsResize,
+    kTCW3CursorShapeNeswResize,
+    kTCW3CursorShapeNwseResize,
+    kTCW3CursorShapeColResize,
+    kTCW3CursorShapeRowResize,
+} TCW3CursorShape;
