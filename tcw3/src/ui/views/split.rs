@@ -12,8 +12,8 @@ use crate::{
     pal,
     pal::prelude::*,
     uicore::{
-        HView, HWnd, Layout, LayoutCtx, MouseDragListener, SizeTraits, UpdateCtx, ViewFlags,
-        ViewListener,
+        CursorShape, HView, HWnd, Layout, LayoutCtx, MouseDragListener, SizeTraits, UpdateCtx,
+        ViewFlags, ViewListener,
     },
 };
 
@@ -96,7 +96,9 @@ impl Split {
     /// `Some(0)`, `Some(1)`, and `None`.
     pub fn new(vertical: bool, fix: Option<usize>) -> Self {
         let container = HView::new(ViewFlags::default());
-        let splitter = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+        let splitter = HView::new(
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
+        );
 
         let shared = Rc::new(Shared {
             vertical,
@@ -122,6 +124,11 @@ impl Split {
             shared: Rc::downgrade(&shared),
             layer: RefCell::new(None),
         });
+
+        splitter.set_cursor_shape(
+            [Some(CursorShape::EwResize), Some(CursorShape::NsResize)][vertical as usize],
+        );
+        // TODO: Use `CursorShape::EResize`, etc.
 
         container.set_layout(shared.layout());
 
