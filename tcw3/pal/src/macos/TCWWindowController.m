@@ -56,6 +56,7 @@
     return self;
 }
 
+/** Called by `window.rs` */
 - (void)close {
     [self->window close];
 }
@@ -66,26 +67,32 @@
     }
 }
 
+/** Called by `window.rs` */
 - (void)setTitle:(NSString *)windowTitle {
     [self->window setTitle:windowTitle];
 }
 
+/** Called by `window.rs` */
 - (void)setContentSize:(NSSize)size {
     [self->window setContentSize:size];
 }
 
+/** Called by `window.rs` */
 - (void)setContentMaxSize:(NSSize)size {
     [self->window setContentMaxSize:size];
 }
 
+/** Called by `window.rs` */
 - (void)setContentMinSize:(NSSize)size {
     [self->window setContentMinSize:size];
 }
 
+/** Called by `window.rs` */
 - (NSSize)contentSize {
     return self->window.contentView.frame.size;
 }
 
+/** Called by `window.rs` */
 - (void)setFlags:(uint32_t)flags {
     // Compute the new masks
     NSWindowStyleMask masks = 0;
@@ -104,27 +111,32 @@
     self->window.styleMask = masks;
 }
 
+/** Called by `window.rs` */
 - (void)makeKeyAndOrderFront {
     [self->window makeKeyAndOrderFront:nil];
 }
 
+/** Called by `window.rs` */
 - (void)orderOut {
     [self->window orderOut:nil];
 }
 
+/** Called by `window.rs` */
 - (void)center {
     [self->window center];
 }
 
+/** Called by `window.rs` */
 - (void)setLayer:(CALayer *)layer {
     self->window.contentView.layer.sublayers = @[ layer ];
 }
 
+/** Called by `window.rs` */
 - (float)dpiScale {
     return (float)self->window.backingScaleFactor;
 }
 
-// Called by `window.rs`
+/** Called by `window.rs` */
 - (void)requestUpdateReady {
     if (!self->displayLink) {
         [self renewDisplayLink];
@@ -147,6 +159,7 @@
     }
 }
 
+/** @private */
 - (void)renewDisplayLink {
     CVReturn error;
 
@@ -233,6 +246,7 @@
     }
 }
 
+/** @private */
 - (void)handleDisplayLinkEvent {
     atomic_store_explicit(&self->handlingDisplayLinkEvent, false,
                           memory_order_relaxed);
@@ -256,13 +270,13 @@
     tcw_wndlistener_update_ready(self.listenerUserData);
 }
 
-// Implements `NSWindowDelegate`
+/** Implements `NSWindowDelegate`. */
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;
     return tcw_wndlistener_should_close(self.listenerUserData);
 }
 
-// Implements `NSWindowDelegate`
+/** Implements `NSWindowDelegate`. */
 - (void)windowWillClose:(NSNotification *)notification {
     (void)notification;
     self->window.delegate = nil;
@@ -275,19 +289,19 @@
     tcw_wndlistener_close(self.listenerUserData);
 }
 
-// Implements `NSWindowDelegate`
+/** Implements `NSWindowDelegate`. */
 - (void)windowDidResize:(NSNotification *)notification {
     (void)notification;
     tcw_wndlistener_resize(self.listenerUserData);
 }
 
-// Implements `NSWindowDelegate`
+/** Implements `NSWindowDelegate`. */
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification {
     (void)notification;
     tcw_wndlistener_dpi_scale_changed(self.listenerUserData);
 }
 
-// Implements `NSWindowDelegate`
+/** Implements `NSWindowDelegate`. */
 - (void)windowDidChangeScreen:(NSNotification *)notification {
     (void)notification;
     [self renewDisplayLink];
