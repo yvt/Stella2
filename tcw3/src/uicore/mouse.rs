@@ -4,7 +4,7 @@ use log::{trace, warn};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use super::{HView, HWnd, ViewFlags, Wnd};
+use super::{CursorShape, HView, HWnd, ViewFlags, Wnd};
 use crate::{pal, pal::Wm};
 
 /// Mouse event handlers for mouse drag gestures.
@@ -129,6 +129,14 @@ impl HWnd {
         }
 
         st.hover_view = new_hover_view;
+
+        // Update the cursor shape of the window
+        let cursor_shape = path2
+            .iter()
+            .filter_map(|hview| hview.view.cursor_shape.get())
+            .last()
+            .unwrap_or(CursorShape::default());
+        self.wnd.set_cursor_shape(cursor_shape);
     }
 
     /// The core implementation of `pal::WndListener::mouse_drag`.
@@ -217,6 +225,25 @@ impl HView {
 
         if let Some(drag) = cancelled_drag {
             drag.listener.cancel(wnd.wm, &drag.view);
+        }
+    }
+
+    /// Recalculate the current cursor shape if `self` is relevant to the
+    /// calculation.
+    pub(super) fn update_cursor(&self, wnd: &Wnd) {
+        let st = wnd.mouse_state.borrow();
+
+        if let Some(view) = &st.hover_view {
+            if view.is_improper_subview_of(self) {
+                // Update the cursor shape of the window
+                let mut cursor_shape = CursorShape::default();
+                view.for_each_ancestor(|hview| {
+                    if let Some(shape) = hview.view.cursor_shape.get() {
+                        cursor_shape = shape;
+                    }
+                });
+                wnd.set_cursor_shape(cursor_shape);
+            }
         }
     }
 }

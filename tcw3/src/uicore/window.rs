@@ -10,8 +10,8 @@ use std::{
 };
 
 use super::{
-    invocation::process_pending_invocations, HView, HWnd, Superview, SuperviewStrong, UpdateCtx,
-    ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags,
+    invocation::process_pending_invocations, CursorShape, HView, HWnd, Superview, SuperviewStrong,
+    UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags,
 };
 use crate::pal::{self, prelude::Wm as _, Wm};
 
@@ -326,6 +326,24 @@ impl Wnd {
     pub(super) fn set_dirty_flags(&self, new_flags: WndDirtyFlags) {
         let dirty = &self.dirty;
         dirty.set(dirty.get() | new_flags);
+    }
+
+    pub(super) fn set_cursor_shape(&self, cursor_shape: CursorShape) {
+        if cursor_shape == self.cursor_shape.get() {
+            return;
+        }
+        self.cursor_shape.set(cursor_shape);
+
+        let pal_wnd = self.pal_wnd.borrow();
+        if let Some(ref pal_wnd) = *pal_wnd {
+            self.wm.set_wnd_attr(
+                pal_wnd,
+                pal::WndAttrs {
+                    cursor_shape: Some(cursor_shape),
+                    ..Default::default()
+                },
+            )
+        }
     }
 }
 

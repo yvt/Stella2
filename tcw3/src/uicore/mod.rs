@@ -41,7 +41,7 @@ pub use self::layer::{UpdateCtx, UpdateReason};
 pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::MouseDragListener;
 
-pub use crate::pal::WndFlags as WndStyleFlags;
+pub use crate::pal::{CursorShape, WndFlags as WndStyleFlags};
 
 /// The maxiumum supported depth of view hierarchy.
 pub const MAX_VIEW_DEPTH: usize = 32;
@@ -155,6 +155,7 @@ struct Wnd {
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
+    cursor_shape: Cell<CursorShape>,
 }
 
 impl fmt::Debug for Wnd {
@@ -195,6 +196,7 @@ impl Wnd {
             updating: Cell::new(false),
             dpi_scale_changed_handlers: RefCell::new(SubscriberList::new()),
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
+            cursor_shape: Cell::new(CursorShape::default()),
         }
     }
 }
@@ -376,6 +378,7 @@ impl<T: ViewListener + 'static> From<T> for Box<dyn ViewListener> {
 struct View {
     dirty: Cell<ViewDirtyFlags>,
     flags: Cell<ViewFlags>,
+    cursor_shape: Cell<Option<CursorShape>>,
 
     listener: RefCell<Box<dyn ViewListener>>,
     layout: RefCell<Box<dyn Layout>>,
@@ -427,6 +430,7 @@ impl View {
             frame: Cell::new(Box2::zero()),
             global_frame: Cell::new(Box2::zero()),
             layers: RefCell::new(Vec::new()),
+            cursor_shape: Cell::new(None),
         }
     }
 }
@@ -817,6 +821,25 @@ impl HView {
     /// Get the flags of a view.
     pub fn flags(&self) -> ViewFlags {
         self.view.flags.get()
+    }
+
+    /// Set the desired apperance of the mouse cursor for a given view.
+    ///
+    /// The final cursor shape is decided based on the hot view (the view with
+    /// `ViewFlags::ACCEPT_MOUSE_OVER` the mouse cursor is currently on). A path
+    /// from the root view to the hot view is calculated, and the highest view
+    /// with a non-`None` cursor shape is chosen for the final cursor shpae.
+    pub fn set_cursor_shape(&self, shape: Option<CursorShape>) {
+        self.view.cursor_shape.set(shape);
+
+        if let Some(hwnd) = self.containing_wnd() {
+            self.update_cursor(&hwnd.wnd);
+        }
+    }
+
+    /// Get the desired apperance of the mouse cursoor for a given view.
+    pub fn cursor_shape(&self) -> Option<CursorShape> {
+        self.view.cursor_shape.get()
     }
 
     /// Pend a call to [`ViewListener::update`].
