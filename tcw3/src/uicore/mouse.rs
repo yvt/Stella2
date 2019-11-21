@@ -1,10 +1,10 @@
 use arrayvec::ArrayVec;
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use log::{trace, warn};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use super::{CursorShape, HView, HWnd, ViewFlags, Wnd};
+use super::{CursorShape, HView, HWnd, ScrollDelta, ViewFlags, Wnd};
 use crate::{pal, pal::Wm};
 
 /// Mouse event handlers for mouse drag gestures.
@@ -39,6 +39,36 @@ pub trait MouseDragListener {
 
 /// A default implementation of [`MouseDragListener`].
 impl MouseDragListener for () {}
+
+/// Event handlers for scroll gestures.
+///
+/// A `ScrollListener` object lives until one of the following events occur:
+///
+///  - `end` is called.
+///  - `cancel` is called.
+///
+pub trait ScrollListener {
+    /// The mouse's scroll wheel was moved.
+    ///
+    /// `velocity` represents the estimated current scroll speed, which is
+    /// useful for implementing the rubber-band effect during intertia scrolling.
+    fn motion(&self, _: Wm, _: &HView, _delta: &ScrollDelta, _velocity: &Vector2<f32>) {}
+
+    /// Mark the start of a momentum phase (also known as *inertia scrolling*).
+    ///
+    /// After calling this method, the system will keep generating `motion`
+    /// events with dissipating delta values.
+    fn start_momentum_phase(&self, _: Wm, _: &HView) {}
+
+    /// The gesture was completed.
+    fn end(&self, _: Wm, _: &HView) {}
+
+    /// The gesture was cancelled.
+    fn cancel(&self, _: Wm, _: &HView) {}
+}
+
+/// A default implementation of [`ScrollListener`].
+impl ScrollListener for () {}
 
 #[derive(Debug)]
 pub(super) struct WndMouseState {

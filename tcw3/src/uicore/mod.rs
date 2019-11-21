@@ -39,9 +39,9 @@ mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
 pub use self::layout::{Layout, LayoutCtx, SizeTraits};
-pub use self::mouse::MouseDragListener;
+pub use self::mouse::{MouseDragListener, ScrollListener};
 
-pub use crate::pal::{CursorShape, WndFlags as WndStyleFlags};
+pub use crate::pal::{CursorShape, ScrollDelta, WndFlags as WndStyleFlags};
 
 /// The maxiumum supported depth of view hierarchy.
 pub const MAX_VIEW_DEPTH: usize = 32;
@@ -201,7 +201,6 @@ impl Wnd {
     }
 }
 
-// TODO: scroll wheel events
 // TODO: mouse motion events
 // TODO: keyboard events
 // TODO: keyboard focus management
@@ -281,6 +280,9 @@ bitflags! {
 
         /// The view accepts mouse over events.
         const ACCEPT_MOUSE_OVER = 1 << 4;
+
+        /// The view accepts scroll events.
+        const ACCEPT_SCROLL = 1 << 5;
     }
 }
 
@@ -363,6 +365,28 @@ pub trait ViewListener {
     ///
     /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
     fn mouse_out(&self, _: Wm, _: &HView) {}
+
+    // TODO: Implement these events
+    /// The mouse's scroll wheel was moved to scroll the view's contents
+    /// underneath the mouse pointer.
+    ///
+    /// The system calls either `scroll_motion` or `scroll_gesture` to process
+    /// scroll events. `scroll_motion` is used for an actual scroll wheel, while
+    /// `scroll_gesture` is for a device such as a track pad that supports a
+    /// continuous scroll operation.
+    ///
+    /// `scroll_motion` is never called when there is an active scroll gesture.
+    ///
+    /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
+    fn scroll_motion(&self, _: Wm, _: &HView, loc: Point2<f32>, _delta: &ScrollDelta) {}
+
+    /// Get event handlers for handling the scroll gesture that started right
+    /// now.
+    ///
+    /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
+    fn scroll_gesture(&self, _: Wm, _: &HView, loc: Point2<f32>) -> Box<dyn ScrollListener> {
+        Box::new(())
+    }
 }
 
 /// A no-op implementation of `ViewListener`.
