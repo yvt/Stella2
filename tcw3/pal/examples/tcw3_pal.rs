@@ -50,11 +50,12 @@ impl WndListener<pal::Wm> for Listener {
         Box::new(DragListener)
     }
 
-    fn scroll_motion(&self, _: pal::Wm, _: &pal::HWnd, delta: &pal::ScrollDelta) {
-        info!("scroll_motion {:?}", delta);
+    fn scroll_motion(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>, delta: &pal::ScrollDelta) {
+        info!("scroll_motion {:?} {:?}", loc, delta);
     }
 
-    fn scroll_gesture(&self, _: pal::Wm, _: &pal::HWnd) -> Box<dyn ScrollListener<pal::Wm>> {
+    fn scroll_gesture(&self, _: pal::Wm, _: &pal::HWnd, loc: Point2<f32>) -> Box<dyn ScrollListener<pal::Wm>> {
+        info!("scroll_gesture {:?}", loc);
         Box::new(MyScrollListener)
     }
 }

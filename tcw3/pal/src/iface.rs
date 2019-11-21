@@ -414,11 +414,11 @@ pub trait WndListener<T: Wm> {
     /// continuous scroll operation.
     ///
     /// `scroll_motion` is never called when there is an active scroll gesture.
-    fn scroll_motion(&self, _: T, _: &T::HWnd, _delta: &ScrollDelta) {}
+    fn scroll_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>, _delta: &ScrollDelta) {}
 
     /// Get event handlers for handling the scroll gesture that started right
     /// now.
-    fn scroll_gesture(&self, _: T, _: &T::HWnd) -> Box<dyn ScrollListener<T>> {
+    fn scroll_gesture(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) -> Box<dyn ScrollListener<T>> {
         Box::new(())
     }
 
