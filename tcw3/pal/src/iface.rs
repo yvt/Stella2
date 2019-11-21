@@ -410,7 +410,6 @@ pub trait WndListener<T: Wm> {
     //  - Pointer device gestures (swipe, zoom, rotate)
     //  - Keyboard
     //  - Input method
-    //  - Mouse cursor
 }
 
 /// A default implementation of [`WndListener`].

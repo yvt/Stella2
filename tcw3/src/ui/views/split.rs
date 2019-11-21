@@ -132,8 +132,6 @@ impl Split {
 
         container.set_layout(shared.layout());
 
-        // TODO: set cursor
-
         Self { container, shared }
     }
 

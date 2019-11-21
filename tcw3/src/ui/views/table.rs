@@ -179,8 +179,6 @@ impl fmt::Debug for Inner {
     }
 }
 
-// TODO: scrolling
-
 /// A part of table view state data that is contained by `RefCell`.
 /// The remaining part is in `Inner`, on the contrary to what the name implies.
 struct State {

@@ -203,7 +203,6 @@ impl Wnd {
 
 // TODO: scroll wheel events
 // TODO: mouse motion events
-// TODO: mouse enter/leave events
 // TODO: keyboard events
 // TODO: keyboard focus management
 
