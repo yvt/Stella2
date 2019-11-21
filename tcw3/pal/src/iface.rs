@@ -8,7 +8,7 @@
 //! non-generic types.
 use bitflags::bitflags;
 use cggeom::Box2;
-use cgmath::{Matrix3, Point2};
+use cgmath::{Matrix3, Point2, Vector2};
 use rgb::RGBA;
 use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash, ops::Range, time::Duration};
 
@@ -405,8 +405,24 @@ pub trait WndListener<T: Wm> {
         Box::new(())
     }
 
+    /// The mouse's scroll wheel was moved to scroll the contents underneath
+    /// the mouse pointer.
+    ///
+    /// The system calls either `scroll_motion` or `scroll_gesture` to process
+    /// scroll events. `scroll_motion` is used for an actual scroll wheel, while
+    /// `scroll_gesture` is for a device such as a track pad that supports a
+    /// continuous scroll operation.
+    ///
+    /// `scroll_motion` is never called when there is an active scroll gesture.
+    fn scroll_motion(&self, _: T, _: &T::HWnd, _delta: &ScrollDelta) {}
+
+    /// Get event handlers for handling the scroll gesture that started right
+    /// now.
+    fn scroll_gesture(&self, _: T, _: &T::HWnd) -> Box<dyn ScrollListener<T>> {
+        Box::new(())
+    }
+
     // TODO: more events
-    //  - Scroll wheel event
     //  - Pointer device gestures (swipe, zoom, rotate)
     //  - Keyboard
     //  - Input method
@@ -446,6 +462,45 @@ pub trait MouseDragListener<T: Wm> {
 
 /// A default implementation of [`MouseDragListener`].
 impl<T: Wm> MouseDragListener<T> for () {}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ScrollDelta {
+    /// The delta position. The meaning varies depending on `precise`.
+    pub delta: Vector2<f32>,
+    /// `true` if `delta` is measured in pixels. Otherwise, `delta` represents
+    /// numbers of lines or rows.
+    pub precise: bool,
+}
+
+/// Event handlers for scroll gestures.
+///
+/// A `ScrollListener` object lives until one of the following events occur:
+///
+///  - `end` is called.
+///  - `cancel` is called.
+///
+pub trait ScrollListener<T: Wm> {
+    /// The mouse's scroll wheel was moved.
+    ///
+    /// `velocity` represents the estimated current scroll speed, which is
+    /// useful for implementing the rubber-band effect during intertia scrolling.
+    fn motion(&self, _: T, _: &T::HWnd, _delta: &ScrollDelta, _velocity: &Vector2<f32>) {}
+
+    /// Mark the start of a momentum phase (also known as *inertia scrolling*).
+    ///
+    /// After calling this method, the system will keep generating `motion`
+    /// events with dissipating delta values.
+    fn start_momentum_phase(&self, _: T, _: &T::HWnd) {}
+
+    /// The gesture was completed.
+    fn end(&self, _: T, _: &T::HWnd) {}
+
+    /// The gesture was cancelled.
+    fn cancel(&self, _: T, _: &T::HWnd) {}
+}
+
+/// A default implementation of [`ScrollListener`].
+impl<T: Wm> ScrollListener<T> for () {}
 
 /// Describes the appearance of the mouse cursor.
 ///

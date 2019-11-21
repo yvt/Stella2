@@ -19,7 +19,7 @@ pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        TextLayout, Wm, WndListener,
+        ScrollListener, TextLayout, Wm, WndListener,
     };
 
     pub use super::futuresext::WmFuturesExt;
@@ -123,8 +123,8 @@ pub type TextLayout = current::TextLayout;
 // the default backend.
 
 pub use self::iface::{
-    BadThread, CursorShape, LayerFlags, LineCap, LineJoin, SysFontType, TextDecorFlags, WndFlags,
-    RGBAF32,
+    BadThread, CursorShape, LayerFlags, LineCap, LineJoin, ScrollDelta, SysFontType,
+    TextDecorFlags, WndFlags, RGBAF32,
 };
 
 /// The window handle type of [`Wm`].
