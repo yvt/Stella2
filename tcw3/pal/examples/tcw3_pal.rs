@@ -1,5 +1,5 @@
 use cggeom::{box2, prelude::*};
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use log::info;
 use tcw3_pal::{self as pal, prelude::*};
 
@@ -49,6 +49,14 @@ impl WndListener<pal::Wm> for Listener {
         info!("mouse_drag {:?}", (loc, button));
         Box::new(DragListener)
     }
+
+    fn scroll_motion(&self, _: pal::Wm, _: &pal::HWnd, delta: &pal::ScrollDelta) {
+        info!("scroll_motion {:?}", delta);
+    }
+
+    fn scroll_gesture(&self, _: pal::Wm, _: &pal::HWnd) -> Box<dyn ScrollListener<pal::Wm>> {
+        Box::new(MyScrollListener)
+    }
 }
 
 struct DragListener;
@@ -65,6 +73,26 @@ impl MouseDragListener<pal::Wm> for DragListener {
     }
     fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
         info!("drag: cancel");
+    }
+}
+
+struct MyScrollListener;
+
+impl ScrollListener<pal::Wm> for MyScrollListener {
+    fn motion(&self, _: pal::Wm, _: &pal::HWnd, delta: &pal::ScrollDelta, velocity: &Vector2<f32>) {
+        info!("scroll: motion {:?} {:?}", delta, velocity);
+    }
+
+    fn start_momentum_phase(&self, _: pal::Wm, _: &pal::HWnd) {
+        info!("scroll: start_momentum_phase");
+    }
+
+    fn end(&self, _: pal::Wm, _: &pal::HWnd) {
+        info!("scroll: end");
+    }
+
+    fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
+        info!("scroll: cancel");
     }
 }
 
