@@ -56,6 +56,8 @@ pub trait WmExt: Sized {
     /// contents (by `Wm::update_wnd`). Thus, this method should be preferred
     /// to `invoke` if you want to defer some calculation but need the result
     /// to be displayed on next screen update.
+    ///
+    /// This is **not** an equivalent of JavaScript's `requestAnimationFrame`!
     fn invoke_on_update(self, f: impl FnOnce(Self) + 'static);
 }
 
