@@ -37,6 +37,12 @@ impl ViewListener for RecordingViewListener {
     }
 }
 
+macro_rules! flush_and_assert_events {
+    ($events:expr, $expected:expr) => {
+        assert_eq!(replace(&mut *$events.borrow_mut(), Vec::new()), $expected);
+    };
+}
+
 #[use_testing_wm]
 #[test]
 fn mouse_over_evts(twm: &dyn TestingWm) {
@@ -82,63 +88,63 @@ fn mouse_over_evts(twm: &dyn TestingWm) {
     let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
         .expect("could not get a single window");
 
-    assert!(events.borrow_mut().is_empty());
+    flush_and_assert_events!(events, []);
 
     // `view0` does not have `ACCEPT_MOUSE_OVER`, so moving the mouse
     // pointer over it does not cause `mouse_over`
     twm.raise_mouse_motion(&pal_hwnd, [0.0; 2].into());
-    assert!(events.borrow_mut().is_empty());
+    flush_and_assert_events!(events, []);
 
     // The mouse pointer is on `view2`, which is a child of `view1`.
     // `view0` receives `mouse_enter` because of its subview receiving
     // `mouse_over`.
     twm.raise_mouse_motion(&pal_hwnd, view2.global_frame().mid());
-    assert!(
-        replace(&mut *events.borrow_mut(), Vec::new())
-            == [
-                (0, Event::MouseEnter),
-                (1, Event::MouseEnter),
-                (2, Event::MouseEnter),
-                (2, Event::MouseOver),
-            ]
+    flush_and_assert_events!(
+        events,
+        [
+            (0, Event::MouseEnter),
+            (1, Event::MouseEnter),
+            (2, Event::MouseEnter),
+            (2, Event::MouseOver),
+        ]
     );
 
     // The mouse pointer is on `view4`, which is a child of `view3`
     twm.raise_mouse_motion(&pal_hwnd, view4.global_frame().mid());
-    assert!(
-        replace(&mut *events.borrow_mut(), Vec::new())
-            == [
-                (2u8, Event::MouseOut),
-                (2, Event::MouseLeave),
-                (1, Event::MouseLeave),
-                (3, Event::MouseEnter),
-                (4, Event::MouseEnter),
-                (4, Event::MouseOver),
-            ]
+    flush_and_assert_events!(
+        events,
+        [
+            (2u8, Event::MouseOut),
+            (2, Event::MouseLeave),
+            (1, Event::MouseLeave),
+            (3, Event::MouseEnter),
+            (4, Event::MouseEnter),
+            (4, Event::MouseOver),
+        ]
     );
 
     // The mouse pointer is on `view3`
     twm.raise_mouse_motion(&pal_hwnd, view3.global_frame().min);
-    assert!(
-        replace(&mut *events.borrow_mut(), Vec::new())
-            == [
-                (4u8, Event::MouseOut),
-                (4, Event::MouseLeave),
-                (3, Event::MouseOver),
-            ]
+    flush_and_assert_events!(
+        events,
+        [
+            (4u8, Event::MouseOut),
+            (4, Event::MouseLeave),
+            (3, Event::MouseOver),
+        ]
     );
 
     // No hot view
     twm.raise_mouse_motion(&pal_hwnd, [0.0; 2].into());
-    assert!(
-        replace(&mut *events.borrow_mut(), Vec::new())
-            == [
-                (3, Event::MouseOut),
-                (3, Event::MouseLeave),
-                (0, Event::MouseLeave),
-            ]
+    flush_and_assert_events!(
+        events,
+        [
+            (3, Event::MouseOut),
+            (3, Event::MouseLeave),
+            (0, Event::MouseLeave),
+        ]
     );
 
     twm.raise_mouse_leave(&pal_hwnd);
-    assert!(events.borrow_mut().is_empty());
+    flush_and_assert_events!(events, []);
 }
