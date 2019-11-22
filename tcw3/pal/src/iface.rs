@@ -472,6 +472,15 @@ pub struct ScrollDelta {
     pub precise: bool,
 }
 
+impl Default for ScrollDelta {
+    fn default() -> Self {
+        Self {
+            delta: Vector2::new(0.0, 0.0),
+            precise: false,
+        }
+    }
+}
+
 /// Event handlers for scroll gestures.
 ///
 /// A `ScrollListener` object lives until one of the following events occur:
