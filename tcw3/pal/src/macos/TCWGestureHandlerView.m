@@ -49,10 +49,6 @@ typedef struct _TCWScrollEvent {
     return self;
 }
 
-- (BOOL)hasActiveGesture {
-    return self->hasMouseDragListener || self->hasScrollListener;
-}
-
 // Implements `NSView`
 - (BOOL)acceptsFirstMouse:(NSEvent *)event {
     (void)event;
@@ -75,14 +71,12 @@ typedef struct _TCWScrollEvent {
 
     NSPoint loc = [self->controller locationOfEvent:event];
 
-    if (![self hasActiveGesture]) {
+    if (!hasMouseDragListener) {
         // Start a new gesture
         self->mouseDragListener =
             tcw_wndlistener_mouse_drag(self->controller.listenerUserData, loc,
                                        (uint8_t)event.buttonNumber);
         self->hasMouseDragListener = YES;
-
-        [controller gestureStartedInView:self];
     }
 
     if (self->hasMouseDragListener) {
@@ -122,8 +116,6 @@ typedef struct _TCWScrollEvent {
     if (self->hasMouseDragListener && self->pressedMouseButtons == 0) {
         self->hasMouseDragListener = NO;
         tcw_mousedraglistener_release(self->mouseDragListener);
-
-        [controller gestureEndedInView:self];
     }
 }
 
@@ -227,12 +219,6 @@ typedef struct _TCWScrollEvent {
             self->controller.listenerUserData, loc);
         self->hasScrollListener = YES;
         self->momentumPhaseActive = NO;
-
-        // Can't use `gestureStartedInView` here, calling it redirect the
-        // scroll events to the new `TCWGestureHandlerView` instead of
-        // `self`
-        // TODO: Maybe do away with `gestureStartedInView` until we really
-        //       need it?
     }
 
     if (!self->hasScrollListener) {

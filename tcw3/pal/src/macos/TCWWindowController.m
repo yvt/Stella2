@@ -15,8 +15,7 @@
     bool displayLinkIsRunning;
     bool wantsUpdateReadyCallback;
 
-    TCWGestureHandlerView *inactiveGestureHandler;
-    NSMutableArray<TCWGestureHandlerView *> *gestureHandlers;
+    TCWGestureHandlerView *gestureHandler;
 }
 
 - (id)init {
@@ -49,9 +48,7 @@
         self->window.contentView.wantsLayer = YES;
 
         // Create the first gesture handler view
-        self->inactiveGestureHandler = [self newGestureHandlerView];
-        self->gestureHandlers = [NSMutableArray new];
-        [self->window.contentView addSubview:self->inactiveGestureHandler];
+        self->gestureHandler = [self newGestureHandlerView];
     }
     return self;
 }
@@ -288,9 +285,7 @@
     self->window.delegate = nil;
 
     // Cancel all input gestures
-    for (TCWGestureHandlerView *view in self->gestureHandlers) {
-        [view cancelGesture];
-    }
+    [self->gestureHandler cancelGesture];
 
     tcw_wndlistener_close(self.listenerUserData);
 }
@@ -325,39 +320,6 @@
     [self->window.contentView addSubview:view];
 
     return view;
-}
-
-- (void)gestureStartedInView:(TCWGestureHandlerView *)view {
-    if (self->inactiveGestureHandler != view) {
-        return;
-    }
-
-    // Create views on-demand to distinguish input gestures.
-    // TODO: Do we really need this, though? It seems impossible to have
-    //       multiple ongoing gestures of the same type at the same moment...
-
-    [self->gestureHandlers addObject:view];
-
-    self->inactiveGestureHandler = [self newGestureHandlerView];
-
-    if (self->gestureHandlers.count > 10) {
-        NSLog(@"Evicting excessive gesture handlers "
-               "(perhaps there's an unhandled 'end of gesture' event?)");
-
-        TCWGestureHandlerView *deletedView =
-            [self->gestureHandlers objectAtIndex:0];
-        [deletedView cancelGesture];
-        [self->gestureHandlers removeObjectAtIndex:0];
-    }
-}
-
-- (void)gestureEndedInView:(TCWGestureHandlerView *)view {
-    NSUInteger index = [self->gestureHandlers indexOfObject:view];
-    NSAssert(index != NSNotFound, @"Unrecognized view");
-
-    [self->gestureHandlers removeObjectAtIndex:index];
-
-    [view removeFromSuperview];
 }
 
 - (NSPoint)locationOfEvent:(NSEvent *)event {
