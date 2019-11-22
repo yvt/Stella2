@@ -378,13 +378,13 @@ pub trait ViewListener {
     /// `scroll_motion` is never called when there is an active scroll gesture.
     ///
     /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
-    fn scroll_motion(&self, _: Wm, _: &HView, loc: Point2<f32>, _delta: &ScrollDelta) {}
+    fn scroll_motion(&self, _: Wm, _: &HView, _loc: Point2<f32>, _delta: &ScrollDelta) {}
 
     /// Get event handlers for handling the scroll gesture that started right
     /// now.
     ///
     /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
-    fn scroll_gesture(&self, _: Wm, _: &HView, loc: Point2<f32>) -> Box<dyn ScrollListener> {
+    fn scroll_gesture(&self, _: Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
         Box::new(())
     }
 }

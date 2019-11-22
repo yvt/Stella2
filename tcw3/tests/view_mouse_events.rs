@@ -1,4 +1,5 @@
 use cggeom::prelude::*;
+use cgmath::Point2;
 use std::{cell::RefCell, mem::replace, rc::Rc};
 use try_match::try_match;
 
@@ -9,7 +10,7 @@ use tcw3::{
         layouts::{EmptyLayout, FillLayout, TableLayout},
         AlignFlags,
     },
-    uicore::{HView, HWnd, SizeTraits, ViewFlags, ViewListener},
+    uicore::{HView, HWnd, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
 };
 
 #[derive(Debug, PartialEq)]
@@ -18,6 +19,8 @@ enum Event {
     MouseLeave,
     MouseOver,
     MouseOut,
+    ScrollMotion,
+    ScrollGesture,
 }
 
 struct RecordingViewListener(u8, Rc<RefCell<Vec<(u8, Event)>>>);
@@ -34,6 +37,14 @@ impl ViewListener for RecordingViewListener {
     }
     fn mouse_out(&self, _: pal::Wm, _: &HView) {
         self.1.borrow_mut().push((self.0, Event::MouseOut));
+    }
+
+    fn scroll_motion(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>, _delta: &ScrollDelta) {
+        self.1.borrow_mut().push((self.0, Event::ScrollMotion));
+    }
+    fn scroll_gesture(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
+        self.1.borrow_mut().push((self.0, Event::ScrollGesture));
+        Box::new(())
     }
 }
 
@@ -147,4 +158,61 @@ fn mouse_over_evts(twm: &dyn TestingWm) {
 
     twm.raise_mouse_leave(&pal_hwnd);
     flush_and_assert_events!(events, []);
+}
+
+#[use_testing_wm]
+#[test]
+fn scroll_evts(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+
+    let view0 = HView::new(ViewFlags::default());
+    let view1 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
+    let view2 = HView::new(ViewFlags::default());
+
+    view0.set_listener(RecordingViewListener(0, events.clone()));
+    view1.set_listener(RecordingViewListener(1, events.clone()));
+    view2.set_listener(RecordingViewListener(2, events.clone()));
+
+    view0.set_layout(FillLayout::new(view1.clone()).with_uniform_margin(10.0));
+
+    view1.set_layout(FillLayout::new(view2.clone()).with_uniform_margin(10.0));
+
+    view2.set_layout(EmptyLayout::new(
+        SizeTraits::default().with_preferred([20.0; 2].into()),
+    ));
+
+    wnd.content_view().set_layout(FillLayout::new(view0));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    flush_and_assert_events!(events, []);
+
+    let delta = ScrollDelta {
+        delta: [5.0; 2].into(),
+        precise: true,
+    };
+
+    // `view0` does not have `ACCEPT_SCROLL`, so moving the mouse wheel with
+    // the mouse pointer over it does not cause `scroll_motion`
+    twm.raise_scroll_motion(&pal_hwnd, [0.0; 2].into(), &delta);
+    let g = twm.raise_scroll_gesture(&pal_hwnd, [0.0; 2].into());
+    g.end();
+    drop(g);
+    flush_and_assert_events!(events, []);
+
+    // `view1`, on the other hand
+    twm.raise_scroll_motion(&pal_hwnd, [30.0; 2].into(), &delta);
+    flush_and_assert_events!(events, [(1, Event::ScrollMotion)]);
+
+    let g = twm.raise_scroll_gesture(&pal_hwnd, [30.0; 2].into());
+    g.end();
+    drop(g);
+    flush_and_assert_events!(events, [(1, Event::ScrollGesture)]);
 }

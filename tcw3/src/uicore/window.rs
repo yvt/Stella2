@@ -436,6 +436,25 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
             hwnd.handle_mouse_motion(None);
         }
     }
+
+    fn scroll_motion(&self, _: Wm, _: &pal::HWnd, loc: Point2<f32>, delta: &pal::ScrollDelta) {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.handle_scroll_motion(loc, delta);
+        }
+    }
+
+    fn scroll_gesture(
+        &self,
+        _: Wm,
+        _: &pal::HWnd,
+        loc: Point2<f32>,
+    ) -> Box<dyn pal::iface::ScrollListener<Wm>> {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.handle_scroll_gesture(loc)
+        } else {
+            Box::new(())
+        }
+    }
 }
 
 pub(crate) fn new_root_content_view() -> HView {

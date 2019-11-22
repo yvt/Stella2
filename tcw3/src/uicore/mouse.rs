@@ -73,6 +73,7 @@ impl ScrollListener for () {}
 #[derive(Debug)]
 pub(super) struct WndMouseState {
     drag_gestures: Option<Rc<DragGesture>>,
+    scroll_gestures: Option<Rc<ScrollGesture>>,
     hover_view: Option<HView>,
 }
 
@@ -80,6 +81,7 @@ impl WndMouseState {
     pub fn new() -> Self {
         Self {
             drag_gestures: None,
+            scroll_gestures: None,
             hover_view: None,
         }
     }
@@ -94,6 +96,21 @@ struct DragGesture {
 impl fmt::Debug for DragGesture {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DragGesture")
+            .field("view", &self.view)
+            .field("listener", &((&*self.listener) as *const _))
+            .finish()
+    }
+}
+
+/// Represents an active scroll gesture.
+struct ScrollGesture {
+    view: HView,
+    listener: Box<dyn ScrollListener>,
+}
+
+impl fmt::Debug for ScrollGesture {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ScrollGesture")
             .field("view", &self.view)
             .field("listener", &((&*self.listener) as *const _))
             .finish()
@@ -223,6 +240,100 @@ impl HWnd {
 
             // Return `dyn pal::iface::MouseDragListener`
             Box::new(PalDragListener {
+                wnd: Rc::downgrade(&self.wnd),
+            })
+        } else {
+            Box::new(())
+        }
+    }
+
+    /// The core implementation of `pal::WndListener::scroll_motion`.
+    pub(super) fn handle_scroll_motion(&self, loc: Point2<f32>, delta: &ScrollDelta) {
+        if self.wnd.mouse_state.borrow().scroll_gestures.is_some() {
+            // PAL broke the contract
+            warn!(
+                "{:?}: Rejecting scroll motion event at {:?} (delta = {:?}) because \
+                 there already is an active scroll gesture",
+                self, loc, delta
+            );
+            return;
+        }
+
+        let hit_view = {
+            let content_view = self.wnd.content_view.borrow();
+            content_view.as_ref().unwrap().hit_test(
+                loc,
+                ViewFlags::ACCEPT_SCROLL,
+                ViewFlags::DENY_MOUSE,
+            )
+        };
+
+        trace!(
+            "{:?}: Scroll motion at {:?} (delta = {:?}) is handled by {:?}",
+            self,
+            loc,
+            delta,
+            hit_view
+        );
+
+        if let Some(hit_view) = hit_view {
+            // Call the view's drag event handler
+            let listener = hit_view.view.listener.borrow();
+            listener.scroll_motion(self.wnd.wm, &hit_view, loc, delta);
+        }
+    }
+
+    /// The core implementation of `pal::WndListener::scroll_gesture`.
+    pub(super) fn handle_scroll_gesture(
+        &self,
+        loc: Point2<f32>,
+    ) -> Box<dyn pal::iface::ScrollListener<pal::Wm>> {
+        let mut st = self.wnd.mouse_state.borrow_mut();
+
+        if st.scroll_gestures.is_some() {
+            // Can't have more than one active scroll gesture
+            // (Is that even possible?)
+
+            warn!(
+                "{:?}: Rejecting the new scroll gesture at {:?} because \
+                 there already is an active scroll gesture",
+                self, loc
+            );
+
+            return Box::new(());
+        }
+
+        let hit_view = {
+            let content_view = self.wnd.content_view.borrow();
+            content_view.as_ref().unwrap().hit_test(
+                loc,
+                ViewFlags::ACCEPT_SCROLL,
+                ViewFlags::DENY_MOUSE,
+            )
+        };
+
+        trace!(
+            "{:?}: Scroll gesture at {:?} is handled by {:?}",
+            self,
+            loc,
+            hit_view
+        );
+
+        if let Some(hit_view) = hit_view {
+            // Call the view's drag event handler
+            let view_scr_listener = {
+                let listener = hit_view.view.listener.borrow();
+                listener.scroll_gesture(self.wnd.wm, &hit_view, loc)
+            };
+
+            // Remember the gesture
+            st.scroll_gestures = Some(Rc::new(ScrollGesture {
+                view: hit_view,
+                listener: view_scr_listener,
+            }));
+
+            // Return `dyn pal::iface::MouseDragListener`
+            Box::new(PalScrollListener {
                 wnd: Rc::downgrade(&self.wnd),
             })
         } else {
@@ -366,6 +477,67 @@ impl pal::iface::MouseDragListener<pal::Wm> for PalDragListener {
     fn cancel(&self, wm: Wm, _: &pal::HWnd) {
         self.with_drag_gesture(|drag| {
             drag.listener.cancel(wm, &drag.view);
+        })
+    }
+}
+
+/// Implements `pal::iface::ScrollListener`.
+struct PalScrollListener {
+    wnd: Weak<Wnd>,
+}
+
+impl PalScrollListener {
+    /// Get `HWnd` if the underlying object is still alive.
+    fn hwnd(&self) -> Option<HWnd> {
+        self.wnd.upgrade().map(|wnd| HWnd { wnd })
+    }
+
+    fn with_scroll_gesture(&self, cb: impl FnOnce(&ScrollGesture)) {
+        if let Some(hwnd) = self.hwnd() {
+            let gesture = hwnd.wnd.mouse_state.borrow().scroll_gestures.clone();
+            // Make sure `mouse_state` is unborrowed before calling
+            // event handlers
+            if let Some(gesture) = &gesture {
+                cb(gesture);
+            }
+        }
+    }
+}
+
+impl Drop for PalScrollListener {
+    fn drop(&mut self) {
+        if let Some(hwnd) = self.hwnd() {
+            trace!("{:?}: Scroll gesture ended", hwnd);
+
+            let gesture = hwnd.wnd.mouse_state.borrow_mut().scroll_gestures.take();
+            drop(gesture);
+        } else {
+            trace!("Scroll gesture ended, but the owner is gone");
+        }
+    }
+}
+
+/// Forwards events from `pal::iface::ScrollListener` to
+/// `uicore::ScrollListener`.
+impl pal::iface::ScrollListener<pal::Wm> for PalScrollListener {
+    fn motion(&self, wm: Wm, _: &pal::HWnd, delta: &pal::ScrollDelta, velocity: Vector2<f32>) {
+        self.with_scroll_gesture(|gesture| {
+            gesture.listener.motion(wm, &gesture.view, delta, velocity);
+        })
+    }
+    fn start_momentum_phase(&self, wm: Wm, _: &pal::HWnd) {
+        self.with_scroll_gesture(|gesture| {
+            gesture.listener.start_momentum_phase(wm, &gesture.view);
+        })
+    }
+    fn end(&self, wm: Wm, _: &pal::HWnd) {
+        self.with_scroll_gesture(|gesture| {
+            gesture.listener.end(wm, &gesture.view);
+        })
+    }
+    fn cancel(&self, wm: Wm, _: &pal::HWnd) {
+        self.with_scroll_gesture(|gesture| {
+            gesture.listener.cancel(wm, &gesture.view);
         })
     }
 }
