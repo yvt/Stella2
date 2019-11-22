@@ -55,6 +55,34 @@ pub trait AxisAlignedBox<T>: Sized {
         point.element_wise_ge(&self.min()).all() && point.element_wise_lt(&self.max()).all()
     }
 
+    /// Return `true` if a point is inside or on the boundary of a box.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{prelude::*, Box2};
+    ///     use cgmath::Point2;
+    ///
+    ///     let b = Box2::new(
+    ///         Point2::new(0.0, 0.0),
+    ///         Point2::new(1.0, 1.0),
+    ///     );
+    ///     assert!(b.contains_point_incl(&Point2::new(0.0, 0.0)));
+    ///     assert!(b.contains_point_incl(&Point2::new(0.5, 0.5)));
+    ///     assert!(b.contains_point_incl(&Point2::new(0.5, 1.0)));
+    ///     assert!(b.contains_point_incl(&Point2::new(1.0, 0.5)));
+    ///
+    ///     assert!(!b.contains_point_incl(&Point2::new(0.5, -1.0)));
+    ///     assert!(!b.contains_point_incl(&Point2::new(0.5, 1.2)));
+    ///     assert!(!b.contains_point_incl(&Point2::new(-1.0, 0.5)));
+    ///     assert!(!b.contains_point_incl(&Point2::new(1.2, 0.5)));
+    #[inline]
+    fn contains_point_incl(&self, point: &Self::Point) -> bool
+    where
+        T: PartialOrd,
+    {
+        point.element_wise_ge(&self.min()).all() && point.element_wise_le(&self.max()).all()
+    }
+
     /// Return `true` if `other` is entirely inside `self`.
     ///
     /// # Examples
