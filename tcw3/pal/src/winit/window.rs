@@ -3,13 +3,13 @@ use std::{
     rc::Rc,
 };
 use winit::{
-    event::{ElementState, WindowEvent},
+    event::{ElementState, MouseScrollDelta, WindowEvent},
     window::{CursorIcon, Window, WindowBuilder, WindowId},
 };
 
-use super::super::iface::{CursorShape, WndAttrs, WndFlags};
+use super::super::iface::{CursorShape, ScrollDelta, WndAttrs, WndFlags};
 use super::{
-    utils::{log_pos_to_point2, mouse_button_to_id},
+    utils::{log_pos_to_point2, log_pos_to_vec2, mouse_button_to_id},
     HWndCore, WinitWm, WinitWmCore, Wnd, WndContent, WndMouseDrag,
 };
 
@@ -265,6 +265,25 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
                     }
                 } // match state
             } // WindowEvent::MouseInput
+            WindowEvent::MouseWheel { delta, .. } => {
+                // Ignore `TouchPhase` for now, it's not so reliable
+                let delta = match delta {
+                    MouseScrollDelta::LineDelta(x, y) => ScrollDelta {
+                        delta: [x, y].into(),
+                        precise: false,
+                    },
+                    MouseScrollDelta::PixelDelta(pos) => ScrollDelta {
+                        delta: log_pos_to_vec2(pos),
+                        precise: true,
+                    },
+                };
+
+                // `MouseWheel` doesn't provide the coordinates, so we get them
+                // from the last `CursorMoved` event
+                let mouse_pos = wnd.mouse_pos.get();
+
+                listener.scroll_motion(self.wm(), &hwnd, mouse_pos, &delta);
+            }
             WindowEvent::RedrawRequested => {
                 if wnd.waiting_update_ready.take() {
                     let _guard = SuppressRequestRedrawGuard::new(self);

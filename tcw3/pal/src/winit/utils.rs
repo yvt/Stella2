@@ -1,7 +1,11 @@
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use winit::{dpi::LogicalPosition, event::MouseButton};
 
 pub fn log_pos_to_point2(p: LogicalPosition) -> Point2<f32> {
+    (p.x as f32, p.y as f32).into()
+}
+
+pub fn log_pos_to_vec2(p: LogicalPosition) -> Vector2<f32> {
     (p.x as f32, p.y as f32).into()
 }
 
