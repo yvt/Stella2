@@ -12,6 +12,7 @@
 // These callbacks are defined in `window.rs`
 typedef OPQAUE_HANDLE TCWListenerUserData;
 typedef OPQAUE_HANDLE TCWMouseDragListenerUserData;
+typedef OPQAUE_HANDLE TCWScrollListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_resize(TCWListenerUserData ud);
@@ -30,6 +31,21 @@ extern void tcw_mousedraglistener_mouse_down(TCWMouseDragListenerUserData ud,
                                              NSPoint loc, uint8_t button);
 extern void tcw_mousedraglistener_mouse_up(TCWMouseDragListenerUserData ud,
                                            NSPoint loc, uint8_t button);
+
+extern void tcw_wndlistener_scroll_motion(TCWListenerUserData ud, NSPoint loc,
+                                          uint8_t precise, double delta_x,
+                                          double delta_y);
+extern TCWScrollListenerUserData
+tcw_wndlistener_scroll_gesture(TCWListenerUserData ud, NSPoint loc);
+extern void tcw_scrolllistener_release(TCWScrollListenerUserData ud);
+extern void tcw_scrolllistener_cancel(TCWScrollListenerUserData ud);
+extern void tcw_scrolllistener_end(TCWScrollListenerUserData ud);
+extern void
+tcw_scrolllistener_start_momentum_phase(TCWScrollListenerUserData ud);
+extern void tcw_scrolllistener_motion(TCWScrollListenerUserData ud,
+                                      uint8_t precise, double delta_x,
+                                      double delta_y, double vel_x,
+                                      double vel_y);
 
 // These flags must be synchronized with `WndFlags`
 #define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))

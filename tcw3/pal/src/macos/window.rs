@@ -278,6 +278,49 @@ unsafe extern "C" fn tcw_wndlistener_mouse_drag(
     .unwrap_or(std::ptr::null())
 }
 
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_scroll_motion(
+    ud: TCWListenerUserData,
+    loc: NSPoint,
+    precise: u8,
+    delta_x: f64,
+    delta_y: f64,
+) {
+    method_impl(ud, |wm, state| {
+        state.listener.borrow().scroll_motion(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+            &iface::ScrollDelta {
+                precise: precise != 0,
+                delta: [delta_x as f32, delta_y as f32].into(),
+            },
+        );
+    });
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_scroll_gesture(
+    ud: TCWListenerUserData,
+    loc: NSPoint,
+) -> TCWScrollListenerUserData {
+    method_impl(ud, |wm, state| {
+        let listener = state.listener.borrow().scroll_gesture(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+        );
+
+        let state = ScrollState {
+            listener,
+            hwnd: state.hwnd.clone(),
+        };
+
+        Box::into_raw(Box::new(state)) as *const _
+    })
+    .unwrap_or(std::ptr::null())
+}
+
 type TCWMouseDragListenerUserData = *const DragState;
 
 struct DragState {
@@ -351,5 +394,73 @@ unsafe extern "C" fn tcw_mousedraglistener_mouse_up(
             point2_from_ns_point(loc).cast().unwrap(),
             button,
         );
+    });
+}
+
+type TCWScrollListenerUserData = *const ScrollState;
+
+struct ScrollState {
+    listener: Box<dyn iface::ScrollListener<Wm>>,
+    hwnd: HWnd,
+}
+
+unsafe fn scroll_method_impl<T>(
+    ud: TCWScrollListenerUserData,
+    f: impl FnOnce(Wm, &ScrollState) -> T,
+) -> Option<T> {
+    if ud.is_null() {
+        return None;
+    }
+    let wm = Wm::global_unchecked();
+    Some(f(wm, &*ud))
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_scrolllistener_release(ud: TCWScrollListenerUserData) {
+    if !ud.is_null() {
+        Box::from_raw(ud as *mut ScrollState);
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_scrolllistener_cancel(ud: TCWScrollListenerUserData) {
+    scroll_method_impl(ud, |wm, state| {
+        state.listener.cancel(wm, &state.hwnd);
+    });
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_scrolllistener_end(ud: TCWScrollListenerUserData) {
+    scroll_method_impl(ud, |wm, state| {
+        state.listener.end(wm, &state.hwnd);
+    });
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_scrolllistener_motion(
+    ud: TCWScrollListenerUserData,
+    precise: u8,
+    delta_x: f64,
+    delta_y: f64,
+    vel_x: f64,
+    vel_y: f64,
+) {
+    scroll_method_impl(ud, |wm, state| {
+        state.listener.motion(
+            wm,
+            &state.hwnd,
+            &iface::ScrollDelta {
+                precise: precise != 0,
+                delta: [delta_x as f32, delta_y as f32].into(),
+            },
+            [vel_x as f32, vel_y as f32].into(),
+        );
+    });
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_scrolllistener_start_momentum_phase(ud: TCWScrollListenerUserData) {
+    scroll_method_impl(ud, |wm, state| {
+        state.listener.start_momentum_phase(wm, &state.hwnd);
     });
 }
