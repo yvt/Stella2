@@ -58,6 +58,8 @@
             tcw_wndlistener_mouse_drag(self->controller.listenerUserData, loc,
                                        (uint8_t)event.buttonNumber);
         self->hasMouseDragListener = YES;
+
+        [controller gestureStartedInView:self];
     }
 
     if (self->hasMouseDragListener) {
@@ -97,6 +99,8 @@
     if (self->hasMouseDragListener && self->pressedMouseButtons == 0) {
         self->hasMouseDragListener = NO;
         tcw_mousedraglistener_release(self->mouseDragListener);
+
+        [controller gestureEndedInView:self];
     }
 }
 

@@ -332,7 +332,9 @@
         return;
     }
 
-    [view removeFromSuperview];
+    // Create views on-demand to distinguish input gestures.
+    // TODO: Do we really need this, though? It seems impossible to have
+    //       multiple ongoing gestures of the same type at the same moment...
 
     [self->gestureHandlers addObject:view];
 
@@ -354,6 +356,8 @@
     NSAssert(index != NSNotFound, @"Unrecognized view");
 
     [self->gestureHandlers removeObjectAtIndex:index];
+
+    [view removeFromSuperview];
 }
 
 - (NSPoint)locationOfEvent:(NSEvent *)event {

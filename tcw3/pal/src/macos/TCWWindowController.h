@@ -8,8 +8,6 @@
 @interface TCWWindowController : NSObject
 @property TCWListenerUserData listenerUserData;
 
-// TODO: The following two methods aren't actually used - `TCWGestureHandlerView`
-//       is WIP, perhaps?
 /** Called by `TCWGestureHandlerView`. */
 - (void)gestureStartedInView:(TCWGestureHandlerView *)view;
 /** Called by `TCWGestureHandlerView`. */
