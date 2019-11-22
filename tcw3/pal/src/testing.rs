@@ -417,6 +417,20 @@ impl wmapi::TestingWm for Wm {
             .get_with_wm(*self)
             .raise_mouse_drag(*self, hwnd, loc, button)
     }
+
+    fn raise_scroll_motion(&self, hwnd: &HWnd, loc: Point2<f32>, delta: &iface::ScrollDelta) {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_scroll_motion(*self, hwnd, loc, delta);
+    }
+
+    fn raise_scroll_gesture(&self, hwnd: &HWnd, loc: Point2<f32>) -> Box<dyn wmapi::ScrollGesture> {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_scroll_gesture(*self, hwnd, loc)
+    }
 }
 
 impl iface::Wm for Wm {

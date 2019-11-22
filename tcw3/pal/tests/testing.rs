@@ -1,5 +1,5 @@
 use cggeom::{box2, prelude::*};
-use cgmath::{Deg, Matrix3, Point2};
+use cgmath::{Deg, Matrix3, Point2, Vector2};
 use log::info;
 use std::{
     cell::Cell,
@@ -695,6 +695,28 @@ fn wnd_mouse_events() {
                 self.0.set(3);
                 Box::new(self.clone())
             }
+
+            fn scroll_motion(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                _loc: Point2<f32>,
+                _delta: &pal::ScrollDelta,
+            ) {
+                assert_eq!(self.0.get(), 7);
+                self.0.set(8);
+            }
+
+            fn scroll_gesture(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                _loc: Point2<f32>,
+            ) -> Box<dyn ScrollListener<pal::Wm>> {
+                assert_eq!(self.0.get(), 8);
+                self.0.set(9);
+                Box::new(self.clone())
+            }
         }
 
         impl MouseDragListener<pal::Wm> for Listener {
@@ -713,6 +735,31 @@ fn wnd_mouse_events() {
             fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
                 assert_eq!(self.0.get(), 4);
                 self.0.set(7);
+            }
+        }
+
+        impl ScrollListener<pal::Wm> for Listener {
+            fn motion(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                _delta: &pal::ScrollDelta,
+                _velocity: Vector2<f32>,
+            ) {
+                assert_eq!(self.0.get(), 9);
+                self.0.set(10);
+            }
+            fn start_momentum_phase(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 10);
+                self.0.set(11);
+            }
+            fn end(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 11);
+                self.0.set(12);
+            }
+            fn cancel(&self, _: pal::Wm, _: &pal::HWnd) {
+                assert_eq!(self.0.get(), 12);
+                self.0.set(13);
             }
         }
 
@@ -744,5 +791,40 @@ fn wnd_mouse_events() {
         assert_eq!(state.get(), 4);
         drag.cancel();
         assert_eq!(state.get(), 7);
+
+        twm.raise_scroll_motion(
+            &hwnd,
+            [20.0; 2].into(),
+            &pal::ScrollDelta {
+                precise: false,
+                delta: [10.0; 2].into(),
+            },
+        );
+        assert_eq!(state.get(), 8);
+        drop(drag);
+
+        let scroll = twm.raise_scroll_gesture(&hwnd, [20.0; 2].into());
+        assert_eq!(state.get(), 9);
+
+        scroll.motion(
+            &pal::ScrollDelta {
+                precise: true,
+                delta: [10.0; 2].into(),
+            },
+            [0.0; 2].into(),
+        );
+        assert_eq!(state.get(), 10);
+        scroll.start_momentum_phase();
+        assert_eq!(state.get(), 11);
+        scroll.end();
+        assert_eq!(state.get(), 12);
+        drop(scroll);
+
+        state.set(8);
+        let scroll = twm.raise_scroll_gesture(&hwnd, [20.0; 2].into());
+        state.set(12);
+        scroll.cancel();
+        assert_eq!(state.get(), 13);
+        drop(scroll);
     });
 }

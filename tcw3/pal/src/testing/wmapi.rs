@@ -1,4 +1,4 @@
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use std::time::Instant;
 
 use crate::{iface, HWnd};
@@ -58,6 +58,12 @@ pub trait TestingWm: 'static {
 
     /// Trigger `WndListener::mouse_drag`.
     fn raise_mouse_drag(&self, hwnd: &HWnd, loc: Point2<f32>, button: u8) -> Box<dyn MouseDrag>;
+
+    /// Trigger `WndListener::scroll_motion`.
+    fn raise_scroll_motion(&self, hwnd: &HWnd, loc: Point2<f32>, delta: &iface::ScrollDelta);
+
+    /// Trigger `WndListener::scroll_gesture`.
+    fn raise_scroll_gesture(&self, hwnd: &HWnd, loc: Point2<f32>) -> Box<dyn ScrollGesture>;
 }
 
 /// A snapshot of window attributes.
@@ -85,6 +91,22 @@ pub trait MouseDrag {
     /// Trigger `MouseDragListener::mouse_up`.
     fn mouse_up(&self, _loc: Point2<f32>, _button: u8);
     /// Trigger `MouseDragListener::cancel`.
+    fn cancel(&self);
+}
+
+/// Provides an interface for simulating a scroll geature.
+///
+/// See [`ScrollListener`] for the semantics of the methods.
+///
+/// [`ScrollListener`]: crate::iface::ScrollListener
+pub trait ScrollGesture {
+    /// Trigger `ScrollListener::mouse_motion`.
+    fn motion(&self, delta: &iface::ScrollDelta, velocity: Vector2<f32>);
+    /// Trigger `ScrollListener::mouse_down`.
+    fn start_momentum_phase(&self);
+    /// Trigger `ScrollListener::mouse_up`.
+    fn end(&self);
+    /// Trigger `ScrollListener::cancel`.
     fn cancel(&self);
 }
 

@@ -1,4 +1,4 @@
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 
 use super::{native, HWnd, HWndInner, Wm};
 use crate::iface;
@@ -65,6 +65,27 @@ impl iface::WndListener<native::Wm> for NativeWndListener {
 
         Box::new(NativeMouseDragListener(drag_listener))
     }
+
+    fn scroll_motion(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        loc: Point2<f32>,
+        delta: &iface::ScrollDelta,
+    ) {
+        forward!(self.0, scroll_motion, [wm: wm], [hwnd: hwnd], loc, delta)
+    }
+
+    fn scroll_gesture(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        loc: Point2<f32>,
+    ) -> Box<dyn iface::ScrollListener<native::Wm>> {
+        let scroll_listener = forward!(self.0, scroll_gesture, [wm: wm], [hwnd: hwnd], loc);
+
+        Box::new(NativeScrollListener(scroll_listener))
+    }
 }
 
 /// Wraps `MouseDragListener<Wm>` to create a `MouseDragListener<native::Wm>`.
@@ -81,6 +102,33 @@ impl iface::MouseDragListener<native::Wm> for NativeMouseDragListener {
 
     fn mouse_up(&self, wm: native::Wm, hwnd: &native::HWnd, loc: Point2<f32>, button: u8) {
         forward!(self.0, mouse_up, [wm: wm], [hwnd: hwnd], loc, button)
+    }
+
+    fn cancel(&self, wm: native::Wm, hwnd: &native::HWnd) {
+        forward!(self.0, cancel, [wm: wm], [hwnd: hwnd])
+    }
+}
+
+/// Wraps `ScrollListener<Wm>` to create a `ScrollListener<native::Wm>`.
+struct NativeScrollListener(Box<dyn iface::ScrollListener<Wm>>);
+
+impl iface::ScrollListener<native::Wm> for NativeScrollListener {
+    fn motion(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        delta: &iface::ScrollDelta,
+        velocity: Vector2<f32>,
+    ) {
+        forward!(self.0, motion, [wm: wm], [hwnd: hwnd], delta, velocity)
+    }
+
+    fn start_momentum_phase(&self, wm: native::Wm, hwnd: &native::HWnd) {
+        forward!(self.0, start_momentum_phase, [wm: wm], [hwnd: hwnd])
+    }
+
+    fn end(&self, wm: native::Wm, hwnd: &native::HWnd) {
+        forward!(self.0, end, [wm: wm], [hwnd: hwnd])
     }
 
     fn cancel(&self, wm: native::Wm, hwnd: &native::HWnd) {

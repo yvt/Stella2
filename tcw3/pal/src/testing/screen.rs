@@ -1,6 +1,6 @@
 //! Compositor for the testing backend.
 use cggeom::{box2, prelude::*, Box2};
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use log::warn;
 use std::{cell::RefCell, fmt, rc::Rc};
 
@@ -345,6 +345,37 @@ impl Screen {
             inner,
         })
     }
+
+    /// Implements `TestingWm::raise_scroll_motion`.
+    pub(super) fn raise_scroll_motion(
+        &self,
+        wm: Wm,
+        hwnd: &HWnd,
+        loc: Point2<f32>,
+        delta: &iface::ScrollDelta,
+    ) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        listener.scroll_motion(wm, &hwnd.into(), loc, delta);
+    }
+
+    /// Implements `TestingWm::raise_scroll_gesture`.
+    pub(super) fn raise_scroll_gesture(
+        &self,
+        wm: Wm,
+        hwnd: &HWnd,
+        loc: Point2<f32>,
+    ) -> Box<dyn wmapi::ScrollGesture> {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        let inner = listener.scroll_gesture(wm, &hwnd.into(), loc);
+
+        Box::new(ScrollGesture {
+            wm,
+            hwnd: hwnd.into(),
+            inner,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -386,6 +417,27 @@ impl wmapi::MouseDrag for MouseDrag {
     }
     fn mouse_up(&self, loc: Point2<f32>, button: u8) {
         self.inner.mouse_up(self.wm, &self.hwnd, loc, button)
+    }
+    fn cancel(&self) {
+        self.inner.cancel(self.wm, &self.hwnd)
+    }
+}
+
+struct ScrollGesture {
+    wm: Wm,
+    hwnd: super::HWnd,
+    inner: Box<dyn iface::ScrollListener<Wm>>,
+}
+
+impl wmapi::ScrollGesture for ScrollGesture {
+    fn motion(&self, delta: &iface::ScrollDelta, velocity: Vector2<f32>) {
+        self.inner.motion(self.wm, &self.hwnd, delta, velocity)
+    }
+    fn start_momentum_phase(&self) {
+        self.inner.start_momentum_phase(self.wm, &self.hwnd)
+    }
+    fn end(&self) {
+        self.inner.end(self.wm, &self.hwnd)
     }
     fn cancel(&self) {
         self.inner.cancel(self.wm, &self.hwnd)
