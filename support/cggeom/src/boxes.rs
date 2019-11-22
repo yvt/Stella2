@@ -78,6 +78,27 @@ pub trait AxisAlignedBox<T>: Sized {
             && other.max().element_wise_le(&self.max()).all()
     }
 
+    /// Return the in-bound point closest to `p`.
+    ///
+    /// # Examples
+    ///
+    ///     use cggeom::{prelude::*, box2};
+    ///     use cgmath::Point2;
+    ///
+    ///     let b = box2! { min: [0.0, 0.0], max: [1.0, 1.0] };
+    ///
+    ///     assert_eq!(b.limit_point(&Point2::new(0.2, 0.5)), Point2::new(0.2, 0.5));
+    ///     assert_eq!(b.limit_point(&Point2::new(-0.3, 0.5)), Point2::new(0.0, 0.5));
+    ///
+    #[inline]
+    fn limit_point(&self, p: &Self::Point) -> Self::Point
+    where
+        T: BaseNum,
+    {
+        p.element_wise_max(&self.min())
+            .element_wise_min(&self.max())
+    }
+
     /// Return `true` iff at least one of the box's dimensions is < 0.
     ///
     /// # Examples
