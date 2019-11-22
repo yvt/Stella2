@@ -52,7 +52,7 @@ pub trait ScrollListener {
     ///
     /// `velocity` represents the estimated current scroll speed, which is
     /// useful for implementing the rubber-band effect during intertia scrolling.
-    fn motion(&self, _: Wm, _: &HView, _delta: &ScrollDelta, _velocity: &Vector2<f32>) {}
+    fn motion(&self, _: Wm, _: &HView, _delta: &ScrollDelta, _velocity: Vector2<f32>) {}
 
     /// Mark the start of a momentum phase (also known as *inertia scrolling*).
     ///

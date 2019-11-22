@@ -85,7 +85,7 @@ impl MouseDragListener<pal::Wm> for DragListener {
 struct MyScrollListener;
 
 impl ScrollListener<pal::Wm> for MyScrollListener {
-    fn motion(&self, _: pal::Wm, _: &pal::HWnd, delta: &pal::ScrollDelta, velocity: &Vector2<f32>) {
+    fn motion(&self, _: pal::Wm, _: &pal::HWnd, delta: &pal::ScrollDelta, velocity: Vector2<f32>) {
         info!("scroll: motion {:?} {:?}", delta, velocity);
     }
 
