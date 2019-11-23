@@ -42,3 +42,5 @@ structopt = "0.3.0"
 enclose = "1.1.8"
 env_logger = "0.7.0"
 try_match = { version = "0.2.1", default-features = false, features = ["std"] }
+quickcheck = "0.9"
+quickcheck_macros = "0.8"

@@ -2098,6 +2098,8 @@ dependencies = [
  "momo 0.1.0 (git+https://github.com/llogiq/momo.git?rev=3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40)",
  "ndarray 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quickcheck 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quickcheck_macros 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rope 0.1.0",
  "sorted_diff 0.1.0",
  "structopt 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",

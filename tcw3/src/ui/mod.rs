@@ -11,7 +11,8 @@ pub mod layouts {
 pub mod mixins {
     pub mod button;
     pub mod canvas;
-    pub use self::{button::ButtonMixin, canvas::CanvasMixin};
+    pub mod scrollwheel;
+    pub use self::{button::ButtonMixin, canvas::CanvasMixin, scrollwheel::ScrollWheelMixin};
 }
 
 pub mod views {
