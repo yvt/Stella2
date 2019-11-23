@@ -63,6 +63,24 @@ impl TableEdit<'_> {
         self.set_vp_pos_inner(super::primary_vp_ptr(), pos);
     }
 
+    /// Get the display offset.
+    pub fn display_offset(&self) -> VpPos {
+        self.state.display_offset
+    }
+
+    /// Set the display offset.
+    ///
+    /// A display offset is a value that is added to the current scrolling
+    /// position. Certain scroll animations require `Table` to display the
+    /// region beyond the scrollable region, but viewports specified by
+    /// `set_scroll_pos` are constrained to the scrollable region. A display
+    /// offset temporarily shifts the displayed portion to make such things
+    /// possible.
+    pub fn set_display_offset(&mut self, pos: VpPos) {
+        self.state.display_offset = pos;
+        self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
+    }
+
     /// Add a new pinned viewport.
     ///
     /// `pos[i]` is automatically clamped to range `0.0..scroll_limit()[i]`.

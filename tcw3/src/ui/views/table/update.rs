@@ -387,6 +387,7 @@ impl TableLayout {
                 let i = ty as usize;
                 let cells_range = &state.cells_ranges[i];
                 let lineset = &state.linesets[i];
+                let display_offset = state.display_offset[i] as f32;
 
                 let vp_size = inner.size.get()[ty.i()];
                 let vp = state.vp_set.primary_vp_range(ty, vp_size);
@@ -424,6 +425,11 @@ impl TableLayout {
                 }
 
                 assert_eq!(pos_list.len(), pos_list.capacity());
+
+                // Add the display offset
+                for x in pos_list.iter_mut() {
+                    *x -= display_offset;
+                }
 
                 pos_list
             })

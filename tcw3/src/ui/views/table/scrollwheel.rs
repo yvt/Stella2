@@ -1,9 +1,9 @@
 //! Low-level scroll event support for `Table`.
-use cggeom::{box2, Box2};
-use cgmath::Point2;
+use cggeom::{box2, prelude::*, Box2};
+use cgmath::{Point2, Vector2};
 use std::borrow::Borrow;
 
-use super::{EditLockError, HVp, Table};
+use super::{EditLockError, HVp, Table, TableEdit};
 use crate::ui::mixins::scrollwheel::ScrollModel;
 
 /// Implements [`ScrollModel`] to bridge between `Table` and `ScrollWheelMixin`.
@@ -49,28 +49,40 @@ impl<T: Borrow<Table>> Drop for UniqueVp<T> {
     }
 }
 
+fn bounds_for_edit(edit: &TableEdit<'_>) -> Box2<f64> {
+    let limit = edit.scroll_limit();
+
+    box2! {
+        min: [0.0, 0.0],
+        max: limit,
+    }
+}
+
 /// Assumes that `Table::edit` would succeed.
 impl<T: Borrow<Table>> ScrollModel for TableScrollModel<T> {
     fn bounds(&mut self) -> Box2<f64> {
         let edit = self.unique_vp.table.borrow().edit().unwrap();
-        let limit = edit.scroll_limit();
-
-        box2! {
-            min: [0.0, 0.0],
-            max: limit,
-        }
+        bounds_for_edit(&edit)
     }
 
     fn pos(&mut self) -> Point2<f64> {
         let edit = self.unique_vp.table.borrow().edit().unwrap();
-        edit.scroll_pos().into()
+        Point2::from(edit.scroll_pos()) + Vector2::from(edit.display_offset())
     }
 
     fn set_pos(&mut self, value: Point2<f64>) {
         let mut edit = self.unique_vp.table.borrow().edit().unwrap();
-        edit.set_scroll_pos(value.into());
-        // TODO: `set_scroll_pos` automatically clips the value, so some
-        //       animations do not work correctly
+
+        let clipped = bounds_for_edit(&edit).limit_point(&value);
+        edit.set_scroll_pos(clipped.into());
+
+        // Use the display offset for over-scrolling.
+        //
+        // It's important that the display offset is set to zero after
+        // a scrolling animation is settled. In such a case, `ScrollWheelMixin`
+        // passes an in-bound value to this method, meaning `clipped` is equal
+        // to `value`. Thus the display offset gets to be zero.
+        edit.set_display_offset((value - clipped).into());
     }
 
     fn line_size(&mut self) -> [f64; 2] {

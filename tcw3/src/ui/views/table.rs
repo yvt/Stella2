@@ -207,6 +207,9 @@ struct State {
 
     /// Viewports.
     vp_set: VpSet,
+
+    /// Display offset - see `TableEdit::set_display_offset`.
+    display_offset: VpPos,
 }
 
 impl fmt::Debug for State {
@@ -217,6 +220,7 @@ impl fmt::Debug for State {
             .field("line_idx_maps", &self.line_idx_maps)
             .field("linesets", &self.linesets)
             .field("vp_set", &self.vp_set)
+            .field("display_offset", &self.display_offset)
             .finish()
     }
 }
@@ -473,6 +477,7 @@ impl Table {
                 line_idx_maps: [LineIdxMap::new(0..0), LineIdxMap::new(0..0)],
                 linesets: [Lineset::new(), Lineset::new()],
                 vp_set: VpSet::new(),
+                display_offset: [0.0; 2],
             }),
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),

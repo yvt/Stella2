@@ -101,6 +101,7 @@ impl ScrollableTable {
 
                     // Steal the control from `ScrollWheelMixin`
                     inner.scroll_mixin.stop();
+                    inner.table.edit().unwrap().set_display_offset([0.0; 2]);
 
                     // Temporarily give the control of the scrollbar's value to
                     // `TableScrollbarDragListener`. This flag is reset when
