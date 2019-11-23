@@ -466,6 +466,8 @@ impl<T: Wm> MouseDragListener<T> for () {}
 #[derive(Debug, Clone, Copy)]
 pub struct ScrollDelta {
     /// The delta position. The meaning varies depending on `precise`.
+    ///
+    /// The signs of the components follow the movement of the scrolled contents.
     pub delta: Vector2<f32>,
     /// `true` if `delta` is measured in pixels. Otherwise, `delta` represents
     /// numbers of lines or rows.
