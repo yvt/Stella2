@@ -99,6 +99,9 @@ impl ScrollableTable {
                     struct InnerRef(Weak<Inner>, LineTy);
                     let inner_ref = InnerRef(inner_weak.clone(), line_ty);
 
+                    // Steal the control from `ScrollWheelMixin`
+                    inner.scroll_mixin.stop();
+
                     // Temporarily give the control of the scrollbar's value to
                     // `TableScrollbarDragListener`. This flag is reset when
                     // `InnerRef` is dropped.
@@ -264,6 +267,11 @@ impl WrapperViewListener {
 impl ViewListener for WrapperViewListener {
     fn scroll_motion(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, delta: &ScrollDelta) {
         if let Some(inner) = self.inner.upgrade() {
+            // Do not allow scrolling in two ways at the same time
+            if inner.drag_active.iter().any(|x| x.get()) {
+                return;
+            }
+
             inner
                 .scroll_mixin
                 .scroll_motion(wm, delta, self.scroll_model_getter())
@@ -272,6 +280,11 @@ impl ViewListener for WrapperViewListener {
 
     fn scroll_gesture(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
         if let Some(inner) = self.inner.upgrade() {
+            // Do not allow scrolling in two ways at the same time
+            if inner.drag_active.iter().any(|x| x.get()) {
+                return Box::new(());
+            }
+
             inner
                 .scroll_mixin
                 .scroll_gesture(self.scroll_model_getter())
