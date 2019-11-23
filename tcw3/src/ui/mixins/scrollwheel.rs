@@ -174,10 +174,10 @@ struct Inner {
 /// through `ScrollWheelMixin::scroll_motion`.
 const STATELESS_SCROLL_TOKEN_FLAG: u64 = 1;
 
-const BOUNCE_TIME: f32 = 0.5;
-const RELAXATION_TIME: f32 = 0.5;
+const BOUNCE_TIME: f32 = 0.4;
+const RELAXATION_TIME: f32 = 0.7;
 
-const BOUNCE_OVERSHOOT_LIMIT: f32 = 150.0;
+const BOUNCE_OVERSHOOT_LIMIT: f32 = 50.0;
 
 impl Inner {
     /// Stop the current scroll action and animation and issue a new `token`.
@@ -240,23 +240,30 @@ impl Inner {
         model.set_pos(pos);
     }
 
-    fn overflowing_flush(&self, model: &mut dyn ScrollModel) {
+    fn overflowing_flush(&self, model: &mut dyn ScrollModel, vertical: bool) {
         let dt = self.take_delta(model);
 
-        let raw_pos = model.pos();
+        let mut raw_pos = model.pos();
         let bounds = model.bounds();
 
-        let pos = Point2::new(
-            inverse_smooth_clamp_twoside(raw_pos.x, bounds.min.x..bounds.max.x),
-            inverse_smooth_clamp_twoside(raw_pos.y, bounds.min.y..bounds.max.y),
-        );
-        let pos = pos - dt;
-        let pos = Point2::new(
-            smooth_clamp_twoside(pos.x, bounds.min.x..bounds.max.x),
-            smooth_clamp_twoside(pos.y, bounds.min.y..bounds.max.y),
-        );
+        let i = vertical as usize;
 
-        model.set_pos(pos);
+        let pos = inverse_smooth_clamp_twoside(raw_pos[i], bounds.min[i]..bounds.max[i]);
+        let pos = pos - dt[i];
+        let pos = smooth_clamp_twoside(pos, bounds.min[i]..bounds.max[i]);
+
+        raw_pos[i] = pos;
+
+        // Bound the other axis' scroll position so that momentum scrolling is
+        // not prevented
+        const TOLERANCE: f64 = 2.0;
+        let k = 1 - i;
+        let sec_pos = raw_pos[k].fmax(bounds.min[k]).fmin(bounds.max[k]);
+        if (sec_pos - raw_pos[k]).abs() < TOLERANCE {
+            raw_pos[k] = sec_pos;
+        }
+
+        model.set_pos(raw_pos);
     }
 
     /// Handles movement in the `Momentum` state. May transition into `Bounce`.
@@ -334,7 +341,7 @@ impl Inner {
             // length of the control handle (an imaginary straight line between
             // the starting point and the control point) so that the movement
             // doesn't go too far.
-            let (mut x1, mut y1) = (0.25, velocity * BOUNCE_TIME * 0.25);
+            let (mut x1, mut y1) = (0.15, velocity * BOUNCE_TIME * 0.15);
             let max_y1 = BOUNCE_OVERSHOOT_LIMIT * 2.0;
             if y1.abs() > max_y1 {
                 x1 *= max_y1 / y1.abs();
@@ -342,7 +349,7 @@ impl Inner {
             }
 
             // Evaluate the animation
-            let overflow = eval_bezier_bouncing_timing_func(x1, y1, 0.25, 0.0, progress);
+            let overflow = eval_bezier_bouncing_timing_func(x1, y1, 0.15, 0.0, progress);
             let delta = overflow - position.get();
             position.set(overflow);
 
@@ -390,8 +397,8 @@ impl Inner {
                 return false;
             }
 
-            // Evaluate the animation. This is the same as CSS's `ease-out`.
-            let xformed = eval_bezier_bouncing_timing_func(0.0, 0.0, 0.58, 1.0, progress);
+            // Evaluate the animation. This is an extreme version of `ease-out`.
+            let xformed = eval_bezier_bouncing_timing_func(0.13, 1.0, 0.25, 1.0, progress);
             let delta = xformed - position.get();
             position.set(xformed);
 
@@ -472,7 +479,7 @@ impl ScrollListener for ScrollListenerImpl {
         let is_momentum_state = self.momentum.get();
         if !is_momentum_state {
             // Reset the direction based on the latest velocity
-            self.vertical.set(delta.delta.y.abs() > delta.delta.x.abs());
+            self.vertical.set(velocity.y.abs() > velocity.x.abs());
         }
         let axis = self.vertical.get() as usize;
         self.velocity.set(velocity[axis]);
@@ -502,7 +509,7 @@ impl ScrollListener for ScrollListenerImpl {
                     );
                 } else {
                     let mut model = (this.model_getter)();
-                    inner.overflowing_flush(&mut *model);
+                    inner.overflowing_flush(&mut *model, this.vertical.get());
                 }
             });
         }
@@ -573,28 +580,30 @@ impl ScrollListener for ScrollListenerImpl {
     }
 }
 
-const OVERFLOW_LIMIT: f64 = 150.0;
+const OVERFLOW_COMPRESS: f64 = 10.0;
+
+const OVERFLOW_LIMIT: f64 = 40.0;
 
 /// This value is used to clamp the result of `smooth_clamp` so that it never
 /// reaches `OVERFLOW_LIMIT`. The clamping is required because the inverse
 /// function is undefined at `OVERFLOW_LIMIT`. Therefore this value must be
 /// slightly less than `OVERFLOW_LIMIT`.
-const OVERFLOW_CLAMP: f64 = OVERFLOW_LIMIT - 10.0;
+const OVERFLOW_CLAMP: f64 = OVERFLOW_LIMIT - 5.0;
 
 /// Like `min(x, OVERFLOW_LIMIT)`, but smooth and asymptotically approaches
 /// `OVERFLOW_LIMIT`. This function satisfies the following properties for all
-/// `x ≥ 0`: `f(0) = 0`, `f'(0) = 1`, `f'(x) > 0` and
+/// `x ≥ 0`: `f(0) = 0`, `f'(0) = 1 / OVERFLOW_COMPRESS`, `f'(x) > 0` and
 /// `lim_{x→∞} f(x) = OVERFLOW_LIMIT`.
 fn smooth_clamp(x: f64) -> f64 {
     debug_assert!(x >= 0.0);
     let limit = OVERFLOW_LIMIT;
-    limit - limit / (x * (1.0 / limit) + 1.0)
+    limit - limit / ((1.0 / OVERFLOW_COMPRESS * x) * (1.0 / limit) + 1.0)
 }
 
 /// The inverse function of `smooth_clamp`.
 fn inverse_smooth_clamp(y: f64) -> f64 {
     let y = y.fmin(OVERFLOW_CLAMP);
-    y / (1.0 - y * (1.0 / OVERFLOW_LIMIT))
+    OVERFLOW_COMPRESS * y / (1.0 - y * (1.0 / OVERFLOW_LIMIT))
 }
 
 fn smooth_clamp_twoside(x: f64, range: std::ops::Range<f64>) -> f64 {
@@ -656,7 +665,7 @@ fn start_animation_timer(wm: pal::Wm, f: impl FnMut(pal::Wm) -> bool + 'static) 
 
 /// Numerically solve an equation `f(x) = 0` using the Newton's method.
 fn solve_newton(start: f32, mut f: impl FnMut(f32) -> f32, mut f_d: impl FnMut(f32) -> f32) -> f32 {
-    (0..6).fold(start, |x, _| x - f(x) / f_d(x))
+    (0..12).fold(start, |x, _| x - f(x) / f_d(x))
 }
 
 /// Evaluate a Bézier timing function. It's defined like a CSS timing function,
@@ -679,17 +688,17 @@ fn eval_bezier_bouncing_timing_func(x1: f32, y1: f32, x2: f32, y2: f32, t: f32) 
 
 #[inline]
 fn eval_cubic_bezier(x: f32, y1: f32, y2: f32, y3: f32) -> f32 {
-    // y1 * (1-x)²x + y2 * (1-x)x² + y3 * x³
-    //  = y1(x-2x²+x³) + y2(x²-x³) + y3x³
-    //  = x³(y1-y2+y3) + x²(-2y1+y2) + xy1
-    x * (y1 + x * (((y2 - y1) - y1) + x * (y3 - (y2 - y1))))
+    // 3y1 * (1-x)²x + 3y2 * (1-x)x² + y3 * x³
+    //  = 3y1(x-2x²+x³) + 3y2(x²-x³) + y3x³
+    //  = x³(3(y1-y2)+y3) + x²(3(y2-y1)-3y1) + 3xy1
+    x * (3.0 * y1 + x * ((3.0 * (y2 - y1) - 3.0 * y1) + x * (y3 - 3.0 * (y2 - y1))))
 }
 
 #[inline]
 fn eval_cubic_bezier_d(x: f32, y1: f32, y2: f32, y3: f32) -> f32 {
-    // (y1 * (1-x)²x + y2 * (1-x)x² + y3 * x³)'
-    //  = 3x²(y1-y2+y3) + 2x(-2y1+y2) + y1
-    y1 + x * (((y2 - y1) - y1) * 2.0 + 3.0 * x * (y3 - (y2 - y1)))
+    // (3y1 * (1-x)²x + 3y2 * (1-x)x² + y3 * x³)'
+    //  = 3x²(3(y1-y2)+y3) + 2x(3(y2-y1)-3y1) + 3y1
+    3.0 * y1 + x * ((3.0 * (y2 - y1) - 3.0 * y1) * 2.0 + 3.0 * x * (y3 - 3.0 * (y2 - y1)))
 }
 
 #[cfg(test)]
@@ -714,7 +723,7 @@ mod tests {
         let x = solve_newton(1.0, &f, &f_d);
         debug!("x = {:?}, f(x) = {:?}", x, f(x));
 
-        f(x).abs() < 1.0e-3
+        f(x).abs() < 1.0e-2
     }
 
     #[test]
@@ -729,6 +738,17 @@ mod tests {
             eval_bezier_bouncing_timing_func(x1, y1, 0.25, 0.0, 1.0),
             0.0,
             epsilon = 1.0e-3
+        );
+
+        assert_abs_diff_eq!(
+            eval_bezier_bouncing_timing_func(0.2, 1.0, 0.0, 1.0, 1.0),
+            1.0,
+            epsilon = 1.0e-3
+        );
+        assert_abs_diff_eq!(
+            eval_bezier_bouncing_timing_func(0.0, 1.0, 0.25, 1.0, 0.9),
+            0.99824,
+            epsilon = 1.0e-2
         );
     }
 
