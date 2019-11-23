@@ -556,6 +556,7 @@ mod fixedpoint;
 mod listener;
 mod scrollable;
 pub mod scrollbar;
+pub mod scrollwheel;
 mod update;
 
 pub use self::edit::TableEdit;

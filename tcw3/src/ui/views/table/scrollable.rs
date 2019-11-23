@@ -1,3 +1,4 @@
+use cgmath::Point2;
 use flags_macro::flags;
 use owning_ref::OwningRef;
 use std::{
@@ -10,16 +11,19 @@ use super::{
         table_edit_to_scrollbar_page_step, table_edit_to_scrollbar_value,
         TableScrollbarDragListener,
     },
+    scrollwheel::TableScrollModel,
     LineTy, Table,
 };
 use crate::{
     pal,
     prelude::*,
     ui::{
+        layouts::FillLayout,
+        mixins::scrollwheel::{ScrollModel, ScrollWheelMixin},
         theming::{ClassSet, ElemClassPath, Manager, Role, StyledBox},
         views::Scrollbar,
     },
-    uicore::{HView, ViewFlags},
+    uicore::{HView, ScrollDelta, ScrollListener, ViewFlags, ViewListener},
 };
 
 /// Wraps [`Table`] to support scrolling.
@@ -30,10 +34,12 @@ pub struct ScrollableTable {
 
 #[derive(Debug)]
 struct Inner {
+    wrapper: HView,
     styled_box: StyledBox,
     table: Table,
     scrollbars: [Scrollbar; 2],
     drag_active: [Cell<bool>; 2],
+    scroll_mixin: ScrollWheelMixin,
 }
 
 impl ScrollableTable {
@@ -55,12 +61,18 @@ impl ScrollableTable {
 
         styled_box.set_class_set(ClassSet::SCROLL_CONTAINER);
 
+        // Create a view for receiving scroll wheel events
+        let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
+        wrapper.set_layout(FillLayout::new(styled_box.view().clone()));
+
         let this = Self {
             inner: Rc::new(Inner {
+                wrapper,
                 styled_box,
                 table,
                 scrollbars,
                 drag_active: [Cell::new(false), Cell::new(false)],
+                scroll_mixin: ScrollWheelMixin::new(),
             }),
         };
 
@@ -123,14 +135,17 @@ impl ScrollableTable {
             // TODO: `set_on_page_step`
         }
 
-        // TODO: Mouse wheel
+        // Watch scroll wheel events
+        this.inner.wrapper.set_listener(WrapperViewListener {
+            inner: Rc::downgrade(&this.inner),
+        });
 
         this
     }
 
     /// Get a handle to the view representing the widget.
     pub fn view(&self) -> &HView {
-        self.inner.styled_box.view()
+        &self.inner.wrapper
     }
 
     /// Get a reference to the inner `Table`.
@@ -228,12 +243,49 @@ impl Inner {
     }
 }
 
+struct WrapperViewListener {
+    inner: Weak<Inner>,
+}
+
+impl WrapperViewListener {
+    fn scroll_model_getter(&self) -> impl Fn() -> Box<dyn ScrollModel> + 'static {
+        let inner_weak = self.inner.clone();
+        move || {
+            if let Some(inner) = inner_weak.upgrade() {
+                let table = OwningRef::new(inner).map(|inner| &inner.table);
+                Box::new(TableScrollModel::new(table).unwrap())
+            } else {
+                Box::new(())
+            }
+        }
+    }
+}
+
+impl ViewListener for WrapperViewListener {
+    fn scroll_motion(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, delta: &ScrollDelta) {
+        if let Some(inner) = self.inner.upgrade() {
+            inner
+                .scroll_mixin
+                .scroll_motion(wm, delta, self.scroll_model_getter())
+        }
+    }
+
+    fn scroll_gesture(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
+        if let Some(inner) = self.inner.upgrade() {
+            inner
+                .scroll_mixin
+                .scroll_gesture(self.scroll_model_getter())
+        } else {
+            Box::new(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         testing::{prelude::*, use_testing_wm},
-        ui::layouts::FillLayout,
         uicore::HWnd,
     };
     use cggeom::prelude::*;
