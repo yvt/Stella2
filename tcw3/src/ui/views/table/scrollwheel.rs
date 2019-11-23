@@ -52,10 +52,11 @@ impl<T: Borrow<Table>> Drop for UniqueVp<T> {
 fn bounds_for_edit(edit: &TableEdit<'_>) -> Box2<f64> {
     let limit = edit.scroll_limit();
 
-    box2! {
+    (box2! {
         min: [0.0, 0.0],
         max: limit,
-    }
+    })
+    .translate(-Vector2::from(edit.scroll_pos()))
 }
 
 /// Assumes that `Table::edit` would succeed.
@@ -66,15 +67,19 @@ impl<T: Borrow<Table>> ScrollModel for TableScrollModel<T> {
     }
 
     fn pos(&mut self) -> Point2<f64> {
+        // `edit.scroll_pos()` is translated to zero (for precision issues with
+        // `ScrollWheelMixin`). Note that changing the frame of reference is
+        // allowed by `ScrollModel`'s contract.
+
         let edit = self.unique_vp.table.borrow().edit().unwrap();
-        Point2::from(edit.scroll_pos()) + Vector2::from(edit.display_offset())
+        Point2::from(edit.display_offset())
     }
 
     fn set_pos(&mut self, value: Point2<f64>) {
         let mut edit = self.unique_vp.table.borrow().edit().unwrap();
 
         let clipped = bounds_for_edit(&edit).limit_point(&value);
-        edit.set_scroll_pos(clipped.into());
+        edit.set_scroll_pos((clipped + Vector2::from(edit.scroll_pos())).into());
 
         // Use the display offset for over-scrolling.
         //
