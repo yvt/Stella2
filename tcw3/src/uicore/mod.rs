@@ -719,15 +719,6 @@ impl HWnd {
     pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, &HWnd) + 'static) {
         self.invoke_on_next_frame_inner(Box::new(f));
     }
-
-    fn invoke_on_next_frame_inner(&self, f: Box<dyn FnOnce(pal::Wm, &HWnd)>) {
-        if self.wnd.closed.get() {
-            return;
-        }
-
-        self.wnd.frame_handlers.borrow_mut().push_back(f);
-        self.pend_update();
-    }
 }
 
 impl PartialEq for HWnd {

@@ -67,3 +67,26 @@ fn invoke_on_update(twm: &dyn TestingWm) {
 
     assert_eq!(count.get(), 3);
 }
+
+#[use_testing_wm]
+#[test]
+fn invoke_on_next_frame(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+    wnd.set_visibility(true);
+
+    let count = Rc::new(Cell::new(0));
+    fn incr_count(wnd: &HWnd, count: Rc<Cell<u32>>) {
+        if count.get() < 3 {
+            count.set(count.get() + 1);
+            wnd.invoke_on_next_frame(move |_, wnd| incr_count(wnd, count));
+        }
+    }
+    wnd.invoke_on_next_frame(enc!((count) move |_, wnd| incr_count(wnd, count)));
+
+    // `request_update_ready` is currently implemented as `invoke`, so
+    // `step_unsend` should process the queue until it's empty
+    twm.step_unsend();
+
+    assert_eq!(count.get(), 3);
+}

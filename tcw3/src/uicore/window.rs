@@ -89,6 +89,22 @@ impl HWnd {
         }
     }
 
+    pub(super) fn invoke_on_next_frame_inner(&self, f: Box<dyn FnOnce(pal::Wm, &HWnd)>) {
+        if self.wnd.closed.get() {
+            return;
+        }
+
+        let mut frame_handlers = self.wnd.frame_handlers.borrow_mut();
+
+        if frame_handlers.is_empty() {
+            if let Some(ref pal_wnd) = *self.wnd.pal_wnd.borrow() {
+                self.wnd.wm.request_update_ready_wnd(pal_wnd);
+            }
+        }
+
+        frame_handlers.push_back(f);
+    }
+
     /// This is basically the handler of `update_ready` event and where layers
     /// are layouted and rendered. Also, the update process clears `Wnd::dirty`.
     fn update(&self) {
