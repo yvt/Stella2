@@ -11,7 +11,7 @@ use std::{cell::Cell, rc::Rc};
 use crate::{
     pal,
     prelude::*,
-    uicore::{HView, ScrollDelta, ScrollListener},
+    uicore::{HView, HWnd, ScrollDelta, ScrollListener},
 };
 
 /// A view listener mix-in that facilitates scrolling and provides a consistent
@@ -269,7 +269,7 @@ impl Inner {
     /// Handles movement in the `Momentum` state. May transition into `Bounce`.
     fn bouncing_flush(
         this: Rc<Self>,
-        wm: pal::Wm,
+        hview: &HView,
         vertical: bool,
         velocity: f32,
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
@@ -307,23 +307,30 @@ impl Inner {
             );
 
             // Start bouncing
-            Self::start_bounce(this, wm, vertical, velocity, model_getter);
+            Self::start_bounce(this, hview, vertical, velocity, model_getter);
         }
     }
 
     fn start_bounce(
         this: Rc<Self>,
-        wm: pal::Wm,
+        hview: &HView,
         vertical: bool,
         velocity: f32,
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
     ) {
         this.stop();
+
+        let hwnd = if let Some(hwnd) = hview.containing_wnd() {
+            hwnd
+        } else {
+            return;
+        };
+
         let token = this.token.get();
 
         let position = Cell::new(0.0);
 
-        start_transition(wm, BOUNCE_TIME, move |_, progress| {
+        start_transition(&hwnd, BOUNCE_TIME, move |_, progress| {
             if token != this.token.get() {
                 return false;
             }
@@ -371,10 +378,17 @@ impl Inner {
 
     fn start_relaxation(
         this: Rc<Self>,
-        wm: pal::Wm,
+        hview: &HView,
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
     ) {
         this.stop();
+
+        let hwnd = if let Some(hwnd) = hview.containing_wnd() {
+            hwnd
+        } else {
+            return;
+        };
+
         let token = this.token.get();
 
         let position = Cell::new(0.0);
@@ -384,7 +398,7 @@ impl Inner {
         let goal = model.bounds().limit_point(&pos) - pos;
         drop(model);
 
-        start_transition(wm, RELAXATION_TIME, move |_, progress| {
+        start_transition(&hwnd, RELAXATION_TIME, move |_, progress| {
             if token != this.token.get() {
                 return false;
             }
@@ -471,7 +485,7 @@ impl ScrollListenerImpl {
 }
 
 impl ScrollListener for ScrollListenerImpl {
-    fn motion(&self, wm: pal::Wm, _: &HView, delta: &ScrollDelta, velocity: Vector2<f32>) {
+    fn motion(&self, wm: pal::Wm, hview: &HView, delta: &ScrollDelta, velocity: Vector2<f32>) {
         if delta.delta == Vector2::new(0.0, 0.0) || !self.is_valid() {
             return;
         }
@@ -490,6 +504,7 @@ impl ScrollListener for ScrollListenerImpl {
             self.inner.flush_enqueued.set(true);
 
             let this = self.clone();
+            let hview = hview.clone();
 
             wm.invoke_on_update(move |_| {
                 let inner = &this.inner;
@@ -502,7 +517,7 @@ impl ScrollListener for ScrollListenerImpl {
                 if this.momentum.get() {
                     Inner::bouncing_flush(
                         this.inner,
-                        wm,
+                        &hview,
                         this.vertical.get(),
                         this.velocity.get(),
                         this.model_getter,
@@ -515,7 +530,7 @@ impl ScrollListener for ScrollListenerImpl {
         }
     }
 
-    fn start_momentum_phase(&self, wm: pal::Wm, _: &HView) {
+    fn start_momentum_phase(&self, _: pal::Wm, hview: &HView) {
         let mut model = (self.model_getter)();
         let pos = model.pos();
         let bounds = model.bounds();
@@ -530,7 +545,7 @@ impl ScrollListener for ScrollListenerImpl {
             // Start the relaxation motion to restore a valid scroll position.
             // No momentum scrolling in this case. `self` is invalidated by
             // `start_relaxation` by modifying `inner.token`.
-            Inner::start_relaxation(Rc::clone(&self.inner), wm, Rc::clone(&self.model_getter));
+            Inner::start_relaxation(Rc::clone(&self.inner), hview, Rc::clone(&self.model_getter));
         } else {
             trace!(
                 "{:?} is inside {:?}, allowing momentum scrolling",
@@ -542,7 +557,7 @@ impl ScrollListener for ScrollListenerImpl {
         self.momentum.set(true);
     }
 
-    fn end(&self, wm: pal::Wm, _: &HView) {
+    fn end(&self, _: pal::Wm, hview: &HView) {
         if !self.is_valid() {
             return;
         }
@@ -568,7 +583,7 @@ impl ScrollListener for ScrollListenerImpl {
 
         // Start the relaxation motion to restore a valid scroll position
         // `self` is invalidated by `start_relaxation` by modifying `inner.token`.
-        Inner::start_relaxation(Rc::clone(&self.inner), wm, Rc::clone(&self.model_getter));
+        Inner::start_relaxation(Rc::clone(&self.inner), hview, Rc::clone(&self.model_getter));
     }
 
     fn cancel(&self, _: pal::Wm, _: &HView) {
@@ -626,11 +641,11 @@ fn inverse_smooth_clamp_twoside(y: f64, range: std::ops::Range<f64>) -> f64 {
     }
 }
 
-fn start_transition(wm: pal::Wm, duration: f32, mut f: impl FnMut(pal::Wm, f32) -> bool + 'static) {
+fn start_transition(hwnd: &HWnd, duration: f32, mut f: impl FnMut(pal::Wm, f32) -> bool + 'static) {
     use std::time::Instant;
     let start = Instant::now();
 
-    start_animation_timer(wm, move |wm| {
+    start_animation_timer(hwnd, move |wm| {
         let elapsed = start.elapsed().as_secs_f32();
         let progress = (elapsed / duration).fmin(1.0);
         f(wm, progress)
@@ -638,21 +653,20 @@ fn start_transition(wm: pal::Wm, duration: f32, mut f: impl FnMut(pal::Wm, f32) 
 }
 
 // TODO: This utility function is convenient and should be moved to something
-//       like a utility module. Also, `uicore` should support
-//       `requestAnimationFrame` natively.
-fn start_animation_timer(wm: pal::Wm, f: impl FnMut(pal::Wm) -> bool + 'static) {
+//       like a utility module.
+/// Call the given function each frame until it returns `false`. `hwnd` is used
+/// to decide the display refresh rate to synchronize.
+fn start_animation_timer(hwnd: &HWnd, f: impl FnMut(pal::Wm) -> bool + 'static) {
     struct TimerState<T: ?Sized>(T);
 
     impl<T: ?Sized + FnMut(pal::Wm) -> bool + 'static> TimerState<T> {
-        fn enqueue(wm: pal::Wm, mut this: Box<Self>) {
-            wm.invoke_on_update(move |wm| {
+        fn enqueue(hwnd: &HWnd, mut this: Box<Self>) {
+            hwnd.invoke_on_next_frame(move |wm, hwnd| {
                 let keep_running = (this.0)(wm);
 
                 if keep_running {
                     // Try to simulate `requestAnimationFrame`
-                    wm.invoke(move |wm| {
-                        Self::enqueue(wm, this);
-                    });
+                    Self::enqueue(hwnd, this);
                 }
             });
         }
@@ -660,7 +674,7 @@ fn start_animation_timer(wm: pal::Wm, f: impl FnMut(pal::Wm) -> bool + 'static) 
 
     let st: Box<TimerState<dyn FnMut(pal::Wm) -> bool>> = Box::new(TimerState(f));
 
-    TimerState::enqueue(wm, st);
+    TimerState::enqueue(hwnd, st);
 }
 
 /// Numerically solve an equation `f(x) = 0` using the Newton's method.
@@ -839,7 +853,10 @@ mod tests {
     #[test]
     fn no_momentum(twm: &dyn TestingWm) {
         let wm = twm.wm();
-        let hview = HView::new(Default::default());
+        let hwnd = HWnd::new(wm);
+        hwnd.set_visibility(true);
+        twm.step_unsend();
+        let hview = hwnd.content_view();
 
         let model_st = Rc::new(init_model_st());
         let model_getter_fac = || {
@@ -878,7 +895,10 @@ mod tests {
     #[test]
     fn relaxation(twm: &dyn TestingWm) {
         let wm = twm.wm();
-        let hview = HView::new(Default::default());
+        let hwnd = HWnd::new(wm);
+        hwnd.set_visibility(true);
+        twm.step_unsend();
+        let hview = hwnd.content_view();
 
         let model_st = Rc::new(init_model_st());
         let model_getter_fac = || {
@@ -930,7 +950,7 @@ mod tests {
             debug!("{}: p = {:?}", i, p);
 
             if p.x <= max.x || p.y <= max.y {
-                break;
+                return;
             }
             assert!(p.x <= pos.x || p.y <= pos.y);
 
@@ -938,6 +958,8 @@ mod tests {
             twm.step_unsend();
             wait_for(twm, 20);
         }
+
+        panic!("The animation did not complete before a certain period of time.");
     }
 
     // TODO: somehow test the bounce animation

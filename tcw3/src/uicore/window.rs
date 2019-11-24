@@ -17,7 +17,7 @@ use crate::pal::{self, prelude::Wm as _, Wm};
 
 impl HView {
     /// Get the containing window for a view.
-    pub(super) fn containing_wnd(&self) -> Option<HWnd> {
+    pub fn containing_wnd(&self) -> Option<HWnd> {
         match self.view.superview.borrow().upgrade() {
             None => None,
             Some(SuperviewStrong::View(sv)) => HView { view: sv }.containing_wnd(),
