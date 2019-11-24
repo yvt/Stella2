@@ -69,9 +69,6 @@ impl HWnd {
     }
 
     /// Pend an update.
-    ///
-    /// This is layers are layouted and rendered. Also, the update process
-    /// clears `Wnd::dirty`.
     pub(super) fn pend_update(&self) {
         assert!(!self.wnd.closed.get(), "the window has been already closed");
 
@@ -92,6 +89,8 @@ impl HWnd {
         }
     }
 
+    /// This is basically the handler of `update_ready` event and where layers
+    /// are layouted and rendered. Also, the update process clears `Wnd::dirty`.
     fn update(&self) {
         if self.wnd.closed.get() {
             return;
