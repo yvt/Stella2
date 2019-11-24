@@ -78,6 +78,12 @@ pub struct HWnd {
     wnd: Rc<Wnd>,
 }
 
+/// A weak window handle type.
+#[derive(Default, Debug, Clone)]
+pub struct WeakHWnd {
+    wnd: Weak<Wnd>,
+}
+
 impl fmt::Debug for HWnd {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if f.alternate() {
@@ -548,6 +554,13 @@ impl HWnd {
         hwnd
     }
 
+    /// Construct a weak handle.
+    pub fn downgrade(&self) -> WeakHWnd {
+        WeakHWnd {
+            wnd: Rc::downgrade(&self.wnd),
+        }
+    }
+
     pub(crate) fn wm(&self) -> Wm {
         self.wnd.wm
     }
@@ -724,6 +737,18 @@ impl PartialEq for HWnd {
 }
 
 impl Eq for HWnd {}
+
+impl WeakHWnd {
+    /// Construct a `WeakHWnd` that doesn't reference any window.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Attempt to upgrade this weak handle to a `HWnd`.
+    pub fn upgrade(&self) -> Option<HWnd> {
+        self.wnd.upgrade().map(|wnd| HWnd { wnd })
+    }
+}
 
 impl HView {
     /// Construct a view object and return a handle to it.
