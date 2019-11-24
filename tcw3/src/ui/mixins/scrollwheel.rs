@@ -858,13 +858,13 @@ mod tests {
                 precise: true,
                 delta: [-5.0, -10.0].into(),
             },
-            [0.0, 0.0].into(),
+            [0.0, 5.0].into(),
         );
 
         twm.step_unsend();
         wait_for(twm, 100);
 
-        let expected_pos = expected_pos + Vector2::new(5.0, 10.0);
+        let expected_pos = expected_pos + Vector2::new(0.0, 10.0);
         assert_eq!(model_st.value.get(), expected_pos);
 
         scroll.end(wm, &hview);
@@ -894,9 +894,22 @@ mod tests {
             &hview,
             &ScrollDelta {
                 precise: true,
-                delta: [-1.0e8, -1.0e8].into(),
+                delta: [0.0, -1.0e8].into(),
             },
-            [0.0, 0.0].into(),
+            [0.0, 5.0].into(),
+        );
+
+        twm.step_unsend();
+        wait_for(twm, 100);
+
+        scroll.motion(
+            wm,
+            &hview,
+            &ScrollDelta {
+                precise: true,
+                delta: [-1.0e8, 0.0].into(),
+            },
+            [5.0, 0.0].into(),
         );
 
         twm.step_unsend();
