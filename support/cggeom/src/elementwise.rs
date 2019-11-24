@@ -1,5 +1,4 @@
 use cgmath::{BaseNum, Point2, Point3, Vector2, Vector3, Vector4};
-use std::cmp::Ordering;
 
 pub trait BoolArray {
     fn any(&self) -> bool;
