@@ -368,7 +368,6 @@ pub trait ViewListener {
     /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
     fn mouse_out(&self, _: Wm, _: &HView) {}
 
-    // TODO: Implement these events
     /// The mouse's scroll wheel was moved to scroll the view's contents
     /// underneath the mouse pointer.
     ///
