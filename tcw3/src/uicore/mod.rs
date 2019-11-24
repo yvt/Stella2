@@ -620,7 +620,7 @@ impl HWnd {
 
             // Pend a root layer change
             let dirty = &self.wnd.dirty;
-            dirty.set(dirty.get() | window::WndDirtyFlags::LAYER);
+            dirty.set(dirty.get() | flags![window::WndDirtyFlags::{LAYER | CONTENTS}]);
         }
 
         // Unmount the old content view
@@ -1030,6 +1030,7 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
                 DESCENDANT_UPDATE_EVENT | DESCENDANT_SUBLAYERS |
                 DESCENDANT_SIZE_TRAITS | DESCENDANT_SUBVIEWS_FRAME
             }]) {
+                wnd.set_dirty_flags(window::WndDirtyFlags::CONTENTS);
                 HWnd { wnd }.pend_update();
             }
         }

@@ -27,6 +27,7 @@ impl HView {
 }
 
 /// A new, min, and max window size based on the `SizeTraits` of the root view.
+#[derive(Default)]
 struct RootSizeReq {
     new_size: Option<[u32; 2]>,
     min_size: Option<[u32; 2]>,
@@ -108,11 +109,20 @@ impl HWnd {
             return;
         };
 
+        // They may set `CONTENTS`
+        process_pending_invocations(self.wnd.wm);
+
+        let update_contents = self.wnd.dirty.get().contains(WndDirtyFlags::CONTENTS);
+
         let RootSizeReq {
             new_size,
             min_size,
             max_size,
-        } = self.update_views();
+        } = if update_contents {
+            self.update_views()
+        } else {
+            RootSizeReq::default()
+        };
 
         // Clear the flag. Beyond this point, when `self.pend_update` is called,
         // a fresh update request will be enqueued.
@@ -168,7 +178,9 @@ impl HWnd {
         self.wnd.updating.set(false);
 
         // Update layers
-        self.wnd.wm.update_wnd(pal_wnd);
+        if update_contents {
+            self.wnd.wm.update_wnd(pal_wnd);
+        }
     }
 
     /// Perform pending updates. Also, returns a new, min, and max window size
@@ -396,6 +408,8 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
                 view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
+            hwnd.wnd.set_dirty_flags(WndDirtyFlags::CONTENTS);
+
             // Layers should be updated *within* the call to thie method
             // for them to properly follow the window outline being dragged.
             hwnd.update();
@@ -525,8 +539,10 @@ bitflags! {
         const STYLE_FLAGS = 1 << 3;
         const STYLE_CAPTION = 1 << 4;
 
+        const CONTENTS = 1 << 5;
+
         /// `update` is queued to the main event queue.
-        const UPDATE = 1 << 5;
+        const UPDATE = 1 << 6;
     }
 }
 
