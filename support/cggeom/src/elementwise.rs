@@ -8,6 +8,8 @@ pub trait BoolArray {
 
 // FIXME: rename?
 pub trait ElementWiseOp {
+    // TODO: Rename these bois to like `fmin` and reimplement them based on
+    //       `alt_fp::FloatOrd`
     fn element_wise_min(&self, rhs: &Self) -> Self;
     fn element_wise_max(&self, rhs: &Self) -> Self;
 }
@@ -22,17 +24,19 @@ pub trait ElementWisePartialOrd {
 
 #[inline]
 fn num_min<T: BaseNum>(x: T, y: T) -> T {
-    match x.partial_cmp(&y) {
-        None | Some(Ordering::Equal) | Some(Ordering::Less) => x,
-        Some(Ordering::Greater) => y,
+    if y < x {
+        y
+    } else {
+        x
     }
 }
 
 #[inline]
 fn num_max<T: BaseNum>(x: T, y: T) -> T {
-    match x.partial_cmp(&y) {
-        None | Some(Ordering::Equal) | Some(Ordering::Greater) => x,
-        Some(Ordering::Less) => y,
+    if y > x {
+        y
+    } else {
+        x
     }
 }
 
