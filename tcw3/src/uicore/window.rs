@@ -109,6 +109,11 @@ impl HWnd {
             return;
         };
 
+        // Process `invoke_on_next_frame`.
+        for cb in self.wnd.frame_handlers.replace(Default::default()) {
+            cb(self.wnd.wm, self);
+        }
+
         // They may set `CONTENTS`
         process_pending_invocations(self.wnd.wm);
 

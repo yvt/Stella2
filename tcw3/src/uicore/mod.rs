@@ -22,6 +22,7 @@ use log::trace;
 use momo::momo;
 use std::{
     cell::{Cell, RefCell},
+    collections::LinkedList,
     fmt,
     rc::{Rc, Weak},
 };
@@ -154,6 +155,7 @@ struct Wnd {
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
+    frame_handlers: RefCell<LinkedList<Box<dyn FnOnce(Wm, &HWnd)>>>,
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
@@ -175,6 +177,7 @@ impl fmt::Debug for Wnd {
             .field("style_attrs", &self.style_attrs)
             .field("updating", &self.updating)
             .field("dpi_scale_changed_handlers", &())
+            .field("frame_handlers", &())
             .field("mouse_state", &self.mouse_state)
             .finish()
     }
@@ -197,6 +200,7 @@ impl Wnd {
             style_attrs: RefCell::new(Default::default()),
             updating: Cell::new(false),
             dpi_scale_changed_handlers: RefCell::new(SubscriberList::new()),
+            frame_handlers: RefCell::new(LinkedList::new()),
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
         }
@@ -693,6 +697,23 @@ impl HWnd {
     /// Get the style flags of a window.
     pub fn style_flags(&self) -> WndStyleFlags {
         self.wnd.style_attrs.borrow().flags
+    }
+
+    /// Enqueue a call to the specified function. The function will be called
+    /// when the system is ready to accept a new displayed frame.
+    ///
+    /// This is the equivalent of JavaScript's `requestAnimationFrame`.
+    pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, &HWnd) + 'static) {
+        self.invoke_on_next_frame_inner(Box::new(f));
+    }
+
+    fn invoke_on_next_frame_inner(&self, f: Box<dyn FnOnce(pal::Wm, &HWnd)>) {
+        if self.wnd.closed.get() {
+            return;
+        }
+
+        self.wnd.frame_handlers.borrow_mut().push_back(f);
+        self.pend_update();
     }
 }
 
