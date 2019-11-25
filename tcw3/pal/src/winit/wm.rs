@@ -1,7 +1,7 @@
 use arrayvec::ArrayVec;
 use fragile::Fragile;
 use iterpool::Pool;
-use neo_linked_list::{LinkedListCell, AssertUnpin};
+use neo_linked_list::{AssertUnpin, LinkedListCell};
 use once_cell::sync::OnceCell;
 use owning_ref::OwningRef;
 use std::{
@@ -15,9 +15,7 @@ use std::{
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
 use super::super::{timerqueue::TimerQueue, MtSticky};
-use super::{
-    HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent,
-};
+use super::{HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
 
 impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
@@ -318,7 +316,8 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
     pub fn invoke(&'static self, cb: impl FnOnce(&'static Self) + 'static) {
         use neo_linked_list::linked_list::Node;
-        self.unsend_invoke_events.push_back_node(Node::pin(AssertUnpin::new(cb)));
+        self.unsend_invoke_events
+            .push_back_node(Node::pin(AssertUnpin::new(cb)));
     }
 
     pub fn invoke_after(

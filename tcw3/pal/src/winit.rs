@@ -39,7 +39,7 @@
 use cgmath::Point2;
 use fragile::Fragile;
 use iterpool::{Pool, PoolPtr};
-use neo_linked_list::{LinkedListCell, AssertUnpin};
+use neo_linked_list::{AssertUnpin, LinkedListCell};
 use once_cell::sync::OnceCell;
 use std::{
     cell::{Cell, RefCell},
