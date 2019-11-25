@@ -125,7 +125,6 @@ impl<T> Node<T> {
 // private methods
 impl<T: ?Sized> LinkedList<T> {
     /// Adds the given node to the front of the list.
-    #[inline]
     fn push_front_node(&mut self, mut node: Box<Node<T>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
@@ -145,7 +144,6 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the front of the list.
-    #[inline]
     fn pop_front_node(&mut self) -> Option<Box<Node<T>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
@@ -164,7 +162,6 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Adds the given node to the back of the list.
-    #[inline]
     fn push_back_node(&mut self, mut node: Box<Node<T>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
@@ -184,7 +181,6 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the back of the list.
-    #[inline]
     fn pop_back_node(&mut self) -> Option<Box<Node<T>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
