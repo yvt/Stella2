@@ -298,7 +298,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let list: LinkedList<u32> = LinkedList::new();
     /// ```
@@ -321,7 +321,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut list1 = LinkedList::new();
     /// list1.push_back('a');
@@ -363,7 +363,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut list: LinkedList<u32> = LinkedList::new();
     ///
@@ -391,7 +391,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut list: LinkedList<u32> = LinkedList::new();
     ///
@@ -425,7 +425,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     /// assert!(dl.is_empty());
@@ -446,7 +446,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     ///
@@ -471,7 +471,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     ///
@@ -495,7 +495,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut list: LinkedList<u32> = LinkedList::new();
     ///
@@ -519,7 +519,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     /// assert_eq!(dl.front(), None);
@@ -555,7 +555,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     /// assert_eq!(dl.front(), None);
@@ -601,7 +601,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     /// assert_eq!(dl.back(), None);
@@ -634,7 +634,7 @@ impl<T: ?Sized> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     /// assert_eq!(dl.back(), None);
@@ -683,7 +683,7 @@ impl<T> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut dl = LinkedList::new();
     ///
@@ -705,7 +705,7 @@ impl<T> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut d = LinkedList::new();
     /// assert_eq!(d.pop_front(), None);
@@ -732,7 +732,7 @@ impl<T> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut d = LinkedList::new();
     /// d.push_back(1);
@@ -751,7 +751,7 @@ impl<T> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::LinkedList;
+    /// use neo_linked_list::LinkedList;
     ///
     /// let mut d = LinkedList::new();
     /// assert_eq!(d.pop_back(), None);
