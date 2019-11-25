@@ -3,6 +3,7 @@ use std::pin::Pin;
 
 use crate::pal::{iface::Wm as WmTrait, MtSticky, Wm};
 
+#[allow(clippy::type_complexity)]
 static ON_UPDATE_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = {
     // This is safe because the created value does not contain an actual
     // unsendable content (`Box<dyn FnOnce(Wm)>`) yet

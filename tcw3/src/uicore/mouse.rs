@@ -182,7 +182,7 @@ impl HWnd {
             .iter()
             .filter_map(|hview| hview.view.cursor_shape.get())
             .last()
-            .unwrap_or(CursorShape::default());
+            .unwrap_or_default();
         self.wnd.set_cursor_shape(cursor_shape);
     }
 

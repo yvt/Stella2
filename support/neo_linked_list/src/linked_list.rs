@@ -133,6 +133,7 @@ impl<T> Node<T> {
         Box::pin(Node::new(element))
     }
 
+    #[allow(clippy::boxed_local)]
     pub fn into_element(self: Box<Self>) -> T {
         self.element
     }
@@ -966,6 +967,7 @@ impl<T: PartialEq + ?Sized> PartialEq for LinkedList<T> {
         self.iter().eq(other)
     }
 
+    #[allow(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Self) -> bool {
         self.iter().ne(other)
     }

@@ -91,6 +91,7 @@ impl HWnd {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn invoke_on_next_frame_inner(
         &self,
         f: Pin<Box<Node<AssertUnpin<dyn FnOnce(pal::Wm, &HWnd)>>>>,
