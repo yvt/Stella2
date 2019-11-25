@@ -5,6 +5,9 @@
 //!
 //!  - All features which are unstable at the point of writing were
 //!    removed.
+//!  - `LinkedList::split_off` was removed.
+//!  - The element count accounting was removed. Counting the elements now takes
+//!    a linear time.
 //!
 //! [`linked_list.rs`]: https://github.com/rust-lang/rust/blob/5a1d028d4c8fc15473dc10473c38df162daa7b41/src/liballoc/collections/linked_list.rs
 use std::cmp::Ordering;
@@ -29,7 +32,6 @@ mod tests;
 pub struct LinkedList<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
-    len: usize,
     marker: PhantomData<Box<Node<T>>>,
 }
 
@@ -49,13 +51,12 @@ struct Node<T> {
 pub struct Iter<'a, T: 'a> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
-    len: usize,
     marker: PhantomData<&'a Node<T>>,
 }
 
 impl<T: fmt::Debug> fmt::Debug for Iter<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Iter").field(&self.len).finish()
+        f.debug_tuple("Iter").finish()
     }
 }
 
@@ -80,15 +81,11 @@ pub struct IterMut<'a, T: 'a> {
     list: &'a mut LinkedList<T>,
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
-    len: usize,
 }
 
 impl<T: fmt::Debug> fmt::Debug for IterMut<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("IterMut")
-            .field(&self.list)
-            .field(&self.len)
-            .finish()
+        f.debug_tuple("IterMut").field(&self.list).finish()
     }
 }
 
@@ -143,7 +140,6 @@ impl<T> LinkedList<T> {
             }
 
             self.head = node;
-            self.len += 1;
         }
     }
 
@@ -162,7 +158,6 @@ impl<T> LinkedList<T> {
                 Some(head) => (*head.as_ptr()).prev = None,
             }
 
-            self.len -= 1;
             node
         })
     }
@@ -184,7 +179,6 @@ impl<T> LinkedList<T> {
             }
 
             self.tail = node;
-            self.len += 1;
         }
     }
 
@@ -203,7 +197,6 @@ impl<T> LinkedList<T> {
                 Some(tail) => (*tail.as_ptr()).next = None,
             }
 
-            self.len -= 1;
             node
         })
     }
@@ -230,8 +223,6 @@ impl<T> LinkedList<T> {
             // this node is the tail node
             None => self.tail = node.prev,
         };
-
-        self.len -= 1;
     }
 }
 
@@ -258,7 +249,6 @@ impl<T> LinkedList<T> {
         LinkedList {
             head: None,
             tail: None,
-            len: 0,
             marker: PhantomData,
         }
     }
@@ -305,7 +295,6 @@ impl<T> LinkedList<T> {
                     }
 
                     self.tail = other.tail.take();
-                    self.len += mem::replace(&mut other.len, 0);
                 }
             }
         }
@@ -335,7 +324,6 @@ impl<T> LinkedList<T> {
         Iter {
             head: self.head,
             tail: self.tail,
-            len: self.len,
             marker: PhantomData,
         }
     }
@@ -368,7 +356,6 @@ impl<T> LinkedList<T> {
         IterMut {
             head: self.head,
             tail: self.tail,
-            len: self.len,
             list: self,
         }
     }
@@ -395,7 +382,8 @@ impl<T> LinkedList<T> {
 
     /// Returns the length of the `LinkedList`.
     ///
-    /// This operation should compute in O(1) time.
+    /// **This operation computes in O(N) time** unlike the original
+    /// implementation of `LinkedList`.
     ///
     /// # Examples
     ///
@@ -415,7 +403,7 @@ impl<T> LinkedList<T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.iter().count()
     }
 
     /// Removes all elements from the `LinkedList`.
@@ -636,85 +624,6 @@ impl<T> LinkedList<T> {
     pub fn pop_back(&mut self) -> Option<T> {
         self.pop_back_node().map(Node::into_element)
     }
-
-    /// Splits the list into two at the given index. Returns everything after the given index,
-    /// including the index.
-    ///
-    /// This operation should compute in O(n) time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `at > len`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::collections::LinkedList;
-    ///
-    /// let mut d = LinkedList::new();
-    ///
-    /// d.push_front(1);
-    /// d.push_front(2);
-    /// d.push_front(3);
-    ///
-    /// let mut splitted = d.split_off(2);
-    ///
-    /// assert_eq!(splitted.pop_front(), Some(1));
-    /// assert_eq!(splitted.pop_front(), None);
-    /// ```
-    pub fn split_off(&mut self, at: usize) -> LinkedList<T> {
-        let len = self.len();
-        assert!(at <= len, "Cannot split off at a nonexistent index");
-        if at == 0 {
-            return mem::take(self);
-        } else if at == len {
-            return Self::new();
-        }
-
-        // Below, we iterate towards the `i-1`th node, either from the start or the end,
-        // depending on which would be faster.
-        let split_node = if at - 1 <= len - 1 - (at - 1) {
-            let mut iter = self.iter_mut();
-            // instead of skipping using .skip() (which creates a new struct),
-            // we skip manually so we can access the head field without
-            // depending on implementation details of Skip
-            for _ in 0..at - 1 {
-                iter.next();
-            }
-            iter.head
-        } else {
-            // better off starting from the end
-            let mut iter = self.iter_mut();
-            for _ in 0..len - 1 - (at - 1) {
-                iter.next_back();
-            }
-            iter.tail
-        };
-
-        // The split node is the new tail node of the first part and owns
-        // the head of the second part.
-        let second_part_head;
-
-        unsafe {
-            second_part_head = split_node.unwrap().as_mut().next.take();
-            if let Some(mut head) = second_part_head {
-                head.as_mut().prev = None;
-            }
-        }
-
-        let second_part = LinkedList {
-            head: second_part_head,
-            tail: self.tail,
-            len: len - at,
-            marker: PhantomData,
-        };
-
-        // Fix the tail ptr of the first part
-        self.tail = split_node;
-        self.len = at;
-
-        second_part
-    }
 }
 
 impl<T> Drop for LinkedList<T> {
@@ -728,22 +637,21 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.head.map(|node| unsafe {
-                // Need an unbound lifetime to get 'a
-                let node = &*node.as_ptr();
-                self.len -= 1;
-                self.head = node.next;
-                &node.element
-            })
-        }
+        self.head.map(|node| unsafe {
+            // Need an unbound lifetime to get 'a
+            let node = &*node.as_ptr();
+            self.head = node.next;
+            &node.element
+        })
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
+        if self.head.is_none() {
+            (0, Some(0))
+        } else {
+            (1, None)
+        }
     }
 
     #[inline]
@@ -755,17 +663,12 @@ impl<'a, T> Iterator for Iter<'a, T> {
 impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.tail.map(|node| unsafe {
-                // Need an unbound lifetime to get 'a
-                let node = &*node.as_ptr();
-                self.len -= 1;
-                self.tail = node.prev;
-                &node.element
-            })
-        }
+        self.tail.map(|node| unsafe {
+            // Need an unbound lifetime to get 'a
+            let node = &*node.as_ptr();
+            self.tail = node.prev;
+            &node.element
+        })
     }
 }
 
@@ -778,22 +681,21 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a mut T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.head.map(|node| unsafe {
-                // Need an unbound lifetime to get 'a
-                let node = &mut *node.as_ptr();
-                self.len -= 1;
-                self.head = node.next;
-                &mut node.element
-            })
-        }
+        self.head.map(|node| unsafe {
+            // Need an unbound lifetime to get 'a
+            let node = &mut *node.as_ptr();
+            self.head = node.next;
+            &mut node.element
+        })
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
+        if self.head.is_none() {
+            (0, Some(0))
+        } else {
+            (1, None)
+        }
     }
 
     #[inline]
@@ -805,17 +707,12 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a mut T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.tail.map(|node| unsafe {
-                // Need an unbound lifetime to get 'a
-                let node = &mut *node.as_ptr();
-                self.len -= 1;
-                self.tail = node.prev;
-                &mut node.element
-            })
-        }
+        self.tail.map(|node| unsafe {
+            // Need an unbound lifetime to get 'a
+            let node = &mut *node.as_ptr();
+            self.tail = node.prev;
+            &mut node.element
+        })
     }
 }
 
@@ -833,7 +730,11 @@ impl<T> Iterator for IntoIter<T> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.list.len, Some(self.list.len))
+        if self.list.is_empty() {
+            (0, Some(0))
+        } else {
+            (1, None)
+        }
     }
 }
 
@@ -940,10 +841,12 @@ impl<T: fmt::Debug> fmt::Debug for LinkedList<T> {
 
 impl<T: Hash> Hash for LinkedList<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.len().hash(state);
+        let mut len = 0;
         for elt in self {
             elt.hash(state);
+            len += 1;
         }
+        len.hash(state);
     }
 }
 
