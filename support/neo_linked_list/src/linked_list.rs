@@ -128,6 +128,11 @@ impl<T> Node<T> {
         }
     }
 
+    /// A shortcut for `Box::pin(Node::new(x))`.
+    pub fn pin(element: T) -> Pin<Box<Self>> {
+        Box::pin(Node::new(element))
+    }
+
     pub fn into_element(self: Box<Self>) -> T {
         self.element
     }
@@ -246,6 +251,17 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Adds the given node to the back of the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neo_linked_list::{LinkedList, linked_list::Node};
+    ///
+    /// let mut d = LinkedList::<[u32]>::new();
+    /// d.push_back_node(Node::pin([1]));
+    /// d.push_back_node(Node::pin([1, 2, 3]));
+    /// assert_eq!(&[1, 2, 3], d.back().unwrap());
+    /// ```
     pub fn push_back_node(&mut self, node: Pin<Box<Node<T>>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
