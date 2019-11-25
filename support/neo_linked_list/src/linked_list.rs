@@ -9,14 +9,16 @@
 //!  - The element count accounting was removed. Counting the elements now takes
 //!    a linear time.
 //!  - The elements can now be unsized.
+//!  - The elements are pinned.
 //!
 //! [`linked_list.rs`]: https://github.com/rust-lang/rust/blob/5a1d028d4c8fc15473dc10473c38df162daa7b41/src/liballoc/collections/linked_list.rs
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::{FromIterator, FusedIterator};
-use std::marker::PhantomData;
+use std::marker::{PhantomData, Unpin};
 use std::mem;
+use std::pin::Pin;
 use std::ptr::NonNull;
 
 #[cfg(test)]
@@ -125,10 +127,11 @@ impl<T> Node<T> {
 // private methods
 impl<T: ?Sized> LinkedList<T> {
     /// Adds the given node to the front of the list.
-    fn push_front_node(&mut self, mut node: Box<Node<T>>) {
+    fn push_front_node(&mut self, node: Pin<Box<Node<T>>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
+            let mut node = Pin::into_inner_unchecked(node);
             node.next = self.head;
             node.prev = None;
             let node = Some(Box::into_raw_non_null(node));
@@ -144,11 +147,11 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the front of the list.
-    fn pop_front_node(&mut self) -> Option<Box<Node<T>>> {
+    fn pop_front_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         self.head.map(|node| unsafe {
-            let node = Box::from_raw(node.as_ptr());
+            let node = Pin::new_unchecked(Box::from_raw(node.as_ptr()));
             self.head = node.next;
 
             match self.head {
@@ -162,10 +165,11 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Adds the given node to the back of the list.
-    fn push_back_node(&mut self, mut node: Box<Node<T>>) {
+    fn push_back_node(&mut self, node: Pin<Box<Node<T>>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
+            let mut node = Pin::into_inner_unchecked(node);
             node.next = None;
             node.prev = self.tail;
             let node = Some(Box::into_raw_non_null(node));
@@ -181,11 +185,11 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the back of the list.
-    fn pop_back_node(&mut self) -> Option<Box<Node<T>>> {
+    fn pop_back_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         self.tail.map(|node| unsafe {
-            let node = Box::from_raw(node.as_ptr());
+            let node = Pin::new_unchecked(Box::from_raw(node.as_ptr()));
             self.tail = node.prev;
 
             match self.tail {
@@ -443,8 +447,20 @@ impl<T: ?Sized> LinkedList<T> {
     /// assert_eq!(dl.front(), Some(&1));
     /// ```
     #[inline]
-    pub fn front(&self) -> Option<&T> {
-        unsafe { self.head.as_ref().map(|node| &node.as_ref().element) }
+    pub fn front(&self) -> Option<&T>
+    where
+        T: Unpin,
+    {
+        self.front_pin().map(Pin::into_inner)
+    }
+
+    #[inline]
+    pub fn front_pin(&self) -> Option<Pin<&T>> {
+        unsafe {
+            self.head
+                .as_ref()
+                .map(|node| Pin::new_unchecked(&node.as_ref().element))
+        }
     }
 
     /// Provides a mutable reference to the front element, or `None` if the list
@@ -468,8 +484,20 @@ impl<T: ?Sized> LinkedList<T> {
     /// assert_eq!(dl.front(), Some(&5));
     /// ```
     #[inline]
-    pub fn front_mut(&mut self) -> Option<&mut T> {
-        unsafe { self.head.as_mut().map(|node| &mut node.as_mut().element) }
+    pub fn front_mut(&mut self) -> Option<&mut T>
+    where
+        T: Unpin,
+    {
+        self.front_pin_mut().map(Pin::into_inner)
+    }
+
+    #[inline]
+    pub fn front_pin_mut(&mut self) -> Option<Pin<&mut T>> {
+        unsafe {
+            self.head
+                .as_mut()
+                .map(|node| Pin::new_unchecked(&mut node.as_mut().element))
+        }
     }
 
     /// Provides a reference to the back element, or `None` if the list is
@@ -487,8 +515,20 @@ impl<T: ?Sized> LinkedList<T> {
     /// assert_eq!(dl.back(), Some(&1));
     /// ```
     #[inline]
-    pub fn back(&self) -> Option<&T> {
-        unsafe { self.tail.as_ref().map(|node| &node.as_ref().element) }
+    pub fn back(&self) -> Option<&T>
+    where
+        T: Unpin,
+    {
+        self.back_pin().map(Pin::into_inner)
+    }
+
+    #[inline]
+    pub fn back_pin(&self) -> Option<Pin<&T>> {
+        unsafe {
+            self.tail
+                .as_ref()
+                .map(|node| Pin::new_unchecked(&node.as_ref().element))
+        }
     }
 
     /// Provides a mutable reference to the back element, or `None` if the list
@@ -512,8 +552,20 @@ impl<T: ?Sized> LinkedList<T> {
     /// assert_eq!(dl.back(), Some(&5));
     /// ```
     #[inline]
-    pub fn back_mut(&mut self) -> Option<&mut T> {
-        unsafe { self.tail.as_mut().map(|node| &mut node.as_mut().element) }
+    pub fn back_mut(&mut self) -> Option<&mut T>
+    where
+        T: Unpin,
+    {
+        self.back_pin_mut().map(Pin::into_inner)
+    }
+
+    #[inline]
+    pub fn back_pin_mut(&mut self) -> Option<Pin<&mut T>> {
+        unsafe {
+            self.tail
+                .as_mut()
+                .map(|node| Pin::new_unchecked(&mut node.as_mut().element))
+        }
     }
 }
 
@@ -536,7 +588,7 @@ impl<T> LinkedList<T> {
     /// assert_eq!(dl.front().unwrap(), &1);
     /// ```
     pub fn push_front(&mut self, elt: T) {
-        self.push_front_node(Box::new(Node::new(elt)));
+        self.push_front_node(Box::pin(Node::new(elt)));
     }
 
     /// Removes the first element and returns it, or `None` if the list is
@@ -558,8 +610,13 @@ impl<T> LinkedList<T> {
     /// assert_eq!(d.pop_front(), Some(1));
     /// assert_eq!(d.pop_front(), None);
     /// ```
-    pub fn pop_front(&mut self) -> Option<T> {
-        self.pop_front_node().map(Node::into_element)
+    pub fn pop_front(&mut self) -> Option<T>
+    where
+        T: Unpin,
+    {
+        self.pop_front_node()
+            .map(Pin::into_inner)
+            .map(Node::into_element)
     }
 
     /// Appends an element to the back of a list.
@@ -577,7 +634,7 @@ impl<T> LinkedList<T> {
     /// assert_eq!(3, *d.back().unwrap());
     /// ```
     pub fn push_back(&mut self, elt: T) {
-        self.push_back_node(Box::new(Node::new(elt)));
+        self.push_back_node(Box::pin(Node::new(elt)));
     }
 
     /// Removes the last element from a list and returns it, or `None` if
@@ -596,8 +653,13 @@ impl<T> LinkedList<T> {
     /// d.push_back(3);
     /// assert_eq!(d.pop_back(), Some(3));
     /// ```
-    pub fn pop_back(&mut self) -> Option<T> {
-        self.pop_back_node().map(Node::into_element)
+    pub fn pop_back(&mut self) -> Option<T>
+    where
+        T: Unpin,
+    {
+        self.pop_back_node()
+            .map(Pin::into_inner)
+            .map(Node::into_element)
     }
 }
 
@@ -695,7 +757,7 @@ impl<T: ?Sized> ExactSizeIterator for IterMut<'_, T> {}
 
 impl<T: ?Sized> FusedIterator for IterMut<'_, T> {}
 
-impl<T> Iterator for IntoIter<T> {
+impl<T: Unpin> Iterator for IntoIter<T> {
     type Item = T;
 
     #[inline]
@@ -713,16 +775,16 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T> {
+impl<T: Unpin> DoubleEndedIterator for IntoIter<T> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
         self.list.pop_back()
     }
 }
 
-impl<T> ExactSizeIterator for IntoIter<T> {}
+impl<T: Unpin> ExactSizeIterator for IntoIter<T> {}
 
-impl<T> FusedIterator for IntoIter<T> {}
+impl<T: Unpin> FusedIterator for IntoIter<T> {}
 
 impl<'a, T: 'a + Copy> Extend<&'a T> for LinkedList<T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
@@ -748,7 +810,7 @@ impl<T> FromIterator<T> for LinkedList<T> {
     }
 }
 
-impl<T> IntoIterator for LinkedList<T> {
+impl<T: Unpin> IntoIterator for LinkedList<T> {
     type Item = T;
     type IntoIter = IntoIter<T>;
 
