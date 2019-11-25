@@ -33,6 +33,14 @@ impl<T: ?Sized> LinkedListCell<T> {
         self.list.into_inner()
     }
 
+    pub fn replace(&self, src: LinkedList<T>) -> LinkedList<T> {
+        std::mem::replace(unsafe { &mut *self.list.get() }, src)
+    }
+
+    pub fn take(&self) -> LinkedList<T> {
+        self.replace(LinkedList::new())
+    }
+
     pub fn get_mut(&mut self) -> &mut LinkedList<T> {
         unsafe { &mut *self.list.get() }
     }
@@ -40,6 +48,14 @@ impl<T: ?Sized> LinkedListCell<T> {
     #[inline]
     pub fn clear(&self) {
         unsafe { &mut *self.list.get() }.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        unsafe { &*self.list.get() }.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        unsafe { &*self.list.get() }.is_empty()
     }
 
     /// Adds the given node to the front of the list.
