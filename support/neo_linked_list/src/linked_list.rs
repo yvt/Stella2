@@ -807,11 +807,11 @@ impl<'a, T: ?Sized> IntoIterator for &'a mut LinkedList<T> {
 
 impl<T: PartialEq + ?Sized> PartialEq for LinkedList<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().eq(other)
+        self.iter().eq(other)
     }
 
     fn ne(&self, other: &Self) -> bool {
-        self.len() != other.len() || self.iter().ne(other)
+        self.iter().ne(other)
     }
 }
 
