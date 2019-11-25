@@ -7,6 +7,7 @@
 //!
 #![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
+#![feature(unsized_locals)] // Call `dyn FnOnce`
 #![allow(clippy::float_cmp)]
 // this lint is ridiculous
 // The size on memory hardly relates to how they are passed via a parameter

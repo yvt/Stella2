@@ -27,6 +27,7 @@ lazy_static = "1"
 itertools = "0.8.0"
 ndarray = "0.13.0"
 log = "0.4"
+neo_linked_list = { path = "../support/neo_linked_list" }
 
 tcw3_images = { path = "images" }
 tcw3_pal = { path = "pal" }

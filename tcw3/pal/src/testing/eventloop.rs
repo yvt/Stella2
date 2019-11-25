@@ -1,8 +1,9 @@
 use log::{trace, warn};
+use neo_linked_list::{linked_list::Node, AssertUnpin, LinkedListCell};
 use std::{
     cell::RefCell,
-    collections::LinkedList,
     ops::Range,
+    pin::Pin,
     sync::{
         mpsc::{channel, Receiver, RecvTimeoutError, Sender},
         Mutex,
@@ -18,10 +19,10 @@ use crate::{
     MtLock, MtSticky,
 };
 
-static UNSEND_DISPATCHES: MtSticky<RefCell<LinkedList<Box<dyn FnOnce(Wm)>>>> = {
+static UNSEND_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = {
     // This is safe because the created value does not contain an actual
     // unsendable content (`Box<dyn FnOnce(Wm)>`) yet
-    unsafe { MtSticky::new_unchecked(RefCell::new(LinkedList::new())) }
+    unsafe { MtSticky::new_unchecked(LinkedListCell::new()) }
 };
 
 static DISPATCH_RECV: MtLock<RefCell<Option<Receiver<Dispatch>>>> = MtLock::new(RefCell::new(None));
@@ -70,12 +71,9 @@ impl Wm {
     }
 
     pub(super) fn invoke_unsend(self, f: impl FnOnce(Self) + 'static) {
-        let boxed: Box<dyn FnOnce(Wm)> = Box::new(f);
-        trace!("invoke_unsend({:?})", (&*boxed) as *const _);
-        UNSEND_DISPATCHES
-            .get_with_wm(self)
-            .borrow_mut()
-            .push_back(boxed);
+        let boxed: Pin<Box<Node<AssertUnpin<dyn FnOnce(Wm)>>>> = Node::pin(AssertUnpin::new(f));
+        trace!("invoke_unsend({:?})", (&boxed.element.inner) as *const _);
+        UNSEND_DISPATCHES.get_with_wm(self).push_back_node(boxed);
     }
 
     pub(super) fn invoke_after(
@@ -121,11 +119,18 @@ impl Wm {
         }
     }
 
+    #[inline(never)]
     pub(super) fn step_unsend(self) {
         loop {
-            let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
+            let e = UNSEND_DISPATCHES.get_with_wm(self).pop_front_node();
             if let Some(e) = e {
-                e(self);
+                blackbox(move || {
+                    // The callback function is `dyn FnOnce`, so it must be moved
+                    // out before calling it. Moving out of `Box` is allowed by
+                    // special-casing, but first we have to unwrap the `Pin` by
+                    // using `Pin::into_inner`.
+                    (Pin::into_inner(e).element.inner)(self);
+                });
             } else {
                 break;
             }
@@ -135,9 +140,9 @@ impl Wm {
     pub(super) fn step_timeout(self, mut timeout: Option<std::time::Duration>) {
         // Check the thread-local queue first because there is no possibility
         // that it can get enqueued by us waiting
-        let e = UNSEND_DISPATCHES.get_with_wm(self).borrow_mut().pop_front();
+        let e = UNSEND_DISPATCHES.get_with_wm(self).pop_front_node();
         if let Some(e) = e {
-            e(self);
+            (Pin::into_inner(e).element.inner)(self);
             return;
         }
 
@@ -242,12 +247,12 @@ impl Wm {
             }
 
             let queue = UNSEND_DISPATCHES.get_with_wm(self);
-            if !queue.borrow().is_empty() {
-                let count = queue.borrow().len();
+            if !queue.is_empty() {
+                let count = queue.len();
                 warn!("Executing {} unprocessed unsend dispatch(es)", count);
 
                 for _ in 0..count {
-                    let e = queue.borrow_mut().pop_front().unwrap();
+                    let e = queue.pop_front_node().unwrap();
                     // `queue` must be unborrowed before dropping `e` because
                     // `e`'s drop handler might generate even more dispatches.
                     drop(e);
@@ -260,4 +265,11 @@ impl Wm {
             break;
         }
     }
+}
+
+/// Limits the stack usage of repeated calls to an unsized closure.
+/// (See The Rust Unstable Book, `unsized_locals` for more.)
+#[inline(never)]
+fn blackbox<R>(f: impl FnOnce() -> R) -> R {
+    f()
 }

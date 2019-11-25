@@ -1,12 +1,13 @@
 use arrayvec::ArrayVec;
 use fragile::Fragile;
 use iterpool::Pool;
+use neo_linked_list::{LinkedListCell, AssertUnpin};
 use once_cell::sync::OnceCell;
 use owning_ref::OwningRef;
 use std::{
     cell::{Cell, RefCell},
-    collections::LinkedList,
     ops::Range,
+    pin::Pin,
     ptr::NonNull,
     sync::Mutex,
     time::Duration,
@@ -14,7 +15,9 @@ use std::{
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopWindowTarget};
 
 use super::super::{timerqueue::TimerQueue, MtSticky};
-use super::{HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent};
+use super::{
+    HInvokeCore, MtData, UserEvent, WinitEnv, WinitWm, WinitWmCore, WndContent,
+};
 
 impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitEnv<TWM, TWC> {
     pub const fn new() -> Self {
@@ -150,7 +153,7 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
             event_loop: RefCell::new(Some(EventLoop::with_user_event())),
             should_terminate: Cell::new(false),
             event_loop_wnd_target: Cell::new(None),
-            unsend_invoke_events: RefCell::new(LinkedList::new()),
+            unsend_invoke_events: LinkedListCell::new(),
             timer_queue: RefCell::new(TimerQueue::new()),
             wnds: RefCell::new(Pool::new()),
             suppress_request_redraw: Cell::new(false),
@@ -225,9 +228,15 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
 
                 // Process `!Send` invocations
                 loop {
-                    let e = self.unsend_invoke_events.borrow_mut().pop_front();
+                    let e = self.unsend_invoke_events.pop_front_node();
                     if let Some(e) = e {
-                        e(self);
+                        blackbox(|| {
+                            // The callback function is `dyn FnOnce`, so it must be moved
+                            // out before calling it. Moving out of `Box` is allowed by
+                            // special-casing, but first we have to unwrap the `Pin` by
+                            // using `Pin::into_inner`.
+                            (Pin::into_inner(e).element.inner)(self);
+                        });
                     } else {
                         break;
                     }
@@ -308,9 +317,8 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     }
 
     pub fn invoke(&'static self, cb: impl FnOnce(&'static Self) + 'static) {
-        self.unsend_invoke_events
-            .borrow_mut()
-            .push_back(Box::new(cb));
+        use neo_linked_list::linked_list::Node;
+        self.unsend_invoke_events.push_back_node(Node::pin(AssertUnpin::new(cb)));
     }
 
     pub fn invoke_after(
@@ -330,4 +338,11 @@ impl<TWM: WinitWm, TWC: WndContent<Wm = TWM>> WinitWmCore<TWM, TWC> {
     pub fn cancel_invoke(&self, hinv: &HInvokeCore) {
         let _ = self.timer_queue.borrow_mut().remove(hinv.htask);
     }
+}
+
+/// Limits the stack usage of repeated calls to an unsized closure.
+/// (See The Rust Unstable Book, `unsized_locals` for more.)
+#[inline(never)]
+fn blackbox<R>(f: impl FnOnce() -> R) -> R {
+    f()
 }

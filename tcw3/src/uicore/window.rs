@@ -3,9 +3,11 @@ use bitflags::bitflags;
 use cggeom::box2;
 use cgmath::Point2;
 use flags_macro::flags;
+use neo_linked_list::{linked_list::Node, AssertUnpin};
 use std::{
     cell::RefCell,
     cmp::{max, min},
+    pin::Pin,
     rc::{Rc, Weak},
 };
 
@@ -89,12 +91,15 @@ impl HWnd {
         }
     }
 
-    pub(super) fn invoke_on_next_frame_inner(&self, f: Box<dyn FnOnce(pal::Wm, &HWnd)>) {
+    pub(super) fn invoke_on_next_frame_inner(
+        &self,
+        f: Pin<Box<Node<AssertUnpin<dyn FnOnce(pal::Wm, &HWnd)>>>>,
+    ) {
         if self.wnd.closed.get() {
             return;
         }
 
-        let mut frame_handlers = self.wnd.frame_handlers.borrow_mut();
+        let frame_handlers = &self.wnd.frame_handlers;
 
         if frame_handlers.is_empty() {
             if let Some(ref pal_wnd) = *self.wnd.pal_wnd.borrow() {
@@ -102,7 +107,7 @@ impl HWnd {
             }
         }
 
-        frame_handlers.push_back(f);
+        frame_handlers.push_back_node(f);
     }
 
     /// This is basically the handler of `update_ready` event and where layers
@@ -125,8 +130,13 @@ impl HWnd {
         };
 
         // Process `invoke_on_next_frame`.
-        for cb in self.wnd.frame_handlers.replace(Default::default()) {
-            cb(self.wnd.wm, self);
+        {
+            let mut frame_handlers = self.wnd.frame_handlers.take();
+            while let Some(cb) = frame_handlers.pop_front_node() {
+                super::invocation::blackbox(move || {
+                    (Pin::into_inner(cb).element.inner)(self.wnd.wm, self);
+                });
+            }
         }
 
         // They may set `CONTENTS`

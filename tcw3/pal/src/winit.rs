@@ -39,10 +39,10 @@
 use cgmath::Point2;
 use fragile::Fragile;
 use iterpool::{Pool, PoolPtr};
+use neo_linked_list::{LinkedListCell, AssertUnpin};
 use once_cell::sync::OnceCell;
 use std::{
     cell::{Cell, RefCell},
-    collections::LinkedList,
     ptr::NonNull,
     rc::Rc,
     sync::Mutex,
@@ -67,7 +67,9 @@ type UserEvent<TWM, TWC> = Box<dyn FnOnce(&'static WinitWmCore<TWM, TWC>) + Send
 
 type EventLoopWndTargetPtr<TWM, TWC> = NonNull<EventLoopWindowTarget<UserEvent<TWM, TWC>>>;
 
-type UnsendInvoke<TWM, TWC> = Box<dyn FnOnce(&'static WinitWmCore<TWM, TWC>)>;
+type UnsendInvoke<TWM, TWC> = dyn FnOnce(&'static WinitWmCore<TWM, TWC>);
+
+type UnsendInvokeBox<TWM, TWC> = Box<UnsendInvoke<TWM, TWC>>;
 
 /// The global state of the window manager, accessible by any threads.
 /// `WinitWmCore` is included in this struct, protected by `MtSticky`. This struct
@@ -98,10 +100,10 @@ pub struct WinitWmCore<TWM: Wm, TWC: WndContent> {
     /// of `run`. It's a reference supplied to the event handler function that
     /// only lives through a single iteration of the main event loop.
     event_loop_wnd_target: Cell<Option<EventLoopWndTargetPtr<TWM, TWC>>>,
-    // The following two fields must be unborrowed before entering user code.
-    // Perhaps, the runtime checks can be removed by type sorcery...?
-    unsend_invoke_events: RefCell<LinkedList<UnsendInvoke<TWM, TWC>>>,
-    timer_queue: RefCell<TimerQueue<UnsendInvoke<TWM, TWC>>>,
+    unsend_invoke_events: LinkedListCell<AssertUnpin<UnsendInvoke<TWM, TWC>>>,
+    /// This field must be unborrowed before entering user code.
+    /// Perhaps, the runtime checks can be removed by type sorcery...?
+    timer_queue: RefCell<TimerQueue<UnsendInvokeBox<TWM, TWC>>>,
 
     /// A list of open windows. To support reentrancy, this must be unborrowed
     /// before calling any user event handlers.

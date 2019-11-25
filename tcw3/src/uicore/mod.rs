@@ -20,9 +20,9 @@ use derive_more::From;
 use flags_macro::flags;
 use log::trace;
 use momo::momo;
+use neo_linked_list::{linked_list::Node, AssertUnpin, LinkedListCell};
 use std::{
     cell::{Cell, RefCell},
-    collections::LinkedList,
     fmt,
     rc::{Rc, Weak},
 };
@@ -161,7 +161,7 @@ struct Wnd {
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
-    frame_handlers: RefCell<LinkedList<Box<dyn FnOnce(Wm, &HWnd)>>>,
+    frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, &HWnd)>>,
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
@@ -206,7 +206,7 @@ impl Wnd {
             style_attrs: RefCell::new(Default::default()),
             updating: Cell::new(false),
             dpi_scale_changed_handlers: RefCell::new(SubscriberList::new()),
-            frame_handlers: RefCell::new(LinkedList::new()),
+            frame_handlers: LinkedListCell::new(),
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
         }
@@ -717,7 +717,7 @@ impl HWnd {
     ///
     /// This is the equivalent of JavaScript's `requestAnimationFrame`.
     pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, &HWnd) + 'static) {
-        self.invoke_on_next_frame_inner(Box::new(f));
+        self.invoke_on_next_frame_inner(Node::pin(AssertUnpin::new(f)));
     }
 }
 
