@@ -18,6 +18,7 @@ members = [
     "support/cggeom",
     "support/demotools",
     "support/iterpool",
+    "support/neo_linked_list",
     "support/rope",
     "support/subscriber_list",
     "support/sorted_diff",

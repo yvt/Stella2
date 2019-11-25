@@ -1,0 +1,13 @@
+[package]
+name = "neo_linked_list"
+version = "0.1.0"
+authors = [
+    "yvt <i@yvt.jp>",
+    "The Rust Project Developers (alloc::collections::LinkedList)",
+]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+rand = "0.7.2"
