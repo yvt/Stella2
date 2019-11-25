@@ -8,6 +8,7 @@
 //!  - `LinkedList::split_off` was removed.
 //!  - The element count accounting was removed. Counting the elements now takes
 //!    a linear time.
+//!  - The elements can now be unsized.
 //!
 //! [`linked_list.rs`]: https://github.com/rust-lang/rust/blob/5a1d028d4c8fc15473dc10473c38df162daa7b41/src/liballoc/collections/linked_list.rs
 use std::cmp::Ordering;
@@ -29,13 +30,13 @@ mod tests;
 /// NOTE: It is almost always better to use `Vec` or `VecDeque` because
 /// array-based containers are generally faster,
 /// more memory efficient, and make better use of CPU cache.
-pub struct LinkedList<T> {
+pub struct LinkedList<T: ?Sized> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
     marker: PhantomData<Box<Node<T>>>,
 }
 
-struct Node<T> {
+struct Node<T: ?Sized> {
     next: Option<NonNull<Node<T>>>,
     prev: Option<NonNull<Node<T>>>,
     element: T,
@@ -48,20 +49,20 @@ struct Node<T> {
 ///
 /// [`iter`]: struct.LinkedList.html#method.iter
 /// [`LinkedList`]: struct.LinkedList.html
-pub struct Iter<'a, T: 'a> {
+pub struct Iter<'a, T: 'a + ?Sized> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
     marker: PhantomData<&'a Node<T>>,
 }
 
-impl<T: fmt::Debug> fmt::Debug for Iter<'_, T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for Iter<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Iter").finish()
     }
 }
 
 // FIXME(#26925) Remove in favor of `#[derive(Clone)]`
-impl<T> Clone for Iter<'_, T> {
+impl<T: ?Sized> Clone for Iter<'_, T> {
     fn clone(&self) -> Self {
         Iter { ..*self }
     }
@@ -74,7 +75,7 @@ impl<T> Clone for Iter<'_, T> {
 ///
 /// [`iter_mut`]: struct.LinkedList.html#method.iter_mut
 /// [`LinkedList`]: struct.LinkedList.html
-pub struct IterMut<'a, T: 'a> {
+pub struct IterMut<'a, T: 'a + ?Sized> {
     // We do *not* exclusively own the entire list here, references to node's `element`
     // have been handed out by the iterator!  So be careful when using this; the methods
     // called must be aware that there can be aliasing pointers to `element`.
@@ -83,7 +84,7 @@ pub struct IterMut<'a, T: 'a> {
     tail: Option<NonNull<Node<T>>>,
 }
 
-impl<T: fmt::Debug> fmt::Debug for IterMut<'_, T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for IterMut<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("IterMut").field(&self.list).finish()
     }
@@ -122,7 +123,7 @@ impl<T> Node<T> {
 }
 
 // private methods
-impl<T> LinkedList<T> {
+impl<T: ?Sized> LinkedList<T> {
     /// Adds the given node to the front of the list.
     #[inline]
     fn push_front_node(&mut self, mut node: Box<Node<T>>) {
@@ -234,7 +235,7 @@ impl<T> Default for LinkedList<T> {
     }
 }
 
-impl<T> LinkedList<T> {
+impl<T: ?Sized> LinkedList<T> {
     /// Creates an empty `LinkedList`.
     ///
     /// # Examples
@@ -542,7 +543,9 @@ impl<T> LinkedList<T> {
     pub fn back_mut(&mut self) -> Option<&mut T> {
         unsafe { self.tail.as_mut().map(|node| &mut node.as_mut().element) }
     }
+}
 
+impl<T> LinkedList<T> {
     /// Adds an element first in the list.
     ///
     /// This operation should compute in O(1) time.
@@ -626,13 +629,13 @@ impl<T> LinkedList<T> {
     }
 }
 
-impl<T> Drop for LinkedList<T> {
+impl<T: ?Sized> Drop for LinkedList<T> {
     fn drop(&mut self) {
         while let Some(_) = self.pop_front_node() {}
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
+impl<'a, T: ?Sized> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     #[inline]
@@ -660,7 +663,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+impl<'a, T: ?Sized> DoubleEndedIterator for Iter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a T> {
         self.tail.map(|node| unsafe {
@@ -672,11 +675,11 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     }
 }
 
-impl<T> ExactSizeIterator for Iter<'_, T> {}
+impl<T: ?Sized> ExactSizeIterator for Iter<'_, T> {}
 
-impl<T> FusedIterator for Iter<'_, T> {}
+impl<T: ?Sized> FusedIterator for Iter<'_, T> {}
 
-impl<'a, T> Iterator for IterMut<'a, T> {
+impl<'a, T: ?Sized> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     #[inline]
@@ -704,7 +707,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
+impl<'a, T: ?Sized> DoubleEndedIterator for IterMut<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a mut T> {
         self.tail.map(|node| unsafe {
@@ -716,9 +719,9 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     }
 }
 
-impl<T> ExactSizeIterator for IterMut<'_, T> {}
+impl<T: ?Sized> ExactSizeIterator for IterMut<'_, T> {}
 
-impl<T> FusedIterator for IterMut<'_, T> {}
+impl<T: ?Sized> FusedIterator for IterMut<'_, T> {}
 
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
@@ -784,7 +787,7 @@ impl<T> IntoIterator for LinkedList<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a LinkedList<T> {
+impl<'a, T: ?Sized> IntoIterator for &'a LinkedList<T> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
 
@@ -793,7 +796,7 @@ impl<'a, T> IntoIterator for &'a LinkedList<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut LinkedList<T> {
+impl<'a, T: ?Sized> IntoIterator for &'a mut LinkedList<T> {
     type Item = &'a mut T;
     type IntoIter = IterMut<'a, T>;
 
@@ -802,7 +805,7 @@ impl<'a, T> IntoIterator for &'a mut LinkedList<T> {
     }
 }
 
-impl<T: PartialEq> PartialEq for LinkedList<T> {
+impl<T: PartialEq + ?Sized> PartialEq for LinkedList<T> {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.iter().eq(other)
     }
@@ -812,15 +815,15 @@ impl<T: PartialEq> PartialEq for LinkedList<T> {
     }
 }
 
-impl<T: Eq> Eq for LinkedList<T> {}
+impl<T: Eq + ?Sized> Eq for LinkedList<T> {}
 
-impl<T: PartialOrd> PartialOrd for LinkedList<T> {
+impl<T: PartialOrd + ?Sized> PartialOrd for LinkedList<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.iter().partial_cmp(other)
     }
 }
 
-impl<T: Ord> Ord for LinkedList<T> {
+impl<T: Ord + ?Sized> Ord for LinkedList<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.iter().cmp(other)
@@ -833,13 +836,13 @@ impl<T: Clone> Clone for LinkedList<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for LinkedList<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for LinkedList<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self).finish()
     }
 }
 
-impl<T: Hash> Hash for LinkedList<T> {
+impl<T: Hash + ?Sized> Hash for LinkedList<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let mut len = 0;
         for elt in self {
