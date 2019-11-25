@@ -10,6 +10,8 @@
 //!    a linear time.
 //!  - The elements can now be unsized.
 //!  - The elements are pinned.
+//!  - `Node` is exposed, making it possible to manipulate the elements which
+//!    are pinned and/or unsized.
 //!
 //! [`linked_list.rs`]: https://github.com/rust-lang/rust/blob/5a1d028d4c8fc15473dc10473c38df162daa7b41/src/liballoc/collections/linked_list.rs
 use std::cmp::Ordering;
@@ -38,10 +40,11 @@ pub struct LinkedList<T: ?Sized> {
     marker: PhantomData<Box<Node<T>>>,
 }
 
-struct Node<T: ?Sized> {
+#[derive(Debug)]
+pub struct Node<T: ?Sized> {
     next: Option<NonNull<Node<T>>>,
     prev: Option<NonNull<Node<T>>>,
-    element: T,
+    pub element: T,
 }
 
 /// An iterator over the elements of a `LinkedList`.
@@ -111,7 +114,7 @@ impl<T: fmt::Debug> fmt::Debug for IntoIter<T> {
 }
 
 impl<T> Node<T> {
-    fn new(element: T) -> Self {
+    pub fn new(element: T) -> Self {
         Node {
             next: None,
             prev: None,
@@ -119,15 +122,25 @@ impl<T> Node<T> {
         }
     }
 
-    fn into_element(self: Box<Self>) -> T {
+    pub fn into_element(self: Box<Self>) -> T {
         self.element
+    }
+}
+
+impl<T: ?Sized> Node<T> {
+    pub fn element_pin(self: Pin<&Self>) -> Pin<&T> {
+        unsafe { Pin::new_unchecked(&Pin::into_inner_unchecked(self).element) }
+    }
+
+    pub fn element_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
+        unsafe { Pin::new_unchecked(&mut Pin::into_inner_unchecked(self).element) }
     }
 }
 
 // private methods
 impl<T: ?Sized> LinkedList<T> {
     /// Adds the given node to the front of the list.
-    fn push_front_node(&mut self, node: Pin<Box<Node<T>>>) {
+    pub fn push_front_node(&mut self, node: Pin<Box<Node<T>>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
@@ -147,7 +160,7 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the front of the list.
-    fn pop_front_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
+    pub fn pop_front_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         self.head.map(|node| unsafe {
@@ -165,7 +178,7 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Adds the given node to the back of the list.
-    fn push_back_node(&mut self, node: Pin<Box<Node<T>>>) {
+    pub fn push_back_node(&mut self, node: Pin<Box<Node<T>>>) {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
@@ -185,7 +198,7 @@ impl<T: ?Sized> LinkedList<T> {
     }
 
     /// Removes and returns the node at the back of the list.
-    fn pop_back_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
+    pub fn pop_back_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
         self.tail.map(|node| unsafe {
@@ -456,11 +469,12 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn front_pin(&self) -> Option<Pin<&T>> {
-        unsafe {
-            self.head
-                .as_ref()
-                .map(|node| Pin::new_unchecked(&node.as_ref().element))
-        }
+        self.front_node().map(Node::element_pin)
+    }
+
+    #[inline]
+    pub fn front_node(&self) -> Option<Pin<&Node<T>>> {
+        unsafe { self.head.as_ref().map(|n| Pin::new_unchecked(n.as_ref())) }
     }
 
     /// Provides a mutable reference to the front element, or `None` if the list
@@ -493,11 +507,19 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn front_pin_mut(&mut self) -> Option<Pin<&mut T>> {
-        unsafe {
-            self.head
-                .as_mut()
-                .map(|node| Pin::new_unchecked(&mut node.as_mut().element))
-        }
+        unsafe { self.front_node_mut() }.map(Node::element_pin_mut)
+    }
+
+    /// Provides a mutable reference to the front element's node, or `None` if
+    /// the list is empty.
+    ///
+    /// # Safety
+    ///
+    // This method is unsafe because it allows replacing the returned
+    // node in-place, corrupting the structure.
+    #[inline]
+    pub unsafe fn front_node_mut(&mut self) -> Option<Pin<&mut Node<T>>> {
+        self.head.as_mut().map(|n| Pin::new_unchecked(n.as_mut()))
     }
 
     /// Provides a reference to the back element, or `None` if the list is
@@ -524,11 +546,12 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn back_pin(&self) -> Option<Pin<&T>> {
-        unsafe {
-            self.tail
-                .as_ref()
-                .map(|node| Pin::new_unchecked(&node.as_ref().element))
-        }
+        self.back_node().map(Node::element_pin)
+    }
+
+    #[inline]
+    pub fn back_node(&self) -> Option<Pin<&Node<T>>> {
+        unsafe { self.tail.as_ref().map(|n| Pin::new_unchecked(n.as_ref())) }
     }
 
     /// Provides a mutable reference to the back element, or `None` if the list
@@ -561,11 +584,19 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn back_pin_mut(&mut self) -> Option<Pin<&mut T>> {
-        unsafe {
-            self.tail
-                .as_mut()
-                .map(|node| Pin::new_unchecked(&mut node.as_mut().element))
-        }
+        unsafe { self.back_node_mut() }.map(Node::element_pin_mut)
+    }
+
+    /// Provides a mutable reference to the back element's node, or `None` if
+    /// the list is empty.
+    ///
+    /// # Safety
+    ///
+    // This method is unsafe because it allows replacing the returned
+    // node in-place, corrupting the structure.
+    #[inline]
+    pub unsafe fn back_node_mut(&mut self) -> Option<Pin<&mut Node<T>>> {
+        self.tail.as_mut().map(|n| Pin::new_unchecked(n.as_mut()))
     }
 }
 
