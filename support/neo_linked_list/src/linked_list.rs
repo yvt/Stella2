@@ -153,7 +153,7 @@ impl<T: ?Sized> Node<T> {
                 // Ensure that `from_hdr` can recover `&Node<T>` from `&Hdr`
                 // (1)
                 assert_eq!(ptr, &self.hdr as *const _ as *const ());
-            }
+            },
             x if x == mem::size_of::<usize>() * 2 => unsafe {
                 let [ptr, vtable]: [*const (); 2] = mem::transmute_copy(&self);
 
