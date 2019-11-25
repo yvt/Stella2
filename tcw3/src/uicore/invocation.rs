@@ -12,15 +12,15 @@ static ON_UPDATE_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>
 
 /// Implements `WmExt::invoke_on_update`.
 pub fn invoke_on_update(wm: Wm, f: impl FnOnce(Wm) + 'static) {
-    invoke_on_update_inner(wm, Box::new(f));
+    invoke_on_update_inner(wm, Node::pin(AssertUnpin::new(f)));
 }
 
-fn invoke_on_update_inner(wm: Wm, f: Box<dyn FnOnce(Wm)>) {
+fn invoke_on_update_inner(wm: Wm, f: Pin<Box<Node<AssertUnpin<dyn FnOnce(Wm)>>>>) {
     let queue = ON_UPDATE_DISPATCHES.get_with_wm(wm);
     if queue.is_empty() {
         wm.invoke(process_pending_invocations);
     }
-    queue.push_back_node(Node::pin(AssertUnpin::new(f)));
+    queue.push_back_node(f);
 }
 
 /// Process pending invocations.
