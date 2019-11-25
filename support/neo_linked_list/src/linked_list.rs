@@ -201,30 +201,6 @@ impl<T: ?Sized> LinkedList<T> {
             node
         })
     }
-
-    /// Unlinks the specified node from the current list.
-    ///
-    /// Warning: this will not check that the provided node belongs to the current list.
-    ///
-    /// This method takes care not to create mutable references to `element`, to
-    /// maintain validity of aliasing pointers.
-    #[inline]
-    unsafe fn unlink_node(&mut self, mut node: NonNull<Node<T>>) {
-        let node = node.as_mut(); // this one is ours now, we can create an &mut.
-
-        // Not creating new mutable (unique!) references overlapping `element`.
-        match node.prev {
-            Some(prev) => (*prev.as_ptr()).next = node.next,
-            // this node is the head node
-            None => self.head = node.next,
-        };
-
-        match node.next {
-            Some(next) => (*next.as_ptr()).prev = node.prev,
-            // this node is the tail node
-            None => self.tail = node.prev,
-        };
-    }
 }
 
 impl<T> Default for LinkedList<T> {
