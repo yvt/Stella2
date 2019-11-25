@@ -932,14 +932,18 @@ fn assert_covariance() {
     }
 }
 
-unsafe impl<T: Send> Send for LinkedList<T> {}
+unsafe impl<T: Send + ?Sized> Send for LinkedList<T> {}
 
-unsafe impl<T: Sync> Sync for LinkedList<T> {}
+unsafe impl<T: Sync + ?Sized> Sync for LinkedList<T> {}
 
-unsafe impl<T: Sync> Send for Iter<'_, T> {}
+unsafe impl<T: Send + ?Sized> Send for Node<T> {}
 
-unsafe impl<T: Sync> Sync for Iter<'_, T> {}
+unsafe impl<T: Sync + ?Sized> Sync for Node<T> {}
 
-unsafe impl<T: Send> Send for IterMut<'_, T> {}
+unsafe impl<T: Sync + ?Sized> Send for Iter<'_, T> {}
 
-unsafe impl<T: Sync> Sync for IterMut<'_, T> {}
+unsafe impl<T: Sync + ?Sized> Sync for Iter<'_, T> {}
+
+unsafe impl<T: Send + ?Sized> Send for IterMut<'_, T> {}
+
+unsafe impl<T: Sync + ?Sized> Sync for IterMut<'_, T> {}
