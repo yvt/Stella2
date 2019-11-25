@@ -14,7 +14,7 @@ fn list_from<T: Clone>(v: &[T]) -> LinkedList<T> {
     v.iter().cloned().collect()
 }
 
-pub fn check_links<T>(list: &LinkedList<T>) {
+pub fn check_links<T: ?Sized>(list: &LinkedList<T>) {
     unsafe {
         let mut len = 0;
         let mut last_ptr: Option<&Node<T>> = None;
@@ -26,21 +26,24 @@ pub fn check_links<T>(list: &LinkedList<T>) {
                 assert!(list.is_empty());
                 return;
             }
-            Some(node) => node_ptr = &*node.as_ptr(),
+            Some(hdr) => node_ptr = &*Node::from_hdr(hdr).as_ptr(),
         }
         loop {
-            match (last_ptr, node_ptr.prev) {
+            match (last_ptr, node_ptr.hdr.prev) {
                 (None, None) => {}
                 (None, _) => panic!("prev link for head"),
                 (Some(p), Some(pptr)) => {
-                    assert_eq!(p as *const Node<T>, pptr.as_ptr() as *const Node<T>);
+                    assert_eq!(
+                        p as *const Node<T>,
+                        Node::from_hdr(pptr).as_ptr() as *const Node<T>
+                    );
                 }
                 _ => panic!("prev link is none, not good"),
             }
-            match node_ptr.next {
+            match node_ptr.hdr.next {
                 Some(next) => {
                     last_ptr = Some(node_ptr);
-                    node_ptr = &*next.as_ptr();
+                    node_ptr = &*Node::from_hdr(next).as_ptr();
                     len += 1;
                 }
                 None => {
@@ -51,8 +54,11 @@ pub fn check_links<T>(list: &LinkedList<T>) {
         }
 
         // verify that the tail node points to the last node.
-        let tail = list.tail.as_ref().expect("some tail node").as_ref();
-        assert_eq!(tail as *const Node<T>, node_ptr as *const Node<T>);
+        let tail = list.tail.as_ref().expect("some tail node");
+        assert_eq!(
+            Node::from_hdr(*tail).as_ptr() as *const Node<T>,
+            node_ptr as *const Node<T>
+        );
         // check that len matches interior links.
         assert_eq!(len, list.len());
     }
@@ -215,6 +221,66 @@ fn fuzz_test(sz: i32) {
 
     let mut i = 0;
     for (a, &b) in m.into_iter().zip(&v) {
+        i += 1;
+        assert_eq!(a, b);
+    }
+    assert_eq!(i, v.len());
+}
+
+#[test]
+fn test_fuzz_dyn() {
+    for _ in 0..25 {
+        fuzz_test_dyn(3);
+        fuzz_test_dyn(16);
+        #[cfg(not(miri))] // Miri is too slow
+        fuzz_test_dyn(189);
+    }
+}
+
+fn fuzz_test_dyn(sz: i32) {
+    trait Get {
+        fn get(&self) -> i32;
+    }
+
+    impl Get for i32 {
+        fn get(&self) -> i32 {
+            *self
+        }
+    }
+
+    let mut m: LinkedList<dyn Get> = LinkedList::new();
+    let mut v = vec![];
+    for i in 0..sz {
+        check_links(&m);
+        let r: u8 = thread_rng().next_u32() as u8;
+        match r % 6 {
+            0 => {
+                m.pop_back_node();
+                v.pop();
+            }
+            1 => {
+                if !v.is_empty() {
+                    m.pop_front_node();
+                    v.remove(0);
+                }
+            }
+            2 | 4 => {
+                m.push_front_node(Box::pin(Node::new(-i)));
+                v.insert(0, -i);
+            }
+            3 | 5 | _ => {
+                m.push_back_node(Box::pin(Node::new(i)));
+                v.push(i);
+            }
+        }
+    }
+
+    check_links(&m);
+
+    let m = std::iter::from_fn(|| m.pop_front_node().map(|g| g.element.get()));
+
+    let mut i = 0;
+    for (a, &b) in m.zip(&v) {
         i += 1;
         assert_eq!(a, b);
     }

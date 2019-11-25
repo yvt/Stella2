@@ -8,7 +8,8 @@
 //!  - `LinkedList::split_off` was removed.
 //!  - The element count accounting was removed. Counting the elements now takes
 //!    a linear time.
-//!  - The elements can now be unsized.
+//!  - The elements can now be unsized. `Node` has a room to store the `vtable`
+//!    pointer.
 //!  - The elements are pinned.
 //!  - `Node` is exposed, making it possible to manipulate the elements which
 //!    are pinned and/or unsized.
@@ -35,16 +36,22 @@ mod tests;
 /// array-based containers are generally faster,
 /// more memory efficient, and make better use of CPU cache.
 pub struct LinkedList<T: ?Sized> {
-    head: Option<NonNull<Node<T>>>,
-    tail: Option<NonNull<Node<T>>>,
+    head: Option<NonNull<Hdr>>,
+    tail: Option<NonNull<Hdr>>,
     marker: PhantomData<Box<Node<T>>>,
 }
 
-#[derive(Debug)]
+#[repr(C)]
 pub struct Node<T: ?Sized> {
-    next: Option<NonNull<Node<T>>>,
-    prev: Option<NonNull<Node<T>>>,
+    /// Must be the first field
+    hdr: Hdr,
     pub element: T,
+}
+
+pub struct Hdr {
+    next: Option<NonNull<Hdr>>,
+    prev: Option<NonNull<Hdr>>,
+    vtable: mem::MaybeUninit<*const ()>,
 }
 
 /// An iterator over the elements of a `LinkedList`.
@@ -55,8 +62,8 @@ pub struct Node<T: ?Sized> {
 /// [`iter`]: struct.LinkedList.html#method.iter
 /// [`LinkedList`]: struct.LinkedList.html
 pub struct Iter<'a, T: 'a + ?Sized> {
-    head: Option<NonNull<Node<T>>>,
-    tail: Option<NonNull<Node<T>>>,
+    head: Option<NonNull<Hdr>>,
+    tail: Option<NonNull<Hdr>>,
     marker: PhantomData<&'a Node<T>>,
 }
 
@@ -85,8 +92,8 @@ pub struct IterMut<'a, T: 'a + ?Sized> {
     // have been handed out by the iterator!  So be careful when using this; the methods
     // called must be aware that there can be aliasing pointers to `element`.
     list: &'a mut LinkedList<T>,
-    head: Option<NonNull<Node<T>>>,
-    tail: Option<NonNull<Node<T>>>,
+    head: Option<NonNull<Hdr>>,
+    tail: Option<NonNull<Hdr>>,
 }
 
 impl<T: fmt::Debug + ?Sized> fmt::Debug for IterMut<'_, T> {
@@ -116,8 +123,7 @@ impl<T: fmt::Debug> fmt::Debug for IntoIter<T> {
 impl<T> Node<T> {
     pub fn new(element: T) -> Self {
         Node {
-            next: None,
-            prev: None,
+            hdr: Hdr::default(),
             element,
         }
     }
@@ -135,6 +141,68 @@ impl<T: ?Sized> Node<T> {
     pub fn element_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
         unsafe { Pin::new_unchecked(&mut Pin::into_inner_unchecked(self).element) }
     }
+
+    /// Update `self.hdr.vtable` if `&Self` is a fat pointer.
+    #[inline]
+    fn set_vtable(&mut self) {
+        match mem::size_of::<&mut Self>() {
+            x if x == mem::size_of::<usize>() => unsafe {
+                // vtable is not needed
+                let ptr: *const () = mem::transmute_copy(&self);
+
+                // Ensure that `from_hdr` can recover `&Node<T>` from `&Hdr`
+                // (1)
+                assert_eq!(ptr, &self.hdr as *const _ as *const ());
+            }
+            x if x == mem::size_of::<usize>() * 2 => unsafe {
+                let [ptr, vtable]: [*const (); 2] = mem::transmute_copy(&self);
+
+                // Ensure that `from_hdr` can recover `&Node<T>` from `&Hdr`
+                // (1)
+                assert_eq!(ptr, &self.hdr as *const _ as *const ());
+                // (2)
+                self.hdr.vtable = mem::MaybeUninit::new(vtable);
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline]
+    fn box_into_hdr(mut self: Box<Self>) -> NonNull<Hdr> {
+        self.set_vtable();
+
+        let mut raw = Box::into_raw_non_null(self);
+
+        NonNull::from(unsafe { &mut raw.as_mut().hdr })
+    }
+
+    #[inline]
+    unsafe fn from_hdr(hdr: NonNull<Hdr>) -> NonNull<Self> {
+        let fatptr: [mem::MaybeUninit<*const ()>; 2] = [
+            // (1)
+            mem::MaybeUninit::new(hdr.as_ptr() as *const ()),
+            // (2) If `&Self` is not a fat pointer, the following part is just
+            // ignored
+            hdr.as_ref().vtable,
+        ];
+
+        mem::transmute_copy(&fatptr)
+    }
+
+    #[inline]
+    unsafe fn box_from_hdr(hdr: NonNull<Hdr>) -> Box<Self> {
+        Box::from_raw(Self::from_hdr(hdr).as_ptr())
+    }
+}
+
+impl Default for Hdr {
+    fn default() -> Self {
+        Hdr {
+            next: None,
+            prev: None,
+            vtable: mem::MaybeUninit::uninit(),
+        }
+    }
 }
 
 // private methods
@@ -145,9 +213,9 @@ impl<T: ?Sized> LinkedList<T> {
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
             let mut node = Pin::into_inner_unchecked(node);
-            node.next = self.head;
-            node.prev = None;
-            let node = Some(Box::into_raw_non_null(node));
+            node.hdr.next = self.head;
+            node.hdr.prev = None;
+            let node = Some(node.box_into_hdr());
 
             match self.head {
                 None => self.tail = node,
@@ -163,9 +231,9 @@ impl<T: ?Sized> LinkedList<T> {
     pub fn pop_front_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
-        self.head.map(|node| unsafe {
-            let node = Pin::new_unchecked(Box::from_raw(node.as_ptr()));
-            self.head = node.next;
+        self.head.map(|hdr| unsafe {
+            let node = Node::box_from_hdr(hdr);
+            self.head = node.hdr.next;
 
             match self.head {
                 None => self.tail = None,
@@ -173,7 +241,7 @@ impl<T: ?Sized> LinkedList<T> {
                 Some(head) => (*head.as_ptr()).prev = None,
             }
 
-            node
+            Pin::new_unchecked(node)
         })
     }
 
@@ -183,9 +251,9 @@ impl<T: ?Sized> LinkedList<T> {
         // to maintain validity of aliasing pointers into `element`.
         unsafe {
             let mut node = Pin::into_inner_unchecked(node);
-            node.next = None;
-            node.prev = self.tail;
-            let node = Some(Box::into_raw_non_null(node));
+            node.hdr.next = None;
+            node.hdr.prev = self.tail;
+            let node = Some(node.box_into_hdr());
 
             match self.tail {
                 None => self.head = node,
@@ -201,9 +269,9 @@ impl<T: ?Sized> LinkedList<T> {
     pub fn pop_back_node(&mut self) -> Option<Pin<Box<Node<T>>>> {
         // This method takes care not to create mutable references to whole nodes,
         // to maintain validity of aliasing pointers into `element`.
-        self.tail.map(|node| unsafe {
-            let node = Pin::new_unchecked(Box::from_raw(node.as_ptr()));
-            self.tail = node.prev;
+        self.tail.map(|hdr| unsafe {
+            let node = Node::box_from_hdr(hdr);
+            self.tail = node.hdr.prev;
 
             match self.tail {
                 None => self.head = None,
@@ -211,7 +279,7 @@ impl<T: ?Sized> LinkedList<T> {
                 Some(tail) => (*tail.as_ptr()).next = None,
             }
 
-            node
+            Pin::new_unchecked(node)
         })
     }
 }
@@ -474,7 +542,11 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn front_node(&self) -> Option<Pin<&Node<T>>> {
-        unsafe { self.head.as_ref().map(|n| Pin::new_unchecked(n.as_ref())) }
+        unsafe {
+            self.head
+                .as_ref()
+                .map(|hdr| Pin::new_unchecked(&*Node::from_hdr(*hdr).as_ptr()))
+        }
     }
 
     /// Provides a mutable reference to the front element, or `None` if the list
@@ -519,7 +591,8 @@ impl<T: ?Sized> LinkedList<T> {
     // node in-place, corrupting the structure.
     #[inline]
     pub unsafe fn front_node_mut(&mut self) -> Option<Pin<&mut Node<T>>> {
-        self.head.as_mut().map(|n| Pin::new_unchecked(n.as_mut()))
+        self.head
+            .map(|hdr| Pin::new_unchecked(&mut *Node::from_hdr(hdr).as_ptr()))
     }
 
     /// Provides a reference to the back element, or `None` if the list is
@@ -551,7 +624,8 @@ impl<T: ?Sized> LinkedList<T> {
 
     #[inline]
     pub fn back_node(&self) -> Option<Pin<&Node<T>>> {
-        unsafe { self.tail.as_ref().map(|n| Pin::new_unchecked(n.as_ref())) }
+        self.tail
+            .map(|hdr| unsafe { Pin::new_unchecked(&*Node::from_hdr(hdr).as_ptr()) })
     }
 
     /// Provides a mutable reference to the back element, or `None` if the list
@@ -596,7 +670,8 @@ impl<T: ?Sized> LinkedList<T> {
     // node in-place, corrupting the structure.
     #[inline]
     pub unsafe fn back_node_mut(&mut self) -> Option<Pin<&mut Node<T>>> {
-        self.tail.as_mut().map(|n| Pin::new_unchecked(n.as_mut()))
+        self.tail
+            .map(|hdr| Pin::new_unchecked(&mut *Node::from_hdr(hdr).as_ptr()))
     }
 }
 
@@ -705,10 +780,10 @@ impl<'a, T: ?Sized> Iterator for Iter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a T> {
-        self.head.map(|node| unsafe {
+        self.head.map(|hdr| unsafe {
             // Need an unbound lifetime to get 'a
-            let node = &*node.as_ptr();
-            self.head = node.next;
+            let node = &*Node::from_hdr(hdr).as_ptr();
+            self.head = node.hdr.next;
             &node.element
         })
     }
@@ -731,10 +806,10 @@ impl<'a, T: ?Sized> Iterator for Iter<'a, T> {
 impl<'a, T: ?Sized> DoubleEndedIterator for Iter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a T> {
-        self.tail.map(|node| unsafe {
+        self.tail.map(|hdr| unsafe {
             // Need an unbound lifetime to get 'a
-            let node = &*node.as_ptr();
-            self.tail = node.prev;
+            let node = &*Node::from_hdr(hdr).as_ptr();
+            self.tail = node.hdr.prev;
             &node.element
         })
     }
@@ -749,10 +824,10 @@ impl<'a, T: ?Sized> Iterator for IterMut<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a mut T> {
-        self.head.map(|node| unsafe {
+        self.head.map(|hdr| unsafe {
             // Need an unbound lifetime to get 'a
-            let node = &mut *node.as_ptr();
-            self.head = node.next;
+            let node = &mut *Node::from_hdr(hdr).as_ptr();
+            self.head = node.hdr.next;
             &mut node.element
         })
     }
@@ -775,10 +850,10 @@ impl<'a, T: ?Sized> Iterator for IterMut<'a, T> {
 impl<'a, T: ?Sized> DoubleEndedIterator for IterMut<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a mut T> {
-        self.tail.map(|node| unsafe {
+        self.tail.map(|hdr| unsafe {
             // Need an unbound lifetime to get 'a
-            let node = &mut *node.as_ptr();
-            self.tail = node.prev;
+            let node = &mut *Node::from_hdr(hdr).as_ptr();
+            self.tail = node.hdr.prev;
             &mut node.element
         })
     }
