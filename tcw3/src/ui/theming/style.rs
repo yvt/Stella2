@@ -30,6 +30,8 @@ bitflags! {
         const HAS_HORIZONTAL_SCROLLBAR = 1 << 7;
         /// The scrollable container has a vertical scrollbar.
         const HAS_VERTICAL_SCROLLBAR = 1 << 8;
+        /// The element is a splitter.
+        const SPLITTER = 1 << 9;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;

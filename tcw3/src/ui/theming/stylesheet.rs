@@ -540,6 +540,13 @@ lazy_static! {
                 .. Metrics::default()
             },
         },
+
+        // Splitter
+        ([.SPLITTER]) (priority = 100) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.5, 0.5, 0.5, 0.8].into(),
+            min_size: [1.0, 1.0].into(),
+        },
     };
 }
 

@@ -11,13 +11,16 @@ use std::{
 use crate::{
     pal,
     pal::prelude::*,
+    ui::{
+        layouts::FillLayout,
+        theming::{ClassSet, ElemClassPath, Manager, StyledBox},
+    },
     uicore::{
         CursorShape, HView, HWnd, Layout, LayoutCtx, MouseDragListener, SizeTraits, UpdateCtx,
         ViewFlags, ViewListener,
     },
 };
 
-const SPLITTER_WIDTH: f32 = 1.0;
 const SPLITTER_TOLERANCE: f32 = 5.0;
 
 /// A widget dividing a rectangle into two resizable panels.
@@ -27,6 +30,13 @@ const SPLITTER_TOLERANCE: f32 = 5.0;
 /// The widget ensures the first panel's size is rounded to an integer.
 /// Consequently, the same goes for the second panel, provided that the overall
 /// size is an integer.
+///
+/// # Styling
+///
+///  - `parent > .SPLITTER` — The splitter element. The width is controlled by
+///    `min_size`. The element has `.VERTICAL` if `vertical` is `true` (i.e.,
+///    the region is separated by a horizontal line).
+///
 #[derive(Debug)]
 pub struct Split {
     container: HView,
@@ -68,6 +78,7 @@ struct Shared {
     value: Cell<f32>,
     container: HView,
     splitter: HView,
+    splitter_sb: StyledBox,
     subviews: RefCell<[HView; 2]>,
     on_drag: RefCell<DragHandler>,
 }
@@ -94,11 +105,19 @@ impl Split {
     /// `vertical` specifies the split direction. `fix` specifies which panel
     /// should be resized when the overall size is changed. It must be one of
     /// `Some(0)`, `Some(1)`, and `None`.
-    pub fn new(vertical: bool, fix: Option<usize>) -> Self {
+    pub fn new(style_manager: &'static Manager, vertical: bool, fix: Option<usize>) -> Self {
         let container = HView::new(ViewFlags::default());
         let splitter = HView::new(
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
         );
+
+        let splitter_sb = StyledBox::new(style_manager, ViewFlags::default());
+
+        splitter_sb.set_class_set(if vertical {
+            ClassSet::SPLITTER | ClassSet::VERTICAL
+        } else {
+            ClassSet::SPLITTER
+        });
 
         let shared = Rc::new(Shared {
             vertical,
@@ -111,6 +130,7 @@ impl Split {
             value: Cell::new(0.5),
             container: container.clone(),
             splitter: splitter.clone(),
+            splitter_sb,
             // Fill the places with dummy views
             subviews: RefCell::new([
                 HView::new(ViewFlags::default()),
@@ -124,6 +144,11 @@ impl Split {
             shared: Rc::downgrade(&shared),
             layer: RefCell::new(None),
         });
+
+        let mut margin = [0.0; 4];
+        margin[!vertical as usize] = SPLITTER_TOLERANCE;
+        margin[!vertical as usize + 2] = SPLITTER_TOLERANCE;
+        splitter.set_layout(FillLayout::new(shared.splitter_sb.view().clone()).with_margin(margin));
 
         splitter.set_cursor_shape(
             [Some(CursorShape::EwResize), Some(CursorShape::NsResize)][vertical as usize],
@@ -176,9 +201,21 @@ impl Split {
     pub fn set_on_drag(&self, handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static) {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
+
+    /// Set the parent class path.
+    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
+        let styled_box = &self.shared.splitter_sb;
+        styled_box.set_parent_class_path(parent_class_path);
+    }
 }
 
 impl Shared {
+    fn splitter_width(&self) -> f32 {
+        let axis_pri = self.vertical as usize;
+        let size = self.splitter.frame().size()[axis_pri];
+        size - SPLITTER_TOLERANCE * 2.0
+    }
+
     /// Get `value` based on the actual position of the splitter.
     fn actual_value(&self) -> f32 {
         let axis_pri = self.vertical as usize;
@@ -186,10 +223,12 @@ impl Shared {
         let size = self.container.frame().size()[axis_pri];
         let pos = self.splitter.frame().min[axis_pri] + SPLITTER_TOLERANCE;
 
+        let splitter_width = self.splitter_width();
+
         match self.fix {
-            None => pos / (size - SPLITTER_WIDTH),
+            None => pos / (size - splitter_width),
             Some(0) => pos,
-            Some(1) => size - SPLITTER_WIDTH - pos,
+            Some(1) => size - splitter_width - pos,
             _ => unreachable!(),
         }
     }
@@ -212,7 +251,9 @@ impl Shared {
                 let axis_pri = self.vertical as usize;
                 let size = self.container.frame().size()[axis_pri];
 
-                1.0 / (size - SPLITTER_WIDTH)
+                let splitter_width = self.splitter_width();
+
+                1.0 / (size - splitter_width)
             }
             Some(0) => 1.0,
             Some(1) => -1.0,
@@ -243,18 +284,19 @@ fn get_split_position(
     value: f32,
     st_min: [f32; 2],
     st_max: [f32; 2],
+    splitter_width: f32,
 ) -> f32 {
-    let mut min = [st_min[0], size - SPLITTER_WIDTH - st_max[0]].fmax();
-    let mut max = [st_max[0], size - SPLITTER_WIDTH - st_min[0]].fmin();
+    let mut min = [st_min[0], size - splitter_width - st_max[0]].fmax();
+    let mut max = [st_max[0], size - splitter_width - st_min[0]].fmin();
 
     // Make sure the first panel's size is rounded
     min = min.ceil();
     max = max.floor();
 
     let position = match fix {
-        None => (size - SPLITTER_WIDTH) * value,
+        None => (size - splitter_width) * value,
         Some(0) => value,
-        Some(1) => size - SPLITTER_WIDTH - value,
+        Some(1) => size - splitter_width - value,
         _ => unreachable!(),
     };
 
@@ -277,18 +319,21 @@ impl Layout for SplitLayout {
     fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
         let st1 = ctx.subview_size_traits(&self.subviews[0]);
         let st2 = ctx.subview_size_traits(&self.subviews[1]);
+        let st_spl = ctx.subview_size_traits(&self.subviews[2]);
 
         let axis_pri = self.vertical as usize;
         let axis_sec = axis_pri ^ 1;
 
+        let splitter_width = st_spl.min[axis_pri] - SPLITTER_TOLERANCE * 2.0;
+
         let mut st = st1;
-        let extra = SPLITTER_WIDTH;
+        let extra = splitter_width;
         st.min[axis_pri] = st1.min[axis_pri].ceil() + st2.min[axis_pri] + extra;
         st.max[axis_pri] = st1.max[axis_pri].floor() + st2.max[axis_pri] + extra;
         st.preferred[axis_pri] = st1.preferred[axis_pri] + st2.preferred[axis_pri] + extra;
 
-        st.min[axis_sec] = [st1.min[axis_sec], st2.min[axis_sec]].fmax();
-        st.max[axis_sec] = [st1.max[axis_sec], st2.max[axis_sec]].fmin();
+        st.min[axis_sec] = [st1.min[axis_sec], st2.min[axis_sec], st_spl.min[axis_sec]].fmax();
+        st.max[axis_sec] = [st1.max[axis_sec], st2.max[axis_sec], st_spl.max[axis_sec]].fmin();
         st.preferred[axis_sec] = ((st1.preferred[axis_sec] + st2.preferred[axis_sec]) * 0.5)
             .fmin(st.max[axis_sec])
             .fmax(st.min[axis_sec]);
@@ -299,8 +344,11 @@ impl Layout for SplitLayout {
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         let st1 = ctx.subview_size_traits(&self.subviews[0]);
         let st2 = ctx.subview_size_traits(&self.subviews[1]);
+        let st_spl = ctx.subview_size_traits(&self.subviews[2]);
 
         let axis_pri = self.vertical as usize;
+
+        let splitter_width = st_spl.min[axis_pri] - SPLITTER_TOLERANCE * 2.0;
 
         let pos = get_split_position(
             size[axis_pri],
@@ -308,6 +356,7 @@ impl Layout for SplitLayout {
             self.value,
             [st1.min[axis_pri], st2.min[axis_pri]],
             [st1.max[axis_pri], st2.max[axis_pri]],
+            splitter_width,
         );
 
         // Arrange the panels
@@ -316,14 +365,14 @@ impl Layout for SplitLayout {
         let mut spl_frame = frame1;
 
         frame1.max[axis_pri] = pos;
-        frame2.min[axis_pri] = pos + SPLITTER_WIDTH;
+        frame2.min[axis_pri] = pos + splitter_width;
 
         ctx.set_subview_frame(&self.subviews[0], frame1);
         ctx.set_subview_frame(&self.subviews[1], frame2);
 
         // Arrange the splitter
         spl_frame.min[axis_pri] = pos - SPLITTER_TOLERANCE;
-        spl_frame.max[axis_pri] = pos + SPLITTER_WIDTH + SPLITTER_TOLERANCE;
+        spl_frame.max[axis_pri] = pos + splitter_width + SPLITTER_TOLERANCE;
 
         ctx.set_subview_frame(&self.subviews[2], spl_frame);
     }
