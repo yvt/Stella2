@@ -7,7 +7,7 @@ use crate::uicore::{HView, Layout, LayoutCtx, SizeTraits};
 #[derive(Debug, Clone)]
 pub struct FillLayout {
     subview: [HView; 1],
-    margin: f32,
+    margin: [f32; 4],
 }
 
 impl FillLayout {
@@ -16,7 +16,7 @@ impl FillLayout {
     pub fn new(subview: HView) -> Self {
         Self {
             subview: [subview],
-            margin: 0.0,
+            margin: [0.0; 4],
         }
     }
 
@@ -24,6 +24,16 @@ impl FillLayout {
     /// specified view using a specified margin value applied for all edges
     /// based on `self`, consuming `self`.
     pub fn with_uniform_margin(self, margin: f32) -> Self {
+        Self {
+            margin: [margin; 4],
+            ..self
+        }
+    }
+
+    /// Construct a `FillLayout` that fills the associated view with a
+    /// specified view using separately specified margin values applied for
+    /// corresponding edges based on `self`, consuming `self`.
+    pub fn with_margin(self, margin: [f32; 4]) -> Self {
         Self { margin, ..self }
     }
 }
@@ -35,7 +45,10 @@ impl Layout for FillLayout {
 
     fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
         let st = ctx.subview_size_traits(&self.subview[0]);
-        let extra = vec2(self.margin, self.margin) * 2.0;
+        let extra = vec2(
+            self.margin[1] + self.margin[3],
+            self.margin[0] + self.margin[2],
+        );
         SizeTraits {
             min: st.min + extra,
             max: st.max + extra,
@@ -47,8 +60,8 @@ impl Layout for FillLayout {
         ctx.set_subview_frame(
             &self.subview[0],
             box2! {
-                min: [self.margin, self.margin],
-                max: [size.x - self.margin, size.y - self.margin],
+                min: [self.margin[3], self.margin[0]],
+                max: [size.x - self.margin[1], size.y - self.margin[2]],
             },
         );
     }
