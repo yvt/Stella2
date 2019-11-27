@@ -276,14 +276,26 @@ where
         self.front().map(|item| self.remove(item))
     }
 
-    pub fn iter_mut(&mut self) -> Iter<&mut Self> {
+    /// Create an iterator.
+    ///
+    /// # Safety
+    ///
+    /// If the link structure is corrupt, it may return a mutable reference to
+    /// the same element more than once, which is an undefined behavior.
+    pub unsafe fn iter_mut(&mut self) -> Iter<&mut Self> {
         Iter {
             next: self.head.first,
             accessor: self,
         }
     }
 
-    pub fn drain<'b>(&'b mut self) -> Drain<'a, 'b, P, F, T> {
+    /// Create a draining iterator.
+    ///
+    /// # Safety
+    ///
+    /// If the link structure is corrupt, it may return a mutable reference to
+    /// the same element more than once, which is an undefined behavior.
+    pub unsafe fn drain<'b>(&'b mut self) -> Drain<'a, 'b, P, F, T> {
         Drain { accessor: self }
     }
 }
@@ -439,7 +451,9 @@ fn basic_mut() {
     assert_eq!(accessor.front_data().unwrap().0, 3);
     assert_eq!(accessor.back_data().unwrap().0, 2);
 
-    let items: Vec<_> = accessor.iter_mut().map(|(_, &mut (x, _))| x).collect();
+    let items: Vec<_> = unsafe { accessor.iter_mut() }
+        .map(|(_, &mut (x, _))| x)
+        .collect();
     assert_eq!(items, vec![3, 1, 2]);
 
     accessor.remove(ptr1);
@@ -465,7 +479,9 @@ fn drain() {
     let ptr3 = accessor.allocate((3, None));
     accessor.push_front(ptr3);
 
-    let items: Vec<_> = accessor.drain().map(|(_, &mut (x, _))| x).collect();
+    let items: Vec<_> = unsafe { accessor.drain() }
+        .map(|(_, &mut (x, _))| x)
+        .collect();
     assert_eq!(items, vec![3, 1, 2]);
 
     assert!(accessor.is_empty());
