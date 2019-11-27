@@ -382,7 +382,7 @@ impl<T> IterablePool<T> {
         self.storage[fp.get()].as_mut()
     }
 
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         Iter {
             remaining_len: self.storage.len(),
             pool: self,
@@ -390,7 +390,7 @@ impl<T> IterablePool<T> {
         }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         IterMut {
             remaining_len: self.storage.len(),
             cur: self.first_used,

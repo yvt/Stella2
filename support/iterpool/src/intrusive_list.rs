@@ -56,7 +56,7 @@ impl ListHead {
 
 /// Accessor to a linked list.
 #[derive(Debug)]
-pub struct ListAccessor<'a, P: 'a, F> {
+pub struct ListAccessor<'a, P, F> {
     head: &'a ListHead,
     pool: &'a P,
     field: F,
@@ -64,7 +64,7 @@ pub struct ListAccessor<'a, P: 'a, F> {
 
 impl<'a, P, F, T> ListAccessor<'a, P, F>
 where
-    P: 'a + ops::Index<PoolPtr, Output = T>,
+    P: ops::Index<PoolPtr, Output = T>,
     F: Fn(&T) -> &Option<Link>,
 {
     pub fn head(&self) -> &ListHead {
@@ -123,7 +123,7 @@ impl<'a, P: 'a, F> ops::Deref for ListAccessor<'a, P, F> {
 
 /// Mutable accessor to a linked list.
 #[derive(Debug)]
-pub struct ListAccessorMut<'a, P: 'a, F> {
+pub struct ListAccessorMut<'a, P, F> {
     head: &'a mut ListHead,
     pool: &'a mut P,
     field: F,
@@ -131,7 +131,7 @@ pub struct ListAccessorMut<'a, P: 'a, F> {
 
 impl<'a, P, F, T> ListAccessorMut<'a, P, F>
 where
-    P: 'a + ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
+    P: ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
     F: FnMut(&mut T) -> &mut Option<Link>,
 {
     pub fn head(&self) -> &ListHead {
@@ -335,10 +335,9 @@ pub struct Iter<T> {
 
 impl<'a, 'b, P, F, T> Iterator for Iter<&'b ListAccessor<'a, P, F>>
 where
-    P: 'a + 'b + ops::Index<PoolPtr, Output = T>,
-    F: 'a + 'b + Fn(&T) -> &Option<Link>,
+    P: ops::Index<PoolPtr, Output = T>,
+    F: 'a + Fn(&T) -> &Option<Link>,
     T: 'a,
-    'a: 'b,
 {
     type Item = (PoolPtr, &'a T);
 
@@ -361,10 +360,9 @@ where
 
 impl<'a, 'b, P, F, T> Iterator for Iter<&'b mut ListAccessorMut<'a, P, F>>
 where
-    P: 'a + 'b + ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
-    F: 'a + 'b + FnMut(&mut T) -> &mut Option<Link>,
+    P: ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
+    F: 'a + FnMut(&mut T) -> &mut Option<Link>,
     T: 'a + 'b,
-    'a: 'b,
 {
     type Item = (PoolPtr, &'a mut T);
 
@@ -388,20 +386,18 @@ where
 #[derive(Debug)]
 pub struct Drain<'a, 'b, P, F, T>
 where
-    P: 'a + 'b + ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
-    F: 'a + 'b + FnMut(&mut T) -> &mut Option<Link>,
+    P: ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
+    F: 'a + FnMut(&mut T) -> &mut Option<Link>,
     T: 'a + 'b,
-    'a: 'b,
 {
     accessor: &'b mut ListAccessorMut<'a, P, F>,
 }
 
 impl<'a, 'b, P, F, T> Iterator for Drain<'a, 'b, P, F, T>
 where
-    P: 'a + 'b + ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
-    F: 'a + 'b + FnMut(&mut T) -> &mut Option<Link>,
+    P: ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
+    F: 'a + FnMut(&mut T) -> &mut Option<Link>,
     T: 'a + 'b,
-    'a: 'b,
 {
     type Item = (PoolPtr, &'a mut T);
 
@@ -417,10 +413,9 @@ where
 
 impl<'a, 'b, P, F, T> Drop for Drain<'a, 'b, P, F, T>
 where
-    P: 'a + 'b + ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
-    F: 'a + 'b + FnMut(&mut T) -> &mut Option<Link>,
+    P: ops::Index<PoolPtr, Output = T> + ops::IndexMut<PoolPtr>,
+    F: 'a + FnMut(&mut T) -> &mut Option<Link>,
     T: 'a + 'b,
-    'a: 'b,
 {
     fn drop(&mut self) {
         while let Some(_) = self.accessor.pop_back() {}
