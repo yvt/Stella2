@@ -1,10 +1,7 @@
 use bitflags::bitflags;
+use iterpool::{IterablePool, PoolPtr};
 use sorted_diff::{sorted_diff, In};
-use std::{
-    cell::{Cell, RefCell},
-    fmt,
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt, rc::Rc};
 use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
 use tcw3_pal::mt_lazy_static;
 
@@ -15,8 +12,6 @@ use super::{
 use crate::{pal, pal::prelude::*};
 
 pub(crate) type SheetId = usize;
-
-pub(crate) type ManagerCb = Box<dyn Fn(pal::Wm, &Manager)>;
 
 pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::Wm, &Manager, &mut NewSheetSetCtx<'_>)>;
 
@@ -29,8 +24,8 @@ pub type ManagerNewSheetSetCb = Box<dyn Fn(pal::Wm, &Manager, &mut NewSheetSetCt
 pub struct Manager {
     wm: pal::Wm,
     sheet_set: RefCell<SheetSet>,
-    set_change_handlers: RefCell<SubscriberList<ManagerCb>>,
     new_set_handlers: RefCell<SubscriberList<ManagerNewSheetSetCb>>,
+    elems: RefCell<IterablePool<ElemInner>>,
 }
 
 impl fmt::Debug for Manager {
@@ -40,6 +35,7 @@ impl fmt::Debug for Manager {
             .field("sheet_set", &())
             .field("set_change_handlers", &())
             .field("new_set_handlers", &())
+            .field("elems", &self.elems)
             .finish()
     }
 }
@@ -53,8 +49,8 @@ impl Manager {
         let this = Self {
             wm,
             sheet_set: RefCell::new(SheetSet { sheets: Vec::new() }),
-            set_change_handlers: RefCell::new(SubscriberList::new()),
             new_set_handlers: RefCell::new(SubscriberList::new()),
+            elems: RefCell::new(IterablePool::new()),
         };
 
         // Create the first `SheetSet`
@@ -67,12 +63,6 @@ impl Manager {
     /// Get a global instance of `Manager`.
     pub fn global(wm: pal::Wm) -> &'static Self {
         GLOBAL_MANAGER.get_with_wm(wm)
-    }
-
-    /// Register a handler function called when `sheet_set()` is updated with a
-    /// new sheet set.
-    pub(crate) fn subscribe_sheet_set_changed(&self, cb: ManagerCb) -> Sub {
-        self.set_change_handlers.borrow_mut().insert(cb).untype()
     }
 
     /// Register a callback function called when a new stylesheet set is being
@@ -91,8 +81,8 @@ impl Manager {
         *self.sheet_set.borrow_mut() = sheet_set;
 
         // Notify the change
-        for handler in self.set_change_handlers.borrow().iter() {
-            handler(self.wm, self);
+        for elem_inner in self.elems.borrow().iter() {
+            elem_inner.on_sheet_set_changed(self);
         }
     }
 
@@ -242,16 +232,22 @@ impl Prop {
 /// updates the active rule set whenever the sheet set is changed. It tracks
 /// changes in properties, and calls the provided [`ElemChangeCb`] whenever
 /// styling properties of the corresponding styled element are updated.
-#[derive(Debug)]
 pub struct Elem {
-    inner: Rc<ElemInner>,
+    style_manager: &'static Manager,
+    ptr: PoolPtr,
+}
+
+impl fmt::Debug for Elem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let inner = self.inner();
+
+        f.debug_struct("Elem").field("inner", &*inner).finish()
+    }
 }
 
 pub type ElemChangeCb = Box<dyn Fn(pal::Wm, PropKindFlags)>;
 
 struct ElemInner {
-    sub: Cell<Option<Sub>>,
-    style_manager: &'static Manager,
     rules: RefCell<ElemRules>,
     /// The function called when property values might have changed.
     change_handler: RefCell<ElemChangeCb>,
@@ -269,8 +265,6 @@ struct ElemRules {
 impl fmt::Debug for ElemInner {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ElemInner")
-            .field("sub", &())
-            .field("style_manager", &self.style_manager)
             .field("rules", &self.rules)
             .field("change_handler", &((&self.change_handler) as *const _))
             .finish()
@@ -279,57 +273,41 @@ impl fmt::Debug for ElemInner {
 
 impl Drop for Elem {
     fn drop(&mut self) {
-        if let Some(sub) = self.inner.sub.take().take() {
-            sub.unsubscribe().unwrap();
-        }
+        self.style_manager
+            .elems
+            .borrow_mut()
+            .deallocate(self.ptr)
+            .unwrap();
     }
 }
 
 impl Elem {
     /// Construct an `Elem`.
     pub fn new(style_manager: &'static Manager) -> Self {
-        let this = Self {
-            inner: Rc::new(ElemInner {
-                sub: Cell::new(None),
-                style_manager,
-                rules: RefCell::new(ElemRules {
-                    class_path: Rc::default(),
-                    rules_by_ord: Vec::new(),
-                    rules_by_prio: Vec::new(),
-                }),
-                change_handler: RefCell::new(Box::new(|_, _| {})),
+        let inner = ElemInner {
+            rules: RefCell::new(ElemRules {
+                class_path: Rc::default(),
+                rules_by_ord: Vec::new(),
+                rules_by_prio: Vec::new(),
             }),
+            change_handler: RefCell::new(Box::new(|_, _| {})),
         };
 
-        // Watch for stylesheet set changes
-        let inner = Rc::clone(&this.inner);
-        let sub = style_manager.subscribe_sheet_set_changed(Box::new(move |wm, _| {
-            // `sheet_set` was changed, update the ative rule set
-            let manager = inner.style_manager;
-            let sheet_set = manager.sheet_set();
-            inner
-                .rules
-                .borrow_mut()
-                .invalidate_rules_and_update(&sheet_set);
+        let ptr = style_manager.elems.borrow_mut().allocate(inner);
 
-            // Notify that any of the properties might have changed
-            inner.change_handler.borrow()(wm, PropKindFlags::all());
-        }));
-        this.inner.sub.set(Some(sub));
-
-        this
+        Self { style_manager, ptr }
     }
 
     /// Set a callback function called when property values might have changed.
     pub fn set_on_change(&self, handler: ElemChangeCb) {
-        *self.inner.change_handler.borrow_mut() = handler;
+        *self.inner().change_handler.borrow_mut() = handler;
     }
 
     /// Get the computed value of the specified styling property.
     pub fn compute_prop(&self, prop: Prop) -> PropValue {
-        let manager = self.inner.style_manager;
+        let manager = self.style_manager;
         let sheet_set = manager.sheet_set();
-        self.inner.rules.borrow().compute_prop(&sheet_set, prop)
+        self.inner().rules.borrow().compute_prop(&sheet_set, prop)
     }
 
     /// Assign a new `ElemClassPath` and update the active rule set.
@@ -366,7 +344,7 @@ impl Elem {
 
     /// Get the class set.
     pub fn class_set(&self) -> ClassSet {
-        self.inner.rules.borrow().class_path.class_set
+        self.inner().rules.borrow().class_path.class_set
     }
 
     /// Get the class path.
@@ -377,25 +355,44 @@ impl Elem {
     /// [`set_parent_class_path`]: Elem::set_parent_class_path
     /// [`set_class_set`]: Elem::set_class_set
     pub fn class_path(&self) -> Rc<ElemClassPath> {
-        Rc::clone(&self.inner.rules.borrow().class_path)
+        Rc::clone(&self.inner().rules.borrow().class_path)
     }
 
     /// Update the target `ElemClassPath` and update the active rule set.
     fn update_class_path_with(&self, f: impl FnOnce(&mut Rc<ElemClassPath>)) {
-        let manager = self.inner.style_manager;
+        let manager = self.style_manager;
         let sheet_set = manager.sheet_set();
+        let inner = self.inner();
 
         // Update the active rule set
         let diff = {
-            let mut rules = self.inner.rules.borrow_mut();
+            let mut rules = inner.rules.borrow_mut();
             f(&mut rules.class_path);
             rules.update(&sheet_set)
         };
 
         // Notify the change
         if !diff.is_empty() {
-            self.inner.change_handler.borrow()(manager.wm, diff);
+            inner.change_handler.borrow()(manager.wm, diff);
         }
+    }
+
+    fn inner(&self) -> impl std::ops::Deref<Target = ElemInner> {
+        use owning_ref::OwningRef;
+        OwningRef::new(self.style_manager.elems.borrow()).map(|elems| &elems[self.ptr])
+    }
+}
+
+impl ElemInner {
+    fn on_sheet_set_changed(&self, manager: &Manager) {
+        // `sheet_set` was changed, update the ative rule set
+        let sheet_set = manager.sheet_set();
+        self.rules
+            .borrow_mut()
+            .invalidate_rules_and_update(&sheet_set);
+
+        // Notify that any of the properties might have changed
+        self.change_handler.borrow()(manager.wm, PropKindFlags::all());
     }
 }
 
