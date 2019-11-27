@@ -23,6 +23,7 @@
 //!
 //! It also comes with a sacrifice. It is impossible to return a free space to
 //! the global heap without destroying entire the pool.
+#![allow(clippy::trivially_copy_pass_by_ref)]
 use std::{mem, num::NonZeroUsize, ops};
 
 pub mod intrusive_list;
@@ -102,22 +103,22 @@ impl PoolPtr {
 impl<T> Entry<T> {
     fn as_ref(&self) -> Option<&T> {
         match self {
-            &Entry::Used(ref value) => Some(value),
-            &Entry::Free(_) => None,
+            Entry::Used(value) => Some(value),
+            Entry::Free(_) => None,
         }
     }
 
     fn as_mut(&mut self) -> Option<&mut T> {
         match self {
-            &mut Entry::Used(ref mut value) => Some(value),
-            &mut Entry::Free(_) => None,
+            Entry::Used(value) => Some(value),
+            Entry::Free(_) => None,
         }
     }
 
     fn next_free_index(&self) -> Option<PoolPtr> {
         match self {
-            &Entry::Used(_) => unreachable!(),
-            &Entry::Free(i) => i,
+            Entry::Used(_) => unreachable!(),
+            Entry::Free(i) => *i,
         }
     }
 }
@@ -125,32 +126,32 @@ impl<T> Entry<T> {
 impl<T> ItEntry<T> {
     fn as_ref(&self) -> Option<&T> {
         match self {
-            &ItEntry::Used(ref value, _) => Some(value),
-            &ItEntry::Free(_) => None,
+            ItEntry::Used(value, _) => Some(value),
+            ItEntry::Free(_) => None,
         }
     }
     fn as_mut(&mut self) -> Option<&mut T> {
         match self {
-            &mut ItEntry::Used(ref mut value, _) => Some(value),
-            &mut ItEntry::Free(_) => None,
+            ItEntry::Used(value, _) => Some(value),
+            ItEntry::Free(_) => None,
         }
     }
     fn next_previous_used_index(&self) -> (PoolPtr, PoolPtr) {
         match self {
-            &ItEntry::Used(_, (prev, next)) => (prev, next),
-            &ItEntry::Free(_) => unreachable!(),
+            ItEntry::Used(_, pn) => *pn,
+            ItEntry::Free(_) => unreachable!(),
         }
     }
     fn next_previous_used_index_mut(&mut self) -> &mut (PoolPtr, PoolPtr) {
         match self {
-            &mut ItEntry::Used(_, ref mut pn) => pn,
-            &mut ItEntry::Free(_) => unreachable!(),
+            ItEntry::Used(_, pn) => pn,
+            ItEntry::Free(_) => unreachable!(),
         }
     }
     fn next_free_index(&self) -> Option<PoolPtr> {
         match self {
-            &ItEntry::Used(_, _) => unreachable!(),
-            &ItEntry::Free(i) => i,
+            ItEntry::Used(_, _) => unreachable!(),
+            ItEntry::Free(i) => *i,
         }
     }
 }
@@ -213,10 +214,10 @@ impl<T> Pool<T> {
 
     pub fn deallocate<S: Into<PoolPtr>>(&mut self, i: S) -> Option<T> {
         let i = i.into();
-        let ref mut e = self.storage[i.get()];
+        let e = &mut self.storage[i.get()];
         match e {
-            &mut Entry::Used(_) => {}
-            &mut Entry::Free(_) => {
+            Entry::Used(_) => {}
+            Entry::Free(_) => {
                 return None;
             }
         }
@@ -440,7 +441,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
-            let ref entry = self.pool.storage[cur.get()];
+            let entry = &self.pool.storage[cur.get()];
             self.cur = Some(entry.next_previous_used_index().0);
             if self.cur == self.pool.first_used {
                 // Reached the end
