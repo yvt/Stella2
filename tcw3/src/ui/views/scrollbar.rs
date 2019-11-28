@@ -14,8 +14,8 @@ use crate::{
     ui::{
         layouts::FillLayout,
         theming::{
-            ClassSet, ElemClassPath, Manager, ModifyArrangementArgs, PropKindFlags, Role,
-            StyledBox, StyledBoxOverride,
+            ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags, Role, StyledBox,
+            StyledBoxOverride, Widget,
         },
     },
     uicore::{HView, MouseDragListener, ViewFlags, ViewListener},
@@ -119,8 +119,7 @@ impl Scrollbar {
         });
 
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
-        thumb.set_parent_class_path(Some(frame.class_path()));
-        frame.set_subview(Role::Generic, Some(thumb.view().clone()));
+        frame.set_child(Role::Generic, Some(&thumb));
 
         let wrapper = HView::new(
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
@@ -148,28 +147,18 @@ impl Scrollbar {
         Self { shared }
     }
 
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
-
-        frame.set_parent_class_path(parent_class_path);
-        thumb.set_parent_class_path(Some(frame.class_path()));
-    }
-
     /// Set the class set of the inner `StyledBox`.
     ///
     /// It defaults to `ClassSet::SCROLLBAR`. Some bits (e.g., `ACTIVE`) are
     /// internally enforced and cannot be modified.
     pub fn set_class_set(&self, mut class_set: ClassSet) {
-        let (frame, thumb) = (&self.shared.frame, &self.shared.thumb);
+        let frame = &self.shared.frame;
 
         // Protected bits
         let protected = ClassSet::ACTIVE | ClassSet::HOVER;
         class_set -= protected;
         class_set |= frame.class_set() & protected;
         frame.set_class_set(class_set);
-
-        thumb.set_parent_class_path(Some(frame.class_path()));
     }
 
     /// Get the class set of the inner `StyledBox`.
@@ -228,9 +217,24 @@ impl Scrollbar {
         *self.shared.on_page_step.borrow_mut() = Box::new(handler);
     }
 
-    /// Get the view representing a styled box.
+    /// Get the view representing the widget.
     pub fn view(&self) -> &HView {
         &self.shared.wrapper
+    }
+
+    /// Get the styling element representing the widget.
+    pub fn style_elem(&self) -> HElem {
+        self.shared.frame.style_elem()
+    }
+}
+
+impl Widget for Scrollbar {
+    fn view(&self) -> &HView {
+        self.view()
+    }
+
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 
@@ -244,13 +248,11 @@ impl Shared {
     }
 
     fn set_active(&self, active: bool) {
-        let (frame, thumb) = (&self.frame, &self.thumb);
+        let frame = &self.frame;
 
         let mut class_set = frame.class_set();
         class_set.set(ClassSet::ACTIVE, active);
         frame.set_class_set(class_set);
-
-        thumb.set_parent_class_path(Some(frame.class_path()));
     }
 }
 
@@ -329,9 +331,7 @@ impl ViewListener for SbViewListener {
         let shared = Rc::clone(&self.shared);
         wm.invoke_on_update(move |_| {
             let frame = &shared.frame;
-            let thumb = &shared.thumb;
             frame.set_class_set(frame.class_set() | ClassSet::HOVER);
-            thumb.set_parent_class_path(Some(frame.class_path()));
         })
     }
 
@@ -339,9 +339,7 @@ impl ViewListener for SbViewListener {
         let shared = Rc::clone(&self.shared);
         wm.invoke_on_update(move |_| {
             let frame = &shared.frame;
-            let thumb = &shared.thumb;
             frame.set_class_set(frame.class_set() - ClassSet::HOVER);
-            thumb.set_parent_class_path(Some(frame.class_path()));
         })
     }
 

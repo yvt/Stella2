@@ -58,7 +58,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     }
 }
 
-pub fn register_stylesheet(manager: &Manager) {
+pub fn register_stylesheet(manager: &'static Manager) {
     manager.subscribe_new_sheet_set(Box::new(move |_, _, ctx| {
         ctx.insert_stylesheet(new_custom_stylesheet());
     }));

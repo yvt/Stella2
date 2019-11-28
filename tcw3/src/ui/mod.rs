@@ -38,11 +38,13 @@ pub mod theming {
     mod style;
     mod stylesheet;
     mod view;
+    mod widget;
     pub use self::{
-        manager::{Elem, ElemChangeCb, Manager, PropKindFlags},
+        manager::{Elem, ElemChangeCb, HElem, Manager, PropKindFlags},
         style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
+        widget::Widget,
     };
 }
 

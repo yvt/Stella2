@@ -20,7 +20,7 @@ use crate::{
     ui::{
         layouts::FillLayout,
         mixins::scrollwheel::{ScrollModel, ScrollWheelMixin},
-        theming::{ClassSet, ElemClassPath, Manager, Role, StyledBox},
+        theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Scrollbar,
     },
     uicore::{HView, ScrollDelta, ScrollListener, ViewFlags, ViewListener},
@@ -53,11 +53,8 @@ impl ScrollableTable {
         ];
 
         styled_box.set_subview(Role::Generic, Some(table.view().clone()));
-        styled_box.set_subview(
-            Role::HorizontalScrollbar,
-            Some(scrollbars[0].view().clone()),
-        );
-        styled_box.set_subview(Role::VerticalScrollbar, Some(scrollbars[1].view().clone()));
+        styled_box.set_child(Role::HorizontalScrollbar, Some(&scrollbars[0]));
+        styled_box.set_child(Role::VerticalScrollbar, Some(&scrollbars[1]));
 
         styled_box.set_class_set(ClassSet::SCROLL_CONTAINER);
 
@@ -152,6 +149,11 @@ impl ScrollableTable {
         &self.inner.wrapper
     }
 
+    /// Get the styling element representing the widget.
+    pub fn style_elem(&self) -> HElem {
+        self.inner.styled_box.style_elem()
+    }
+
     /// Get a reference to the inner `Table`.
     pub fn table(&self) -> &Table {
         &self.inner.table
@@ -170,34 +172,20 @@ impl ScrollableTable {
         class_set -= protected;
         class_set |= styled_box.class_set() & protected;
         styled_box.set_class_set(class_set);
+    }
+}
 
-        self.inner.update_class_path();
+impl Widget for ScrollableTable {
+    fn view(&self) -> &HView {
+        self.view()
     }
 
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        self.inner
-            .styled_box
-            .set_parent_class_path(parent_class_path);
-        self.inner.update_class_path();
-    }
-
-    /// Get `Rc<ElemClassPath>` representing the class path of the styled
-    /// element. The returned value can be set on subviews as a parent class
-    /// path.
-    pub fn class_path(&self) -> Rc<ElemClassPath> {
-        self.inner.styled_box.class_path()
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 
 impl Inner {
-    /// Update the class paths of the subviews.
-    fn update_class_path(&self) {
-        for sb in &self.scrollbars {
-            sb.set_parent_class_path(Some(self.styled_box.class_path()));
-        }
-    }
-
     /// Update the internally enforced class sets.
     fn update_class_set(&self) {
         let has_scrollbar = {
@@ -216,8 +204,6 @@ impl Inner {
             return;
         }
         styled_box.set_class_set(class_set);
-
-        self.update_class_path();
     }
 
     /// Set scrollbar values. Does nothing if a scroll operation is active for
