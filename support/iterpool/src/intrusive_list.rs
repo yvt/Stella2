@@ -528,6 +528,13 @@ where
             accessor: self,
         }
     }
+
+    pub fn clear(&self) {
+        for (_, el) in self.iter() {
+            (self.field)(el).set(None);
+        }
+        self.set_head(ListHead::new());
+    }
 }
 
 impl<'a, H, P, F> ops::Deref for ListAccessorCell<'a, H, P, F> {
@@ -755,6 +762,38 @@ fn basic_cell() {
     println!("{:?}", (&pool, &head));
 
     assert!(accessor.is_empty());
+}
+
+#[test]
+fn clear_cell() {
+    use crate::Pool;
+    use std::cell::Cell;
+    let mut pool = Pool::new();
+    let head = Cell::new(ListHead::new());
+
+    macro_rules! get_accessor {
+        () => {
+            ListAccessorCell::new(&head, &pool, |(_, link)| link)
+        };
+    }
+
+    let ptrs = [
+        pool.allocate((1, Cell::new(None))),
+        pool.allocate((2, Cell::new(None))),
+        pool.allocate((3, Cell::new(None))),
+    ];
+
+    get_accessor!().push_back(ptrs[0]);
+    get_accessor!().push_back(ptrs[1]);
+    get_accessor!().push_front(ptrs[2]);
+
+    get_accessor!().clear();
+
+    assert_eq!(head.get().first, None);
+    for &ptr in &ptrs {
+        let e = &pool[ptr];
+        assert!(e.1.get().is_none());
+    }
 }
 
 #[test]
