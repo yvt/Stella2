@@ -384,7 +384,11 @@ impl<T> IterablePool<T> {
     }
 
     pub fn iter(&self) -> Iter<'_, T> {
-        Iter {
+        Iter(self.ptr_iter())
+    }
+
+    pub fn ptr_iter(&self) -> PtrIter<'_, T> {
+        PtrIter {
             remaining_len: self.storage.len(),
             pool: self,
             cur: self.first_used,
@@ -392,7 +396,11 @@ impl<T> IterablePool<T> {
     }
 
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut {
+        IterMut(self.ptr_iter_mut())
+    }
+
+    pub fn ptr_iter_mut(&mut self) -> PtrIterMut<'_, T> {
+        PtrIterMut {
             remaining_len: self.storage.len(),
             cur: self.first_used,
             pool: self,
@@ -430,14 +438,26 @@ impl<T> ops::IndexMut<PoolPtr> for IterablePool<T> {
 
 /// An iterator over the elements of a `IterablePool`.
 #[derive(Debug, Clone)]
-pub struct Iter<'a, T> {
+pub struct Iter<'a, T>(PtrIter<'a, T>);
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|x| x.1)
+    }
+}
+
+/// An iterator over the elements of a `IterablePool`.
+#[derive(Debug, Clone)]
+pub struct PtrIter<'a, T> {
     pool: &'a IterablePool<T>,
     cur: Option<PoolPtr>,
     remaining_len: usize,
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
+impl<'a, T> Iterator for PtrIter<'a, T> {
+    type Item = (PoolPtr, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
@@ -448,7 +468,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
                 self.cur = None;
             }
             self.remaining_len -= 1;
-            Some(entry.as_ref().unwrap())
+            Some((cur, entry.as_ref().unwrap()))
         } else {
             None
         }
@@ -461,14 +481,26 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
 /// A mutable iterator over the elements of a `IterablePool`.
 #[derive(Debug)]
-pub struct IterMut<'a, T> {
+pub struct IterMut<'a, T>(PtrIterMut<'a, T>);
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|x| x.1)
+    }
+}
+
+/// A mutable iterator over the elements of a `IterablePool`.
+#[derive(Debug)]
+pub struct PtrIterMut<'a, T> {
     pool: &'a mut IterablePool<T>,
     cur: Option<PoolPtr>,
     remaining_len: usize,
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = &'a mut T;
+impl<'a, T> Iterator for PtrIterMut<'a, T> {
+    type Item = (PoolPtr, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
         use std::mem::transmute;
@@ -481,7 +513,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
                 self.cur = None;
             }
             self.remaining_len -= 1;
-            Some(entry.as_mut().unwrap())
+            Some((cur, entry.as_mut().unwrap()))
         } else {
             None
         }
