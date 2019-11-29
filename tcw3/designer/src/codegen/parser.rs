@@ -27,7 +27,7 @@ pub fn parse_file(file: &codemap::File, diag: &mut Diag) -> std::result::Result<
     })
 }
 
-fn span_to_codemap(span: proc_macro2::Span, file: &codemap::File) -> Option<codemap::Span> {
+pub fn span_to_codemap(span: proc_macro2::Span, file: &codemap::File) -> Option<codemap::Span> {
     let start = line_column_to_span(span.start(), file);
     let end = line_column_to_span(span.end(), file);
     Some(start.merge(end))
@@ -44,6 +44,8 @@ pub struct File {
 
 pub enum Item {
     Import(LitStr),
+    // TODO
+    __Nonexhaustive,
 }
 
 impl Parse for File {

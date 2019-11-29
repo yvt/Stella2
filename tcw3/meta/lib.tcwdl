@@ -1,1 +1,1 @@
-import!("views/lib.tcwdl");
+import!("views/label.tcwdl");

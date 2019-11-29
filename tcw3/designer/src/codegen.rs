@@ -1,6 +1,7 @@
 use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level};
 use std::{
     borrow::Cow,
+    collections::HashSet,
     env, fmt,
     fs::File,
     io::{prelude::*, BufWriter},
@@ -91,13 +92,58 @@ impl<'a> BuildScriptConfig<'a> {
 
         let mut diag = diag::Diag::new();
 
-        // Parse the input source file
-        // TODO: Process `import!("pathname.tcwdl")`
-        let root_source = diag
-            .load_file(&in_root_source_file, None)
-            .map_err(|()| None)?;
+        // Parse the input source files
+        let mut files = Vec::new();
+        {
+            let mut queue = vec![(in_root_source_file.clone(), None)];
+            let mut found_files = HashSet::new();
+            let mut i = 0;
 
-        let _root_file = parser::parse_file(&root_source, &mut diag).map_err(|()| None)?;
+            found_files.insert(in_root_source_file);
+
+            while i < queue.len() {
+                let (path, import_span) = queue[i].clone();
+                let diag_file = match diag.load_file(&path, import_span) {
+                    Ok(f) => f,
+                    Err(()) => {
+                        i += 1;
+                        continue;
+                    }
+                };
+
+                let parsed_file = match parser::parse_file(&diag_file, &mut diag) {
+                    Ok(f) => f,
+                    Err(()) => {
+                        i += 1;
+                        continue;
+                    }
+                };
+
+                // Process `import!` directives
+                for item in parsed_file.items.iter() {
+                    if let parser::Item::Import(lit) = item {
+                        let value = lit.value();
+                        let mut new_path = path.clone();
+                        new_path.pop();
+                        new_path.push(Path::new(&value));
+
+                        if found_files.contains(&new_path) {
+                            continue;
+                        }
+
+                        found_files.insert(new_path.clone());
+                        queue.push((new_path, parser::span_to_codemap(lit.span(), &diag_file)));
+                    }
+                }
+
+                files.push((parsed_file, diag_file));
+                i += 1;
+            }
+        }
+
+        if diag.has_error() {
+            return Err(None);
+        }
 
         // Import metadata of dependencies
         let deps: Vec<(&str, Crate)> = self
