@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
+[lib]
+crate-type = ["dylib"]
+
 [dependencies]
 bincode = "1.2.0"
 codemap = "0.1.0"
