@@ -11,6 +11,7 @@ fn main() {
     }
 
     BuildScriptConfig::new()
+        .root_source_file(&args[1])
         .out_source_file(&args[2])
         .run_and_exit_on_error();
 }

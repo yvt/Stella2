@@ -5,6 +5,7 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
+codemap = "0.1.0"
 codemap-diagnostic = "0.1.1"
 
 [dependencies.syn]
