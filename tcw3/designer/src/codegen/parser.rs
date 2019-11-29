@@ -1,7 +1,7 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use syn::{
     parse::{Parse, ParseStream, Result},
-    parse_str, Attribute, Error, ItemUse, LitStr, Token, Visibility,
+    parse_str, token, Attribute, Error, Ident, ItemUse, LitStr, Path, Token, Type, Visibility,
 };
 
 use super::diag::Diag;
@@ -38,6 +38,19 @@ fn line_column_to_span(lc: proc_macro2::LineColumn, file: &codemap::File) -> cod
     line_span.subspan(lc.column as u64, lc.column as u64)
 }
 
+mod kw {
+    syn::custom_keyword!(comp);
+    syn::custom_keyword!(prop);
+    syn::custom_keyword!(on);
+    syn::custom_keyword!(wire);
+    syn::custom_keyword!(get);
+    syn::custom_keyword!(set);
+    syn::custom_keyword!(watch);
+    syn::custom_keyword!(sub);
+    syn::custom_keyword!(clone);
+    syn::custom_keyword!(borrow);
+}
+
 pub struct File {
     pub items: Vec<Item>,
 }
@@ -45,9 +58,7 @@ pub struct File {
 pub enum Item {
     Import(LitStr),
     Use(ItemUse),
-
-    // TODO
-    __Nonexhaustive,
+    Comp(Comp),
 }
 
 impl Parse for File {
@@ -95,15 +106,19 @@ impl Parse for Item {
         let ahead = input.fork();
         let _vis: Visibility = ahead.parse()?;
 
-        let mut item = if input.peek(Token![use]) {
+        let la = ahead.lookahead1();
+        let mut item = if la.peek(Token![use]) {
             Item::Use(check_use_syntax(input.parse()?)?)
+        } else if la.peek(kw::comp) {
+            Item::Comp(input.parse()?)
         } else {
-            return Err(input.error("Unexpected token"));
+            return Err(la.error());
         };
 
         let item_attrs = match &mut item {
             Item::Use(item) => &mut item.attrs,
-            _ => unreachable!(),
+            Item::Comp(item) => &mut item.attrs,
+            Item::Import(_) => unreachable!(),
         };
         attrs.extend(item_attrs.drain(..));
         *item_attrs = attrs;
@@ -141,5 +156,262 @@ fn check_use_syntax(node: ItemUse) -> Result<ItemUse> {
         Err(error)
     } else {
         Ok(node)
+    }
+}
+
+/// A component definition.
+pub struct Comp {
+    pub attrs: Vec<Attribute>,
+    pub vis: Visibility,
+    pub comp_token: kw::comp,
+    pub path: Path,
+    pub brace_token: token::Brace,
+    pub items: Vec<CompItem>,
+}
+
+impl Parse for Comp {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let comp_token = input.parse()?;
+        let path = input.parse()?;
+        let content;
+        let brace_token = syn::braced!(content in input);
+
+        let items = std::iter::from_fn(|| {
+            if content.is_empty() {
+                None
+            } else {
+                Some(content.parse())
+            }
+        })
+        .collect::<Result<_>>()?;
+
+        Ok(Self {
+            attrs,
+            vis,
+            comp_token,
+            path,
+            brace_token,
+            items,
+        })
+    }
+}
+
+/// An item in `Comp`.
+pub enum CompItem {
+    Field(CompItemField),
+}
+
+impl Parse for CompItem {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut attrs = input.call(Attribute::parse_outer)?;
+        let ahead = input.fork();
+        let _vis: Visibility = ahead.parse()?;
+
+        let la = ahead.lookahead1();
+        let mut item = if la.peek(kw::prop) || la.peek(Token![const]) || la.peek(kw::wire) {
+            CompItem::Field(input.parse()?)
+        } else {
+            return Err(la.error());
+        };
+
+        let item_attrs = match &mut item {
+            CompItem::Field(item) => &mut item.attrs,
+        };
+        attrs.extend(item_attrs.drain(..));
+        *item_attrs = attrs;
+
+        Ok(item)
+    }
+}
+
+/// - `pub prop class_set: ClassSet { pub set; get borrow; } = expr;`
+/// - `pub const vertical: ClassSet = expr;`
+/// - `pub wire active: ClassSet = expr;`
+pub struct CompItemField {
+    pub attrs: Vec<Attribute>,
+    pub vis: Visibility,
+    pub field_ty: FieldType,
+    pub ident: Ident,
+    pub ty: Option<Type>,
+    pub accessors: Option<Vec<FieldAccessor>>,
+    pub dyn_expr: Option<DynExpr>,
+    pub semi_token: Option<Token![;]>,
+}
+
+pub enum FieldType {
+    Prop,
+    Const,
+    Wire,
+}
+
+impl Parse for CompItemField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let field_ty = input.parse()?;
+        let ident = input.parse()?;
+
+        let ty = if input.parse::<Token![:]>().is_ok() {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
+        let accessors = if input.peek(token::Brace) {
+            let content;
+            syn::braced!(content in input);
+            Some(
+                std::iter::from_fn(|| {
+                    if content.is_empty() {
+                        None
+                    } else {
+                        Some(content.parse())
+                    }
+                })
+                .collect::<Result<_>>()?,
+            )
+        } else {
+            None
+        };
+
+        let dyn_expr = if input.parse::<Token![=]>().is_ok() {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
+        // A semicolon is required if it's terminated by `DynExpr` or `Type`.
+        let semi_token = if !accessors.is_some() || dyn_expr.is_some() {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            attrs,
+            vis,
+            field_ty,
+            ident,
+            ty,
+            accessors,
+            dyn_expr,
+            semi_token,
+        })
+    }
+}
+
+impl Parse for FieldType {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let la = input.lookahead1();
+        if la.peek(kw::prop) {
+            input.parse::<kw::prop>().map(|_| FieldType::Prop)
+        } else if la.peek(Token![const]) {
+            input.parse::<Token![const]>().map(|_| FieldType::Const)
+        } else if la.peek(kw::wire) {
+            input.parse::<kw::wire>().map(|_| FieldType::Wire)
+        } else {
+            Err(la.error())
+        }
+    }
+}
+
+pub enum FieldAccessor {
+    Set {
+        vis: Visibility,
+    },
+    Get {
+        vis: Visibility,
+        mode: Option<FieldGetMode>,
+    },
+    Watch {
+        vis: Visibility,
+        mode: FieldWatchMode,
+    },
+}
+
+pub enum FieldGetMode {
+    Borrow,
+    Clone,
+}
+
+pub enum FieldWatchMode {
+    Sub { method: Ident },
+}
+
+impl Parse for FieldAccessor {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let vis = input.parse()?;
+
+        let la = input.lookahead1();
+        let this = if la.peek(kw::set) {
+            input.parse::<kw::set>()?;
+            FieldAccessor::Set { vis }
+        } else if la.peek(kw::get) {
+            input.parse::<kw::get>()?;
+            FieldAccessor::Get {
+                vis,
+                mode: if input.peek(Token![;]) {
+                    None
+                } else {
+                    Some(input.parse()?)
+                },
+            }
+        } else if la.peek(kw::watch) {
+            input.parse::<kw::watch>()?;
+            FieldAccessor::Watch {
+                vis,
+                mode: input.parse()?,
+            }
+        } else {
+            return Err(la.error());
+        };
+
+        input.parse::<Token![;]>()?;
+        Ok(this)
+    }
+}
+
+impl Parse for FieldGetMode {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let la = input.lookahead1();
+        if la.peek(kw::clone) {
+            input.parse::<kw::clone>().map(|_| FieldGetMode::Clone)
+        } else if la.peek(kw::borrow) {
+            input.parse::<kw::borrow>().map(|_| FieldGetMode::Borrow)
+        } else {
+            Err(la.error())
+        }
+    }
+}
+
+impl Parse for FieldWatchMode {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let la = input.lookahead1();
+        if la.peek(kw::sub) {
+            input.parse::<kw::sub>()?;
+
+            let content;
+            syn::braced!(content in input);
+
+            let method = content.parse()?;
+
+            if !content.is_empty() {
+                return Err(content.error("Unexpected token"));
+            }
+
+            Ok(FieldWatchMode::Sub { method })
+        } else {
+            Err(la.error())
+        }
+    }
+}
+
+pub enum DynExpr {}
+
+impl Parse for DynExpr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Err(input.error("not implemented"))
     }
 }

@@ -1,2 +1,12 @@
 // TODO
-use crate::ui::theming::{ClassSet, StyledBox};
+use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
+
+#[prototype_only]
+pub comp tcw3::ui::views::Label {
+    pub const style_manager: &Manager;
+
+    pub prop text: String { pub set; }
+
+    pub const view: HView;
+    pub const style_elem: HElem { pub get clone; }
+}
