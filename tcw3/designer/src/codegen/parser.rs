@@ -1,7 +1,7 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use syn::{
     parse::{Parse, ParseStream, Result},
-    parse_str, Error, LitStr, Token,
+    parse_str, Attribute, Error, ItemUse, LitStr, Token, Visibility,
 };
 
 use super::diag::Diag;
@@ -44,6 +44,8 @@ pub struct File {
 
 pub enum Item {
     Import(LitStr),
+    Use(ItemUse),
+
     // TODO
     __Nonexhaustive,
 }
@@ -86,9 +88,58 @@ impl Parse for Item {
 
             input.parse::<Token![;]>()?;
 
-            Ok(item)
-        } else {
-            Err(input.error("Unexpected token"))
+            return Ok(item);
         }
+
+        let mut attrs = input.call(Attribute::parse_outer)?;
+        let ahead = input.fork();
+        let _vis: Visibility = ahead.parse()?;
+
+        let mut item = if input.peek(Token![use]) {
+            Item::Use(check_use_syntax(input.parse()?)?)
+        } else {
+            return Err(input.error("Unexpected token"));
+        };
+
+        let item_attrs = match &mut item {
+            Item::Use(item) => &mut item.attrs,
+            _ => unreachable!(),
+        };
+        attrs.extend(item_attrs.drain(..));
+        *item_attrs = attrs;
+
+        Ok(item)
+    }
+}
+
+/// Reject unsupported syntax in a given `use` item.
+fn check_use_syntax(node: ItemUse) -> Result<ItemUse> {
+    let mut out_errors = Vec::new();
+    check_use_syntax_inner(&node.tree, &mut out_errors);
+
+    fn check_use_syntax_inner(node: &syn::UseTree, out_errors: &mut Vec<Error>) {
+        match node {
+            syn::UseTree::Path(path) => {
+                check_use_syntax_inner(&path.tree, out_errors);
+            }
+            syn::UseTree::Name(_) | syn::UseTree::Rename(_) => {}
+            syn::UseTree::Glob(_) => {
+                out_errors.push(Error::new_spanned(node, "Glob imports are not supported"));
+            }
+            syn::UseTree::Group(gr) => {
+                for item in gr.items.iter() {
+                    check_use_syntax_inner(&item, out_errors);
+                }
+            }
+        }
+    }
+
+    if let Some(mut error) = out_errors.pop() {
+        for e in out_errors {
+            error.combine(e);
+        }
+        Err(error)
+    } else {
+        Ok(node)
     }
 }
