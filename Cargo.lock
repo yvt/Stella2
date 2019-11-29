@@ -1895,6 +1895,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "stella2_assets 0.1.0",
+ "stella2_meta 0.1.0",
  "stella2_windres 0.1.0",
  "stvg_tcw3 0.1.0",
  "tcw3 0.1.0",
@@ -1905,6 +1906,14 @@ name = "stella2_assets"
 version = "0.1.0"
 dependencies = [
  "stvg_macro 0.1.0",
+]
+
+[[package]]
+name = "stella2_meta"
+version = "0.1.0"
+dependencies = [
+ "tcw3_designer 0.1.0",
+ "tcw3_meta 0.1.0",
 ]
 
 [[package]]

@@ -1,0 +1,12 @@
+[package]
+name = "stella2_meta"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[build-dependencies]
+tcw3_designer = { path = "../../tcw3/designer" }
+tcw3_meta = { path = "../../tcw3/meta" }
+
+[lib]
+path = "lib.rs"

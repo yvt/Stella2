@@ -3,6 +3,7 @@ cargo-features = ["profile-overrides"]  # Enable the use of `[profile.dev.overri
 [workspace]
 members = [
     "stella2",
+    "stella2/meta",
     "stella2_assets",
     "tcw3",
     "tcw3/designer",
