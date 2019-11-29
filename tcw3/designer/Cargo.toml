@@ -5,8 +5,10 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
+bincode = "1.2.0"
 codemap = "0.1.0"
 codemap-diagnostic = "0.1.1"
+serde = { version = "1.0", features = ["derive"] }
 
 [dependencies.syn]
 version = "1.0.8"
