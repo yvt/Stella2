@@ -73,20 +73,19 @@ impl BuildScriptConfig {
         let in_root_source_file = if let Some(x) = self.in_root_source_file {
             x
         } else {
-            let dir = env::var_os("CARGO_MANIFEST_DIR").ok_or(
-                "CARGO_MANIFEST_DIR is missing; are we really in a build script?".to_string(),
-            )?;
-            let path = Path::new(&dir).join("lib.tcwdl");
-            path
+            let dir = env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
+                "CARGO_MANIFEST_DIR is missing; are we really in a build script?".to_string()
+            })?;
+            Path::new(&dir).join("lib.tcwdl")
         };
 
         let out_source_file = if let Some(x) = self.out_source_file {
             x
         } else {
-            let out_dir = env::var_os("OUT_DIR")
-                .ok_or("OUT_DIR is missing; are we really in a build script?".to_string())?;
-            let dest_path = Path::new(&out_dir).join("designer.rs");
-            dest_path
+            let out_dir = env::var_os("OUT_DIR").ok_or_else(|| {
+                "OUT_DIR is missing; are we really in a build script?".to_string()
+            })?;
+            Path::new(&out_dir).join("designer.rs")
         };
 
         let mut diag = diag::Diag::new();
