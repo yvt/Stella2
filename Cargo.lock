@@ -284,6 +284,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "codemap"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "codemap-diagnostic"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "atty 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "codemap 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "termcolor 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2114,9 +2129,19 @@ dependencies = [
  "subscriber_list 0.1.0",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tcw3_images 0.1.0",
+ "tcw3_meta 0.1.0",
  "tcw3_pal 0.1.0",
  "tcw3_testing 0.1.0",
  "try_match 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tcw3_designer"
+version = "0.1.0"
+dependencies = [
+ "codemap-diagnostic 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2130,6 +2155,13 @@ dependencies = [
  "iterpool 0.1.0",
  "quick-error2 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tcw3_pal 0.1.0",
+]
+
+[[package]]
+name = "tcw3_meta"
+version = "0.1.0"
+dependencies = [
+ "tcw3_designer 0.1.0",
 ]
 
 [[package]]
@@ -2575,6 +2607,8 @@ dependencies = [
 "checksum cocoa 0.18.5 (registry+https://github.com/rust-lang/crates.io-index)" = "1706996401131526e36b3b49f0c4d912639ce110996f3ca144d78946727bce54"
 "checksum cocoa 0.19.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f29f7768b2d1be17b96158e3285951d366b40211320fb30826a76cb7a0da6400"
 "checksum cocoa 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0a4736c86d51bd878b474400d9ec888156f4037015f5d09794fab9f26eab1ad4"
+"checksum codemap 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "bfa90095b7cbcca06055fed0e0bc0dcfc66a841bd9ea62bab2303a41e092ed72"
+"checksum codemap-diagnostic 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4ba0e6be8e2774e750f9e90625b490249715bece38a12f9d09e82477caba5028"
 "checksum color_quant 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
 "checksum core-foundation 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "25b9e03f145fd4f2bf705e07b900cd41fc636598fe5dc452fd0db1441c3f496d"
 "checksum core-foundation 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "57d24c7a13c43e870e37c1556b74555437870a04514f7685f5b354e090567171"

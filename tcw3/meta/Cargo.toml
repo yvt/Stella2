@@ -1,0 +1,11 @@
+[package]
+name = "tcw3_meta"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[build-dependencies]
+tcw3_designer = { path = "../designer" }
+
+[lib]
+path = "lib.rs"

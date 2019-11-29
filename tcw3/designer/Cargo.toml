@@ -1,0 +1,18 @@
+[package]
+name = "tcw3_designer"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+codemap-diagnostic = "0.1.1"
+
+[dependencies.syn]
+version = "1.0.8"
+default-features = false
+features = ["derive", "full", "parsing"]
+
+[dependencies.proc-macro2]
+version = "1.0.4"
+default-features = false
+features = ["span-locations"]
