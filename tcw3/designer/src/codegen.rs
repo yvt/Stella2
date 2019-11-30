@@ -143,9 +143,12 @@ impl<'a> BuildScriptConfig<'a> {
             }
         }
 
+        // Load prelude
+        let prelude = resolve::Prelude::new(&mut diag);
+
         // Resolve pathes
         for (parsed_file, diag_file) in files.iter_mut() {
-            resolve::resolve_paths(parsed_file, diag_file, &mut diag);
+            resolve::resolve_paths(parsed_file, diag_file, &mut diag, &prelude);
         }
 
         if diag.has_error() {

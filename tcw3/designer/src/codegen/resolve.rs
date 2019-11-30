@@ -12,8 +12,15 @@ use super::{
 };
 
 /// Replace all `Path`s in the given AST with absolute paths.
-pub fn resolve_paths(file: &mut File, codemap_file: &codemap::File, diag: &mut Diag) {
-    let mut alias_map = HashMap::new();
+pub fn resolve_paths(
+    file: &mut File,
+    codemap_file: &codemap::File,
+    diag: &mut Diag,
+    prelude: &Prelude,
+) {
+    // Import prelude
+    let mut alias_map = prelude.alias_map.clone();
+
     for item in file.items.iter() {
         if let Item::Use(u) = item {
             process_use(&mut alias_map, codemap_file, diag, u);
@@ -21,7 +28,12 @@ pub fn resolve_paths(file: &mut File, codemap_file: &codemap::File, diag: &mut D
     }
 
     // Report duplicate imports
-    for (ident, aliases) in alias_map.iter() {
+    for (ident, aliases) in alias_map.iter_mut() {
+        // Imports from prelude may be overridden
+        if aliases.len() > 1 && aliases[0].from_prelude {
+            aliases.swap_remove(0);
+        }
+
         if aliases.len() > 1 {
             diag.emit(&[Diagnostic {
                 level: Level::Error,
@@ -187,9 +199,11 @@ pub fn resolve_paths(file: &mut File, codemap_file: &codemap::File, diag: &mut D
     );
 }
 
+#[derive(Clone)]
 struct Alias {
     path: Path,
     span: Option<codemap::Span>,
+    from_prelude: bool,
 }
 
 fn process_use(
@@ -301,6 +315,7 @@ fn process_use_tree(
                 Alias {
                     path,
                     span: span_to_codemap(t.rename.span(), codemap_file),
+                    from_prelude: false,
                 },
             );
         }
@@ -324,5 +339,35 @@ fn process_use_tree(
                 process_use_tree(path, item, codemap_file, diag, f);
             }
         }
+    }
+}
+
+pub struct Prelude {
+    alias_map: HashMap<Ident, Vec<Alias>>,
+}
+
+impl Prelude {
+    /// Load the prelude module. It shouldn't generate any errors, but this
+    /// method still needs `diag` because it shares the same subroutines with
+    /// normal processing.
+    pub fn new(diag: &mut Diag) -> Self {
+        let source = include_str!("prelude.txt");
+
+        let diag_file = diag.add_file("<prelude>".to_owned(), source.to_owned());
+        let parsed_file = super::parser::parse_file(&diag_file, diag).unwrap();
+
+        let mut alias_map = HashMap::new();
+        for item in parsed_file.items.iter() {
+            if let Item::Use(u) = item {
+                process_use(&mut alias_map, &diag_file, diag, u);
+            }
+        }
+
+        for aliases in alias_map.values_mut() {
+            assert_eq!(aliases.len(), 1);
+            aliases[0].from_prelude = true;
+        }
+
+        Self { alias_map }
     }
 }
