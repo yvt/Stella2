@@ -1,0 +1,11 @@
+
+use tcw3::ui::views::Label;
+
+#[widget]
+pub comp stella2::TestWidget {
+    pub prop text: String = || "hello!".to_string();
+
+    const child = Label {
+        prop text = |this.text| format!("text = '{}'", text);
+    };
+}

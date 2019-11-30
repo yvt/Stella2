@@ -1,7 +1,8 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use syn::{
     parse::{Parse, ParseStream, Result},
-    parse_str, token, Attribute, Error, Ident, ItemUse, LitStr, Path, Token, Type, Visibility,
+    parse_str, token, Attribute, Error, Expr, Ident, ItemUse, LitStr, Path, Token, Type,
+    Visibility,
 };
 
 use super::diag::Diag;
@@ -49,6 +50,7 @@ mod kw {
     syn::custom_keyword!(sub);
     syn::custom_keyword!(clone);
     syn::custom_keyword!(borrow);
+    syn::custom_keyword!(this);
 }
 
 pub struct File {
@@ -408,10 +410,160 @@ impl Parse for FieldWatchMode {
     }
 }
 
-pub enum DynExpr {}
+pub enum DynExpr {
+    Func(Func),
+    ObjInit(ObjInit),
+}
 
 impl Parse for DynExpr {
     fn parse(input: ParseStream) -> Result<Self> {
-        Err(input.error("not implemented"))
+        let la = input.lookahead1();
+
+        if la.peek(Token![|]) {
+            Ok(DynExpr::Func(input.parse()?))
+        } else if la.peek(Ident) {
+            Ok(DynExpr::ObjInit(input.parse()?))
+        } else {
+            Err(la.error())
+        }
+    }
+}
+
+/// |&this, this.prop|
+pub struct Func {
+    pub or1_token: Token![|],
+    pub inputs: Vec<FuncInput>,
+    pub or2_token: Token![|],
+    pub body: Expr,
+}
+
+impl Parse for Func {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let or1_token = input.parse()?;
+        let mut first = true;
+        let inputs = std::iter::from_fn(|| {
+            // delimiter
+            let colon = input.parse::<Token![,]>();
+            while input.parse::<Token![,]>().is_ok() {}
+
+            if input.peek(Token![|]) {
+                None
+            } else {
+                if let (Err(e), false) = (colon, first) {
+                    return Some(Err(e));
+                }
+                first = false;
+
+                Some(input.parse())
+            }
+        })
+        .collect::<Result<_>>()?;
+        let or2_token = input.parse()?;
+        let body = input.parse()?;
+
+        Ok(Self {
+            or1_token,
+            inputs,
+            or2_token,
+            body,
+        })
+    }
+}
+
+pub struct FuncInput {
+    pub by_ref: Option<Token![&]>,
+    pub input: Box<Input>,
+}
+
+impl Parse for FuncInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let by_ref = input.parse().ok();
+        let input = input.parse()?;
+
+        Ok(Self { by_ref, input })
+    }
+}
+
+/// `this.prop`
+pub enum Input {
+    Field(InputField),
+    This(kw::this),
+}
+
+impl Parse for Input {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut this = Input::This(input.parse()?);
+
+        while input.peek(Token![.]) {
+            let dot_token = input.parse()?;
+            let member = input.parse()?;
+
+            this = Input::Field(InputField {
+                base: Box::new(this),
+                dot_token,
+                member,
+            });
+        }
+
+        Ok(this)
+    }
+}
+
+/// `{base}.member`
+pub struct InputField {
+    pub base: Box<Input>,
+    pub dot_token: Token![.],
+    pub member: Ident,
+}
+
+/// `FillLayout { ... }`
+pub struct ObjInit {
+    pub path: Path,
+    pub brace_token: token::Brace,
+    pub fields: Vec<ObjInitField>,
+}
+
+impl Parse for ObjInit {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let path = input.parse()?;
+        let content;
+        let brace_token = syn::braced!(content in input);
+
+        let fields = std::iter::from_fn(|| {
+            if content.is_empty() {
+                None
+            } else {
+                Some(content.parse())
+            }
+        })
+        .collect::<Result<_>>()?;
+
+        Ok(Self {
+            path,
+            brace_token,
+            fields,
+        })
+    }
+}
+
+/// `prop x = value;`
+pub struct ObjInitField {
+    /// `prop` or `const`. `wire` is not valid here
+    pub field_ty: FieldType,
+    pub ident: Ident,
+    pub eq_token: Token![=],
+    pub dyn_expr: DynExpr,
+    pub semi_token: Token![;],
+}
+
+impl Parse for ObjInitField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            field_ty: input.parse()?,
+            ident: input.parse()?,
+            eq_token: input.parse()?,
+            dyn_expr: input.parse()?,
+            semi_token: input.parse()?,
+        })
     }
 }
