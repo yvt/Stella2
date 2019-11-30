@@ -203,6 +203,7 @@ impl Parse for Comp {
 /// An item in `Comp`.
 pub enum CompItem {
     Field(CompItemField),
+    On(CompItemOn),
 }
 
 impl Parse for CompItem {
@@ -214,12 +215,15 @@ impl Parse for CompItem {
         let la = ahead.lookahead1();
         let mut item = if la.peek(kw::prop) || la.peek(Token![const]) || la.peek(kw::wire) {
             CompItem::Field(input.parse()?)
+        } else if la.peek(kw::on) {
+            CompItem::On(input.parse()?)
         } else {
             return Err(la.error());
         };
 
         let item_attrs = match &mut item {
             CompItem::Field(item) => &mut item.attrs,
+            CompItem::On(item) => &mut item.attrs,
         };
         attrs.extend(item_attrs.drain(..));
         *item_attrs = attrs;
@@ -410,6 +414,47 @@ impl Parse for FieldWatchMode {
     }
 }
 
+/// - `on |this.prop| { statements... };`
+pub struct CompItemOn {
+    pub attrs: Vec<Attribute>,
+    pub on_token: kw::on,
+    pub dyn_expr: DynExpr,
+    pub semi_token: Option<Token![;]>,
+}
+
+impl Parse for CompItemOn {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let on_token = input.parse()?;
+        let dyn_expr = input.parse()?;
+
+        match vis {
+            Visibility::Inherited => {}
+            _ => {
+                return Err(Error::new_spanned(
+                    vis,
+                    "visibility specification is not allowed for `on`",
+                ))
+            }
+        }
+
+        // The semicolon is elidable on certain cases
+        let semi_token = if dynexpr_requires_terminator(&dyn_expr) {
+            Some(input.parse()?)
+        } else {
+            input.parse().ok()
+        };
+
+        Ok(Self {
+            attrs,
+            on_token,
+            dyn_expr,
+            semi_token,
+        })
+    }
+}
+
 pub enum DynExpr {
     Func(Func),
     ObjInit(ObjInit),
@@ -565,5 +610,29 @@ impl Parse for ObjInitField {
             dyn_expr: input.parse()?,
             semi_token: input.parse()?,
         })
+    }
+}
+
+/// Taken from `syn`'s private function
+fn expr_requires_terminator(expr: &Expr) -> bool {
+    // see https://github.com/rust-lang/rust/blob/eb8f2586e/src/libsyntax/parse/classify.rs#L17-L37
+    match expr {
+        Expr::Unsafe(..)
+        | Expr::Block(..)
+        | Expr::If(..)
+        | Expr::Match(..)
+        | Expr::While(..)
+        | Expr::Loop(..)
+        | Expr::ForLoop(..)
+        | Expr::Async(..)
+        | Expr::TryBlock(..) => false,
+        _ => true,
+    }
+}
+
+fn dynexpr_requires_terminator(expr: &DynExpr) -> bool {
+    match expr {
+        DynExpr::Func(Func { body, .. }) => expr_requires_terminator(body),
+        _ => true,
     }
 }

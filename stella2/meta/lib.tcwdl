@@ -5,6 +5,8 @@ use tcw3::ui::views::Label;
 pub comp stella2::TestWidget {
     pub prop text: String = || "hello!".to_string();
 
+    on |this.text| { dbg!(); }
+
     const child = Label {
         prop text = |this.text| format!("text = '{}'", text);
     };
