@@ -40,7 +40,7 @@ fn line_column_to_span(lc: proc_macro2::LineColumn, file: &codemap::File) -> cod
     line_span.subspan(lc.column as u64, lc.column as u64)
 }
 
-mod kw {
+pub mod kw {
     syn::custom_keyword!(comp);
     syn::custom_keyword!(prop);
     syn::custom_keyword!(on);
@@ -112,7 +112,7 @@ impl Parse for Item {
 
         let la = ahead.lookahead1();
         let mut item = if la.peek(Token![use]) {
-            Item::Use(check_use_syntax(input.parse()?)?)
+            Item::Use(input.parse()?)
         } else if la.peek(kw::comp) {
             Item::Comp(input.parse()?)
         } else {
@@ -128,38 +128,6 @@ impl Parse for Item {
         *item_attrs = attrs;
 
         Ok(item)
-    }
-}
-
-/// Reject unsupported syntax in a given `use` item.
-fn check_use_syntax(node: ItemUse) -> Result<ItemUse> {
-    let mut out_errors = Vec::new();
-    check_use_syntax_inner(&node.tree, &mut out_errors);
-
-    fn check_use_syntax_inner(node: &syn::UseTree, out_errors: &mut Vec<Error>) {
-        match node {
-            syn::UseTree::Path(path) => {
-                check_use_syntax_inner(&path.tree, out_errors);
-            }
-            syn::UseTree::Name(_) | syn::UseTree::Rename(_) => {}
-            syn::UseTree::Glob(_) => {
-                out_errors.push(Error::new_spanned(node, "Glob imports are not supported"));
-            }
-            syn::UseTree::Group(gr) => {
-                for item in gr.items.iter() {
-                    check_use_syntax_inner(&item, out_errors);
-                }
-            }
-        }
-    }
-
-    if let Some(mut error) = out_errors.pop() {
-        for e in out_errors {
-            error.combine(e);
-        }
-        Err(error)
-    } else {
-        Ok(node)
     }
 }
 

@@ -12,6 +12,8 @@ use crate::metadata::Crate;
 
 mod diag;
 mod parser;
+mod resolve;
+mod visit_mut;
 
 #[derive(Default)]
 pub struct BuildScriptConfig<'a> {
@@ -139,6 +141,11 @@ impl<'a> BuildScriptConfig<'a> {
                 files.push((parsed_file, diag_file));
                 i += 1;
             }
+        }
+
+        // Resolve pathes
+        for (parsed_file, diag_file) in files.iter_mut() {
+            resolve::resolve_paths(parsed_file, diag_file, &mut diag);
         }
 
         if diag.has_error() {
