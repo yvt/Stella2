@@ -1,8 +1,9 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use syn::{
     parse::{Parse, ParseStream, Result},
-    parse_str, token, Attribute, Error, Expr, Ident, ItemUse, LitStr, Path, Token, Type,
-    Visibility,
+    parse_str,
+    punctuated::Punctuated,
+    token, Attribute, Error, Expr, FnArg, Ident, ItemUse, LitStr, Path, Token, Type, Visibility,
 };
 
 use super::diag::Diag;
@@ -51,6 +52,7 @@ mod kw {
     syn::custom_keyword!(clone);
     syn::custom_keyword!(borrow);
     syn::custom_keyword!(this);
+    syn::custom_keyword!(event);
 }
 
 pub struct File {
@@ -204,6 +206,7 @@ impl Parse for Comp {
 pub enum CompItem {
     Field(CompItemField),
     On(CompItemOn),
+    Event(CompItemEvent),
 }
 
 impl Parse for CompItem {
@@ -217,6 +220,8 @@ impl Parse for CompItem {
             CompItem::Field(input.parse()?)
         } else if la.peek(kw::on) {
             CompItem::On(input.parse()?)
+        } else if la.peek(kw::event) {
+            CompItem::Event(input.parse()?)
         } else {
             return Err(la.error());
         };
@@ -224,6 +229,7 @@ impl Parse for CompItem {
         let item_attrs = match &mut item {
             CompItem::Field(item) => &mut item.attrs,
             CompItem::On(item) => &mut item.attrs,
+            CompItem::Event(item) => &mut item.attrs,
         };
         attrs.extend(item_attrs.drain(..));
         *item_attrs = attrs;
@@ -450,6 +456,42 @@ impl Parse for CompItemOn {
             attrs,
             on_token,
             dyn_expr,
+            semi_token,
+        })
+    }
+}
+
+/// - `pub event activated(pal::Wm);`
+pub struct CompItemEvent {
+    pub attrs: Vec<Attribute>,
+    pub vis: Visibility,
+    pub event_token: kw::event,
+    pub ident: Ident,
+    pub paren_token: token::Paren,
+    pub inputs: Punctuated<FnArg, Token![,]>,
+    pub semi_token: Option<Token![;]>,
+}
+
+impl Parse for CompItemEvent {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let event_token = input.parse()?;
+        let ident = input.parse()?;
+
+        let content;
+        let paren_token = syn::parenthesized!(content in input);
+        let inputs = content.parse_terminated(FnArg::parse)?;
+
+        let semi_token = input.parse()?;
+
+        Ok(Self {
+            attrs,
+            vis,
+            event_token,
+            ident,
+            paren_token,
+            inputs,
             semi_token,
         })
     }

@@ -1,11 +1,13 @@
 
-use tcw3::ui::views::Label;
+use tcw3::{ui::views::Label, pal};
 
 #[widget]
 pub comp stella2::TestWidget {
     pub prop text: String = || "hello!".to_string();
 
     on |this.text| { dbg!(); }
+
+    pub event some_event(wm: pal::Wm);
 
     const child = Label {
         prop text = |this.text| format!("text = '{}'", text);
