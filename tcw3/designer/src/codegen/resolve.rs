@@ -7,7 +7,7 @@ use syn::{
 
 use super::{
     diag::Diag,
-    parser::{span_to_codemap, Comp, File, Item},
+    parser::{span_to_codemap, Comp, File, Func, Item},
     visit_mut,
 };
 
@@ -168,6 +168,12 @@ pub fn resolve_paths(file: &mut File, codemap_file: &codemap::File, diag: &mut D
             // Ignore `i.path` because it contains the path of the component
             // we want to *define*.
             i.items.iter_mut().for_each(|i| self.visit_comp_item_mut(i));
+        }
+
+        fn visit_func_mut(&mut self, _: &mut Func) {
+            // Ignore `i.inputs` because it does not include a path.
+            // Ignore `i.body` because it's inserted to the implementation code
+            // verbatim.
         }
     }
 
