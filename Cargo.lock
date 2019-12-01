@@ -2162,6 +2162,7 @@ name = "tcw3_designer"
 version = "0.1.0"
 dependencies = [
  "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "codemap 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "codemap-diagnostic 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",

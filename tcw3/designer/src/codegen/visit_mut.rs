@@ -118,13 +118,21 @@ pub fn visit_field_accessor_mut(
     i: &mut parser::FieldAccessor,
 ) {
     match i {
-        parser::FieldAccessor::Set { vis } => {
+        parser::FieldAccessor::Set { set_token: _, vis } => {
             v.visit_visibility_mut(vis);
         }
-        parser::FieldAccessor::Get { vis, mode: _ } => {
+        parser::FieldAccessor::Get {
+            get_token: _,
+            vis,
+            mode: _,
+        } => {
             v.visit_visibility_mut(vis);
         }
-        parser::FieldAccessor::Watch { vis, mode: _ } => {
+        parser::FieldAccessor::Watch {
+            watch_token: _,
+            vis,
+            mode: _,
+        } => {
             v.visit_visibility_mut(vis);
         }
     }
@@ -132,7 +140,7 @@ pub fn visit_field_accessor_mut(
 
 pub fn visit_comp_item_on_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::CompItemOn) {
     i.attrs.iter_mut().for_each(|i| v.visit_attribute_mut(i));
-    v.visit_dyn_expr_mut(&mut i.dyn_expr);
+    v.visit_func_mut(&mut i.func);
 }
 
 pub fn visit_comp_item_event_mut(

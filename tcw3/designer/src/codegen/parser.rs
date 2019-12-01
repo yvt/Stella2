@@ -1,4 +1,5 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use std::fmt;
 use syn::{
     parse::{Parse, ParseStream, Result},
     parse_str,
@@ -220,6 +221,7 @@ pub struct CompItemField {
     pub semi_token: Option<Token![;]>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FieldType {
     Prop,
     Const,
@@ -282,6 +284,16 @@ impl Parse for CompItemField {
     }
 }
 
+impl fmt::Display for FieldType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            FieldType::Const => "const",
+            FieldType::Wire => "wire",
+            FieldType::Prop => "prop",
+        })
+    }
+}
+
 impl Parse for FieldType {
     fn parse(input: ParseStream) -> Result<Self> {
         let la = input.lookahead1();
@@ -299,18 +311,22 @@ impl Parse for FieldType {
 
 pub enum FieldAccessor {
     Set {
+        set_token: kw::set,
         vis: Visibility,
     },
     Get {
+        get_token: kw::get,
         vis: Visibility,
         mode: Option<FieldGetMode>,
     },
     Watch {
+        watch_token: kw::watch,
         vis: Visibility,
         mode: FieldWatchMode,
     },
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum FieldGetMode {
     Borrow,
     Clone,
@@ -326,11 +342,12 @@ impl Parse for FieldAccessor {
 
         let la = input.lookahead1();
         let this = if la.peek(kw::set) {
-            input.parse::<kw::set>()?;
-            FieldAccessor::Set { vis }
+            let set_token = input.parse::<kw::set>()?;
+            FieldAccessor::Set { set_token, vis }
         } else if la.peek(kw::get) {
-            input.parse::<kw::get>()?;
+            let get_token = input.parse::<kw::get>()?;
             FieldAccessor::Get {
+                get_token,
                 vis,
                 mode: if input.peek(Token![;]) {
                     None
@@ -339,8 +356,9 @@ impl Parse for FieldAccessor {
                 },
             }
         } else if la.peek(kw::watch) {
-            input.parse::<kw::watch>()?;
+            let watch_token = input.parse::<kw::watch>()?;
             FieldAccessor::Watch {
+                watch_token,
                 vis,
                 mode: input.parse()?,
             }
@@ -392,7 +410,7 @@ impl Parse for FieldWatchMode {
 pub struct CompItemOn {
     pub attrs: Vec<Attribute>,
     pub on_token: kw::on,
-    pub dyn_expr: DynExpr,
+    pub func: Func,
     pub semi_token: Option<Token![;]>,
 }
 
@@ -401,7 +419,7 @@ impl Parse for CompItemOn {
         let attrs = input.call(Attribute::parse_outer)?;
         let vis = input.parse()?;
         let on_token = input.parse()?;
-        let dyn_expr = input.parse()?;
+        let func: Func = input.parse()?;
 
         match vis {
             Visibility::Inherited => {}
@@ -414,7 +432,7 @@ impl Parse for CompItemOn {
         }
 
         // The semicolon is elidable on certain cases
-        let semi_token = if dynexpr_requires_terminator(&dyn_expr) {
+        let semi_token = if expr_requires_terminator(&func.body) {
             Some(input.parse()?)
         } else {
             input.parse().ok()
@@ -423,7 +441,7 @@ impl Parse for CompItemOn {
         Ok(Self {
             attrs,
             on_token,
-            dyn_expr,
+            func,
             semi_token,
         })
     }

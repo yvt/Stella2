@@ -13,6 +13,7 @@ use crate::metadata::Crate;
 mod diag;
 mod parser;
 mod resolve;
+mod sem;
 mod visit_mut;
 
 #[derive(Default)]
@@ -146,7 +147,8 @@ impl<'a> BuildScriptConfig<'a> {
         // Load prelude
         let prelude = resolve::Prelude::new(&mut diag);
 
-        // Resolve pathes
+        // Resolve paths, meaning they are all expanded to absolute paths
+        // as specified by `use` items.
         for (parsed_file, diag_file) in files.iter_mut() {
             resolve::resolve_paths(parsed_file, diag_file, &mut diag, &prelude);
         }
@@ -156,7 +158,7 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Import metadata of dependencies
-        let deps: Vec<(&str, Crate)> = self
+        let _deps: Vec<(&str, Crate)> = self
             .linked_crates
             .iter()
             .map(|(name, metadata)| {
@@ -169,9 +171,25 @@ impl<'a> BuildScriptConfig<'a> {
             })
             .collect::<Result<Vec<_>, String>>()?;
 
-        dbg!(&deps);
+        // Start analysis of this crate
+        let mut comps = Vec::new();
+        for (parsed_file, diag_file) in files.iter() {
+            for item in parsed_file.items.iter() {
+                if let parser::Item::Comp(comp) = item {
+                    comps.push(sem::analyze_comp(comp, diag_file, &mut diag));
+                }
+            }
+        }
 
-        // TODO: do something
+        if diag.has_error() {
+            return Err(None);
+        }
+
+        // TODO: Generate metadata (`Crate`) from `comps`
+        // TODO: Analyze `comps` again using all the metadata we have
+        // TODO: ... which allows us to handle `#[inject] const`
+        // TODO: Now, generate `Crate` again
+        // TODO: Generate implementation code
 
         // Generate the metadata for this crate
         let meta = Crate {
