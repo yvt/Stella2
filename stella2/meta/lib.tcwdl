@@ -5,9 +5,9 @@ use tcw3::{ui::views::Label, pal};
 pub comp stella2::TestWidget {
     pub prop text: String = || "hello!".to_string();
 
-    init |this.text| { dbg!(); }
+    on (init) |this.text| { dbg!(); }
 
-    watch |this.text| { dbg!(); }
+    on (this.text) |this.text| { dbg!(); }
 
     // TODO: support reading event data
     // on (this.some_event) |this, event.wm| { dbg!(); }

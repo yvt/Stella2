@@ -37,8 +37,6 @@ bitflags::bitflags! {
 
 pub enum CompItemDef<'a> {
     Field(FieldDef<'a>),
-    Init(InitDef<'a>),
-    Watch(WatchDef<'a>),
     On(OnDef<'a>),
     Event(EventDef<'a>),
 }
@@ -133,18 +131,8 @@ pub struct FieldWatcher {
     // TODO: I kinda want to change the watcher mode to use an existing event
 }
 
-pub struct InitDef<'a> {
-    pub func: Func,
-    pub syn: &'a parser::CompItemInit,
-}
-
-pub struct WatchDef<'a> {
-    pub func: Func,
-    pub syn: &'a parser::CompItemWatch,
-}
-
 pub struct OnDef<'a> {
-    pub event: Vec<Ident>,
+    pub triggers: Vec<Trigger>,
     pub func: Func,
     pub syn: &'a parser::CompItemOn,
 }
@@ -169,6 +157,11 @@ pub struct Func {
 pub struct FuncInput {
     pub by_ref: bool,
     pub field: Vec<Ident>,
+}
+
+pub enum Trigger {
+    Init,
+    Input { field: Vec<Ident> },
 }
 
 pub struct ObjInit {
@@ -229,8 +222,6 @@ impl AnalyzeCtx<'_> {
             parser::CompItem::Field(i) => {
                 CompItemDef::Field(self.analyze_field(i, out_lifted_fields))
             }
-            parser::CompItem::Init(i) => CompItemDef::Init(self.analyze_init(i)),
-            parser::CompItem::Watch(i) => CompItemDef::Watch(self.analyze_watch(i)),
             parser::CompItem::On(i) => CompItemDef::On(self.analyze_on(i)),
             parser::CompItem::Event(i) => CompItemDef::Event(self.analyze_event(i)),
         }
@@ -352,23 +343,13 @@ impl AnalyzeCtx<'_> {
         }
     }
 
-    fn analyze_init<'a>(&mut self, item: &'a parser::CompItemInit) -> InitDef<'a> {
-        InitDef {
-            func: self.analyze_func(&item.func),
-            syn: item,
-        }
-    }
-
-    fn analyze_watch<'a>(&mut self, item: &'a parser::CompItemWatch) -> WatchDef<'a> {
-        WatchDef {
-            func: self.analyze_func(&item.func),
-            syn: item,
-        }
-    }
-
     fn analyze_on<'a>(&mut self, item: &'a parser::CompItemOn) -> OnDef<'a> {
         OnDef {
-            event: self.analyze_input(&item.event),
+            triggers: item
+                .triggers
+                .iter()
+                .map(|tr| self.analyze_trigger(tr))
+                .collect(),
             func: self.analyze_func(&item.func),
             syn: item,
         }
@@ -412,6 +393,15 @@ impl AnalyzeCtx<'_> {
         FuncInput {
             by_ref: func.by_ref.is_some(),
             field: self.analyze_input(&func.input),
+        }
+    }
+
+    fn analyze_trigger(&mut self, tr: &parser::Trigger) -> Trigger {
+        match tr {
+            parser::Trigger::Init(_) => Trigger::Init,
+            parser::Trigger::Input(i) => Trigger::Input {
+                field: self.analyze_input(i),
+            },
         }
     }
 

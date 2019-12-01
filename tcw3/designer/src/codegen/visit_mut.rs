@@ -27,14 +27,6 @@ pub trait TcwdlVisitMut: VisitMut {
         visit_field_accessor_mut(self, i);
     }
 
-    fn visit_comp_item_init_mut(&mut self, i: &mut parser::CompItemInit) {
-        visit_comp_item_init_mut(self, i);
-    }
-
-    fn visit_comp_item_watch_mut(&mut self, i: &mut parser::CompItemWatch) {
-        visit_comp_item_watch_mut(self, i);
-    }
-
     fn visit_comp_item_on_mut(&mut self, i: &mut parser::CompItemOn) {
         visit_comp_item_on_mut(self, i);
     }
@@ -49,6 +41,10 @@ pub trait TcwdlVisitMut: VisitMut {
 
     fn visit_func_mut(&mut self, i: &mut parser::Func) {
         visit_func_mut(self, i);
+    }
+
+    fn visit_trigger_mut(&mut self, i: &mut parser::Trigger) {
+        visit_trigger_mut(self, i);
     }
 
     fn visit_func_input_mut(&mut self, i: &mut parser::FuncInput) {
@@ -96,8 +92,6 @@ pub fn visit_comp_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::Com
 pub fn visit_comp_item_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::CompItem) {
     match i {
         parser::CompItem::Field(i) => v.visit_comp_item_field_mut(i),
-        parser::CompItem::Init(i) => v.visit_comp_item_init_mut(i),
-        parser::CompItem::Watch(i) => v.visit_comp_item_watch_mut(i),
         parser::CompItem::On(i) => v.visit_comp_item_on_mut(i),
         parser::CompItem::Event(i) => v.visit_comp_item_event_mut(i),
     }
@@ -148,25 +142,9 @@ pub fn visit_field_accessor_mut(
     }
 }
 
-pub fn visit_comp_item_init_mut(
-    v: &mut (impl TcwdlVisitMut + ?Sized),
-    i: &mut parser::CompItemInit,
-) {
-    i.attrs.iter_mut().for_each(|i| v.visit_attribute_mut(i));
-    v.visit_func_mut(&mut i.func);
-}
-
-pub fn visit_comp_item_watch_mut(
-    v: &mut (impl TcwdlVisitMut + ?Sized),
-    i: &mut parser::CompItemWatch,
-) {
-    i.attrs.iter_mut().for_each(|i| v.visit_attribute_mut(i));
-    v.visit_func_mut(&mut i.func);
-}
-
 pub fn visit_comp_item_on_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::CompItemOn) {
     i.attrs.iter_mut().for_each(|i| v.visit_attribute_mut(i));
-    v.visit_input_mut(&mut i.event);
+    i.triggers.iter_mut().for_each(|i| v.visit_trigger_mut(i));
     v.visit_func_mut(&mut i.func);
 }
 
@@ -190,6 +168,13 @@ pub fn visit_dyn_expr_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser:
 pub fn visit_func_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::Func) {
     i.inputs.iter_mut().for_each(|i| v.visit_func_input_mut(i));
     v.visit_expr_mut(&mut i.body);
+}
+
+pub fn visit_trigger_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::Trigger) {
+    match i {
+        parser::Trigger::Init(_) => {}
+        parser::Trigger::Input(i) => v.visit_input_mut(i),
+    }
 }
 
 pub fn visit_func_input_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::FuncInput) {
