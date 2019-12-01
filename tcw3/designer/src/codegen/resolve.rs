@@ -143,7 +143,13 @@ pub fn resolve_paths(
                     if alias_rooted {
                         break;
                     }
-                } else {
+                } else if applied_map_list.len() > 0 {
+                    // The path was translated at least once (meaning the
+                    // original path was not rooted), but we are still in the
+                    // loop because `i` is unrooted. Yet, we could not find
+                    // the first component from the set of known imports. In
+                    // this case, we are stuck (we won't be able to obtain the
+                    // absolute (= rooted) path) so report an error.
                     let spans = vec![
                         span_to_codemap(first_ident.span(), self.codemap_file).map(|span| {
                             SpanLabel {
@@ -168,6 +174,9 @@ pub fn resolve_paths(
                         code: None,
                         spans,
                     }]);
+                    break;
+                } else {
+                    // The input path turned out to be a rooted path.
                     break;
                 }
             }
