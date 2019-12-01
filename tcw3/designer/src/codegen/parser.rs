@@ -7,9 +7,12 @@ use syn::{
     token, Attribute, Error, Expr, FnArg, Ident, ItemUse, LitStr, Path, Token, Type, Visibility,
 };
 
-use super::diag::Diag;
+use super::{diag::Diag, EmittedError};
 
-pub fn parse_file(file: &codemap::File, diag: &mut Diag) -> std::result::Result<File, ()> {
+pub fn parse_file(
+    file: &codemap::File,
+    diag: &mut Diag,
+) -> std::result::Result<File, EmittedError> {
     parse_str(file.source()).map_err(|e| {
         // Convert `syn::Error` to `codemap_diagnostic::Diagnostic`s
         for error in e {
@@ -27,6 +30,9 @@ pub fn parse_file(file: &codemap::File, diag: &mut Diag) -> std::result::Result<
                     .collect(),
             }]);
         }
+
+        // Since we already reported the error through `diag`...
+        EmittedError
     })
 }
 

@@ -53,43 +53,40 @@ impl<'a> BuildScriptConfig<'a> {
         }
     }
 
-    pub fn run(self) -> Result<(), ()> {
+    pub fn run(self) -> Result<(), EmittedError> {
         let result = self.run_inner();
         if let Err(e) = result {
-            if let Some(message) = e {
-                let mut emitter = Emitter::stderr(ColorConfig::Auto, None);
-                emitter.emit(&[Diagnostic {
-                    level: Level::Error,
-                    message,
-                    code: None,
-                    spans: vec![],
-                }]);
-            } else {
-                // The error is already reported to stderr if `e` is `None`
-            }
+            let mut emitter = Emitter::stderr(ColorConfig::Auto, None);
+            emitter.emit(&[Diagnostic {
+                level: Level::Error,
+                message: if let BuildError::Emitted = e {
+                    "Aborting due to previous error(s)".to_string()
+                } else {
+                    format!("{}", e)
+                },
+                code: None,
+                spans: vec![],
+            }]);
 
-            Err(())
+            Err(EmittedError)
         } else {
             Ok(())
         }
     }
 
-    fn run_inner(self) -> Result<(), Option<String>> {
+    fn run_inner(self) -> Result<(), BuildError> {
         let in_root_source_file = if let Some(x) = self.in_root_source_file {
             x
         } else {
-            let dir = env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
-                "CARGO_MANIFEST_DIR is missing; are we really in a build script?".to_string()
-            })?;
+            let dir =
+                env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::CargoManifestDirMissing)?;
             Path::new(&dir).join("lib.tcwdl")
         };
 
         let out_source_file = if let Some(x) = self.out_source_file {
             x
         } else {
-            let out_dir = env::var_os("OUT_DIR").ok_or_else(|| {
-                "OUT_DIR is missing; are we really in a build script?".to_string()
-            })?;
+            let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::OutDirMissing)?;
             Path::new(&out_dir).join("designer.rs")
         };
 
@@ -108,7 +105,7 @@ impl<'a> BuildScriptConfig<'a> {
                 let (path, import_span) = queue[i].clone();
                 let diag_file = match diag.load_file(&path, import_span) {
                     Ok(f) => f,
-                    Err(()) => {
+                    Err(EmittedError) => {
                         i += 1;
                         continue;
                     }
@@ -116,7 +113,7 @@ impl<'a> BuildScriptConfig<'a> {
 
                 let parsed_file = match parser::parse_file(&diag_file, &mut diag) {
                     Ok(f) => f,
-                    Err(()) => {
+                    Err(EmittedError) => {
                         i += 1;
                         continue;
                     }
@@ -154,7 +151,7 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         if diag.has_error() {
-            return Err(None);
+            return Err(BuildError::Emitted);
         }
 
         // Import metadata of dependencies
@@ -164,12 +161,11 @@ impl<'a> BuildScriptConfig<'a> {
             .map(|(name, metadata)| {
                 Ok((
                     name.as_str(),
-                    bincode::deserialize(metadata).map_err(|e| {
-                        format!("Failed to import the metadata of '{}': {}", name, e)
-                    })?,
+                    bincode::deserialize(metadata)
+                        .map_err(|e| BuildError::MetadataDeserializationFailure(name.clone(), e))?,
                 ))
             })
-            .collect::<Result<Vec<_>, String>>()?;
+            .collect::<Result<Vec<_>, BuildError>>()?;
 
         // Start analysis of this crate
         let mut comps = Vec::new();
@@ -182,7 +178,7 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         if diag.has_error() {
-            return Err(None);
+            return Err(BuildError::Emitted);
         }
 
         // TODO: Generate metadata (`Crate`) from `comps`
@@ -198,13 +194,8 @@ impl<'a> BuildScriptConfig<'a> {
 
         let meta_bin = bincode::serialize(&meta).unwrap();
 
-        let out_f = File::create(&out_source_file).map_err(|e| {
-            format!(
-                "Could not open the output file '{}': {}",
-                out_source_file.display(),
-                e
-            )
-        })?;
+        let out_f = File::create(&out_source_file)
+            .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;
 
         (move || -> std::io::Result<()> {
             let mut out_f = BufWriter::new(out_f);
@@ -232,16 +223,10 @@ impl<'a> BuildScriptConfig<'a> {
 
             Ok(())
         })()
-        .map_err(|e| {
-            format!(
-                "I/O error while writing the output file '{}': {}",
-                out_source_file.display(),
-                e
-            )
-        })?;
+        .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;
 
         if diag.has_error() {
-            Err(None)
+            Err(BuildError::Emitted)
         } else {
             Ok(())
         }
@@ -258,3 +243,37 @@ impl<T: fmt::Display> fmt::Display for DisplayArray<'_, T> {
         Ok(())
     }
 }
+
+/// Represents a build error.
+///
+/// Most errors are reported through stderr, and in this case, `EmittedError`
+/// is returned.
+///
+/// The doc comments for the variants are converted to a `Display`
+/// implementation by `displaydoc`.
+#[derive(Debug, displaydoc::Display)]
+#[non_exhaustive]
+enum BuildError {
+    /// `in_root_source_file` is not specified but `CARGO_MANIFEST_DIR` is
+    /// missing; are we really in a build script?
+    CargoManifestDirMissing,
+    /// `out_source_file` is not specified but `OUT_DIR` is missing; are we
+    /// really in a build script?
+    OutDirMissing,
+    /// Failed to import the metadata of `{0}`: {1}
+    MetadataDeserializationFailure(String, bincode::Error),
+    /// Could not write the output file `{0}`: {1}
+    OutputFileError(PathBuf, std::io::Error),
+    /// Build failed.
+    Emitted,
+}
+
+impl From<EmittedError> for BuildError {
+    fn from(_: EmittedError) -> Self {
+        Self::Emitted
+    }
+}
+
+/// Represents an error that already has been reported via other means.
+#[derive(Debug, Clone, Copy)]
+pub struct EmittedError;

@@ -2,6 +2,8 @@ use codemap::Span;
 use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level, SpanLabel, SpanStyle};
 use std::{fs::File, io::prelude::*, path::Path, sync::Arc};
 
+use super::EmittedError;
+
 pub type FileRef = Arc<codemap::File>;
 
 pub struct Diag {
@@ -25,7 +27,7 @@ impl Diag {
         &mut self,
         path: impl AsRef<Path>,
         source: Option<Span>,
-    ) -> Result<FileRef, ()> {
+    ) -> Result<FileRef, EmittedError> {
         let path = path.as_ref();
 
         let source = read_file(path).map_err(|e| {
@@ -42,6 +44,9 @@ impl Diag {
                     .into_iter()
                     .collect(),
             }]);
+
+            // Since we already reported the error through `diag`...
+            EmittedError
         })?;
 
         Ok(self.add_file(path.to_string_lossy().into_owned(), source))
