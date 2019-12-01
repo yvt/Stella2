@@ -55,6 +55,7 @@ pub mod kw {
     syn::custom_keyword!(get);
     syn::custom_keyword!(set);
     syn::custom_keyword!(watch);
+    syn::custom_keyword!(init);
     syn::custom_keyword!(sub);
     syn::custom_keyword!(clone);
     syn::custom_keyword!(borrow);
@@ -180,6 +181,7 @@ impl Parse for Comp {
 /// An item in `Comp`.
 pub enum CompItem {
     Field(CompItemField),
+    Init(CompItemInit),
     Watch(CompItemWatch),
     Event(CompItemEvent),
 }
@@ -193,6 +195,8 @@ impl Parse for CompItem {
         let la = ahead.lookahead1();
         let mut item = if la.peek(kw::prop) || la.peek(Token![const]) || la.peek(kw::wire) {
             CompItem::Field(input.parse()?)
+        } else if la.peek(kw::init) {
+            CompItem::Init(input.parse()?)
         } else if la.peek(kw::watch) {
             CompItem::Watch(input.parse()?)
         } else if la.peek(kw::event) {
@@ -203,6 +207,7 @@ impl Parse for CompItem {
 
         let item_attrs = match &mut item {
             CompItem::Field(item) => &mut item.attrs,
+            CompItem::Init(item) => &mut item.attrs,
             CompItem::Watch(item) => &mut item.attrs,
             CompItem::Event(item) => &mut item.attrs,
         };
@@ -409,6 +414,47 @@ impl Parse for FieldWatchMode {
         } else {
             Err(la.error())
         }
+    }
+}
+
+/// - `init |this.prop| { statements... };`
+pub struct CompItemInit {
+    pub attrs: Vec<Attribute>,
+    pub init_token: kw::init,
+    pub func: Func,
+    pub semi_token: Option<Token![;]>,
+}
+
+impl Parse for CompItemInit {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let init_token = input.parse()?;
+        let func: Func = input.parse()?;
+
+        match vis {
+            Visibility::Inherited => {}
+            _ => {
+                return Err(Error::new_spanned(
+                    vis,
+                    "visibility specification is not allowed for `init`",
+                ))
+            }
+        }
+
+        // The semicolon is elidable on certain cases
+        let semi_token = if expr_requires_terminator(&func.body) {
+            Some(input.parse()?)
+        } else {
+            input.parse().ok()
+        };
+
+        Ok(Self {
+            attrs,
+            init_token,
+            func,
+            semi_token,
+        })
     }
 }
 
