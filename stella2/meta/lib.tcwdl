@@ -9,6 +9,9 @@ pub comp stella2::TestWidget {
 
     watch |this.text| { dbg!(); }
 
+    // TODO: support reading event data
+    // on (this.some_event) |this, event.wm| { dbg!(); }
+
     pub event some_event(wm: pal::Wm);
 
     const child = Label {

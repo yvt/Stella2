@@ -39,6 +39,7 @@ pub enum CompItemDef<'a> {
     Field(FieldDef<'a>),
     Init(InitDef<'a>),
     Watch(WatchDef<'a>),
+    On(OnDef<'a>),
     Event(EventDef<'a>),
 }
 
@@ -142,6 +143,12 @@ pub struct WatchDef<'a> {
     pub syn: &'a parser::CompItemWatch,
 }
 
+pub struct OnDef<'a> {
+    pub event: Vec<Ident>,
+    pub func: Func,
+    pub syn: &'a parser::CompItemOn,
+}
+
 pub struct EventDef<'a> {
     pub vis: syn::Visibility,
     pub ident: Ident,
@@ -224,6 +231,7 @@ impl AnalyzeCtx<'_> {
             }
             parser::CompItem::Init(i) => CompItemDef::Init(self.analyze_init(i)),
             parser::CompItem::Watch(i) => CompItemDef::Watch(self.analyze_watch(i)),
+            parser::CompItem::On(i) => CompItemDef::On(self.analyze_on(i)),
             parser::CompItem::Event(i) => CompItemDef::Event(self.analyze_event(i)),
         }
     }
@@ -358,6 +366,14 @@ impl AnalyzeCtx<'_> {
         }
     }
 
+    fn analyze_on<'a>(&mut self, item: &'a parser::CompItemOn) -> OnDef<'a> {
+        OnDef {
+            event: self.analyze_input(&item.event),
+            func: self.analyze_func(&item.func),
+            syn: item,
+        }
+    }
+
     fn analyze_event<'a>(&mut self, item: &'a parser::CompItemEvent) -> EventDef<'a> {
         EventDef {
             vis: item.vis.clone(),
@@ -393,7 +409,13 @@ impl AnalyzeCtx<'_> {
     }
 
     fn analyze_func_input(&mut self, func: &parser::FuncInput) -> FuncInput {
-        let mut input = &*func.input;
+        FuncInput {
+            by_ref: func.by_ref.is_some(),
+            field: self.analyze_input(&func.input),
+        }
+    }
+
+    fn analyze_input(&mut self, mut input: &parser::Input) -> Vec<Ident> {
         let mut field: Vec<_> = std::iter::from_fn(|| {
             let (e, next) = match input {
                 parser::Input::Field(field) => (
@@ -409,10 +431,7 @@ impl AnalyzeCtx<'_> {
 
         field.reverse();
 
-        FuncInput {
-            by_ref: func.by_ref.is_some(),
-            field,
-        }
+        field
     }
 
     fn analyze_obj_init(

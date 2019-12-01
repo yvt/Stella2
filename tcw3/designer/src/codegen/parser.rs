@@ -183,6 +183,7 @@ pub enum CompItem {
     Field(CompItemField),
     Init(CompItemInit),
     Watch(CompItemWatch),
+    On(CompItemOn),
     Event(CompItemEvent),
 }
 
@@ -199,6 +200,8 @@ impl Parse for CompItem {
             CompItem::Init(input.parse()?)
         } else if la.peek(kw::watch) {
             CompItem::Watch(input.parse()?)
+        } else if la.peek(kw::on) {
+            CompItem::On(input.parse()?)
         } else if la.peek(kw::event) {
             CompItem::Event(input.parse()?)
         } else {
@@ -209,6 +212,7 @@ impl Parse for CompItem {
             CompItem::Field(item) => &mut item.attrs,
             CompItem::Init(item) => &mut item.attrs,
             CompItem::Watch(item) => &mut item.attrs,
+            CompItem::On(item) => &mut item.attrs,
             CompItem::Event(item) => &mut item.attrs,
         };
         attrs.extend(item_attrs.drain(..));
@@ -493,6 +497,59 @@ impl Parse for CompItemWatch {
         Ok(Self {
             attrs,
             watch_token,
+            func,
+            semi_token,
+        })
+    }
+}
+
+/// - `on (this.const1.event) |this.prop| { statements... }`
+pub struct CompItemOn {
+    pub attrs: Vec<Attribute>,
+    pub on_token: kw::on,
+    pub paren_token: token::Paren,
+    pub event: Box<Input>,
+    pub func: Func,
+    pub semi_token: Option<Token![;]>,
+}
+
+impl Parse for CompItemOn {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
+        let on_token = input.parse()?;
+
+        let content;
+        let paren_token = syn::parenthesized!(content in input);
+        let event = content.parse()?;
+        if !content.is_empty() {
+            return Err(content.error("unexpected token"));
+        }
+
+        let func: Func = input.parse()?;
+
+        match vis {
+            Visibility::Inherited => {}
+            _ => {
+                return Err(Error::new_spanned(
+                    vis,
+                    "visibility specification is not allowed for `on`",
+                ))
+            }
+        }
+
+        // The semicolon is elidable on certain cases
+        let semi_token = if expr_requires_terminator(&func.body) {
+            Some(input.parse()?)
+        } else {
+            input.parse().ok()
+        };
+
+        Ok(Self {
+            attrs,
+            on_token,
+            paren_token,
+            event,
             func,
             semi_token,
         })
