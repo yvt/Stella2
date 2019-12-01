@@ -180,7 +180,7 @@ impl Parse for Comp {
 /// An item in `Comp`.
 pub enum CompItem {
     Field(CompItemField),
-    On(CompItemOn),
+    Watch(CompItemWatch),
     Event(CompItemEvent),
 }
 
@@ -193,8 +193,8 @@ impl Parse for CompItem {
         let la = ahead.lookahead1();
         let mut item = if la.peek(kw::prop) || la.peek(Token![const]) || la.peek(kw::wire) {
             CompItem::Field(input.parse()?)
-        } else if la.peek(kw::on) {
-            CompItem::On(input.parse()?)
+        } else if la.peek(kw::watch) {
+            CompItem::Watch(input.parse()?)
         } else if la.peek(kw::event) {
             CompItem::Event(input.parse()?)
         } else {
@@ -203,7 +203,7 @@ impl Parse for CompItem {
 
         let item_attrs = match &mut item {
             CompItem::Field(item) => &mut item.attrs,
-            CompItem::On(item) => &mut item.attrs,
+            CompItem::Watch(item) => &mut item.attrs,
             CompItem::Event(item) => &mut item.attrs,
         };
         attrs.extend(item_attrs.drain(..));
@@ -412,19 +412,19 @@ impl Parse for FieldWatchMode {
     }
 }
 
-/// - `on |this.prop| { statements... };`
-pub struct CompItemOn {
+/// - `watch |this.prop| { statements... };`
+pub struct CompItemWatch {
     pub attrs: Vec<Attribute>,
-    pub on_token: kw::on,
+    pub watch_token: kw::watch,
     pub func: Func,
     pub semi_token: Option<Token![;]>,
 }
 
-impl Parse for CompItemOn {
+impl Parse for CompItemWatch {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
         let vis = input.parse()?;
-        let on_token = input.parse()?;
+        let watch_token = input.parse()?;
         let func: Func = input.parse()?;
 
         match vis {
@@ -432,7 +432,7 @@ impl Parse for CompItemOn {
             _ => {
                 return Err(Error::new_spanned(
                     vis,
-                    "visibility specification is not allowed for `on`",
+                    "visibility specification is not allowed for `watch`",
                 ))
             }
         }
@@ -446,7 +446,7 @@ impl Parse for CompItemOn {
 
         Ok(Self {
             attrs,
-            on_token,
+            watch_token,
             func,
             semi_token,
         })

@@ -5,7 +5,7 @@ use tcw3::{ui::views::Label, pal};
 pub comp stella2::TestWidget {
     pub prop text: String = || "hello!".to_string();
 
-    on |this.text| { dbg!(); }
+    watch |this.text| { dbg!(); }
 
     pub event some_event(wm: pal::Wm);
 

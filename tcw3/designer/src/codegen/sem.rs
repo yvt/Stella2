@@ -37,7 +37,7 @@ bitflags::bitflags! {
 
 pub enum CompItemDef<'a> {
     Field(FieldDef<'a>),
-    On(OnDef<'a>),
+    Watch(WatchDef<'a>),
     Event(EventDef<'a>),
 }
 
@@ -131,9 +131,9 @@ pub struct FieldWatcher {
     // TODO: I kinda want to change the watcher mode to use an existing event
 }
 
-pub struct OnDef<'a> {
+pub struct WatchDef<'a> {
     pub func: Func,
-    pub syn: &'a parser::CompItemOn,
+    pub syn: &'a parser::CompItemWatch,
 }
 
 pub struct EventDef<'a> {
@@ -216,7 +216,7 @@ impl AnalyzeCtx<'_> {
             parser::CompItem::Field(i) => {
                 CompItemDef::Field(self.analyze_field(i, out_lifted_fields))
             }
-            parser::CompItem::On(i) => CompItemDef::On(self.analyze_on(i)),
+            parser::CompItem::Watch(i) => CompItemDef::Watch(self.analyze_watch(i)),
             parser::CompItem::Event(i) => CompItemDef::Event(self.analyze_event(i)),
         }
     }
@@ -337,8 +337,8 @@ impl AnalyzeCtx<'_> {
         }
     }
 
-    fn analyze_on<'a>(&mut self, item: &'a parser::CompItemOn) -> OnDef<'a> {
-        OnDef {
+    fn analyze_watch<'a>(&mut self, item: &'a parser::CompItemWatch) -> WatchDef<'a> {
+        WatchDef {
             func: self.analyze_func(&item.func),
             syn: item,
         }
