@@ -56,7 +56,6 @@ pub mod kw {
     syn::custom_keyword!(set);
     syn::custom_keyword!(watch);
     syn::custom_keyword!(init);
-    syn::custom_keyword!(sub);
     syn::custom_keyword!(clone);
     syn::custom_keyword!(borrow);
     syn::custom_keyword!(this);
@@ -340,7 +339,7 @@ pub enum FieldGetMode {
 }
 
 pub enum FieldWatchMode {
-    Sub { method: Ident },
+    Event { event: Ident },
 }
 
 impl Parse for FieldAccessor {
@@ -394,19 +393,19 @@ impl Parse for FieldGetMode {
 impl Parse for FieldWatchMode {
     fn parse(input: ParseStream) -> Result<Self> {
         let la = input.lookahead1();
-        if la.peek(kw::sub) {
-            input.parse::<kw::sub>()?;
+        if la.peek(kw::event) {
+            input.parse::<kw::event>()?;
 
             let content;
-            syn::braced!(content in input);
+            syn::parenthesized!(content in input);
 
-            let method = content.parse()?;
+            let event = content.parse()?;
 
             if !content.is_empty() {
                 return Err(content.error("Unexpected token"));
             }
 
-            Ok(FieldWatchMode::Sub { method })
+            Ok(FieldWatchMode::Event { event })
         } else {
             Err(la.error())
         }

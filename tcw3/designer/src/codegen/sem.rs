@@ -128,7 +128,7 @@ pub use self::parser::FieldGetMode;
 
 pub struct FieldWatcher {
     pub vis: syn::Visibility,
-    // TODO: I kinda want to change the watcher mode to use an existing event
+    pub event: Ident,
 }
 
 pub struct OnDef<'a> {
@@ -273,11 +273,17 @@ impl AnalyzeCtx<'_> {
                         (1, get_token.span())
                     }
                     parser::FieldAccessor::Watch {
-                        watch_token, vis, ..
+                        watch_token,
+                        vis,
+                        mode,
                     } => {
                         accessors.watch = Some(FieldWatcher {
                             vis: vis.clone(),
-                            // TODO: mode
+                            event: match mode {
+                                parser::FieldWatchMode::Event { event } => {
+                                    Ident::from_syn(event, self.file)
+                                }
+                            },
                         });
                         (2, watch_token.span())
                     }
