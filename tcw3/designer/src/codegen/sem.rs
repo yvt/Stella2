@@ -156,12 +156,23 @@ pub struct Func {
 
 pub struct FuncInput {
     pub by_ref: bool,
-    pub field: Vec<Ident>,
+    pub input: Input,
 }
 
 pub enum Trigger {
     Init,
-    Input { field: Vec<Ident> },
+    Input(Input),
+}
+
+pub struct Input {
+    pub origin: InputOrigin,
+    pub selectors: Vec<Ident>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputOrigin {
+    This,
+    Event,
 }
 
 pub struct ObjInit {
@@ -392,36 +403,41 @@ impl AnalyzeCtx<'_> {
     fn analyze_func_input(&mut self, func: &parser::FuncInput) -> FuncInput {
         FuncInput {
             by_ref: func.by_ref.is_some(),
-            field: self.analyze_input(&func.input),
+            input: self.analyze_input(&func.input),
         }
     }
 
     fn analyze_trigger(&mut self, tr: &parser::Trigger) -> Trigger {
         match tr {
             parser::Trigger::Init(_) => Trigger::Init,
-            parser::Trigger::Input(i) => Trigger::Input {
-                field: self.analyze_input(i),
-            },
+            parser::Trigger::Input(i) => Trigger::Input(self.analyze_input(i)),
         }
     }
 
-    fn analyze_input(&mut self, mut input: &parser::Input) -> Vec<Ident> {
-        let mut field: Vec<_> = std::iter::from_fn(|| {
-            let (e, next) = match input {
-                parser::Input::Field(field) => (
-                    Some(Ident::from_syn(&field.member, self.file)),
-                    &*field.base,
-                ),
-                parser::Input::This(_) => (None, input),
-            };
-            input = next;
-            e
-        })
-        .collect();
+    fn analyze_input(&mut self, mut input: &parser::Input) -> Input {
+        let mut selectors = &input.selectors[..];
+        let origin = if selectors[0].is_field_with_ident("this") {
+            // e.g., `this.prop1`
+            selectors = &selectors[1..];
+            InputOrigin::This
+        } else if selectors[0].is_field_with_ident("event") {
+            // e.g., `event.mouse_position`
+            selectors = &selectors[1..];
+            InputOrigin::Event
+        } else {
+            // The origin can be elided like `prop1`
+            InputOrigin::This
+        };
 
-        field.reverse();
-
-        field
+        Input {
+            origin,
+            selectors: selectors
+                .iter()
+                .map(|s| match s {
+                    parser::InputSelector::Field { ident, .. } => Ident::from_syn(ident, self.file),
+                })
+                .collect(),
+        }
     }
 
     fn analyze_obj_init(
@@ -479,10 +495,13 @@ impl AnalyzeCtx<'_> {
         Func {
             inputs: vec![FuncInput {
                 by_ref: false,
-                field: vec![Ident {
-                    sym: lifted_field_name.clone(),
-                    span: None,
-                }],
+                input: Input {
+                    origin: InputOrigin::This,
+                    selectors: vec![Ident {
+                        span: None,
+                        sym: lifted_field_name.clone(),
+                    }],
+                },
             }],
             body: syn::Expr::Path(syn::ExprPath {
                 attrs: vec![],

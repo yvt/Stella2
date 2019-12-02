@@ -55,8 +55,8 @@ pub trait TcwdlVisitMut: VisitMut {
         visit_input_mut(self, i);
     }
 
-    fn visit_input_field_mut(&mut self, i: &mut parser::InputField) {
-        visit_input_field_mut(self, i);
+    fn visit_input_selector_mut(&mut self, i: &mut parser::InputSelector) {
+        visit_input_selector_mut(self, i);
     }
 
     fn visit_obj_init_mut(&mut self, i: &mut parser::ObjInit) {
@@ -182,15 +182,23 @@ pub fn visit_func_input_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parse
 }
 
 pub fn visit_input_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::Input) {
-    match i {
-        parser::Input::Field(i) => v.visit_input_field_mut(i),
-        parser::Input::This(_) => {}
-    }
+    i.selectors
+        .iter_mut()
+        .for_each(|i| v.visit_input_selector_mut(i));
 }
 
-pub fn visit_input_field_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::InputField) {
-    v.visit_input_mut(&mut i.base);
-    v.visit_ident_mut(&mut i.member);
+pub fn visit_input_selector_mut(
+    v: &mut (impl TcwdlVisitMut + ?Sized),
+    i: &mut parser::InputSelector,
+) {
+    match i {
+        parser::InputSelector::Field {
+            dot_token: _,
+            ident,
+        } => {
+            v.visit_ident_mut(ident);
+        }
+    }
 }
 
 pub fn visit_obj_init_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut parser::ObjInit) {

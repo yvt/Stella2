@@ -593,35 +593,54 @@ impl Parse for FuncInput {
 }
 
 /// `this.prop`
-pub enum Input {
-    Field(InputField),
-    This(kw::this),
+pub struct Input {
+    pub selectors: Vec<InputSelector>,
 }
 
 impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut this = Input::This(input.parse()?);
+        let mut selectors = Vec::new();
 
-        while input.peek(Token![.]) {
-            let dot_token = input.parse()?;
-            let member = input.parse()?;
+        let ident: Ident = input.parse()?;
+        selectors.push(InputSelector::Field {
+            dot_token: None,
+            ident,
+        });
 
-            this = Input::Field(InputField {
-                base: Box::new(this),
-                dot_token,
-                member,
-            });
+        loop {
+            if input.peek(Token![.]) {
+                let dot_token = input.parse()?;
+                let ident = input.parse()?;
+                selectors.push(InputSelector::Field {
+                    dot_token: Some(dot_token),
+                    ident,
+                });
+            } else {
+                break;
+            }
         }
 
-        Ok(this)
+        Ok(Input { selectors })
     }
 }
 
-/// `{base}.member`
-pub struct InputField {
-    pub base: Box<Input>,
-    pub dot_token: Token![.],
-    pub member: Ident,
+pub enum InputSelector {
+    Field {
+        /// Elided for the first selector
+        dot_token: Option<Token![.]>,
+        ident: Ident,
+    }, // TODO: array indexing
+}
+
+impl InputSelector {
+    #[allow(irrefutable_let_patterns)]
+    pub(crate) fn is_field_with_ident(&self, x: impl AsRef<str>) -> bool {
+        if let InputSelector::Field { ident, .. } = self {
+            *ident == x
+        } else {
+            false
+        }
+    }
 }
 
 /// `FillLayout { ... }`

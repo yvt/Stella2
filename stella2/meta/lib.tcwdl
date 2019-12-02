@@ -5,16 +5,15 @@ use tcw3::{ui::views::Label, pal};
 pub comp stella2::TestWidget {
     pub prop text: String = || "hello!".to_string();
 
-    on (init) |this.text| { dbg!(); }
+    on (init) |text| { dbg!(); }
 
-    on (this.text) |this.text| { dbg!(); }
+    on (text) |text| { dbg!(); }
 
-    // TODO: support reading event data
-    // on (this.some_event) |this, event.wm| { dbg!(); }
+    on (some_event) |this, event.wm| { dbg!(); }
 
     pub event some_event(wm: pal::Wm);
 
     const child = Label {
-        prop text = |this.text| format!("text = '{}'", text);
+        prop text = |text| format!("text = '{}'", text);
     };
 }
