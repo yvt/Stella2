@@ -710,10 +710,3 @@ fn expr_requires_terminator(expr: &Expr) -> bool {
         _ => true,
     }
 }
-
-fn dynexpr_requires_terminator(expr: &DynExpr) -> bool {
-    match expr {
-        DynExpr::Func(Func { body, .. }) => expr_requires_terminator(body),
-        _ => true,
-    }
-}
