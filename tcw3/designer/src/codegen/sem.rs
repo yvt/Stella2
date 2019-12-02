@@ -46,9 +46,13 @@ pub struct FieldDef<'a> {
     pub field_ty: FieldType,
     pub flags: FieldFlags,
     pub ident: Ident,
+    /// The type of the field's value. Set by the analysis unless there was
+    /// an error.
     pub ty: Option<syn::Type>,
     pub accessors: FieldAccessors,
-    /// - Can be `None` only if `field_ty` is `Const`.
+    /// - Can be `None` unless `field_ty` is `Wire`. For `Const`, `None` means
+    ///   the value must be supplied via the constructor, and for `Prop` it
+    ///   means it's initialized by `Default::default()`.
     /// - Can be `Some(ObjInit(_))` only if `field_ty` is `Const`.
     pub value: Option<DynExpr>,
     pub syn: Option<&'a parser::CompItemField>,
@@ -336,12 +340,54 @@ impl AnalyzeCtx<'_> {
             accessors = default_accessors;
         }
 
+        let ty = if let Some(ty) = item.ty.clone() {
+            Some(ty)
+        } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
+            Some(syn::Type::Path(syn::TypePath {
+                qself: None,
+                path: init.path.clone(),
+            }))
+        } else {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "Type must be specified unless the initializer is an object literal"
+                    .to_string(),
+                code: None,
+                spans: span_to_codemap(item.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+
+            None
+        };
+
+        if item.dyn_expr.is_none() && item.field_ty == parser::FieldType::Wire {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "A value is required for this field type".to_string(),
+                code: None,
+                spans: span_to_codemap(item.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+
         FieldDef {
             vis: item.vis.clone(),
             field_ty: item.field_ty,
             flags: FieldFlags::empty(),
             ident: Ident::from_syn(&item.ident, self.file),
-            ty: item.ty.clone(),
+            ty,
             accessors,
             value: item.dyn_expr.as_ref().map(|d| {
                 if item.field_ty == FieldType::Const {
@@ -491,7 +537,10 @@ impl AnalyzeCtx<'_> {
                 sym: lifted_field_name.clone(),
                 span: None,
             },
-            ty: None,
+            ty: Some(syn::Type::Path(syn::TypePath {
+                qself: None,
+                path: init.path.clone(),
+            })),
             accessors: FieldAccessors::default_none(),
             value: Some(DynExpr::ObjInit(obj_init)),
             syn: None,
