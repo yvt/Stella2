@@ -1,4 +1,5 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use proc_macro2::Span;
 use std::collections::HashMap;
 use syn::{
     punctuated::Punctuated, spanned::Spanned, Ident, ItemUse, Path, PathArguments, PathSegment,
@@ -11,7 +12,12 @@ use super::{
     visit_mut,
 };
 
-/// Replace all `Path`s in the given AST with absolute paths.
+/// Replace all `Path`s in the given AST with absolute paths
+/// (`::cratename::item`) or `crate::` paths.
+///
+/// The postcondition of the resulting paths is defined by
+/// `is_path_rooted_or_crate`. It might not be upheld if there were any errors,
+/// which will be reported through `diag`.
 pub fn resolve_paths(
     file: &mut File,
     codemap_file: &codemap::File,
@@ -60,11 +66,10 @@ pub fn resolve_paths(
     }
 
     impl syn::visit_mut::VisitMut for PathResolver<'_> {
-        fn visit_attribute_mut(&mut self, _: &mut syn::Attribute) {}
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
         fn visit_path_mut(&mut self, i: &mut Path) {
-            if i.leading_colon.take().is_some() {
+            if is_path_rooted_or_crate(i) {
                 // The path is already rooted, no need to resolve
                 return;
             }
@@ -73,7 +78,29 @@ pub fn resolve_paths(
             let path_span = span_to_codemap(i.span(), self.codemap_file);
 
             loop {
-                let first_ident = &i.segments.first().unwrap().ident;
+                let root_ident = i.segments.first().unwrap().ident.to_string();
+                if root_ident == "super" {
+                    let span = i.segments.first().unwrap().ident.span();
+                    self.diag.emit(&[Diagnostic {
+                        level: Level::Error,
+                        message: "`super` is not allowed to use".to_string(),
+                        code: None,
+                        spans: span_to_codemap(span, self.codemap_file)
+                            .into_iter()
+                            .map(|span| SpanLabel {
+                                span,
+                                label: None,
+                                style: SpanStyle::Primary,
+                            })
+                            .into_iter()
+                            .collect(),
+                    }]);
+                    break;
+                }
+                let root_is_self = root_ident == "self";
+
+                let first_ident_i = root_is_self as usize;
+                let first_ident = &i.segments[first_ident_i].ident;
 
                 if applied_map_list.iter().any(|(i, _)| *i == first_ident) {
                     // Detected a cycle
@@ -114,42 +141,22 @@ pub fn resolve_paths(
                     // Leave breadcrumbs to detect a cycle
                     applied_map_list.push((ident, alias));
 
-                    // e.g., `a<T>::b::c` is mapped by `use self::f::g as a;`.
-                    let mut new_path = Path {
-                        leading_colon: None,
-                        segments: Punctuated::new(),
-                    };
-                    let alias_rooted =
-                        alias.path.segments.first().unwrap().ident.to_string() != "self";
-                    let alias_start_i = if alias_rooted { 0 } else { 1 };
-
-                    // Push `f::g`
-                    for k in alias_start_i..alias.path.segments.len() {
-                        new_path.segments.push(alias.path.segments[k].clone());
-                    }
+                    // e.g., `self::a<T>::b::c` is mapped by `use self::f::g as a;`.
+                    // `new_path` = `self::f::g`
+                    let mut new_path = alias.path.clone();
 
                     // Attach `<T>` to the last component, `g`
                     let head = new_path.segments.last_mut().unwrap();
                     head.arguments = i.segments.first().unwrap().arguments.clone();
 
-                    // Append `::b::c` to finally get `f::g<T>::b::c`, which is
-                    // resolved again because the map is not rooted (i.e.,
-                    // starts with `self::`)
-                    for k in 1..i.segments.len() {
+                    // Append `::b::c` to finally get `self::f::g<T>::b::c`
+                    for k in (first_ident_i + 1)..i.segments.len() {
                         new_path.segments.push(i.segments[k].clone());
                     }
 
                     *i = new_path;
-                    if alias_rooted {
-                        break;
-                    }
-                } else if applied_map_list.len() > 0 {
-                    // The path was translated at least once (meaning the
-                    // original path was not rooted), but we are still in the
-                    // loop because `i` is unrooted. Yet, we could not find
-                    // the first component from the set of known imports. In
-                    // this case, we are stuck (we won't be able to obtain the
-                    // absolute (= rooted) path) so report an error.
+                } else if root_is_self {
+                    // `i` is `self::hoge` but `hoge` is not in the scope
                     let spans = vec![
                         span_to_codemap(first_ident.span(), self.codemap_file).map(|span| {
                             SpanLabel {
@@ -177,6 +184,7 @@ pub fn resolve_paths(
                     break;
                 } else {
                     // The input path turned out to be a rooted path.
+                    i.leading_colon = Some(Token![::](Span::call_site()));
                     break;
                 }
             }
@@ -185,10 +193,43 @@ pub fn resolve_paths(
 
     impl visit_mut::TcwdlVisitMut for PathResolver<'_> {
         fn visit_comp_mut(&mut self, i: &mut Comp) {
-            // Ignore `i.attrs`
-            // Ignore `i.path` because it contains the path of the component
-            // we want to *define*.
-            i.items.iter_mut().for_each(|i| self.visit_comp_item_mut(i));
+            visit_mut::visit_comp_mut(self, i);
+
+            // Make sure `i.path` does not refer to an external crate.
+            let path = &i.path;
+            let bad = {
+                if path.leading_colon.is_some() {
+                    true
+                } else {
+                    let first = path.segments.first().unwrap().ident.to_string();
+                    if first == "crate" {
+                        false
+                    } else if first == "super" || first == "self" {
+                        // This is not supposed to be seen at this point and it's
+                        // already reported to the user by `visit_path_mut`
+                        false
+                    } else {
+                        true
+                    }
+                }
+            };
+            if bad {
+                let span = path.segments.first().unwrap().span();
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Can't define a component outside the current crate".to_string(),
+                    code: None,
+                    spans: span_to_codemap(span, self.codemap_file)
+                        .into_iter()
+                        .map(|span| SpanLabel {
+                            span,
+                            label: Some("Expected to start with `crate::`".to_string()),
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
         }
 
         fn visit_func_mut(&mut self, _: &mut Func) {
@@ -208,6 +249,15 @@ pub fn resolve_paths(
     );
 }
 
+fn is_path_rooted_or_crate(path: &Path) -> bool {
+    if path.leading_colon.is_some() {
+        true
+    } else {
+        let first = path.segments.first().unwrap().ident.to_string();
+        first == "crate"
+    }
+}
+
 #[derive(Clone)]
 struct Alias {
     path: Path,
@@ -221,24 +271,8 @@ fn process_use(
     diag: &mut Diag,
     item: &ItemUse,
 ) {
-    if let Some(colon) = &item.leading_colon {
-        diag.emit(&[Diagnostic {
-            level: Level::Error,
-            message: "Leading colon is not supported".to_string(),
-            code: None,
-            spans: span_to_codemap(colon.span(), codemap_file)
-                .map(|span| SpanLabel {
-                    span,
-                    label: None,
-                    style: SpanStyle::Primary,
-                })
-                .into_iter()
-                .collect(),
-        }]);
-    }
-
     let mut empty_path = Path {
-        leading_colon: None,
+        leading_colon: item.leading_colon.clone(),
         segments: Punctuated::new(),
     };
 

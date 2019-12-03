@@ -2,7 +2,7 @@
 use tcw3::{ui::views::Label, pal};
 
 #[widget]
-pub comp stella2::TestWidget {
+pub comp crate::TestWidget {
     pub prop text: String {
         pub get; pub set; pub watch event(text_changed);
     } = || "hello!".to_string();

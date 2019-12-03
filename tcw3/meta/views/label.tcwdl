@@ -3,7 +3,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
 
 #[prototype_only]
 #[widget]
-pub comp tcw3::ui::views::Label {
+pub comp crate::ui::views::Label {
     pub const style_manager: &Manager;
 
     pub prop text: String { pub set; }
