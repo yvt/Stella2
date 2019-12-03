@@ -183,7 +183,7 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Generate metadata (`Crate`) from `comps`
-        let mut meta = metagen::metagen_crate(&comps);
+        let mut meta = metagen::gen_crate(&comps);
 
         // TODO: Analyze `comps` again using all the metadata we have
         // TODO: ... which allows us to handle `#[inject] const`
