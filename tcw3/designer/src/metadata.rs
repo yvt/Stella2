@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub mod visit_mut;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Crate {
     pub comps: Vec<CompDef>,
@@ -9,7 +11,8 @@ pub struct Crate {
 pub enum Visibility {
     Private,
     /// This variant is used only for the current crate. Replaced with
-    /// `Private` when exporting the metadata to a file.
+    /// `Private` when exporting the metadata to a file in accordance with
+    /// the one-crate-one-file rule.
     Restricted(Path),
     Public,
 }
@@ -32,6 +35,8 @@ pub type Ident = String;
 pub struct CompDef {
     pub flags: CompFlags,
     pub vis: Visibility,
+    /// The path of the component's type. Note that a component can have
+    /// multiple aliases.
     pub paths: Vec<Path>,
     pub items: Vec<CompItemDef>,
 }

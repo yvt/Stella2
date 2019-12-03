@@ -8,6 +8,19 @@ pub fn metagen_crate(comps: &[sem::CompDef<'_>]) -> metadata::Crate {
     }
 }
 
+/// Replaces `Visibility::Restricted` with `Visibility::Private`.
+pub struct DowngradeRestrictedVisibility;
+
+impl metadata::visit_mut::VisitMut for DowngradeRestrictedVisibility {
+    fn visit_visibility_mut(&mut self, i: &mut metadata::Visibility) {
+        if let metadata::Visibility::Restricted(_) = i {
+            *i = metadata::Visibility::Private;
+        }
+    }
+
+    fn visit_path_mut(&mut self, _: &mut metadata::Path) {}
+}
+
 fn metagen_comp(comp: &sem::CompDef<'_>) -> metadata::CompDef {
     metadata::CompDef {
         flags: comp.flags,

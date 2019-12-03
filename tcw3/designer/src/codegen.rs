@@ -183,12 +183,18 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Generate metadata (`Crate`) from `comps`
-        let meta = metagen::metagen_crate(&comps);
+        let mut meta = metagen::metagen_crate(&comps);
 
         // TODO: Analyze `comps` again using all the metadata we have
         // TODO: ... which allows us to handle `#[inject] const`
         // TODO: Now, generate `Crate` again
         // TODO: Generate implementation code
+
+        // Remove `pub(in crate::...)`
+        crate::metadata::visit_mut::visit_crate_mut(
+            &mut metagen::DowngradeRestrictedVisibility,
+            &mut meta,
+        );
 
         let meta_bin = bincode::serialize(&meta).unwrap();
 
