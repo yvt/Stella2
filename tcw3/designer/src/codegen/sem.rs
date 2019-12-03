@@ -4,8 +4,8 @@ use syn::spanned::Spanned;
 use super::{diag::Diag, parser, parser::span_to_codemap};
 
 pub struct Ident {
-    sym: String,
-    span: Option<codemap::Span>,
+    pub sym: String,
+    pub span: Option<codemap::Span>,
 }
 
 impl Ident {
@@ -25,15 +25,7 @@ pub struct CompDef<'a> {
     pub syn: &'a parser::Comp,
 }
 
-bitflags::bitflags! {
-    pub struct CompFlags: u8 {
-        /// Do not generate implementation code.
-        const PROTOTYPE_ONLY = 1;
-
-        /// The component represents a widget.
-        const WIDGET = 1 << 1;
-    }
-}
+pub use crate::metadata::CompFlags;
 
 pub enum CompItemDef<'a> {
     Field(FieldDef<'a>),
@@ -60,11 +52,7 @@ pub struct FieldDef<'a> {
 
 pub use self::parser::FieldType;
 
-bitflags::bitflags! {
-    pub struct FieldFlags: u8 {
-        const INJECT = 1;
-    }
-}
+pub use crate::metadata::FieldFlags;
 
 pub struct FieldAccessors {
     /// Valid only for `prop`

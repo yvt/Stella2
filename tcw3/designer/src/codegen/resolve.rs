@@ -65,6 +65,44 @@ pub fn resolve_paths(
         alias_map: &'a HashMap<Ident, Vec<Alias>>,
     }
 
+    impl PathResolver<'_> {
+        fn validate_component_path(&mut self, path: &Path) {
+            let spans: Vec<_> = path
+                .segments
+                .iter()
+                .filter_map(|seg| {
+                    if seg.arguments.is_empty() {
+                        None
+                    } else {
+                        Some(seg.span())
+                    }
+                })
+                .collect();
+
+            if spans.is_empty() {
+                return;
+            }
+
+            let spans: Vec<_> = spans
+                .into_iter()
+                .filter_map(|span| span_to_codemap(span, self.codemap_file))
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect();
+
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "Component path may not include a path argument".to_string(),
+                code: None,
+                spans,
+            }]);
+        }
+    }
+
     impl syn::visit_mut::VisitMut for PathResolver<'_> {
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
@@ -230,6 +268,8 @@ pub fn resolve_paths(
                         .collect(),
                 }]);
             }
+
+            self.validate_component_path(path);
         }
 
         fn visit_func_mut(&mut self, _: &mut Func) {

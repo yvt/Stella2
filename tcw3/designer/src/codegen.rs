@@ -11,6 +11,7 @@ use std::{
 use crate::metadata::Crate;
 
 mod diag;
+mod metagen;
 mod parser;
 mod resolve;
 mod sem;
@@ -181,16 +182,13 @@ impl<'a> BuildScriptConfig<'a> {
             return Err(BuildError::Emitted);
         }
 
-        // TODO: Generate metadata (`Crate`) from `comps`
+        // Generate metadata (`Crate`) from `comps`
+        let meta = metagen::metagen_crate(&comps);
+
         // TODO: Analyze `comps` again using all the metadata we have
         // TODO: ... which allows us to handle `#[inject] const`
         // TODO: Now, generate `Crate` again
         // TODO: Generate implementation code
-
-        // Generate the metadata for this crate
-        let meta = Crate {
-            hello: "saluton".to_string(),
-        };
 
         let meta_bin = bincode::serialize(&meta).unwrap();
 

@@ -227,12 +227,7 @@ pub struct CompItemField {
     pub semi_token: Option<Token![;]>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum FieldType {
-    Prop,
-    Const,
-    Wire,
-}
+pub use crate::metadata::FieldType;
 
 impl Parse for CompItemField {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -332,11 +327,7 @@ pub enum FieldAccessor {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum FieldGetMode {
-    Borrow,
-    Clone,
-}
+pub use crate::metadata::FieldGetMode;
 
 pub enum FieldWatchMode {
     Event { event: Ident },
