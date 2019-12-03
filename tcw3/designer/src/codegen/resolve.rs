@@ -230,6 +230,8 @@ pub fn resolve_paths(
     }
 
     impl visit_mut::TcwdlVisitMut for PathResolver<'_> {
+        // clippy obviously can't read comments
+        #[allow(clippy::if_same_then_else)]
         fn visit_comp_mut(&mut self, i: &mut Comp) {
             visit_mut::visit_comp_mut(self, i);
 
@@ -243,7 +245,7 @@ pub fn resolve_paths(
                     if first == "crate" {
                         false
                     } else if first == "super" || first == "self" {
-                        // This is not supposed to be seen at this point and it's
+                        // This is not supposed to be seen at this point but it's
                         // already reported to the user by `visit_path_mut`
                         false
                     } else {
