@@ -3,6 +3,7 @@ use syn::spanned::Spanned;
 
 use super::{diag::Diag, parser, parser::span_to_codemap};
 
+#[derive(Debug, Clone)]
 pub struct Ident {
     pub sym: String,
     pub span: Option<codemap::Span>,

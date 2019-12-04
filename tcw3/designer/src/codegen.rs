@@ -1,4 +1,5 @@
 use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level};
+use quote::ToTokens;
 use std::{
     borrow::Cow,
     collections::HashSet,
@@ -11,6 +12,7 @@ use std::{
 use crate::metadata::Crate;
 
 mod diag;
+mod implgen;
 mod metagen;
 mod parser;
 mod resolve;
@@ -188,7 +190,16 @@ impl<'a> BuildScriptConfig<'a> {
         // TODO: Analyze `comps` again using all the metadata we have
         // TODO: ... which allows us to handle `#[inject] const`
         // TODO: Now, generate `Crate` again
-        // TODO: Generate implementation code
+
+        // Generate implementation code
+        let implgen_ctx = implgen::Ctx {
+            crates: vec![],                // TODO
+            crate_map: Default::default(), // TODO
+        };
+        let comp_code_chunks: Vec<_> = comps
+            .iter()
+            .map(|comp| (comp, implgen::gen_comp(comp, &implgen_ctx, &mut diag)))
+            .collect();
 
         // Remove `pub(in crate::...)`
         crate::metadata::visit_mut::visit_crate_mut(
@@ -217,8 +228,24 @@ impl<'a> BuildScriptConfig<'a> {
                 out_f,
                 "
                 #[macro_export]
-                macro_rules! designed_impl {{
-                    () => ();
+                macro_rules! designer_impl {{
+            "
+            )?;
+
+            for (comp, code_chunk) in comp_code_chunks {
+                writeln!(
+                    out_f,
+                    "
+                    ({path}) => {{ {chunk} }};
+                ",
+                    path = comp.path.to_token_stream(),
+                    chunk = code_chunk
+                )?;
+            }
+
+            writeln!(
+                out_f,
+                "
                 }}
             "
             )?;
