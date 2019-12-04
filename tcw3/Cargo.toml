@@ -29,6 +29,7 @@ ndarray = "0.13.0"
 log = "0.4"
 neo_linked_list = { path = "../support/neo_linked_list" }
 
+tcw3_designer_runtime = { path = "designer_runtime" }
 tcw3_images = { path = "images" }
 tcw3_pal = { path = "pal" }
 tcw3_testing = { path = "testing" }

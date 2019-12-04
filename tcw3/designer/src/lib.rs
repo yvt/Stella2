@@ -23,19 +23,19 @@
 //! ## Crate Metadata
 //!
 //! ```text
-//!                                                        tcw3_designer <-,
-//!                                                                        |
-//!  ,----------,     dep      ,---------------,  codegen  ,----------,    |
-//!  | upstream | -----------> | upstream_meta | <-------- | build.rs | -> |
-//!  '----------'              '---------------'           '----------'    |
-//!       ^                            ^                         build-dep |
-//!       |                            |       build-dep                   |
-//!       | dep                        '------------------------,          |
-//!       |                                                     |          |
-//!       |                                                     |          |
-//!  ,----------,     dep      ,---------------,  codegen  ,----------,    |
-//!  | applicat | -----------> | applicat_meta | <-------- | build.rs | ---'
-//!  '----------'              '---------------'           '----------'
+//! ,-> tcw3 -> tcw3_designer_runtime                    tcw3_designer <-,
+//! |                                                                    |
+//! |    ,----------,  dep   ,---------------,  codegen  ,----------,    |
+//! | <- | upstream | -----> | upstream_meta | <-------- | build.rs | -> |
+//! |    '----------'        '---------------'           '----------'    |
+//! |         ^                      ^                         build-dep |
+//! |         |                      |       build-dep                   |
+//! |         | dep                  '------------------------,          |
+//! |         |                                               |          |
+//! |         |                                               |          |
+//! |    ,----------,  dep   ,---------------,  codegen  ,----------,    |
+//! '--- | applicat | -----> | applicat_meta | <-------- | build.rs | ---'
+//!      '----------'        '---------------'           '----------'
 //! ```
 //!
 //! In order to enable the consumption of other crate's components, TCW3
@@ -113,7 +113,7 @@
 //! functions like `|obj.prop| expr` register automatically-generated event
 //! handlers for observing changes in the input values.
 //!
-//! The registration functions return `subscriber_list::UntypedSubscription`.
+//! The registration functions return `tcw3::designer_runtime::Sub`.
 //! They are automatically unsubscribed when `Component` is dropped.
 //!
 //! Event handlers maintain weak references to `ComponentShared`.

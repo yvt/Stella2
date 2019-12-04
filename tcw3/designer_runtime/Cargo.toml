@@ -1,0 +1,9 @@
+[package]
+name = "tcw3_designer_runtime"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+subscriber_list = { path = "../../support/subscriber_list" }
+

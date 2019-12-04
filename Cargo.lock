@@ -2160,6 +2160,7 @@ dependencies = [
  "structopt 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "subscriber_list 0.1.0",
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tcw3_designer_runtime 0.1.0",
  "tcw3_images 0.1.0",
  "tcw3_meta 0.1.0",
  "tcw3_pal 0.1.0",
@@ -2180,6 +2181,13 @@ dependencies = [
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tcw3_designer_runtime"
+version = "0.1.0"
+dependencies = [
+ "subscriber_list 0.1.0",
 ]
 
 [[package]]

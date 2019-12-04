@@ -7,6 +7,7 @@ members = [
     "stella2_assets",
     "tcw3",
     "tcw3/designer",
+    "tcw3/designer_runtime",
     "tcw3/testing",
     "tcw3/pal",
     "tcw3/images",

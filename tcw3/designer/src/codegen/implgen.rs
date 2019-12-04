@@ -13,7 +13,7 @@ mod paths {
     pub const CELL: &str = "::std::cell::Cell";
     pub const REF_CELL: &str = "::std::cell::RefCell";
     pub const FN: &str = "::std::ops::Fn";
-    pub const SUB_LIST: &str = "::subscriber_list::SubscriberList";
+    pub const SUB_LIST: &str = "::tcw3::designer_runtime::SubscriberList";
 }
 
 mod fields {
