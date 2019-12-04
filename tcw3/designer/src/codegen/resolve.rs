@@ -107,15 +107,15 @@ pub fn resolve_paths(
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
         fn visit_path_mut(&mut self, i: &mut Path) {
-            if is_path_rooted_or_crate(i) {
-                // The path is already rooted, no need to resolve
-                return;
-            }
-
             let mut applied_map_list: Vec<(&Ident, &Alias)> = Vec::new();
             let path_span = span_to_codemap(i.span(), self.codemap_file);
 
             loop {
+                if is_path_rooted_or_crate(i) {
+                    // The path is already rooted, no need to resolve
+                    return;
+                }
+
                 let root_ident = i.segments.first().unwrap().ident.to_string();
                 if root_ident == "super" {
                     let span = i.segments.first().unwrap().ident.span();
