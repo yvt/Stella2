@@ -57,7 +57,13 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
     // `struct ComponentType`
     // -------------------------------------------------------------------
     writeln!(out, "#![derive(Clone)]").unwrap();
-    writeln!(out, "pub struct {} {{", comp_ident).unwrap();
+    writeln!(
+        out,
+        "{vis} struct {comp} {{",
+        vis = comp.vis.to_token_stream(),
+        comp = comp_ident
+    )
+    .unwrap();
     writeln!(
         out,
         "    {field}: {rc}<{comp}Shared>,",
@@ -70,7 +76,7 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
 
     // `struct ComponentTypeShared`
     // -------------------------------------------------------------------
-    writeln!(out, "pub struct {}Shared {{", comp_ident).unwrap();
+    writeln!(out, "struct {}Shared {{", comp_ident).unwrap();
     writeln!(
         out,
         "    {field}: {cell}<{comp}State>,",
@@ -118,7 +124,7 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
 
     // `struct ComponentTypeState`
     // -------------------------------------------------------------------
-    writeln!(out, "pub struct {}State {{", comp_ident).unwrap();
+    writeln!(out, "struct {}State {{", comp_ident).unwrap();
     for item in comp.items.iter() {
         match item {
             sem::CompItemDef::Field(item) => match item.field_ty {
