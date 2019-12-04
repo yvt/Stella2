@@ -333,6 +333,26 @@ impl AnalyzeCtx<'_> {
             accessors = default_accessors;
         }
 
+        // `const` without a default value nor a setter is impossible to
+        // initialize
+        if item.field_ty == FieldType::Const && accessors.set.is_none() && item.dyn_expr.is_none() {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "`const` must have a default value or a setter \
+                          because otherwise it's impossible to initialize"
+                    .to_string(),
+                code: None,
+                spans: span_to_codemap(item.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+
         let ty = if let Some(ty) = item.ty.clone() {
             Some(ty)
         } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
