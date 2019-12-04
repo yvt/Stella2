@@ -16,6 +16,11 @@ mod paths {
     pub const SUB_LIST: &str = "::subscriber_list::SubscriberList";
 }
 
+mod fields {
+    pub const SHARED: &str = "shared";
+    pub const STATE: &str = "state";
+}
+
 pub struct Ctx {
     /// The list of loaded crates. `[0]` is always the current crate.
     pub crates: Vec<metadata::Crate>,
@@ -55,16 +60,25 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
     writeln!(out, "pub struct {} {{", comp_ident).unwrap();
     writeln!(
         out,
-        "    inner: {rc}<{comp}Inner>,",
+        "    {field}: {rc}<{comp}Shared>,",
+        field = fields::SHARED,
         rc = paths::RC,
         comp = comp_ident
     )
     .unwrap();
     writeln!(out, "}}").unwrap();
 
-    // `struct ComponentTypeInner`
+    // `struct ComponentTypeShared`
     // -------------------------------------------------------------------
-    writeln!(out, "pub struct {}Inner {{", comp_ident).unwrap();
+    writeln!(out, "pub struct {}Shared {{", comp_ident).unwrap();
+    writeln!(
+        out,
+        "    {field}: {cell}<{comp}State>,",
+        field = fields::STATE,
+        cell = paths::REF_CELL,
+        comp = comp_ident
+    )
+    .unwrap();
 
     for item in comp.items.iter() {
         match item {
@@ -73,14 +87,12 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
                     writeln!(
                         out,
                         "    {ident}: {ty},",
-                        ident = ConstInnerField(&item.ident.sym),
+                        ident = InnerValueField(&item.ident.sym),
                         ty = item.ty.to_token_stream()
                     )
                     .unwrap();
                 }
-                sem::FieldType::Wire => {
-                    // TODO
-                }
+                sem::FieldType::Wire => {}
                 sem::FieldType::Prop => {
                     // TODO
                 }
@@ -104,6 +116,29 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
 
     writeln!(out, "}}").unwrap();
 
+    // `struct ComponentTypeState`
+    // -------------------------------------------------------------------
+    writeln!(out, "pub struct {}State {{", comp_ident).unwrap();
+    for item in comp.items.iter() {
+        match item {
+            sem::CompItemDef::Field(item) => match item.field_ty {
+                sem::FieldType::Const => {}
+                sem::FieldType::Wire | sem::FieldType::Prop => {
+                    writeln!(
+                        out,
+                        "    {ident}: {ty},",
+                        ident = InnerValueField(&item.ident.sym),
+                        ty = item.ty.to_token_stream()
+                    )
+                    .unwrap();
+                }
+            },
+            sem::CompItemDef::Event(_) => {}
+            sem::CompItemDef::On(_) => {}
+        }
+    }
+    writeln!(out, "}}").unwrap();
+
     // TODO: builder and/or `new`
     // TODO: setters/getters/subscriptions
 
@@ -122,8 +157,8 @@ macro_rules! fn_fmt_write {
     };
 }
 
-struct ConstInnerField<T>(T);
-impl<T: fmt::Display> fmt::Display for ConstInnerField<T> {
+struct InnerValueField<T>(T);
+impl<T: fmt::Display> fmt::Display for InnerValueField<T> {
     fn_fmt_write! { |this| ("value_{}", this.0) }
 }
 
