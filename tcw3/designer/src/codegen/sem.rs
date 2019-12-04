@@ -150,6 +150,9 @@ pub struct Func {
 pub struct FuncInput {
     pub by_ref: bool,
     pub input: Input,
+    /// The identifier used to refer to the input value inside the function
+    /// body.
+    pub ident: Ident,
 }
 
 pub enum Trigger {
@@ -442,9 +445,19 @@ impl AnalyzeCtx<'_> {
     }
 
     fn analyze_func_input(&mut self, func: &parser::FuncInput) -> FuncInput {
+        let ident = if let Some((_, i)) = &func.rename {
+            Ident::from_syn(i, self.file)
+        } else {
+            // Use the last component as `ident`
+            match func.input.selectors.last().unwrap() {
+                parser::InputSelector::Field { ident, .. } => Ident::from_syn(ident, self.file),
+            }
+        };
+
         FuncInput {
             by_ref: func.by_ref.is_some(),
             input: self.analyze_input(&func.input),
+            ident,
         }
     }
 
@@ -545,6 +558,10 @@ impl AnalyzeCtx<'_> {
                         span: None,
                         sym: lifted_field_name.clone(),
                     }],
+                },
+                ident: Ident {
+                    span: None,
+                    sym: lifted_field_name.clone(),
                 },
             }],
             body: syn::Expr::Path(syn::ExprPath {

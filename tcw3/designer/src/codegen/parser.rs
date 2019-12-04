@@ -571,14 +571,24 @@ impl Parse for Trigger {
 pub struct FuncInput {
     pub by_ref: Option<Token![&]>,
     pub input: Box<Input>,
+    pub rename: Option<(Token![as], Ident)>,
 }
 
 impl Parse for FuncInput {
     fn parse(input: ParseStream) -> Result<Self> {
         let by_ref = input.parse().ok();
-        let input = input.parse()?;
+        let input_parsed = input.parse()?;
+        let rename = if input.peek(Token![as]) {
+            Some((input.parse()?, input.parse()?))
+        } else {
+            None
+        };
 
-        Ok(Self { by_ref, input })
+        Ok(Self {
+            by_ref,
+            input: input_parsed,
+            rename,
+        })
     }
 }
 

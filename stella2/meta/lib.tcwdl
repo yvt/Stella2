@@ -10,7 +10,7 @@ pub comp crate::TestWidget {
 
     on (init) |text| { dbg!(); }
 
-    on (text) |text| { dbg!(); }
+    on (text) |text as value| { dbg!(); }
 
     on (some_event) |this, event.wm| { dbg!(); }
 
