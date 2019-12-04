@@ -359,7 +359,7 @@ impl AnalyzeCtx<'_> {
             None
         };
 
-        if item.dyn_expr.is_none() && item.field_ty == parser::FieldType::Wire {
+        if item.dyn_expr.is_none() && item.field_ty != parser::FieldType::Const {
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
                 message: "A value is required for this field type".to_string(),
