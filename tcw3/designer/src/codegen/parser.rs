@@ -9,6 +9,8 @@ use syn::{
 
 use super::{diag::Diag, EmittedError};
 
+pub mod visit_mut;
+
 pub fn parse_file(
     file: &codemap::File,
     diag: &mut Diag,

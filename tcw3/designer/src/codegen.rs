@@ -17,7 +17,6 @@ mod metagen;
 mod parser;
 mod resolve;
 mod sem;
-mod visit_mut;
 
 /// Options for the code generator that generates a meta crate's contents.
 #[derive(Default)]

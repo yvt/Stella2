@@ -8,8 +8,7 @@ use syn::{
 
 use super::{
     diag::Diag,
-    parser::{span_to_codemap, Comp, File, Func, Item},
-    visit_mut,
+    parser::{span_to_codemap, visit_mut, Comp, File, Func, Item},
 };
 
 /// Replace all `Path`s in the given AST with absolute paths
