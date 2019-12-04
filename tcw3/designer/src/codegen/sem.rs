@@ -56,7 +56,8 @@ pub use self::parser::FieldType;
 pub use crate::metadata::FieldFlags;
 
 pub struct FieldAccessors {
-    /// Valid only for `prop`
+    /// Valid for `prop` and `const`. For `const`, it refers to a construction
+    /// parameter.
     pub set: Option<FieldSetter>,
     /// Valid for all field types
     pub get: Option<FieldGetter>,
@@ -67,7 +68,7 @@ pub struct FieldAccessors {
 impl FieldAccessors {
     fn default_const(vis: syn::Visibility) -> Self {
         Self {
-            set: None,
+            set: Some(FieldSetter { vis: vis.clone() }),
             get: Some(FieldGetter {
                 vis,
                 mode: FieldGetMode::Borrow,
@@ -290,7 +291,7 @@ impl AnalyzeCtx<'_> {
 
             // Deny accessors disallowed for the field type
             let deny_acc_ty: &[usize] = match item.field_ty {
-                FieldType::Const => &[0, 2],
+                FieldType::Const => &[2],
                 FieldType::Prop => &[],
                 FieldType::Wire => &[0],
             };

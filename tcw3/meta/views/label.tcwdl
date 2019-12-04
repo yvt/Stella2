@@ -8,6 +8,6 @@ pub comp crate::ui::views::Label {
 
     pub prop text: String { pub set; }
 
-    pub const view: HView;
-    pub const style_elem: HElem { pub get clone; }
+    pub const view: HView { pub get; } = || unreachable!();
+    pub const style_elem: HElem { pub get clone; } = || unreachable!();
 }
