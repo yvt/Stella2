@@ -2,7 +2,7 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use either::{Left, Right};
 use quote::ToTokens;
-use std::{collections::HashMap, fmt, fmt::Write};
+use std::{collections::HashMap, fmt, fmt::Write, iter::repeat};
 
 use super::{diag::Diag, sem};
 use crate::metadata;
@@ -16,6 +16,7 @@ mod paths {
     pub const REF_CELL: &str = "::std::cell::RefCell";
     pub const FN: &str = "::std::ops::Fn";
     pub const SUB_LIST: &str = "::tcw3::designer_runtime::SubscriberList";
+    pub const UNSET: &str = "::tcw3::designer_runtime::Unset";
 }
 
 mod fields {
@@ -166,6 +167,7 @@ pub fn gen_comp(
         ) => Some(field),
         _ => None,
     });
+    let num_non_optional_consts = non_optional_consts.clone().count();
 
     writeln!(
         out,
@@ -209,7 +211,46 @@ pub fn gen_comp(
     }
     writeln!(out, "}}").unwrap();
 
-    // TODO: `Builder::{new, build, with_*}`
+    // `ComponentBuilder::<Unset, ...>::new`
+    writeln!(
+        out,
+        "impl {comp}Builder{gen} {{",
+        comp = comp_ident,
+        gen = if non_optional_consts.clone().next().is_some() {
+            Left(format!(
+                "<{}>",
+                CommaSeparated(repeat(paths::UNSET).take(num_non_optional_consts))
+            ))
+        } else {
+            Right("")
+        }
+    )
+    .unwrap();
+    writeln!(out, "    {vis} fn new() -> Self {{", vis = builder_vis).unwrap();
+    writeln!(out, "        Self {{").unwrap();
+    for item in comp.items.iter() {
+        match item {
+            sem::CompItemDef::Field(item) if item.field_ty == sem::FieldType::Const => {
+                writeln!(
+                    out,
+                    "            {ident}: {ty},",
+                    ident = InnerValueField(&item.ident.sym),
+                    ty = if item.value.is_some() {
+                        "None"
+                    } else {
+                        paths::UNSET
+                    },
+                )
+                .unwrap();
+            }
+            _ => {}
+        }
+    }
+    writeln!(out, "        }}").unwrap();
+    writeln!(out, "    }}").unwrap();
+    writeln!(out, "}}").unwrap();
+
+    // TODO: `Builder::{build, with_*}`
 
     // TODO: setters/getters/subscriptions
 
