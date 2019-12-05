@@ -4,7 +4,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
 #[prototype_only]
 #[widget]
 pub comp crate::ui::views::Label {
-    pub const style_manager: &Manager;
+    pub const style_manager: &Manager { pub set; pub get; }
 
     // The initializers specified here are not actually used because
     // this component has `#[prototype_only]`. Without initializers, the consts

@@ -68,7 +68,7 @@ pub struct FieldAccessors {
 impl FieldAccessors {
     fn default_const(vis: syn::Visibility) -> Self {
         Self {
-            set: Some(FieldSetter { vis: vis.clone() }),
+            set: None,
             get: Some(FieldGetter {
                 vis,
                 mode: FieldGetMode::Borrow,
