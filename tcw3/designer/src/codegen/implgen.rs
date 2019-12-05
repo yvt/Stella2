@@ -6,8 +6,8 @@ use std::{collections::HashMap, fmt, fmt::Write};
 use super::{diag::Diag, sem};
 use crate::metadata;
 
-mod iterutils;
 mod buildergen;
+mod iterutils;
 
 /// Paths to standard library items.
 mod paths {
@@ -70,30 +70,30 @@ pub fn gen_comp(
     writeln!(out, "#![derive(Clone)]").unwrap();
     writeln!(
         out,
-        "{vis} struct {comp} {{",
+        "{vis} struct {ty} {{",
         vis = comp.vis.to_token_stream(),
-        comp = comp_ident
+        ty = CompTy(comp_ident)
     )
     .unwrap();
     writeln!(
         out,
-        "    {field}: {rc}<{comp}Shared>,",
+        "    {field}: {rc}<{ty}>,",
         field = fields::SHARED,
         rc = paths::RC,
-        comp = comp_ident
+        ty = CompSharedTy(comp_ident)
     )
     .unwrap();
     writeln!(out, "}}").unwrap();
 
     // `struct ComponentTypeShared`
     // -------------------------------------------------------------------
-    writeln!(out, "struct {}Shared {{", comp_ident).unwrap();
+    writeln!(out, "struct {} {{", CompSharedTy(comp_ident)).unwrap();
     writeln!(
         out,
-        "    {field}: {cell}<{comp}State>,",
+        "    {field}: {cell}<{ty}>,",
         field = fields::STATE,
         cell = paths::REF_CELL,
-        comp = comp_ident
+        ty = CompStateTy(comp_ident)
     )
     .unwrap();
 
@@ -135,7 +135,7 @@ pub fn gen_comp(
 
     // `struct ComponentTypeState`
     // -------------------------------------------------------------------
-    writeln!(out, "struct {}State {{", comp_ident).unwrap();
+    writeln!(out, "struct {} {{", CompStateTy(comp_ident)).unwrap();
     for item in comp.items.iter() {
         match item {
             sem::CompItemDef::Field(item) => match item.field_ty {
@@ -180,6 +180,26 @@ macro_rules! fn_fmt_write {
 struct Angle<T>(T);
 impl<T: fmt::Display> fmt::Display for Angle<T> {
     fn_fmt_write! { |this| ("<{}>", this.0) }
+}
+
+struct CompTy<T>(T);
+impl<T: fmt::Display> fmt::Display for CompTy<T> {
+    fn_fmt_write! { |this| ("{}", this.0) }
+}
+
+struct CompSharedTy<T>(T);
+impl<T: fmt::Display> fmt::Display for CompSharedTy<T> {
+    fn_fmt_write! { |this| ("{}Shared", this.0) }
+}
+
+struct CompStateTy<T>(T);
+impl<T: fmt::Display> fmt::Display for CompStateTy<T> {
+    fn_fmt_write! { |this| ("{}State", this.0) }
+}
+
+struct CompBuilderTy<T>(T);
+impl<T: fmt::Display> fmt::Display for CompBuilderTy<T> {
+    fn_fmt_write! { |this| ("{}Builder", this.0) }
 }
 
 #[derive(Clone)]

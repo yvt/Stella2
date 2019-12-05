@@ -4,7 +4,7 @@ use std::{fmt::Write, iter::repeat};
 
 use super::super::{diag::Diag, sem};
 use super::{
-    iterutils::Iterutils, paths, Angle, CommaSeparated, FactoryGenParamNameForField,
+    iterutils::Iterutils, paths, Angle, CommaSeparated, CompBuilderTy, FactoryGenParamNameForField,
     FactorySetterForField, InnerValueField,
 };
 use crate::metadata;
@@ -48,9 +48,9 @@ pub fn gen_builder(
 
     writeln!(
         out,
-        "{vis} struct {comp}Builder{gen} {{",
+        "{vis} struct {ty}{gen} {{",
         vis = builder_vis,
-        comp = comp_ident,
+        ty = CompBuilderTy(comp_ident),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
@@ -114,8 +114,8 @@ pub fn gen_builder(
     // -------------------------------------------------------------------
     writeln!(
         out,
-        "impl{gen} {comp}Builder{gen} {{",
-        comp = comp_ident,
+        "impl{gen} {ty}{gen} {{",
+        ty = CompBuilderTy(comp_ident),
         gen = if non_optional_consts.clone().next().is_some() {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
@@ -148,8 +148,8 @@ pub fn gen_builder(
     for (i, field) in non_optional_consts.clone().enumerate() {
         // They each change one type parameter of `ComponentBuilder`
         let new_builder_ty = format!(
-            "{comp}Builder<{gen}>",
-            comp = comp_ident,
+            "{ident}<{gen}>",
+            ident = CompBuilderTy(comp_ident),
             gen = CommaSeparated(
                 builder_ty_params
                     .clone()
