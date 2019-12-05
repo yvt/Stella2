@@ -1,5 +1,6 @@
 //! Implementation code generation
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use either::{Left, Right};
 use quote::ToTokens;
 use std::{collections::HashMap, fmt, fmt::Write};
 
@@ -9,6 +10,7 @@ use crate::metadata;
 /// Paths to standard library items.
 mod paths {
     pub const BOX: &str = "::std::boxed::Box";
+    pub const OPTION: &str = "::std::option::Option";
     pub const RC: &str = "::std::rc::Rc";
     pub const CELL: &str = "::std::cell::Cell";
     pub const REF_CELL: &str = "::std::cell::RefCell";
@@ -29,7 +31,12 @@ pub struct Ctx {
     pub crate_map: HashMap<String, usize>,
 }
 
-pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String {
+pub fn gen_comp(
+    comp: &sem::CompDef<'_>,
+    meta_comp: &metadata::CompDef,
+    _ctx: &Ctx,
+    diag: &mut Diag,
+) -> String {
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {
         return r#"compile_error!(
             "`designer_impl!` can't generate code because the component is defined with #[prototype_only]"
@@ -145,7 +152,65 @@ pub fn gen_comp(comp: &sem::CompDef<'_>, _ctx: &Ctx, diag: &mut Diag) -> String 
     }
     writeln!(out, "}}").unwrap();
 
-    // TODO: builder and/or `new`
+    // `struct ComponentTypeBuilder`
+    // -------------------------------------------------------------------
+    let builder_vis = meta_comp.builder_vis();
+
+    let non_optional_consts = comp.items.iter().filter_map(|item| match item {
+        sem::CompItemDef::Field(
+            field @ sem::FieldDef {
+                field_ty: sem::FieldType::Const,
+                value: None, // non-optional
+                ..
+            },
+        ) => Some(field),
+        _ => None,
+    });
+
+    writeln!(
+        out,
+        "{vis} struct {comp}Builder{gen} {{",
+        vis = builder_vis,
+        comp = comp_ident,
+        gen = if non_optional_consts.clone().next().is_some() {
+            Left(format!(
+                "<{}>",
+                CommaSeparated(
+                    non_optional_consts
+                        .clone()
+                        .map(|field| FactoryGenParamNameForField(&field.ident.sym))
+                )
+            ))
+        } else {
+            Right("")
+        }
+    )
+    .unwrap();
+    for item in comp.items.iter() {
+        match item {
+            sem::CompItemDef::Field(item) if item.field_ty == sem::FieldType::Const => {
+                writeln!(
+                    out,
+                    "    {ident}: {ty},",
+                    ident = InnerValueField(&item.ident.sym),
+                    ty = if item.value.is_some() {
+                        // optional
+                        Left(format!("{}<{}>", paths::OPTION, item.ty.to_token_stream()))
+                    } else {
+                        // non-optional - use a generics-based trick to enforce
+                        //                initialization
+                        Right(FactoryGenParamNameForField(&item.ident.sym))
+                    },
+                )
+                .unwrap();
+            }
+            _ => {}
+        }
+    }
+    writeln!(out, "}}").unwrap();
+
+    // TODO: `Builder::{new, build, with_*}`
+
     // TODO: setters/getters/subscriptions
 
     out
@@ -161,6 +226,11 @@ macro_rules! fn_fmt_write {
             write!(f, $($fmt)*)
         }
     };
+}
+
+struct FactoryGenParamNameForField<T>(T);
+impl<T: fmt::Display> fmt::Display for FactoryGenParamNameForField<T> {
+    fn_fmt_write! { |this| ("T_{}", this.0) }
 }
 
 struct InnerValueField<T>(T);

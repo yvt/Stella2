@@ -64,10 +64,15 @@
 //!
 //! ## Component Types
 //!
-//! For a `pub` component named `Component`, the following three types are
+//! For a `pub` component named `Component`, the following four types are
 //! defined (they are inserted to a source file by `designer_impl` macro):
 //!
 //! ```rust,no_compile
+//! pub struct ComponentBuilder<T_mandatory_attr> {
+//!     mandatory_attr: T_mandatory_attr,
+//!     optional_attr: Option<u32>,
+//! }
+//!
 //! pub struct Component {
 //!     shared: Rc<ComponentShared>,
 //! }
@@ -84,6 +89,27 @@
 //!     value_wire1: u32,
 //!     /* ...*/
 //! }
+//! ```
+//!
+//! ## Builder Types
+//!
+//! `ComponentBuilder` implements a moving builder pattern (where methods take
+//! `Self` and return a modified instance, destroying the original one). It
+//! uses a generics-based trick to ensure that the mandatory parameters are
+//! properly set at compile-time.
+//!
+//! ```rust,no_compile
+//! use tcw3::designer_runtime::Unset;
+//!
+//! pub struct ComponentBuilder<T_mandatory_attr> {
+//!     mandatory_attr: T_mandatory_attr,
+//! }
+//!
+//! // `Unset` represents those "holes"
+//! impl ComponentBuilder<Unset> { pub fn new() -> Self { /* ... */ } }
+//!
+//! // `build` appears only if these holes are filled
+//! impl ComponentBuilder<u32> { pub fn build() -> Component { /* ... */ } }
 //! ```
 //!
 //! ## Component Initialization

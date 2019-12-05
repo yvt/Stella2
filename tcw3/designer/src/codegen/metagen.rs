@@ -84,9 +84,15 @@ fn gen_path(path: &syn::Path) -> metadata::Path {
 }
 
 fn gen_field(field: &sem::FieldDef<'_>) -> metadata::FieldDef {
+    let mut flags = field.flags;
+
+    if field.field_ty == metadata::FieldType::Const && field.value.is_some() {
+        flags |= metadata::FieldFlags::OPTIONAL;
+    }
+
     metadata::FieldDef {
         field_ty: field.field_ty,
-        flags: field.flags,
+        flags,
         ident: gen_sem_ident(&field.ident),
         accessors: metadata::FieldAccessors {
             set: field.accessors.set.as_ref().map(|a| metadata::FieldSetter {

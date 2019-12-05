@@ -198,7 +198,13 @@ impl<'a> BuildScriptConfig<'a> {
         };
         let comp_code_chunks: Vec<_> = comps
             .iter()
-            .map(|comp| (comp, implgen::gen_comp(comp, &implgen_ctx, &mut diag)))
+            .zip(meta.comps.iter())
+            .map(|(comp, meta_comp)| {
+                (
+                    comp,
+                    implgen::gen_comp(comp, meta_comp, &implgen_ctx, &mut diag),
+                )
+            })
             .collect();
 
         // Remove `pub(in crate::...)`
