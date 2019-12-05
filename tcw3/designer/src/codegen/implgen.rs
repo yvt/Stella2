@@ -157,57 +157,53 @@ pub fn gen_comp(
     // -------------------------------------------------------------------
     let builder_vis = meta_comp.builder_vis();
 
-    let non_optional_consts = comp.items.iter().filter_map(|item| match item {
+    let settable_consts = comp.items.iter().filter_map(|item| match item {
         sem::CompItemDef::Field(
             field @ sem::FieldDef {
                 field_ty: sem::FieldType::Const,
-                value: None, // non-optional
+                accessors: sem::FieldAccessors { set: Some(_), .. },
                 ..
             },
         ) => Some(field),
         _ => None,
     });
+    let non_optional_consts = settable_consts
+        .clone()
+        .filter(|field| field.value.is_none());
     let num_non_optional_consts = non_optional_consts.clone().count();
+
+    // `T_field1`, `T_field2`, ...
+    let builder_ty_params = non_optional_consts
+        .clone()
+        .map(|field| FactoryGenParamNameForField(&field.ident.sym));
 
     writeln!(
         out,
         "{vis} struct {comp}Builder{gen} {{",
         vis = builder_vis,
         comp = comp_ident,
-        gen = if non_optional_consts.clone().next().is_some() {
-            Left(format!(
-                "<{}>",
-                CommaSeparated(
-                    non_optional_consts
-                        .clone()
-                        .map(|field| FactoryGenParamNameForField(&field.ident.sym))
-                )
-            ))
+        gen = if num_non_optional_consts != 0 {
+            Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
             Right("")
         }
     )
     .unwrap();
-    for item in comp.items.iter() {
-        match item {
-            sem::CompItemDef::Field(item) if item.field_ty == sem::FieldType::Const => {
-                writeln!(
-                    out,
-                    "    {ident}: {ty},",
-                    ident = InnerValueField(&item.ident.sym),
-                    ty = if item.value.is_some() {
-                        // optional
-                        Left(format!("{}<{}>", paths::OPTION, item.ty.to_token_stream()))
-                    } else {
-                        // non-optional - use a generics-based trick to enforce
-                        //                initialization
-                        Right(FactoryGenParamNameForField(&item.ident.sym))
-                    },
-                )
-                .unwrap();
-            }
-            _ => {}
-        }
+    for field in settable_consts.clone() {
+        writeln!(
+            out,
+            "    {ident}: {ty},",
+            ident = InnerValueField(&field.ident.sym),
+            ty = if field.value.is_some() {
+                // optional
+                Left(format!("{}<{}>", paths::OPTION, field.ty.to_token_stream()))
+            } else {
+                // non-optional - use a generics-based trick to enforce
+                //                initialization
+                Right(FactoryGenParamNameForField(&field.ident.sym))
+            },
+        )
+        .unwrap();
     }
     writeln!(out, "}}").unwrap();
 
@@ -216,11 +212,10 @@ pub fn gen_comp(
         out,
         "impl {comp}Builder{gen} {{",
         comp = comp_ident,
-        gen = if non_optional_consts.clone().next().is_some() {
-            Left(format!(
-                "<{}>",
-                CommaSeparated(repeat(paths::UNSET).take(num_non_optional_consts))
-            ))
+        gen = if num_non_optional_consts != 0 {
+            Left(Angle(CommaSeparated(
+                repeat(paths::UNSET).take(num_non_optional_consts),
+            )))
         } else {
             Right("")
         }
@@ -228,23 +223,18 @@ pub fn gen_comp(
     .unwrap();
     writeln!(out, "    {vis} fn new() -> Self {{", vis = builder_vis).unwrap();
     writeln!(out, "        Self {{").unwrap();
-    for item in comp.items.iter() {
-        match item {
-            sem::CompItemDef::Field(item) if item.field_ty == sem::FieldType::Const => {
-                writeln!(
-                    out,
-                    "            {ident}: {ty},",
-                    ident = InnerValueField(&item.ident.sym),
-                    ty = if item.value.is_some() {
-                        "None"
-                    } else {
-                        paths::UNSET
-                    },
-                )
-                .unwrap();
-            }
-            _ => {}
-        }
+    for field in settable_consts.clone() {
+        writeln!(
+            out,
+            "            {ident}: {ty},",
+            ident = InnerValueField(&field.ident.sym),
+            ty = if field.value.is_some() {
+                "None"
+            } else {
+                paths::UNSET
+            },
+        )
+        .unwrap();
     }
     writeln!(out, "        }}").unwrap();
     writeln!(out, "    }}").unwrap();
@@ -267,6 +257,11 @@ macro_rules! fn_fmt_write {
             write!(f, $($fmt)*)
         }
     };
+}
+
+struct Angle<T>(T);
+impl<T: fmt::Display> fmt::Display for Angle<T> {
+    fn_fmt_write! { |this| ("<{}>", this.0) }
 }
 
 struct FactoryGenParamNameForField<T>(T);
