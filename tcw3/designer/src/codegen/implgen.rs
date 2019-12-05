@@ -7,10 +7,14 @@ use std::{collections::HashMap, fmt, fmt::Write, iter::repeat};
 use super::{diag::Diag, sem};
 use crate::metadata;
 
+mod iterutils;
+use self::iterutils::Iterutils;
+
 /// Paths to standard library items.
 mod paths {
     pub const BOX: &str = "::std::boxed::Box";
     pub const OPTION: &str = "::std::option::Option";
+    pub const SOME: &str = "::std::option::Option::Some";
     pub const RC: &str = "::std::rc::Rc";
     pub const CELL: &str = "::std::cell::Cell";
     pub const REF_CELL: &str = "::std::cell::RefCell";
@@ -167,6 +171,9 @@ pub fn gen_comp(
         ) => Some(field),
         _ => None,
     });
+    let optional_consts = settable_consts
+        .clone()
+        .filter(|field| field.value.is_some());
     let non_optional_consts = settable_consts
         .clone()
         .filter(|field| field.value.is_none());
@@ -240,7 +247,90 @@ pub fn gen_comp(
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
 
-    // TODO: `Builder::{build, with_*}`
+    // `ComponentBuilder::{with_*}`
+    writeln!(
+        out,
+        "impl{gen} {comp}Builder{gen} {{",
+        comp = comp_ident,
+        gen = if non_optional_consts.clone().next().is_some() {
+            Left(Angle(CommaSeparated(builder_ty_params.clone())))
+        } else {
+            Right("")
+        }
+    )
+    .unwrap();
+
+    for field in optional_consts.clone() {
+        // They just assign a new value to `Option<T>`
+        writeln!(
+            out,
+            "    {vis} fn {method}(self, {ident}: {ty}) -> Self {{",
+            vis = field.vis.to_token_stream(),
+            method = FactorySetterForField(&field.ident.sym),
+            ident = field.ident.sym,
+            ty = field.ty.to_token_stream(),
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "        Self {{ {ident}: {some}({ident}), ..self }}",
+            some = paths::SOME,
+            ident = field.ident.sym,
+        )
+        .unwrap();
+        writeln!(out, "    }}",).unwrap();
+    }
+
+    for (i, field) in non_optional_consts.clone().enumerate() {
+        // They each change one type parameter of `ComponentBuilder`
+        let new_builder_ty = format!(
+            "{comp}Builder<{gen}>",
+            comp = comp_ident,
+            gen = CommaSeparated(
+                builder_ty_params
+                    .clone()
+                    .map(Left)
+                    .replace_at(i, Right(field.ty.to_token_stream()))
+            )
+        );
+        writeln!(
+            out,
+            "    {vis} fn {method}(self, {ident}: {ty}) -> {new_bldr_ty} {{",
+            vis = field.vis.to_token_stream(),
+            method = FactorySetterForField(&field.ident.sym),
+            ident = field.ident.sym,
+            ty = field.ty.to_token_stream(),
+            new_bldr_ty = new_builder_ty,
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "        {comp}Builder {{ {fields} }}",
+            comp = comp_ident,
+            fields = CommaSeparated(settable_consts.clone().map(|field2| {
+                if field2.ident.sym == field.ident.sym {
+                    // Replace with the new value
+                    format!(
+                        "{}: {}",
+                        InnerValueField(&field2.ident.sym),
+                        field2.ident.sym
+                    )
+                } else {
+                    // Use the old value
+                    format!(
+                        "{}: self.{}",
+                        InnerValueField(&field2.ident.sym),
+                        field2.ident.sym
+                    )
+                }
+            }))
+        )
+        .unwrap();
+        writeln!(out, "    }}",).unwrap();
+    }
+    writeln!(out, "}}").unwrap();
+
+    // TODO: `Builder::build`
 
     // TODO: setters/getters/subscriptions
 
@@ -264,9 +354,15 @@ impl<T: fmt::Display> fmt::Display for Angle<T> {
     fn_fmt_write! { |this| ("<{}>", this.0) }
 }
 
+#[derive(Clone)]
 struct FactoryGenParamNameForField<T>(T);
 impl<T: fmt::Display> fmt::Display for FactoryGenParamNameForField<T> {
     fn_fmt_write! { |this| ("T_{}", this.0) }
+}
+
+struct FactorySetterForField<T>(T);
+impl<T: fmt::Display> fmt::Display for FactorySetterForField<T> {
+    fn_fmt_write! { |this| ("with_{}", this.0) }
 }
 
 struct InnerValueField<T>(T);
