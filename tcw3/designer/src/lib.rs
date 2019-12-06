@@ -18,6 +18,55 @@
 //!
 //! TODO - please see `tcw3_meta`.
 //!
+//! # Language Reference
+//!
+//! TODO
+//!
+//! ## Inputs
+//!
+//! *Inputs* (e.g., `this.prop` in `wire foo = |&this.prop| *prop + 42`)
+//! represent a value used as an input to calculation as well as specifying
+//! the trigger of an event handler. They are defined recursively as follows:
+//!
+//!  - `ϕ` is de-sugared into `this.ϕ` if it does not start with `this.` or
+//!    `event.`.
+//!  - `this` is an input.
+//!  - `this.item` is an input if the enclosing component (the surrounding
+//!    `comp` block) has a field or event named `field`.
+//!  - If `ϕ` is an input representing a `const`¹ field, the field
+//!    stores a component, and the said component has a field or event named
+//!    `item`, then `ϕ.item` is an input.
+//!  - `event.param` is an input if the input is specified in the handler
+//!    function of an `on` item (i.e., in `on (x) |y| { ... }`, `y` meets this
+//!    condition but `x` does not), the trigger input (i.e., `x` in the previous
+//!    example) only contains inputs representing one or more events, and all of
+//!    the said events have a parameter named `param`.
+//!
+//! ¹ This restriction may be lifted in the future.
+//!
+//! Inputs appear in various positions with varying roles, which impose
+//! restrictions on the kinds of the inputs' referents:
+//!
+//! | Position              | Role     |
+//! | --------------------- | -------- |
+//! | `on` trigger          | Trigger  |
+//! | `on` handler function | Sampled  |
+//! | `const`               | Static   |
+//! | `prop`                | Static   |
+//! | `wire`                | Reactive |
+//! | obj-init → `const`    | Static   |
+//! | obj-init → `prop`     | Reactive |
+//!
+//! - The role is **Reactive** or **Trigger**, the input must be watchable. That
+//!   is, the referent must be one of the following:
+//!     - A `const` field.
+//!     - A `prop` or `wire` field in a component other than the enclosing
+//!       component, having a `watch` accessor visible to the enclosing
+//!       component.
+//!     - Any field of the enclosing component.
+//!     - An `event` item.
+//! - The role is **Static**, the referent must be a `const` field.
+//!
 //! # Implementation Details
 //!
 //! ## Crate Metadata
@@ -122,16 +171,13 @@
 //! A dependency graph is constructed. Each node represents one of the
 //! following: (1) A field having a value, which is either an object
 //! initialization literal `OtherComp { ... }` or a function `|dep| expr`.
-//! (2) A `const` field in an object initialization literal in `Component`.
+//! (2) A `const` or `prop` field in an object initialization literal in
+//! `Component`.
 //! A topological order is found and the values are evaluated according to that.
 //! Note that because none of the component's structs are available at this
 //! point, **`this` cannot be used as an input to any of the fields** involved
 //! here. Obviously, fields that are not initialized at this point cannot be
 //! used as an input.
-//!
-//! **Props** —
-//! The initial values of `prop` fields in object initialization literals are
-//! initialized in a topological order found in a similar way.
 //!
 //! **Events** —
 //! Event handlers are hooked up to child objects. `on (obj.event)` and
