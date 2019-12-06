@@ -43,9 +43,8 @@ pub struct FieldDef<'a> {
     /// an error.
     pub ty: Option<syn::Type>,
     pub accessors: FieldAccessors,
-    /// - Can be `None` unless `field_ty` is `Wire`. For `Const`, `None` means
-    ///   the value must be supplied via the constructor, and for `Prop` it
-    ///   means it's initialized by `Default::default()`.
+    /// - Can be `None` unless `field_ty` is `Wire`. `None` means
+    ///   the value must be supplied via the constructor.
     /// - Can be `Some(ObjInit(_))` only if `field_ty` is `Const`.
     pub value: Option<DynExpr>,
     pub syn: Option<&'a parser::CompItemField>,
@@ -333,12 +332,12 @@ impl AnalyzeCtx<'_> {
             accessors = default_accessors;
         }
 
-        // `const` without a default value nor a setter is impossible to
-        // initialize
-        if item.field_ty == FieldType::Const && accessors.set.is_none() && item.dyn_expr.is_none() {
+        // `const` and `prop` without a default value nor a setter are impossible
+        // to initialize
+        if item.field_ty != FieldType::Wire && accessors.set.is_none() && item.dyn_expr.is_none() {
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
-                message: "`const` must have a default value or a setter \
+                message: "Must have a default value or a setter \
                           because otherwise it's impossible to initialize"
                     .to_string(),
                 code: None,
@@ -379,7 +378,7 @@ impl AnalyzeCtx<'_> {
             None
         };
 
-        if item.dyn_expr.is_none() && item.field_ty != parser::FieldType::Const {
+        if item.dyn_expr.is_none() && item.field_ty == parser::FieldType::Wire {
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
                 message: "A value is required for this field type".to_string(),
