@@ -18,31 +18,33 @@ pub fn gen_builder(
 ) {
     let builder_vis = meta_comp.builder_vis();
 
-    let settable_consts = comp.items.iter().filter_map(|item| match item {
+    let settable_fields = comp.items.iter().filter_map(|item| match item {
         sem::CompItemDef::Field(
             field @ sem::FieldDef {
-                field_ty: sem::FieldType::Const,
                 accessors: sem::FieldAccessors { set: Some(_), .. },
                 ..
             },
-        ) => Some(field),
+        ) => {
+            assert!(field.field_ty != sem::FieldType::Wire);
+            Some(field)
+        }
         _ => None,
     });
-    let optional_consts = settable_consts
+    let optional_fields = settable_fields
         .clone()
         .filter(|field| field.value.is_some());
-    let non_optional_consts = settable_consts
+    let non_optional_fields = settable_fields
         .clone()
         .filter(|field| field.value.is_none());
-    let num_non_optional_consts = non_optional_consts.clone().count();
+    let num_non_optional_consts = non_optional_fields.clone().count();
 
     // `T_field1`, `T_field2`, ...
-    let builder_ty_params = non_optional_consts
+    let builder_ty_params = non_optional_fields
         .clone()
         .map(|field| FactoryGenParamNameForField(&field.ident.sym));
 
     // `u32`, `HView`, ...
-    let builder_complete_ty_params = non_optional_consts
+    let builder_complete_ty_params = non_optional_fields
         .clone()
         .map(|field| field.ty.to_token_stream());
 
@@ -58,7 +60,7 @@ pub fn gen_builder(
         }
     )
     .unwrap();
-    for field in settable_consts.clone() {
+    for field in settable_fields.clone() {
         writeln!(
             out,
             "    {ident}: {ty},",
@@ -93,7 +95,7 @@ pub fn gen_builder(
     .unwrap();
     writeln!(out, "    {vis} fn new() -> Self {{", vis = builder_vis).unwrap();
     writeln!(out, "        Self {{").unwrap();
-    for field in settable_consts.clone() {
+    for field in settable_fields.clone() {
         writeln!(
             out,
             "            {ident}: {ty},",
@@ -116,7 +118,7 @@ pub fn gen_builder(
         out,
         "impl{gen} {ty}{gen} {{",
         ty = CompBuilderTy(comp_ident),
-        gen = if non_optional_consts.clone().next().is_some() {
+        gen = if non_optional_fields.clone().next().is_some() {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
             Right("")
@@ -124,7 +126,7 @@ pub fn gen_builder(
     )
     .unwrap();
 
-    for field in optional_consts.clone() {
+    for field in optional_fields.clone() {
         // They just assign a new value to `Option<T>`
         writeln!(
             out,
@@ -145,7 +147,7 @@ pub fn gen_builder(
         writeln!(out, "    }}",).unwrap();
     }
 
-    for (i, field) in non_optional_consts.clone().enumerate() {
+    for (i, field) in non_optional_fields.clone().enumerate() {
         // They each change one type parameter of `ComponentBuilder`
         let new_builder_ty = format!(
             "{ident}<{gen}>",
@@ -171,7 +173,7 @@ pub fn gen_builder(
             out,
             "        {comp}Builder {{ {fields} }}",
             comp = comp_ident,
-            fields = CommaSeparated(settable_consts.clone().map(|field2| {
+            fields = CommaSeparated(settable_fields.clone().map(|field2| {
                 if field2.ident.sym == field.ident.sym {
                     // Replace with the new value
                     format!(
