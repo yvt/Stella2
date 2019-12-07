@@ -168,6 +168,8 @@ pub struct Input {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputOrigin {
     This,
+    /// An event parameter. In this case, `Input::selectors` must contain
+    /// exactly one item.
     Event,
 }
 
@@ -496,7 +498,38 @@ impl AnalyzeCtx<'_> {
             InputOrigin::This
         } else if selectors[0].is_field_with_ident("event") {
             // e.g., `event.mouse_position`
-            selectors = &selectors[1..];
+
+            if selectors.len() == 0 {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Parameter name must be specified (e.g., `event.wm`)".to_string(),
+                    code: None,
+                    spans: span_to_codemap(input.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            } else if selectors.len() > 2 {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Can't specify subfields of an event parameter".to_string(),
+                    code: None,
+                    spans: span_to_codemap(selectors[2].span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
+
+            selectors = &selectors[1..2];
             InputOrigin::Event
         } else {
             // The origin can be elided like `prop1`
