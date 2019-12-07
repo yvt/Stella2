@@ -156,13 +156,22 @@ pub struct FuncInput {
 }
 
 pub enum Trigger {
-    Init,
+    Init(InitTrigger),
     Input(Input),
+}
+
+pub struct InitTrigger {
+    pub span: Option<codemap::Span>,
 }
 
 pub struct Input {
     pub origin: InputOrigin,
     pub selectors: Vec<Ident>,
+    pub span: Option<codemap::Span>,
+
+    /// A sequence number that is unique within `CompDef`. Used by `implgen`
+    /// to attach analysis results.
+    pub index: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,12 +201,19 @@ pub fn analyze_comp<'a>(
     file: &codemap::File,
     diag: &mut Diag,
 ) -> CompDef<'a> {
-    AnalyzeCtx { file, diag }.analyze_comp(comp)
+    AnalyzeCtx {
+        file,
+        diag,
+        next_input_index: 0,
+    }
+    .analyze_comp(comp)
 }
 
 struct AnalyzeCtx<'a> {
     file: &'a codemap::File,
     diag: &'a mut Diag,
+
+    next_input_index: usize,
 }
 
 impl AnalyzeCtx<'_> {
@@ -456,6 +472,7 @@ impl AnalyzeCtx<'_> {
     }
 
     fn analyze_func(&mut self, func: &parser::Func) -> Func {
+        // TODO: Check `FuncInput::rename` collision
         Func {
             inputs: func
                 .inputs
@@ -485,7 +502,9 @@ impl AnalyzeCtx<'_> {
 
     fn analyze_trigger(&mut self, tr: &parser::Trigger) -> Trigger {
         match tr {
-            parser::Trigger::Init(_) => Trigger::Init,
+            parser::Trigger::Init(i) => Trigger::Init(InitTrigger {
+                span: span_to_codemap(i.span(), self.file),
+            }),
             parser::Trigger::Input(i) => Trigger::Input(self.analyze_input(i)),
         }
     }
@@ -544,6 +563,8 @@ impl AnalyzeCtx<'_> {
                     parser::InputSelector::Field { ident, .. } => Ident::from_syn(ident, self.file),
                 })
                 .collect(),
+            index: self.get_next_input_index(),
+            span: span_to_codemap(input.span(), self.file),
         }
     }
 
@@ -611,6 +632,8 @@ impl AnalyzeCtx<'_> {
                         span: None,
                         sym: lifted_field_name.clone(),
                     }],
+                    index: self.get_next_input_index(),
+                    span: None,
                 },
                 ident: Ident {
                     span: None,
@@ -623,5 +646,11 @@ impl AnalyzeCtx<'_> {
                 path: syn::Ident::new(&lifted_field_name, proc_macro2::Span::call_site()).into(),
             }),
         }
+    }
+
+    fn get_next_input_index(&mut self) -> usize {
+        let ret = self.next_input_index;
+        self.next_input_index += 1;
+        ret
     }
 }

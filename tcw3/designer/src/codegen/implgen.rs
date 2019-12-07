@@ -6,6 +6,7 @@ use std::{collections::HashMap, fmt, fmt::Write};
 use super::{diag::Diag, sem};
 use crate::metadata;
 
+mod analysis;
 mod buildergen;
 mod iterutils;
 
@@ -38,7 +39,7 @@ pub struct Ctx {
 pub fn gen_comp(
     comp: &sem::CompDef<'_>,
     meta_comp: &metadata::CompDef,
-    _ctx: &Ctx,
+    ctx: &Ctx,
     diag: &mut Diag,
 ) -> String {
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {
@@ -64,6 +65,9 @@ pub fn gen_comp(
             }),
         diag,
     );
+
+    // Analyze input references
+    let _analysis = analysis::Analysis::new(comp, meta_comp, ctx, diag);
 
     // `struct ComponentType`
     // -------------------------------------------------------------------

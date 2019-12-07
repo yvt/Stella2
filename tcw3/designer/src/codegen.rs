@@ -185,20 +185,20 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Generate metadata (`Crate`) from `comps`
-        let mut meta = metagen::gen_crate(&comps);
+        let meta = metagen::gen_crate(&comps);
 
         // TODO: Analyze `comps` again using all the metadata we have
         // TODO: ... which allows us to handle `#[inject] const`
         // TODO: Now, generate `Crate` again
 
         // Generate implementation code
-        let implgen_ctx = implgen::Ctx {
-            crates: vec![],                // TODO
+        let mut implgen_ctx = implgen::Ctx {
+            crates: vec![meta],            // TODO
             crate_map: Default::default(), // TODO
         };
         let comp_code_chunks: Vec<_> = comps
             .iter()
-            .zip(meta.comps.iter())
+            .zip(implgen_ctx.crates[0].comps.iter())
             .map(|(comp, meta_comp)| {
                 (
                     comp,
@@ -207,13 +207,15 @@ impl<'a> BuildScriptConfig<'a> {
             })
             .collect();
 
+        let meta = &mut implgen_ctx.crates[0];
+
         // Remove `pub(in crate::...)`
         crate::metadata::visit_mut::visit_crate_mut(
             &mut metagen::DowngradeRestrictedVisibility,
-            &mut meta,
+            meta,
         );
 
-        let meta_bin = bincode::serialize(&meta).unwrap();
+        let meta_bin = bincode::serialize(meta).unwrap();
 
         let out_f = File::create(&out_source_file)
             .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;

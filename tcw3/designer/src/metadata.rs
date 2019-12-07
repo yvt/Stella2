@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use try_match::try_match;
 
 pub mod visit_mut;
 
@@ -65,6 +66,8 @@ pub struct FieldDef {
     pub flags: FieldFlags,
     pub ident: Ident,
     pub accessors: FieldAccessors,
+    /// `Some(_)` if the field type refers to a component. `None` otherwise.
+    pub ty: Option<CompRef>,
 }
 
 bitflags::bitflags! {
@@ -83,6 +86,10 @@ pub enum FieldType {
     Const,
     Wire,
 }
+
+/// References a `CompDef` in `Crate`. (TODO: support referencing compoents
+/// from other crates)
+pub type CompRef = usize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldAccessors {
@@ -259,6 +266,19 @@ impl PathRef<'_> {
     }
 }
 
+impl CompItemDef {
+    pub fn event(&self) -> Option<&EventDef> {
+        try_match!(Self::Event(event) = self).ok()
+    }
+
+    pub fn ident(&self) -> &Ident {
+        match self {
+            CompItemDef::Field(field) => &field.ident,
+            CompItemDef::Event(event) => &event.ident,
+        }
+    }
+}
+
 impl CompDef {
     /// Calculate the maximum possibile visibility of the component's builder
     /// type can have. Having a visibility beyond this is pointless on account
@@ -281,5 +301,12 @@ impl CompDef {
                 _ => None,
             })
             .fold(VisibilityRef::Public, VisibilityRef::strictest)
+    }
+
+    pub fn find_item_by_ident(&self, ident: &str) -> Option<(usize, &CompItemDef)> {
+        self.items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.ident() == ident)
     }
 }

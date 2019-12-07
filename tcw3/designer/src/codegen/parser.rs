@@ -1,4 +1,6 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 use std::fmt;
 use syn::{
     parse::{Parse, ParseStream, Result},
@@ -626,6 +628,14 @@ impl Parse for Input {
     }
 }
 
+impl ToTokens for Input {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        for sel in self.selectors.iter() {
+            sel.to_tokens(tokens);
+        }
+    }
+}
+
 pub enum InputSelector {
     Field {
         /// Elided for the first selector
@@ -641,6 +651,19 @@ impl InputSelector {
             *ident == x
         } else {
             false
+        }
+    }
+}
+
+impl ToTokens for InputSelector {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Field { dot_token, ident } => {
+                if let Some(x) = dot_token {
+                    x.to_tokens(tokens);
+                }
+                ident.to_tokens(tokens);
+            }
         }
     }
 }

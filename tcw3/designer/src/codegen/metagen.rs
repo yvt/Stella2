@@ -93,6 +93,7 @@ fn gen_field(field: &sem::FieldDef<'_>) -> metadata::FieldDef {
     metadata::FieldDef {
         field_ty: field.field_ty,
         flags,
+        ty: None, // TODO
         ident: gen_sem_ident(&field.ident),
         accessors: metadata::FieldAccessors {
             set: field.accessors.set.as_ref().map(|a| metadata::FieldSetter {
