@@ -18,6 +18,7 @@ pathfinding = "2"
 quote = "1.0.0"
 serde = { version = "1.0", features = ["derive"] }
 try_match = "0.2.1"
+uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
 [dependencies.syn]
 version = "1.0.8"

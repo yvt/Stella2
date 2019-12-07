@@ -2,14 +2,15 @@ use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level};
 use quote::ToTokens;
 use std::{
     borrow::Cow,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env, fmt,
     fs::File,
     io::{prelude::*, BufWriter},
+    mem::replace,
     path::{Path, PathBuf},
 };
 
-use crate::metadata::Crate;
+use crate::metadata::Repo;
 
 mod diag;
 mod implgen;
@@ -23,6 +24,7 @@ mod sem;
 pub struct BuildScriptConfig<'a> {
     in_root_source_file: Option<PathBuf>,
     out_source_file: Option<PathBuf>,
+    crate_name: Option<String>,
     linked_crates: Vec<(String, Cow<'a, [u8]>)>,
 }
 
@@ -41,6 +43,13 @@ impl<'a> BuildScriptConfig<'a> {
     pub fn out_source_file(self, path: impl AsRef<Path>) -> Self {
         Self {
             out_source_file: Some(path.as_ref().to_path_buf()),
+            ..self
+        }
+    }
+
+    pub fn crate_name(self, name: impl Into<String>) -> Self {
+        Self {
+            crate_name: Some(name.into()),
             ..self
         }
     }
@@ -78,6 +87,18 @@ impl<'a> BuildScriptConfig<'a> {
     }
 
     fn run_inner(self) -> Result<(), BuildError> {
+        let crate_name = if let Some(x) = self.crate_name {
+            x
+        } else {
+            let meta_pkg_name =
+                env::var("CARGO_PKG_NAME").map_err(|_| BuildError::CrateNameMissing)?;
+            if meta_pkg_name.ends_with("-meta") || meta_pkg_name.ends_with("_meta") {
+                meta_pkg_name[0..meta_pkg_name.len() - 5].to_string()
+            } else {
+                return Err(BuildError::CrateNameMissing);
+            }
+        };
+
         let in_root_source_file = if let Some(x) = self.in_root_source_file {
             x
         } else {
@@ -158,7 +179,7 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Import metadata of dependencies
-        let _deps: Vec<(&str, Crate)> = self
+        let mut deps: Vec<(&str, Repo)> = self
             .linked_crates
             .iter()
             .map(|(name, metadata)| {
@@ -170,7 +191,81 @@ impl<'a> BuildScriptConfig<'a> {
             })
             .collect::<Result<Vec<_>, BuildError>>()?;
 
+        // Consolidate the metadata of our known universe
+        // -------------------------------------------------------------------
+        let mut uuids = deps
+            .iter()
+            .enumerate()
+            .map(|(dep_i, e)| {
+                e.1.crates
+                    .iter()
+                    .enumerate()
+                    .map(move |(crate_i, cr)| (dep_i, crate_i, cr.uuid))
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+        uuids.sort_unstable_by_key(|&(_, _, uuid)| uuid);
+        uuids.dedup_by_key(|&mut (_, _, uuid)| uuid);
+
+        let mut repo = Repo {
+            main_crate_i: 0, // will be set by `gen_and_push_crate`
+            crates: Vec::new(),
+        };
+
+        // Prepare to remap crate indices
+        let dep_crate_i_maps: Vec<Vec<_>> = deps
+            .iter()
+            .map(|(_, repo)| {
+                repo.crates
+                    .iter()
+                    .map(|cr| {
+                        // Find the new crate index (in `repo`)
+                        uuids
+                            .binary_search_by_key(&cr.uuid, |&(_, _, uuid)| uuid)
+                            .unwrap()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Put all known crates into `repo.crates`
+        for &(dep_i, crate_i, uuid) in uuids.iter() {
+            let cr_cell = &mut deps[dep_i].1.crates[crate_i];
+            let mut cr = replace(cr_cell, Default::default());
+
+            // `uuid` is the primary information of `uuids`. `(dep_i, crate_i)`
+            // is optimization for a faster lookup
+            assert_eq!(cr.uuid, uuid);
+
+            // Keep UUID, we'll need those in the next step
+            cr_cell.uuid = cr.uuid;
+
+            // Remap crate references from `deps[dep_i]` to `repo`
+            crate::metadata::visit_mut::visit_crate_mut(
+                &mut metagen::MapCrateIndex(&dep_crate_i_maps[dep_i]),
+                &mut cr,
+            );
+
+            repo.crates.push(cr);
+        }
+
+        // We'll need a map from imported crate names (which might not be
+        // identical to orignal crate names) to indices into `repo.crates`
+        let imports_crate_i: HashMap<&str, usize> = deps
+            .into_iter()
+            .map(|(imported_name, repo)| {
+                let main_crate_uuid = repo.crates[repo.main_crate_i].uuid;
+
+                let crate_i = uuids
+                    .binary_search_by_key(&main_crate_uuid, |&(_, _, uuid)| uuid)
+                    .unwrap();
+
+                (imported_name, crate_i)
+            })
+            .collect();
+
         // Start analysis of this crate
+        // -------------------------------------------------------------------
         let mut comps = Vec::new();
         for (parsed_file, diag_file) in files.iter() {
             for item in parsed_file.items.iter() {
@@ -185,20 +280,24 @@ impl<'a> BuildScriptConfig<'a> {
         }
 
         // Generate metadata (`Crate`) from `comps`
-        let meta = metagen::gen_crate(&comps);
+        metagen::gen_and_push_crate(&comps, &imports_crate_i, crate_name, &mut repo, &mut diag);
 
-        // TODO: Analyze `comps` again using all the metadata we have
+        if diag.has_error() {
+            return Err(BuildError::Emitted);
+        }
+
         // TODO: ... which allows us to handle `#[inject] const`
         // TODO: Now, generate `Crate` again
 
         // Generate implementation code
-        let mut implgen_ctx = implgen::Ctx {
-            crates: vec![meta],            // TODO
-            crate_map: Default::default(), // TODO
+        let implgen_ctx = implgen::Ctx {
+            repo: &repo,
+            imports_crate_i: &imports_crate_i,
         };
+        let meta_comps = &repo.crates[repo.main_crate_i].comps;
         let comp_code_chunks: Vec<_> = comps
             .iter()
-            .zip(implgen_ctx.crates[0].comps.iter())
+            .zip(meta_comps.iter())
             .map(|(comp, meta_comp)| {
                 (
                     comp,
@@ -207,15 +306,14 @@ impl<'a> BuildScriptConfig<'a> {
             })
             .collect();
 
-        let meta = &mut implgen_ctx.crates[0];
-
-        // Remove `pub(in crate::...)`
-        crate::metadata::visit_mut::visit_crate_mut(
+        // Remove `pub(in crate::...)` - actually this is not strictly, but may
+        // slightly reduce the metadata by pruning unneeded crates in the future
+        crate::metadata::visit_mut::visit_repo_mut(
             &mut metagen::DowngradeRestrictedVisibility,
-            meta,
+            &mut repo,
         );
 
-        let meta_bin = bincode::serialize(meta).unwrap();
+        let meta_bin = bincode::serialize(&repo).unwrap();
 
         let out_f = File::create(&out_source_file)
             .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;
@@ -293,6 +391,9 @@ impl<T: fmt::Display> fmt::Display for DisplayArray<'_, T> {
 #[derive(Debug, displaydoc::Display)]
 #[non_exhaustive]
 enum BuildError {
+    /// Could not guess the crate name from `CARGO_PKG_NAME`; are we really in
+    /// a build script?
+    CrateNameMissing,
     /// `in_root_source_file` is not specified but `CARGO_MANIFEST_DIR` is
     /// missing; are we really in a build script?
     CargoManifestDirMissing,

@@ -61,7 +61,7 @@ pub struct ItemIndirection {
 }
 
 struct AnalysisCtx<'a> {
-    ctx: &'a Ctx,
+    ctx: &'a Ctx<'a>,
     diag: &'a mut Diag,
     analysis: &'a mut Analysis,
     cur_comp: &'a metadata::CompDef,
@@ -78,8 +78,8 @@ impl Analysis {
     ) -> Self {
         // Find the `(comp_crate_i, comp_i)` of the enclosing component
         // TODO: This value should be passed in lieu of `meta_comp`
-        let cur_comp_crate_i = 0;
-        let cur_comp_i = ctx.crates[cur_comp_crate_i]
+        let cur_comp_crate_i = ctx.repo.main_crate_i;
+        let cur_comp_i = ctx.repo.crates[cur_comp_crate_i]
             .comps
             .iter()
             .position(|c| std::ptr::eq(c, meta_comp))
@@ -154,8 +154,8 @@ fn analyze_on(actx: &mut AnalysisCtx<'_>, item: &sem::OnDef) {
                     InputInfo::Item(item_input) => {
                         // Find the item the input refers to
                         let ind = item_input.indirections.last().unwrap();
-                        let item =
-                            &actx.ctx.crates[ind.comp_crate_i].comps[ind.comp_i].items[ind.item_i];
+                        let item = &actx.ctx.repo.crates[ind.comp_crate_i].comps[ind.comp_i].items
+                            [ind.item_i];
 
                         if let metadata::CompItemDef::Event(_) = item {
                             // Okay
@@ -346,8 +346,8 @@ fn analyze_input_inner(
                         None
                     }
                     EventTrigger::Event(ind, trigger_span) => {
-                        let item =
-                            &actx.ctx.crates[ind.comp_crate_i].comps[ind.comp_i].items[ind.item_i];
+                        let item = &actx.ctx.repo.crates[ind.comp_crate_i].comps[ind.comp_i].items
+                            [ind.item_i];
                         let event = item.event().unwrap();
 
                         Some(
@@ -448,7 +448,11 @@ fn analyze_input_inner(
                     State::Field(field) => {
                         if let Some(comp_i) = field.ty {
                             let crate_i = actx.cur_comp_crate_i;
-                            (&actx.ctx.crates[crate_i].comps[comp_i], crate_i, comp_i)
+                            (
+                                &actx.ctx.repo.crates[crate_i].comps[comp_i],
+                                crate_i,
+                                comp_i,
+                            )
                         } else {
                             actx.diag.emit(&[Diagnostic {
                                 level: Level::Error,

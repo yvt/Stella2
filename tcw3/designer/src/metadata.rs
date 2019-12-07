@@ -1,19 +1,31 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use try_match::try_match;
+use uuid::Uuid;
 
 pub mod visit_mut;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Repo {
+    /// Specifies which element of `crates` is the main crate. Other elements
+    /// are its dependencies.
+    pub main_crate_i: usize,
+    pub crates: Vec<Crate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Crate {
+    /// Should be used only for creating diagnostic messages.
+    pub name: String,
+    pub uuid: Uuid,
     pub comps: Vec<CompDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Visibility {
     Private,
-    /// This variant is used only for the current crate. Replaced with
-    /// `Private` when exporting the metadata to a file in accordance with
+    /// This variant is meaningful only for the current crate. Can be replaced
+    /// with `Private` when exporting the metadata to a file in accordance with
     /// the one-crate-one-file rule.
     Restricted(Path),
     Public,
@@ -22,13 +34,9 @@ pub enum Visibility {
 /// The absolute path to an item.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Path {
-    pub root: PathRoot,
+    /// Index into `Repo::crates`
+    pub crate_i: usize,
     pub idents: Vec<Ident>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum PathRoot {
-    Crate,
 }
 
 pub type Ident = String;
@@ -145,7 +153,9 @@ impl fmt::Display for Path {
 
 impl fmt::Display for PathRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "crate")?;
+        // TODO: Add a method like `PathRef::display(&Repo)` to support
+        //       reverse-lookup of crate names
+        write!(f, "{{{}}}", self.crate_i)?;
         for ident in self.idents.iter() {
             write!(f, "::{}", ident)?;
         }
@@ -212,14 +222,15 @@ impl VisibilityRef<'_> {
 /// The borrowed version of `Path`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathRef<'a> {
-    root: PathRoot,
+    /// Index into `Repo::crates`
+    crate_i: usize,
     idents: &'a [Ident],
 }
 
 impl Path {
     pub fn as_ref(&self) -> PathRef<'_> {
         PathRef {
-            root: self.root,
+            crate_i: self.crate_i,
             idents: &self.idents[..],
         }
     }
@@ -228,7 +239,7 @@ impl Path {
 impl PathRef<'_> {
     pub fn to_owned(&self) -> Path {
         Path {
-            root: self.root,
+            crate_i: self.crate_i,
             idents: self.idents.to_owned(),
         }
     }
@@ -238,18 +249,18 @@ impl PathRef<'_> {
             None
         } else {
             Some(Self {
-                root: self.root,
+                crate_i: self.crate_i,
                 idents: &self.idents[..self.idents.len() - 1],
             })
         }
     }
 
     pub fn starts_with(&self, other: &PathRef<'_>) -> bool {
-        self.root == other.root && self.idents.starts_with(other.idents)
+        self.crate_i == other.crate_i && self.idents.starts_with(other.idents)
     }
 
     pub fn lowest_common_ancestor(&self, other: &Self) -> Option<Self> {
-        if self.root == other.root {
+        if self.crate_i == other.crate_i {
             let len = self
                 .idents
                 .iter()
@@ -257,7 +268,7 @@ impl PathRef<'_> {
                 .take_while(|(a, b)| a == b)
                 .count();
             Some(Self {
-                root: self.root,
+                crate_i: self.crate_i,
                 idents: &self.idents[..len],
             })
         } else {

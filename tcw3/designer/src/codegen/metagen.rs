@@ -1,11 +1,38 @@
 //! Metadata generation
-use super::sem;
+use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use std::collections::HashMap;
+
+use super::{diag::Diag, sem};
 use crate::metadata;
 
-pub fn gen_crate(comps: &[sem::CompDef<'_>]) -> metadata::Crate {
-    metadata::Crate {
-        comps: comps.iter().map(gen_comp).collect(),
-    }
+/// Analyze the given `CompDef`s, add `Crate` to `out_repo.crates`.
+pub fn gen_and_push_crate(
+    comps: &[sem::CompDef<'_>],
+    imports_crate_i: &HashMap<&str, usize>,
+    crate_name: String,
+    out_repo: &mut metadata::Repo,
+    diag: &mut Diag,
+) {
+    let mut ctx = Ctx {
+        resolver: CompResolver {
+            imports_crate_i,
+            deps_crates: &out_repo.crates,
+            local_crate_name: &crate_name,
+            local_crate_i: out_repo.crates.len(),
+            local_comps: &comps,
+        },
+        diag,
+    };
+
+    let new_crate = metadata::Crate {
+        comps: comps.iter().map(|c| gen_comp(&mut ctx, c)).collect(),
+        // TODO: probably should use a hash for reproducible builds
+        uuid: uuid::Uuid::new_v4(),
+        name: crate_name,
+    };
+
+    out_repo.main_crate_i = out_repo.crates.len();
+    out_repo.crates.push(new_crate);
 }
 
 /// Replaces `Visibility::Restricted` with `Visibility::Private`.
@@ -21,20 +48,102 @@ impl metadata::visit_mut::VisitMut for DowngradeRestrictedVisibility {
     fn visit_path_mut(&mut self, _: &mut metadata::Path) {}
 }
 
-fn gen_comp(comp: &sem::CompDef<'_>) -> metadata::CompDef {
+pub struct MapCrateIndex<'a>(pub &'a [usize]);
+
+impl metadata::visit_mut::VisitMut for MapCrateIndex<'_> {
+    fn visit_path_mut(&mut self, i: &mut metadata::Path) {
+        i.crate_i = self.0[i.crate_i];
+    }
+}
+
+struct Ctx<'a> {
+    resolver: CompResolver<'a>,
+    diag: &'a mut Diag,
+}
+
+struct CompResolver<'a> {
+    imports_crate_i: &'a HashMap<&'a str, usize>,
+    deps_crates: &'a [metadata::Crate],
+    /// The name of the current crate.
+    local_crate_name: &'a str,
+    local_crate_i: usize,
+    /// Local components.
+    local_comps: &'a [sem::CompDef<'a>],
+}
+
+impl CompResolver<'_> {
+    fn find_crate_by_path(&self, path: &syn::Path) -> Option<usize> {
+        let crate_name = path.segments[0].ident.to_string();
+        if self.local_crate_name == crate_name
+            || (crate_name == "crate" && path.leading_colon.is_none())
+        {
+            Some(self.local_crate_i)
+        } else {
+            assert!(path.leading_colon.is_some());
+
+            // Based on the postcondition of a successful call to `resolve_paths`,
+            // `path.segments[0].ident` always refers to a crate name
+            Some(*self.imports_crate_i.get(&*crate_name)?)
+        }
+    }
+
+    // TODO: use this to resolve component types
+    fn find_comp_by_path(&self, path: &syn::Path) -> Option<(usize, usize)> {
+        let segments = &path.segments;
+
+        // Paths with arguments never refer to a component
+        if segments.iter().any(|s| !s.arguments.is_empty()) {
+            return None;
+        }
+
+        let crate_name = &path.segments[0].ident;
+        if *crate_name == self.local_crate_name
+            || (*crate_name == "crate" && path.leading_colon.is_none())
+        {
+            // Search the local components
+            let comp_i = self
+                .local_comps
+                .iter()
+                .position(|comp: &sem::CompDef<'_>| {
+                    // The first path segment represents a crate name. Skip that
+                    // part because (1) we already know it has the correct crate
+                    // name; and (2) one path might use `crate` while the other
+                    // one is using the crate name.
+                    let segs1 = comp.path.segments.iter().skip(1).map(|s| &s.ident);
+                    let segs2 = path.segments.iter().skip(1).map(|s| &s.ident);
+                    segs1.eq(segs2)
+                })?;
+
+            return Some((self.local_crate_i, comp_i));
+        }
+
+        // Search the dependencies
+        let crate_i = *self.imports_crate_i.get(&*crate_name.to_string())?;
+        let kuleto = &self.deps_crates[crate_i];
+        let comp_i = kuleto.comps.iter().position(|comp: &metadata::CompDef| {
+            let segs1 = comp.paths[0].idents.iter();
+            let segs2 = path.segments.iter().skip(1).map(|s| &s.ident);
+            segs2.eq(segs1)
+        })?;
+
+        Some((crate_i, comp_i))
+    }
+}
+
+fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
     metadata::CompDef {
         flags: comp.flags,
-        vis: gen_vis(&comp.vis),
-        paths: vec![gen_path(&comp.path)],
+        vis: gen_vis(ctx, &comp.vis),
+        paths: vec![gen_path(ctx, &comp.path)],
         items: comp
             .items
             .iter()
             .filter_map(|item| match item {
                 sem::CompItemDef::Field(field) => {
-                    Some(metadata::CompItemDef::Field(gen_field(field)))
+                    Some(metadata::CompItemDef::Field(gen_field(ctx, field)))
                 }
                 sem::CompItemDef::Event(event) => {
-                    Some(metadata::CompItemDef::Event(gen_event(event)))
+                    Some(metadata::CompItemDef::Event(gen_event(ctx, event)))
                 }
                 // `on` is invisible to outside
                 sem::CompItemDef::On(_) => None,
@@ -43,34 +152,34 @@ fn gen_comp(comp: &sem::CompDef<'_>) -> metadata::CompDef {
     }
 }
 
-fn gen_vis(vis: &syn::Visibility) -> metadata::Visibility {
+fn gen_vis(ctx: &mut Ctx<'_>, vis: &syn::Visibility) -> metadata::Visibility {
     match vis {
         syn::Visibility::Inherited => metadata::Visibility::Private,
         syn::Visibility::Public(_) => metadata::Visibility::Public,
         syn::Visibility::Crate(_) => metadata::Visibility::Restricted(metadata::Path {
-            root: metadata::PathRoot::Crate,
+            crate_i: ctx.resolver.local_crate_i,
             idents: vec![],
         }),
         // TODO: validate `r`
-        syn::Visibility::Restricted(r) => metadata::Visibility::Restricted(gen_path(&r.path)),
+        syn::Visibility::Restricted(r) => metadata::Visibility::Restricted(gen_path(ctx, &r.path)),
     }
 }
 
 /// Assumes `path` is already rooted by `super::resolve`.
-fn gen_path(path: &syn::Path) -> metadata::Path {
-    if path.leading_colon.is_some() {
-        unimplemented!(
-            "This function is not supposed to see a rooted path \
-             because it's only used for local paths for now, but this \
-             might change in a potential future"
-        );
-    }
-
-    let root = if path.segments[0].ident.to_string() == "crate" {
-        metadata::PathRoot::Crate
+fn gen_path(ctx: &mut Ctx<'_>, path: &syn::Path) -> metadata::Path {
+    let crate_i = if let Some(i) = ctx.resolver.find_crate_by_path(path) {
+        i
     } else {
-        // The postcondition of a successful call to `resolve_paths`
-        unreachable!();
+        let crate_name = &path.segments[0].ident;
+
+        ctx.diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: format!("Can't find a crate named `{}`", crate_name),
+            code: None,
+            spans: vec![], // TODO
+        }]);
+
+        ctx.resolver.local_crate_i
     };
 
     let idents = path
@@ -80,10 +189,10 @@ fn gen_path(path: &syn::Path) -> metadata::Path {
         .map(|seg| gen_ident(&seg.ident))
         .collect();
 
-    metadata::Path { root, idents }
+    metadata::Path { crate_i, idents }
 }
 
-fn gen_field(field: &sem::FieldDef<'_>) -> metadata::FieldDef {
+fn gen_field(ctx: &mut Ctx<'_>, field: &sem::FieldDef<'_>) -> metadata::FieldDef {
     let mut flags = field.flags;
 
     if field.field_ty == metadata::FieldType::Const && field.value.is_some() {
@@ -97,10 +206,10 @@ fn gen_field(field: &sem::FieldDef<'_>) -> metadata::FieldDef {
         ident: gen_sem_ident(&field.ident),
         accessors: metadata::FieldAccessors {
             set: field.accessors.set.as_ref().map(|a| metadata::FieldSetter {
-                vis: gen_vis(&a.vis),
+                vis: gen_vis(ctx, &a.vis),
             }),
             get: field.accessors.get.as_ref().map(|a| metadata::FieldGetter {
-                vis: gen_vis(&a.vis),
+                vis: gen_vis(ctx, &a.vis),
                 mode: a.mode,
             }),
             watch: field
@@ -108,16 +217,16 @@ fn gen_field(field: &sem::FieldDef<'_>) -> metadata::FieldDef {
                 .watch
                 .as_ref()
                 .map(|a| metadata::FieldWatcher {
-                    vis: gen_vis(&a.vis),
+                    vis: gen_vis(ctx, &a.vis),
                     event: gen_sem_ident(&a.event),
                 }),
         },
     }
 }
 
-fn gen_event(event: &sem::EventDef<'_>) -> metadata::EventDef {
+fn gen_event(ctx: &mut Ctx<'_>, event: &sem::EventDef<'_>) -> metadata::EventDef {
     metadata::EventDef {
-        vis: gen_vis(&event.vis),
+        vis: gen_vis(ctx, &event.vis),
         ident: gen_sem_ident(&event.ident),
         inputs: event
             .inputs

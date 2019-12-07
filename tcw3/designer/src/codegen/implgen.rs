@@ -28,12 +28,12 @@ mod fields {
     pub const STATE: &str = "state";
 }
 
-pub struct Ctx {
-    /// The list of loaded crates. `[0]` is always the current crate.
-    pub crates: Vec<metadata::Crate>,
+pub struct Ctx<'a> {
+    /// Contains all loaded crates.
+    pub repo: &'a metadata::Repo,
 
-    /// Mapping from external crate names to indices into `crates`.
-    pub crate_map: HashMap<String, usize>,
+    /// Mapping from imported crate names to indices into `repo.crates`.
+    pub imports_crate_i: &'a HashMap<&'a str, usize>,
 }
 
 pub fn gen_comp(

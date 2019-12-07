@@ -50,6 +50,10 @@ pub trait VisitMut {
     }
 }
 
+pub fn visit_repo_mut(v: &mut (impl VisitMut + ?Sized), i: &mut Repo) {
+    i.crates.iter_mut().for_each(|i| v.visit_crate_mut(i));
+}
+
 pub fn visit_crate_mut(v: &mut (impl VisitMut + ?Sized), i: &mut Crate) {
     i.comps.iter_mut().for_each(|i| v.visit_comp_def_mut(i));
 }
