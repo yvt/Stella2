@@ -50,7 +50,7 @@ pub fn gen_comp(
 
     let mut out = String::new();
 
-    let comp_ident = &comp.path.segments.last().unwrap().ident;
+    let comp_ident = &comp.path.syn_path.segments.last().unwrap().ident;
 
     // String → index into `comp.items`
     // This also checks duplicate item names.
@@ -75,7 +75,7 @@ pub fn gen_comp(
     writeln!(
         out,
         "{vis} struct {ty} {{",
-        vis = comp.vis.to_token_stream(),
+        vis = comp.vis,
         ty = CompTy(comp_ident)
     )
     .unwrap();

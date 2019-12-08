@@ -1,4 +1,6 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use quote::ToTokens;
+use std::fmt;
 use syn::spanned::Spanned;
 
 use super::{diag::Diag, parser, parser::span_to_codemap};
@@ -18,10 +20,75 @@ impl Ident {
     }
 }
 
+#[derive(Clone)]
+pub enum Visibility {
+    Public {
+        span: Option<codemap::Span>,
+    },
+    Crate {
+        span: Option<codemap::Span>,
+    },
+    Restricted {
+        span: Option<codemap::Span>,
+        path: Box<Path>,
+    },
+    Inherited,
+}
+
+impl Visibility {
+    pub fn from_syn(i: &syn::Visibility, file: &codemap::File) -> Self {
+        match i {
+            syn::Visibility::Public(_) => Visibility::Public {
+                span: parser::span_to_codemap(i.span(), file),
+            },
+            syn::Visibility::Crate(_) => Visibility::Crate {
+                span: parser::span_to_codemap(i.span(), file),
+            },
+            syn::Visibility::Restricted(r) => Visibility::Restricted {
+                span: parser::span_to_codemap(i.span(), file),
+                path: Box::new(Path::from_syn(&r.path, file)),
+            },
+            syn::Visibility::Inherited => Visibility::Inherited,
+        }
+    }
+}
+
+impl fmt::Display for Visibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Public { .. } => write!(f, "pub"),
+            Self::Crate { .. } => write!(f, "pub(crate)"),
+            Self::Restricted { path, .. } => write!(f, "pub(in {})", path),
+            Self::Inherited => Ok(()),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Path {
+    pub syn_path: syn::Path,
+    pub span: Option<codemap::Span>,
+}
+
+impl Path {
+    pub fn from_syn(i: &syn::Path, file: &codemap::File) -> Self {
+        Self {
+            syn_path: i.clone(),
+            span: parser::span_to_codemap(i.span(), file),
+        }
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.syn_path.to_token_stream())
+    }
+}
+
 pub struct CompDef<'a> {
     pub flags: CompFlags,
-    pub vis: syn::Visibility,
-    pub path: syn::Path,
+    pub vis: Visibility,
+    pub path: Path,
     pub items: Vec<CompItemDef<'a>>,
     pub syn: &'a parser::Comp,
 }
@@ -35,7 +102,7 @@ pub enum CompItemDef<'a> {
 }
 
 pub struct FieldDef<'a> {
-    pub vis: syn::Visibility, // FIXME: maybe not needed
+    pub vis: Visibility, // FIXME: maybe not needed
     pub field_ty: FieldType,
     pub flags: FieldFlags,
     pub ident: Ident,
@@ -65,7 +132,7 @@ pub struct FieldAccessors {
 }
 
 impl FieldAccessors {
-    fn default_const(vis: syn::Visibility) -> Self {
+    fn default_const(vis: Visibility) -> Self {
         Self {
             set: None,
             get: Some(FieldGetter {
@@ -76,7 +143,7 @@ impl FieldAccessors {
         }
     }
 
-    fn default_prop(vis: syn::Visibility) -> Self {
+    fn default_prop(vis: Visibility) -> Self {
         Self {
             set: Some(FieldSetter { vis: vis.clone() }),
             get: Some(FieldGetter {
@@ -87,7 +154,7 @@ impl FieldAccessors {
         }
     }
 
-    fn default_wire(vis: syn::Visibility) -> Self {
+    fn default_wire(vis: Visibility) -> Self {
         Self {
             set: None,
             get: Some(FieldGetter {
@@ -108,19 +175,19 @@ impl FieldAccessors {
 }
 
 pub struct FieldSetter {
-    pub vis: syn::Visibility,
+    pub vis: Visibility,
 }
 
 #[derive(Clone)]
 pub struct FieldGetter {
-    pub vis: syn::Visibility,
+    pub vis: Visibility,
     pub mode: FieldGetMode,
 }
 
 pub use self::parser::FieldGetMode;
 
 pub struct FieldWatcher {
-    pub vis: syn::Visibility,
+    pub vis: Visibility,
     pub event: Ident,
 }
 
@@ -131,7 +198,7 @@ pub struct OnDef<'a> {
 }
 
 pub struct EventDef<'a> {
-    pub vis: syn::Visibility,
+    pub vis: Visibility,
     pub ident: Ident,
     pub inputs: Vec<syn::FnArg>,
     pub syn: &'a parser::CompItemEvent,
@@ -183,7 +250,7 @@ pub enum InputOrigin {
 }
 
 pub struct ObjInit {
-    pub path: syn::Path,
+    pub path: Path,
     pub fields: Vec<ObjInitField>,
 }
 
@@ -222,8 +289,8 @@ impl AnalyzeCtx<'_> {
 
         let mut this = CompDef {
             flags: CompFlags::empty(),
-            vis: comp.vis.clone(),
-            path: comp.path.clone(),
+            vis: Visibility::from_syn(&comp.vis, self.file),
+            path: Path::from_syn(&comp.path, self.file),
             items: comp
                 .items
                 .iter()
@@ -259,9 +326,15 @@ impl AnalyzeCtx<'_> {
     ) -> FieldDef<'a> {
         let mut accessors;
         let default_accessors = match item.field_ty {
-            FieldType::Const => FieldAccessors::default_const(item.vis.clone()),
-            FieldType::Prop => FieldAccessors::default_prop(item.vis.clone()),
-            FieldType::Wire => FieldAccessors::default_wire(item.vis.clone()),
+            FieldType::Const => {
+                FieldAccessors::default_const(Visibility::from_syn(&item.vis, self.file))
+            }
+            FieldType::Prop => {
+                FieldAccessors::default_prop(Visibility::from_syn(&item.vis, self.file))
+            }
+            FieldType::Wire => {
+                FieldAccessors::default_wire(Visibility::from_syn(&item.vis, self.file))
+            }
         };
         if let Some(syn_accessors) = &item.accessors {
             accessors = FieldAccessors::default_none();
@@ -271,7 +344,9 @@ impl AnalyzeCtx<'_> {
             for syn_accessor in syn_accessors.iter() {
                 let (acc_ty, span) = match syn_accessor {
                     parser::FieldAccessor::Set { set_token, vis } => {
-                        accessors.set = Some(FieldSetter { vis: vis.clone() });
+                        accessors.set = Some(FieldSetter {
+                            vis: Visibility::from_syn(vis, self.file),
+                        });
                         (0, set_token.span())
                     }
                     parser::FieldAccessor::Get {
@@ -280,7 +355,7 @@ impl AnalyzeCtx<'_> {
                         mode,
                     } => {
                         accessors.get = Some(FieldGetter {
-                            vis: vis.clone(),
+                            vis: Visibility::from_syn(vis, self.file),
                             mode: mode
                                 .unwrap_or_else(|| default_accessors.get.as_ref().unwrap().mode),
                         });
@@ -292,7 +367,7 @@ impl AnalyzeCtx<'_> {
                         mode,
                     } => {
                         accessors.watch = Some(FieldWatcher {
-                            vis: vis.clone(),
+                            vis: Visibility::from_syn(vis, self.file),
                             event: match mode {
                                 parser::FieldWatchMode::Event { event } => {
                                     Ident::from_syn(event, self.file)
@@ -413,7 +488,7 @@ impl AnalyzeCtx<'_> {
         }
 
         FieldDef {
-            vis: item.vis.clone(),
+            vis: Visibility::from_syn(&item.vis, self.file),
             field_ty: item.field_ty,
             flags: FieldFlags::empty(),
             ident: Ident::from_syn(&item.ident, self.file),
@@ -450,7 +525,7 @@ impl AnalyzeCtx<'_> {
 
     fn analyze_event<'a>(&mut self, item: &'a parser::CompItemEvent) -> EventDef<'a> {
         EventDef {
-            vis: item.vis.clone(),
+            vis: Visibility::from_syn(&item.vis, self.file),
             ident: Ident::from_syn(&item.ident, self.file),
             inputs: item.inputs.iter().cloned().collect(),
             syn: item,
@@ -574,7 +649,7 @@ impl AnalyzeCtx<'_> {
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> ObjInit {
         ObjInit {
-            path: init.path.clone(),
+            path: Path::from_syn(&init.path, self.file),
             fields: init
                 .fields
                 .iter()
@@ -606,7 +681,7 @@ impl AnalyzeCtx<'_> {
         let lifted_field_name = format!("__lifted_{}", out_lifted_fields.len());
 
         out_lifted_fields.push(FieldDef {
-            vis: syn::Visibility::Inherited,
+            vis: Visibility::Inherited,
             field_ty: FieldType::Const,
             flags: FieldFlags::empty(),
             ident: Ident {

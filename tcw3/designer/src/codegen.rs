@@ -1,5 +1,4 @@
 use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level};
-use quote::ToTokens;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -344,7 +343,7 @@ impl<'a> BuildScriptConfig<'a> {
                     "
                     ({path}) => {{ {chunk} }};
                 ",
-                    path = comp.path.to_token_stream(),
+                    path = comp.path,
                     chunk = code_chunk
                 )?;
             }

@@ -131,7 +131,7 @@ pub fn gen_builder(
         writeln!(
             out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> Self {{",
-            vis = field.vis.to_token_stream(),
+            vis = field.vis,
             method = FactorySetterForField(&field.ident.sym),
             ident = field.ident.sym,
             ty = field.ty.to_token_stream(),
@@ -162,7 +162,7 @@ pub fn gen_builder(
         writeln!(
             out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> {new_bldr_ty} {{",
-            vis = field.vis.to_token_stream(),
+            vis = field.vis,
             method = FactorySetterForField(&field.ident.sym),
             ident = field.ident.sym,
             ty = field.ty.to_token_stream(),

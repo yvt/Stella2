@@ -108,7 +108,7 @@ impl CompResolver<'_> {
                     // part because (1) we already know it has the correct crate
                     // name; and (2) one path might use `crate` while the other
                     // one is using the crate name.
-                    let segs1 = comp.path.segments.iter().skip(1).map(|s| &s.ident);
+                    let segs1 = comp.path.syn_path.segments.iter().skip(1).map(|s| &s.ident);
                     let segs2 = path.segments.iter().skip(1).map(|s| &s.ident);
                     segs1.eq(segs2)
                 })?;
@@ -151,25 +151,27 @@ fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
     }
 }
 
-fn gen_vis(ctx: &mut Ctx<'_>, vis: &syn::Visibility) -> metadata::Visibility {
+fn gen_vis(ctx: &mut Ctx<'_>, vis: &sem::Visibility) -> metadata::Visibility {
     match vis {
-        syn::Visibility::Inherited => metadata::Visibility::Private,
-        syn::Visibility::Public(_) => metadata::Visibility::Public,
-        syn::Visibility::Crate(_) => metadata::Visibility::Restricted(metadata::Path {
+        sem::Visibility::Inherited => metadata::Visibility::Private,
+        sem::Visibility::Public { .. } => metadata::Visibility::Public,
+        sem::Visibility::Crate { .. } => metadata::Visibility::Restricted(metadata::Path {
             crate_i: ctx.resolver.local_crate_i,
             idents: vec![],
         }),
         // TODO: validate `r`
-        syn::Visibility::Restricted(r) => metadata::Visibility::Restricted(gen_path(ctx, &r.path)),
+        sem::Visibility::Restricted { path, .. } => {
+            metadata::Visibility::Restricted(gen_path(ctx, path))
+        }
     }
 }
 
 /// Assumes `path` is already rooted by `super::resolve`.
-fn gen_path(ctx: &mut Ctx<'_>, path: &syn::Path) -> metadata::Path {
-    let crate_i = if let Some(i) = ctx.resolver.find_crate_by_path(path) {
+fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
+    let crate_i = if let Some(i) = ctx.resolver.find_crate_by_path(&path.syn_path) {
         i
     } else {
-        let crate_name = &path.segments[0].ident;
+        let crate_name = &path.syn_path.segments[0].ident;
 
         ctx.diag.emit(&[Diagnostic {
             level: Level::Error,
@@ -182,6 +184,7 @@ fn gen_path(ctx: &mut Ctx<'_>, path: &syn::Path) -> metadata::Path {
     };
 
     let idents = path
+        .syn_path
         .segments
         .iter()
         .skip(1)
