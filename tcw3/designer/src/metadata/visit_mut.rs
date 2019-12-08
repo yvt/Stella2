@@ -29,6 +29,10 @@ pub trait VisitMut {
         visit_field_def_mut(self, i);
     }
 
+    fn visit_comp_ref_mut(&mut self, i: &mut CompRef) {
+        visit_comp_ref_mut(self, i);
+    }
+
     fn visit_field_accessors_mut(&mut self, i: &mut FieldAccessors) {
         visit_field_accessors_mut(self, i);
     }
@@ -48,6 +52,14 @@ pub trait VisitMut {
     fn visit_event_def_mut(&mut self, i: &mut EventDef) {
         visit_event_def_mut(self, i);
     }
+
+    fn visit_crate_i_mut(&mut self, i: &mut usize) {
+        let _ = i;
+    }
+
+    fn visit_comp_i_mut(&mut self, i: &mut usize) {
+        let _ = i;
+    }
 }
 
 pub fn visit_repo_mut(v: &mut (impl VisitMut + ?Sized), i: &mut Repo) {
@@ -66,6 +78,7 @@ pub fn visit_visibility_mut(v: &mut (impl VisitMut + ?Sized), i: &mut Visibility
 }
 
 pub fn visit_path_mut(v: &mut (impl VisitMut + ?Sized), i: &mut Path) {
+    v.visit_crate_i_mut(&mut i.crate_i);
     i.idents.iter_mut().for_each(|i| v.visit_ident_mut(i));
 }
 
@@ -88,7 +101,15 @@ pub fn visit_comp_item_def_mut(v: &mut (impl VisitMut + ?Sized), i: &mut CompIte
 
 pub fn visit_field_def_mut(v: &mut (impl VisitMut + ?Sized), i: &mut FieldDef) {
     v.visit_ident_mut(&mut i.ident);
+    if let Some(i) = &mut i.ty {
+        v.visit_comp_ref_mut(i);
+    }
     v.visit_field_accessors_mut(&mut i.accessors);
+}
+
+pub fn visit_comp_ref_mut(v: &mut (impl VisitMut + ?Sized), i: &mut CompRef) {
+    v.visit_crate_i_mut(&mut i.crate_i);
+    v.visit_comp_i_mut(&mut i.comp_i);
 }
 
 pub fn visit_field_accessors_mut(v: &mut (impl VisitMut + ?Sized), i: &mut FieldAccessors) {

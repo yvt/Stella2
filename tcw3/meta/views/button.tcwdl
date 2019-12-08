@@ -1,0 +1,16 @@
+// TODO
+use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, pal};
+
+#[prototype_only]
+#[widget]
+pub comp crate::ui::views::Button {
+    pub const style_manager: &Manager { pub set; pub get; }
+
+    pub event activated(wm: pal::Wm);
+
+    pub prop caption: String { pub set; } = || unreachable!();
+    pub prop class_set: ClassSet { pub set; } = || unreachable!();
+
+    pub const view: HView { pub get; } = || unreachable!();
+    pub const style_elem: HElem { pub get clone; } = || unreachable!();
+}

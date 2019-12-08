@@ -51,8 +51,8 @@ impl metadata::visit_mut::VisitMut for DowngradeRestrictedVisibility {
 pub struct MapCrateIndex<'a>(pub &'a [usize]);
 
 impl metadata::visit_mut::VisitMut for MapCrateIndex<'_> {
-    fn visit_path_mut(&mut self, i: &mut metadata::Path) {
-        i.crate_i = self.0[i.crate_i];
+    fn visit_crate_i_mut(&mut self, i: &mut usize) {
+        *i = self.0[*i];
     }
 }
 
@@ -87,7 +87,6 @@ impl CompResolver<'_> {
         }
     }
 
-    // TODO: use this to resolve component types
     fn find_comp_by_path(&self, path: &syn::Path) -> Option<(usize, usize)> {
         let segments = &path.segments;
 
@@ -199,10 +198,22 @@ fn gen_field(ctx: &mut Ctx<'_>, field: &sem::FieldDef<'_>) -> metadata::FieldDef
         flags |= metadata::FieldFlags::OPTIONAL;
     }
 
+    // See if `field.ty` refers to a known component.
+    let comp_ty = match field.ty.as_ref().unwrap() {
+        syn::Type::Path(syn::TypePath { qself: None, path }) => {
+            if let Some((crate_i, comp_i)) = ctx.resolver.find_comp_by_path(path) {
+                Some(metadata::CompRef { crate_i, comp_i })
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
     metadata::FieldDef {
         field_ty: field.field_ty,
         flags,
-        ty: None, // TODO
+        ty: comp_ty,
         ident: gen_sem_ident(&field.ident),
         accessors: metadata::FieldAccessors {
             set: field.accessors.set.as_ref().map(|a| metadata::FieldSetter {

@@ -95,9 +95,12 @@ pub enum FieldType {
     Wire,
 }
 
-/// References a `CompDef` in `Crate`. (TODO: support referencing compoents
-/// from other crates)
-pub type CompRef = usize;
+/// A reference to a `CompDef` in the same `Repo`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CompRef {
+    pub crate_i: usize,
+    pub comp_i: usize,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldAccessors {

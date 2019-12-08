@@ -446,8 +446,7 @@ fn analyze_input_inner(
                         comp_i,
                     } => (comp, crate_i, comp_i),
                     State::Field(field) => {
-                        if let Some(comp_i) = field.ty {
-                            let crate_i = actx.cur_comp_crate_i;
+                        if let Some(metadata::CompRef { crate_i, comp_i }) = field.ty {
                             (
                                 &actx.ctx.repo.crates[crate_i].comps[comp_i],
                                 crate_i,

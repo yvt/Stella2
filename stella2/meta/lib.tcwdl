@@ -1,5 +1,5 @@
 
-use tcw3::{ui::views::Label, pal};
+use tcw3::{ui::views::{Label, Button}, pal};
 
 #[widget]
 pub comp crate::TestWidget {
@@ -19,4 +19,10 @@ pub comp crate::TestWidget {
     const child = Label {
         prop text = |text| format!("text = '{}'", text);
     };
+
+    const child2 = Button {
+        prop caption = |this.text as x| format!("text = '{}'", x);
+    };
+
+    on (child2.activated) |event.wm| { dbg!(); }
 }
