@@ -130,6 +130,10 @@ impl CompResolver<'_> {
 }
 
 fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
+    let path = gen_path(ctx, &comp.path);
+
+    validate_comp_path(ctx, &path, &comp.path);
+
     metadata::CompDef {
         flags: comp.flags,
         vis: gen_vis(ctx, &comp.vis),
@@ -148,6 +152,26 @@ fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
                 sem::CompItemDef::On(_) => None,
             })
             .collect(),
+    }
+}
+
+fn validate_comp_path(ctx: &mut Ctx<'_>, path: &metadata::Path, orig_path: &sem::Path) {
+    if path.crate_i != ctx.resolver.local_crate_i {
+        ctx.diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: "Can't define a component outside the current crate".to_string(),
+            code: None,
+            spans: orig_path
+                .span
+                .into_iter()
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
+        }]);
     }
 }
 

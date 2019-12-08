@@ -1,5 +1,4 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
-use proc_macro2::Span;
 use std::collections::HashMap;
 use syn::{
     punctuated::Punctuated, spanned::Spanned, Ident, ItemUse, Path, PathArguments, PathSegment,
@@ -8,7 +7,7 @@ use syn::{
 
 use super::{
     diag::Diag,
-    parser::{span_to_codemap, visit_mut, Comp, File, Func, Item},
+    parser::{span_to_codemap, visit_mut, File, Func, Item},
 };
 
 /// Replace all `Path`s in the given AST with absolute paths
@@ -62,44 +61,6 @@ pub fn resolve_paths(
         codemap_file: &'a codemap::File,
         diag: &'a mut Diag,
         alias_map: &'a HashMap<Ident, Vec<Alias>>,
-    }
-
-    impl PathResolver<'_> {
-        fn validate_component_path(&mut self, path: &Path) {
-            let spans: Vec<_> = path
-                .segments
-                .iter()
-                .filter_map(|seg| {
-                    if seg.arguments.is_empty() {
-                        None
-                    } else {
-                        Some(seg.span())
-                    }
-                })
-                .collect();
-
-            if spans.is_empty() {
-                return;
-            }
-
-            let spans: Vec<_> = spans
-                .into_iter()
-                .filter_map(|span| span_to_codemap(span, self.codemap_file))
-                .map(|span| SpanLabel {
-                    span,
-                    label: None,
-                    style: SpanStyle::Primary,
-                })
-                .into_iter()
-                .collect();
-
-            self.diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: "Component path may not include a path argument".to_string(),
-                code: None,
-                spans,
-            }]);
-        }
     }
 
     impl syn::visit_mut::VisitMut for PathResolver<'_> {
@@ -221,7 +182,8 @@ pub fn resolve_paths(
                     break;
                 } else {
                     // The input path turned out to be a rooted path.
-                    i.leading_colon = Some(Token![::](Span::call_site()));
+                    let span = i.segments[0].span();
+                    i.leading_colon = Some(Token![::](span));
                     break;
                 }
             }
@@ -229,50 +191,6 @@ pub fn resolve_paths(
     }
 
     impl visit_mut::TcwdlVisitMut for PathResolver<'_> {
-        // clippy obviously can't read comments
-        #[allow(clippy::if_same_then_else)]
-        fn visit_comp_mut(&mut self, i: &mut Comp) {
-            visit_mut::visit_comp_mut(self, i);
-
-            // Make sure `i.path` does not refer to an external crate.
-            let path = &i.path;
-            let bad = {
-                if path.leading_colon.is_some() {
-                    true
-                } else {
-                    let first = path.segments.first().unwrap().ident.to_string();
-                    if first == "crate" {
-                        false
-                    } else if first == "super" || first == "self" {
-                        // This is not supposed to be seen at this point but it's
-                        // already reported to the user by `visit_path_mut`
-                        false
-                    } else {
-                        true
-                    }
-                }
-            };
-            if bad {
-                let span = path.segments.first().unwrap().span();
-                self.diag.emit(&[Diagnostic {
-                    level: Level::Error,
-                    message: "Can't define a component outside the current crate".to_string(),
-                    code: None,
-                    spans: span_to_codemap(span, self.codemap_file)
-                        .into_iter()
-                        .map(|span| SpanLabel {
-                            span,
-                            label: Some("Expected to start with `crate::`".to_string()),
-                            style: SpanStyle::Primary,
-                        })
-                        .into_iter()
-                        .collect(),
-                }]);
-            }
-
-            self.validate_component_path(path);
-        }
-
         fn visit_func_mut(&mut self, _: &mut Func) {
             // Ignore `i.inputs` because it does not include a path.
             // Ignore `i.body` because it's inserted to the implementation code
