@@ -413,8 +413,11 @@ fn analyze_input_inner(
             }
         } // sem::InputOrigin::Event
 
-        sem::InputOrigin::This if input.selectors.is_empty() => InputInfo::This, // sem::InputOrigin::This if ...
+        // `this` refers to `this`
+        sem::InputOrigin::This if input.selectors.is_empty() => InputInfo::This,
 
+        // `this.field1.field2` refers to something indirectly accessible
+        // through `this`
         sem::InputOrigin::This => {
             enum State<'a> {
                 Comp {
