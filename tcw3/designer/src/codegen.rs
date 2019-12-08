@@ -1,4 +1,5 @@
 use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level};
+use log::info;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -58,7 +59,12 @@ impl<'a> BuildScriptConfig<'a> {
         self
     }
 
+    /// Run the code generator. Terminate the current process on failure.
+    ///
+    /// This method automatically sets up a logger using `env_logger`.
     pub fn run_and_exit_on_error(self) {
+        env_logger::init();
+
         if self.run().is_err() {
             std::process::exit(1);
         }
@@ -91,6 +97,7 @@ impl<'a> BuildScriptConfig<'a> {
         } else {
             let meta_pkg_name =
                 env::var("CARGO_PKG_NAME").map_err(|_| BuildError::CrateNameMissing)?;
+            info!("CARGO_PKG_NAME = {:?}", meta_pkg_name);
             if meta_pkg_name.ends_with("-meta") || meta_pkg_name.ends_with("_meta") {
                 meta_pkg_name[0..meta_pkg_name.len() - 5].to_string()
             } else {
@@ -103,6 +110,7 @@ impl<'a> BuildScriptConfig<'a> {
         } else {
             let dir =
                 env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::CargoManifestDirMissing)?;
+            info!("CARGO_MANIFEST_DIR = {:?}", dir);
             Path::new(&dir).join("lib.tcwdl")
         };
 
@@ -110,6 +118,7 @@ impl<'a> BuildScriptConfig<'a> {
             x
         } else {
             let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::OutDirMissing)?;
+            info!("OUT_DIR = {:?}", out_dir);
             Path::new(&out_dir).join("designer.rs")
         };
 
