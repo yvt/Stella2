@@ -133,7 +133,7 @@ fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
     metadata::CompDef {
         flags: comp.flags,
         vis: gen_vis(ctx, &comp.vis),
-        paths: vec![gen_path(ctx, &comp.path)],
+        paths: vec![gen_path(ctx, &comp.path)], // TODO: validate path
         items: comp
             .items
             .iter()
@@ -168,6 +168,8 @@ fn gen_vis(ctx: &mut Ctx<'_>, vis: &sem::Visibility) -> metadata::Visibility {
 
 /// Assumes `path` is already rooted by `super::resolve`.
 fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
+    // For now, `path` is actually not allowed to be anything from dependent
+    // crates, but anyway...
     let crate_i = if let Some(i) = ctx.resolver.find_crate_by_path(&path.syn_path) {
         i
     } else {
@@ -177,7 +179,15 @@ fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
             level: Level::Error,
             message: format!("Can't find a crate named `{}`", crate_name),
             code: None,
-            spans: vec![], // TODO
+            spans: path
+                .span
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
         }]);
 
         ctx.resolver.local_crate_i
