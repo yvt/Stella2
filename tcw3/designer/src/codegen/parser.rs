@@ -157,7 +157,7 @@ impl Parse for Comp {
         let attrs = input.call(Attribute::parse_outer)?;
         let vis = input.parse()?;
         let comp_token = input.parse()?;
-        let path = input.parse()?;
+        let path = input.call(Path::parse_mod_style)?;
         let content;
         let brace_token = syn::braced!(content in input);
 
@@ -677,7 +677,7 @@ pub struct ObjInit {
 
 impl Parse for ObjInit {
     fn parse(input: ParseStream) -> Result<Self> {
-        let path = input.parse()?;
+        let path = input.call(Path::parse_mod_style)?;
         let content;
         let brace_token = syn::braced!(content in input);
 
