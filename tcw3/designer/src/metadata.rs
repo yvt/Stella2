@@ -83,7 +83,7 @@ bitflags::bitflags! {
     pub struct FieldFlags: u8 {
         const INJECT = 1;
 
-        /// Only valid in `metadata`. `field_ty` must be `Const`.
+        /// Only valid in `metadata`.
         const OPTIONAL = 1 << 1;
     }
 }
