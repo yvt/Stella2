@@ -396,6 +396,34 @@ pub fn gen_construct(
                         );
                     }
                     sem::DynExpr::ObjInit(init) => {
+                        // Find the component we are constructing. The field's
+                        // type is guaranteed to match the component's type
+                        // because we do not allow explicitly specifying the type
+                        // when `ObjInit` is in use.
+                        let meta_item_i =
+                            item_meta2sem_map.iter().position(|i| i == item_i).unwrap();
+                        let meta_field = meta_comp.items[meta_item_i].field().unwrap();
+
+                        if let Some(ty) = &meta_field.ty {
+                            check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);
+                        } else {
+                            diag.emit(&[Diagnostic {
+                                level: Level::Error,
+                                message: format!("`{}` does not refer to a component", init.path),
+                                code: None,
+                                spans: init
+                                    .path
+                                    .span
+                                    .map(|span| SpanLabel {
+                                        span,
+                                        label: None,
+                                        style: SpanStyle::Primary,
+                                    })
+                                    .into_iter()
+                                    .collect(),
+                            }]);
+                        }
+
                         // TODO: Check if `init.path` refers to a component
                         writeln!(out, "{}::new()", CompBuilderTy(&init.path)).unwrap();
                         // TODO: This might be a good opportunity to check
@@ -437,4 +465,104 @@ pub fn gen_construct(
     // TODO: Setup event handlers (maybe in another source file?)
 
     writeln!(out, "{}", var_this).unwrap();
+}
+
+fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut Diag) {
+    let mut initers = vec![Vec::new(); comp.items.len()];
+
+    for init_field in obj_init.fields.iter() {
+        let item_i = comp.items.iter().position(|item| {
+            item.field()
+                .filter(|f| f.ident == init_field.ident.sym)
+                .is_some()
+        });
+
+        let init_field_span = init_field.ident.span.map(|span| SpanLabel {
+            span,
+            label: None,
+            style: SpanStyle::Primary,
+        });
+
+        if let Some(item_i) = item_i {
+            if let Some(field) = comp.items[item_i].field() {
+                if init_field.field_ty != field.field_ty {
+                    diag.emit(&[Diagnostic {
+                        level: Level::Error,
+                        message: format!(
+                            "Field type mismatch; the field `{}` is of type `{}`",
+                            field.field_ty, init_field.field_ty
+                        ),
+                        code: None,
+                        spans: init_field_span.into_iter().collect(),
+                    }]);
+                }
+
+                initers[item_i].push(init_field);
+            } else {
+                diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: format!("`{}::{}` is not a field", comp.name(), init_field.ident.sym),
+                    code: None,
+                    spans: init_field_span.into_iter().collect(),
+                }]);
+            }
+        } else {
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "Component `{}` does not have a field named `{}`",
+                    comp.name(),
+                    init_field.ident.sym
+                ),
+                code: None,
+                spans: init_field_span.into_iter().collect(),
+            }]);
+        }
+    }
+
+    // Report excessive or lack of initialization
+    for (item, initers) in comp.items.iter().zip(initers.iter()) {
+        let field = if let Some(x) = item.field() {
+            x
+        } else {
+            continue;
+        };
+
+        if initers.len() > 1 {
+            let codemap_spans: Vec<_> = initers
+                .iter()
+                .filter_map(|init_field| init_field.ident.span)
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .collect();
+
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!("Too many initializers for the field `{}`", item.ident()),
+                code: None,
+                spans: codemap_spans,
+            }]);
+        }
+
+        if !field.flags.contains(metadata::FieldFlags::OPTIONAL) && initers.is_empty() {
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!("Non-optional field `{}` is not initialized", field.ident),
+                code: None,
+                spans: obj_init
+                    .path
+                    .span
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+    }
 }

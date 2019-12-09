@@ -185,6 +185,13 @@ impl fmt::Display for VisibilityRef<'_> {
 // Metadata Manipulation
 // ---------------------------------------------------------------------------
 
+impl Repo {
+    /// Find a `CompDef` by `CompRef`.
+    pub fn comp_by_ref(&self, r: &CompRef) -> &CompDef {
+        &self.crates[r.crate_i].comps[r.comp_i]
+    }
+}
+
 /// The borrowed version of `Visiblity`.
 #[derive(Debug, Clone)]
 pub enum VisibilityRef<'a> {
@@ -298,6 +305,10 @@ impl CompItemDef {
 }
 
 impl CompDef {
+    pub fn name(&self) -> &Ident {
+        self.paths[0].idents.last().unwrap()
+    }
+
     /// Calculate the maximum possibile visibility of the component's builder
     /// type can have. Having a visibility beyond this is pointless on account
     /// of `const` fields that can't be initialized.
