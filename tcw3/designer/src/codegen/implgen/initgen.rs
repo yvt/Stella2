@@ -333,8 +333,9 @@ pub fn gen_construct(
                 }
                 writeln!(
                     out,
-                    "    {field}: {val},",
+                    "    {field}: {refcell}::new({val}),",
                     field = fields::STATE,
+                    refcell = paths::REF_CELL,
                     val = var_state,
                 )
                 .unwrap();

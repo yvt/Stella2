@@ -87,7 +87,7 @@ pub fn gen_comp(
 
     // `struct ComponentType`
     // -------------------------------------------------------------------
-    writeln!(out, "#![derive(Clone)]").unwrap();
+    writeln!(out, "#[derive(Clone)]").unwrap();
     writeln!(
         out,
         "{vis} struct {ty} {{",

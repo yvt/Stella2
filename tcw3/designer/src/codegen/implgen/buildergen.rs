@@ -142,8 +142,9 @@ pub fn gen_builder(
         .unwrap();
         writeln!(
             out,
-            "        Self {{ {ident}: {some}({ident}), ..self }}",
+            "        Self {{ {field}: {some}({ident}), ..self }}",
             some = paths::SOME,
+            field = InnerValueField(&field.ident.sym),
             ident = field.ident.sym,
         )
         .unwrap();
