@@ -1,3 +1,4 @@
+use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use log::debug;
 use pathfinding::directed::{
     strongly_connected_components::strongly_connected_components,
@@ -23,7 +24,7 @@ pub fn gen_construct(
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
-    _diag: &mut Diag,
+    diag: &mut Diag,
     out: &mut String,
 ) {
     // Construct a dependency graph to find the initialization order
@@ -67,7 +68,7 @@ pub fn gen_construct(
     let push_func_deps = |deps: &mut Vec<usize>, func: &sem::Func| {
         for func_input in func.inputs.iter() {
             match analysis.get_input(&func_input.input) {
-                analysis::InputInfo::EventParam(param_input) => unreachable!(),
+                analysis::InputInfo::EventParam(_) => unreachable!(),
                 analysis::InputInfo::Item(item_input) => {
                     let ind0 = item_input.indirections.first().unwrap();
                     let sem_item_i = item_meta2sem_map[ind0.item_i];
@@ -102,7 +103,7 @@ pub fn gen_construct(
                         Some(sem::DynExpr::Func(func)) => {
                             push_func_deps(&mut deps, func);
                         }
-                        Some(sem::DynExpr::ObjInit(init)) => {
+                        Some(sem::DynExpr::ObjInit(_)) => {
                             // In `nodes`, this node is followed by zero or more
                             // `DepNode::ObjInitField` nodes
                             deps.extend((node_i + 1..nodes.len()).take_while(|&i| {
@@ -158,7 +159,78 @@ pub fn gen_construct(
     } else {
         // If none was found, find cycles and report them as an error.
         let sccs = strongly_connected_components(&node_i_list, node_depends_on);
-        unimplemented!("Cycle found - {:?}", sccs);
+
+        diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: format!(
+                "A circular dependency was detected in the \
+                 field initialization of `{}`",
+                comp_ident
+            ),
+            code: None,
+            spans: comp
+                .path
+                .span
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
+        }]);
+
+        let num_cycles = sccs.iter().filter(|scc| scc.len() > 1).count();
+
+        for (i, scc) in sccs.iter().filter(|scc| scc.len() > 1).enumerate() {
+            let codemap_spans: Vec<_> = scc
+                .iter()
+                .rev()
+                .filter_map(|&x| match &nodes[x] {
+                    DepNode::Field { item_i } => {
+                        let field = comp.items[*item_i].field().unwrap();
+                        Some((field.ident.span?, "initialization of this field"))
+                    }
+                    DepNode::ObjInitField { item_i, field_i } => {
+                        let field = comp.items[*item_i].field().unwrap();
+                        let obj_init = field.value.as_ref().unwrap().obj_init().unwrap();
+                        let init_field = &obj_init.fields[*field_i];
+                        Some((init_field.ident.span?, "initialization of this field"))
+                    }
+                    DepNode::This => Some((comp.path.span?, "`this` reference of the component")),
+                })
+                .enumerate()
+                .map(|(i, (span, label))| SpanLabel {
+                    span,
+                    label: Some(format!("({}) {}", i + 1, label)),
+                    style: SpanStyle::Primary,
+                })
+                .collect();
+
+            diag.emit(&[Diagnostic {
+                level: Level::Note,
+                message: format!("Cycle (SCC) {} of {}", i + 1, num_cycles),
+                code: None,
+                spans: codemap_spans,
+            }]);
+        }
+
+        let involves_this = sccs
+            .iter()
+            .filter(|scc| scc.len() > 1 && scc.contains(&0))
+            .nth(0)
+            .is_some();
+
+        if involves_this {
+            diag.emit(&[Diagnostic {
+                level: Level::Note,
+                message: "`this` is constructed after initializing all fields".to_string(),
+                code: None,
+                spans: vec![],
+            }]);
+        }
+
+        return;
     };
 
     // The last node should be `this`
