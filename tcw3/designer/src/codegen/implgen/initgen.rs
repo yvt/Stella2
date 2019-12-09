@@ -424,10 +424,7 @@ pub fn gen_construct(
                             }]);
                         }
 
-                        // TODO: Check if `init.path` refers to a component
                         writeln!(out, "{}::new()", CompBuilderTy(&init.path)).unwrap();
-                        // TODO: This might be a good opportunity to check
-                        //       (1) missing fields (2) field type mismatch (3) duplicate fields
                         for obj_field in init.fields.iter() {
                             write!(
                                 out,
