@@ -13,6 +13,8 @@ use super::{diag::Diag, EmittedError};
 
 pub mod visit_mut;
 
+// TODO: Preserve the original span of `VisRestricted::path` somehow
+
 pub fn parse_file(
     file: &codemap::File,
     diag: &mut Diag,
@@ -148,6 +150,8 @@ pub struct Comp {
     pub vis: Visibility,
     pub comp_token: kw::comp,
     pub path: Path,
+    /// `path` before being resolved by `resolve_paths`
+    pub orig_path: Path,
     pub brace_token: token::Brace,
     pub items: Vec<CompItem>,
 }
@@ -174,6 +178,7 @@ impl Parse for Comp {
             attrs,
             vis,
             comp_token,
+            orig_path: path.clone(),
             path,
             brace_token,
             items,
@@ -671,6 +676,8 @@ impl ToTokens for InputSelector {
 /// `FillLayout { ... }`
 pub struct ObjInit {
     pub path: Path,
+    /// `path` before being resolved by `resolve_paths`
+    pub orig_path: Path,
     pub brace_token: token::Brace,
     pub fields: Vec<ObjInitField>,
 }
@@ -691,6 +698,7 @@ impl Parse for ObjInit {
         .collect::<Result<_>>()?;
 
         Ok(Self {
+            orig_path: path.clone(),
             path,
             brace_token,
             fields,

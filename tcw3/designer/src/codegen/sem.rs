@@ -78,6 +78,17 @@ impl Path {
             span: parser::span_to_codemap(i.span(), file),
         }
     }
+
+    pub fn from_syn_with_span_of(
+        i: &syn::Path,
+        with_span_of: &syn::Path,
+        file: &codemap::File,
+    ) -> Self {
+        Self {
+            syn_path: i.clone(),
+            span: parser::span_to_codemap(with_span_of.span(), file),
+        }
+    }
 }
 
 impl fmt::Display for Path {
@@ -303,7 +314,7 @@ impl AnalyzeCtx<'_> {
         let mut this = CompDef {
             flags: CompFlags::empty(),
             vis: Visibility::from_syn(&comp.vis, self.file),
-            path: Path::from_syn(&comp.path, self.file),
+            path: Path::from_syn_with_span_of(&comp.path, &comp.orig_path, self.file),
             items: comp
                 .items
                 .iter()
@@ -681,7 +692,7 @@ impl AnalyzeCtx<'_> {
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> ObjInit {
         ObjInit {
-            path: Path::from_syn(&init.path, self.file),
+            path: Path::from_syn_with_span_of(&init.path, &init.orig_path, self.file),
             fields: init
                 .fields
                 .iter()
