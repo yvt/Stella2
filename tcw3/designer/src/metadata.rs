@@ -83,7 +83,7 @@ bitflags::bitflags! {
     pub struct FieldFlags: u8 {
         const INJECT = 1;
 
-        /// Only valid in `metadata`.
+        /// Only valid in `metadata`. Only relevant for `FieldType::{Const, Prop}`.
         const OPTIONAL = 1 << 1;
     }
 }
@@ -316,9 +316,12 @@ impl CompDef {
         self.items
             .iter()
             .filter_map(|item| match item {
-                // Non-optional `const` fields have
                 CompItemDef::Field(FieldDef {
-                    field_ty: FieldType::Const,
+                    field_ty: FieldType::Wire,
+                    ..
+                }) => None,
+                // Non-optional `const` and `prop` fields
+                CompItemDef::Field(FieldDef {
                     flags,
                     accessors:
                         FieldAccessors {

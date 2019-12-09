@@ -231,7 +231,7 @@ fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
 fn gen_field(ctx: &mut Ctx<'_>, field: &sem::FieldDef<'_>) -> metadata::FieldDef {
     let mut flags = field.flags;
 
-    if field.field_ty == metadata::FieldType::Const && field.value.is_some() {
+    if field.field_ty != metadata::FieldType::Wire && field.value.is_some() {
         flags |= metadata::FieldFlags::OPTIONAL;
     }
 
