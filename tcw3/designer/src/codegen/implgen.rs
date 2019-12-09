@@ -8,11 +8,14 @@ use crate::metadata;
 
 mod analysis;
 mod buildergen;
+mod evalgen;
+mod initgen;
 mod iterutils;
 
 /// Paths to standard library items.
 mod paths {
     pub const BOX: &str = "::std::boxed::Box";
+    pub const CLONE: &str = "::std::clone::Clone";
     pub const OPTION: &str = "::std::option::Option";
     pub const SOME: &str = "::std::option::Option::Some";
     pub const RC: &str = "::std::rc::Rc";
@@ -54,7 +57,7 @@ pub fn gen_comp(
 
     // String → index into `comp.items`
     // This also checks duplicate item names.
-    let _item_name_map = make_name_map(
+    let item_name_map = make_name_map(
         comp.items
             .iter()
             .enumerate()
@@ -66,8 +69,21 @@ pub fn gen_comp(
         diag,
     );
 
+    if diag.has_error() {
+        // Duplicate item names cause may false errors down below, so
+        // return early.
+        return out;
+    }
+
+    // index into `meta_comp.items` → index into `comp.items`
+    let item_meta2sem_map: Vec<_> = meta_comp
+        .items
+        .iter()
+        .map(|i| *item_name_map.get(i.ident()).unwrap())
+        .collect();
+
     // Analyze input references
-    let _analysis = analysis::Analysis::new(comp, meta_comp, ctx, diag);
+    let analysis = analysis::Analysis::new(comp, meta_comp, ctx, diag);
 
     // `struct ComponentType`
     // -------------------------------------------------------------------
@@ -162,7 +178,16 @@ pub fn gen_comp(
 
     // `struct ComponentTypeBuilder`
     // -------------------------------------------------------------------
-    buildergen::gen_builder(comp, meta_comp, comp_ident, diag, &mut out);
+    buildergen::gen_builder(
+        comp,
+        meta_comp,
+        comp_ident,
+        &analysis,
+        ctx,
+        &item_meta2sem_map,
+        diag,
+        &mut out,
+    );
 
     // TODO: setters/getters/subscriptions
 
@@ -247,6 +272,11 @@ impl fmt::Display for EventBoxHandlerTy<'_> {
         bx = paths::BOX,
         inner = EventDynHandlerTy(this.0)
     ) }
+}
+
+struct TempVar<T>(T);
+impl<T: fmt::Display> fmt::Display for TempVar<T> {
+    fn_fmt_write! { |this| ("__tmp_{}", this.0) }
 }
 
 struct CommaSeparated<T>(T);

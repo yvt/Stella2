@@ -281,6 +281,10 @@ impl PathRef<'_> {
 }
 
 impl CompItemDef {
+    pub fn field(&self) -> Option<&FieldDef> {
+        try_match!(Self::Field(field) = self).ok()
+    }
+
     pub fn event(&self) -> Option<&EventDef> {
         try_match!(Self::Event(event) = self).ok()
     }

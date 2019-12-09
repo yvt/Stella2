@@ -21,7 +21,7 @@ pub comp crate::TestWidget {
     };
 
     const child2 = Button {
-        prop caption = |this.text as x| format!("text = '{}'", x);
+        prop caption = |this.text as x, &child.view| format!("text = '{}'", x);
     };
 
     on (child2.activated) |event.wm| { dbg!(); }

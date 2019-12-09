@@ -2,6 +2,7 @@ use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use quote::ToTokens;
 use std::fmt;
 use syn::spanned::Spanned;
+use try_match::try_match;
 
 use super::{diag::Diag, parser, parser::span_to_codemap};
 
@@ -99,6 +100,12 @@ pub enum CompItemDef<'a> {
     Field(FieldDef<'a>),
     On(OnDef<'a>),
     Event(EventDef<'a>),
+}
+
+impl CompItemDef<'_> {
+    pub fn field(&self) -> Option<&FieldDef<'_>> {
+        try_match!(Self::Field(x) = self).ok()
+    }
 }
 
 pub struct FieldDef<'a> {
@@ -207,6 +214,12 @@ pub struct EventDef<'a> {
 pub enum DynExpr {
     Func(Func),
     ObjInit(ObjInit),
+}
+
+impl DynExpr {
+    pub fn obj_init(&self) -> Option<&ObjInit> {
+        try_match!(Self::ObjInit(x) = self).ok()
+    }
 }
 
 pub struct Func {

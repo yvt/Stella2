@@ -4,8 +4,8 @@ use std::{fmt::Write, iter::repeat};
 
 use super::super::{diag::Diag, sem};
 use super::{
-    iterutils::Iterutils, paths, Angle, CommaSeparated, CompBuilderTy, FactoryGenParamNameForField,
-    FactorySetterForField, InnerValueField,
+    analysis, initgen, iterutils::Iterutils, paths, Angle, CommaSeparated, CompBuilderTy, Ctx,
+    FactoryGenParamNameForField, FactorySetterForField, InnerValueField,
 };
 use crate::metadata;
 
@@ -13,7 +13,10 @@ pub fn gen_builder(
     comp: &sem::CompDef<'_>,
     meta_comp: &metadata::CompDef,
     comp_ident: &proc_macro2::Ident,
-    _diag: &mut Diag,
+    analysis: &analysis::Analysis,
+    ctx: &Ctx,
+    item_meta2sem_map: &[usize],
+    diag: &mut Diag,
     out: &mut String,
 ) {
     let builder_vis = meta_comp.builder_vis();
@@ -210,7 +213,16 @@ pub fn gen_builder(
     )
     .unwrap();
     writeln!(out, "    fn build(self) -> {} {{", comp_ident).unwrap();
-    // TODO
+    initgen::gen_construct(
+        comp,
+        meta_comp,
+        comp_ident,
+        analysis,
+        ctx,
+        item_meta2sem_map,
+        diag,
+        out,
+    );
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
 }

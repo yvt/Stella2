@@ -7,8 +7,7 @@ use crate::metadata;
 
 pub struct Analysis {
     /// Results indexed by `sem::Input::index`.
-    pub inputs: Vec<Option<InputInfo>>,
-
+    inputs: Vec<Option<InputInfo>>,
     // TODO: For each function expression, we should create a map from
     //       input variables (`b` in `|a as b| body`) to their sources (`a` in
     //       the previous example). This makes it possible to handle
@@ -19,6 +18,13 @@ pub struct Analysis {
     //              event.event1_foo as param, // used only with `event1`
     //              event.event2_bar as param, // used only with `event2`
     //          | { body }
+}
+
+impl Analysis {
+    /// Get analysis for the given input.
+    pub fn get_input(&self, i: &sem::Input) -> &InputInfo {
+        self.inputs[i.index].as_ref().unwrap()
+    }
 }
 
 /// The analysis result for one `sem::Input`.
@@ -63,12 +69,38 @@ pub struct ItemInput {
 
 #[derive(Clone, Copy)]
 pub struct ItemIndirection {
-    /// An index into `Ctx::crates`.
+    /// An index into `ctx.repo.crates`.
     pub comp_crate_i: usize,
-    /// An index into `ctx.crates[comp_crate_i].comps`.
+    /// An index into `ctx.repo.crates[comp_crate_i].comps`.
     pub comp_i: usize,
-    /// An index into `ctx.crates[comp_crate_i].comps[comp_i].items`.
+    /// An index into `ctx.repo.crates[comp_crate_i].comps[comp_i].items`.
     pub item_i: usize,
+}
+
+impl InputInfo {
+    /// Get a flag indicating whether the input produces an input variable
+    /// that is passed into the evaluator.
+    ///
+    /// For example, the `init` trigger does not produce a value by itself, so
+    /// this function returns `false`.
+    pub fn has_value(&self, repo: &metadata::Repo) -> bool {
+        match self {
+            Self::EventParam(_) => true,
+            Self::Item(item_input) => {
+                let item = item_input.indirections.last().unwrap().item(repo);
+                item.field().is_some()
+            }
+            Self::This => true,
+            Self::Invalid => false,
+        }
+    }
+}
+
+impl ItemIndirection {
+    /// Find the `CompItemDef` that `self` refers to.
+    pub fn item<'a>(&self, repo: &'a metadata::Repo) -> &'a metadata::CompItemDef {
+        &repo.crates[self.comp_crate_i].comps[self.comp_i].items[self.item_i]
+    }
 }
 
 struct AnalysisCtx<'a> {
