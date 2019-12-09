@@ -188,9 +188,8 @@ pub fn gen_builder(
                 } else {
                     // Use the old value
                     format!(
-                        "{}: self.{}",
+                        "{0}: self.{0}",
                         InnerValueField(&field2.ident.sym),
-                        field2.ident.sym
                     )
                 }
             }))
