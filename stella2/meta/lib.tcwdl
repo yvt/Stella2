@@ -1,8 +1,10 @@
 
-use tcw3::{ui::views::{Label, Button}, pal};
+use tcw3::{ui::{views::{Label, Button}, theming::Manager}, pal};
 
 #[widget]
 pub comp crate::TestWidget {
+    pub const style_manager: &'static Manager { pub set; }
+
     pub prop text: String {
         pub get; pub set; pub watch event(text_changed);
     } = || "hello!".to_string();
@@ -17,10 +19,14 @@ pub comp crate::TestWidget {
     pub event some_event(wm: pal::Wm);
 
     const child = Label {
+        const style_manager = |style_manager| style_manager;
+
         prop text = |text| format!("text = '{}'", text);
     };
 
     const child2 = Button {
+        const style_manager = |style_manager| style_manager;
+
         prop caption = |this.text as x, &child.view| format!("text = '{}'", x);
     };
 
