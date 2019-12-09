@@ -459,6 +459,25 @@ impl AnalyzeCtx<'_> {
         }
 
         let ty = if let Some(ty) = item.ty.clone() {
+            if let Some(parser::DynExpr::ObjInit(_)) = item.dyn_expr {
+                // Because we can't check if the type is compatible with
+                // the object literal in a reliable way.
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Type mustn't be specified if the initializer is an object literal"
+                        .to_string(),
+                    code: None,
+                    spans: span_to_codemap(item.ident.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
+
             Some(ty)
         } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
             Some(syn::Type::Path(syn::TypePath {
