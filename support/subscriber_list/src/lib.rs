@@ -22,6 +22,12 @@ pub struct Subscription<T> {
     ptr: PoolPtr,
 }
 
+impl<T> Default for SubscriberList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> SubscriberList<T> {
     pub fn new() -> Self {
         Self {
