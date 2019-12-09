@@ -8,6 +8,17 @@ use crate::metadata;
 pub struct Analysis {
     /// Results indexed by `sem::Input::index`.
     pub inputs: Vec<Option<InputInfo>>,
+
+    // TODO: For each function expression, we should create a map from
+    //       input variables (`b` in `|a as b| body`) to their sources (`a` in
+    //       the previous example). This makes it possible to handle
+    //       multiplexing like the following example, which is currently
+    //       invalid:
+    //
+    //          on (event1, event2) |
+    //              event.event1_foo as param, // used only with `event1`
+    //              event.event2_bar as param, // used only with `event2`
+    //          | { body }
 }
 
 /// The analysis result for one `sem::Input`.
@@ -521,6 +532,8 @@ fn analyze_input_inner(
 
                     return InputInfo::Invalid;
                 };
+
+                // TODO: Check accessibility
 
                 indirections.push(ItemIndirection {
                     comp_crate_i: crate_i,

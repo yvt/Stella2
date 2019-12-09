@@ -67,6 +67,11 @@
 //!     - An `event` item.
 //! - The role is **Static**, the referent must be a `const` field.
 //!
+//! ## Limiations
+//!
+//! - The code generator does not have access to Rust's full type system.
+//!   Therefore, it does not perform type chacking at all.
+//!
 //! # Implementation Details
 //!
 //! ## Crate Metadata
