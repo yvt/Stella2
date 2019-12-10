@@ -632,19 +632,23 @@ impl AnalyzeCtx<'_> {
         }
 
         for attr in item.attrs.iter() {
-            self.diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: "Unknown field attribute".to_string(),
-                code: None,
-                spans: span_to_codemap(attr.path.span(), self.file)
-                    .map(|span| SpanLabel {
-                        span,
-                        label: None,
-                        style: SpanStyle::Primary,
-                    })
-                    .into_iter()
-                    .collect(),
-            }]);
+            if attr.path.is_ident("doc") {
+                // TODO: handle doc comments
+            } else {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Unknown field attribute".to_string(),
+                    code: None,
+                    spans: span_to_codemap(attr.path.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
         }
 
         FieldDef {
