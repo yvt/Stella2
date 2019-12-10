@@ -59,6 +59,10 @@ bitflags::bitflags! {
 
         /// The component represents a widget.
         const WIDGET = 1 << 1;
+
+        /// The component uses the simple builder API.
+        /// Requires `PROTOTYPE_ONLY`.
+        const SIMPLE_BUILDER = 1 << 2;
     }
 }
 

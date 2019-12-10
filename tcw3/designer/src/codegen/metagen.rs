@@ -142,9 +142,9 @@ fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
             .items
             .iter()
             .filter_map(|item| match item {
-                sem::CompItemDef::Field(field) => {
-                    Some(metadata::CompItemDef::Field(gen_field(ctx, field)))
-                }
+                sem::CompItemDef::Field(field) => Some(metadata::CompItemDef::Field(gen_field(
+                    ctx, field, comp.flags,
+                ))),
                 sem::CompItemDef::Event(event) => {
                     Some(metadata::CompItemDef::Event(gen_event(ctx, event)))
                 }
@@ -228,7 +228,11 @@ fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
     metadata::Path { crate_i, idents }
 }
 
-fn gen_field(ctx: &mut Ctx<'_>, field: &sem::FieldDef<'_>) -> metadata::FieldDef {
+fn gen_field(
+    ctx: &mut Ctx<'_>,
+    field: &sem::FieldDef<'_>,
+    comp_flags: metadata::CompFlags,
+) -> metadata::FieldDef {
     let mut flags = field.flags;
 
     if field.field_ty != metadata::FieldType::Wire && field.value.is_some() {
@@ -246,6 +250,31 @@ fn gen_field(ctx: &mut Ctx<'_>, field: &sem::FieldDef<'_>) -> metadata::FieldDef
         }
         _ => None,
     };
+
+    // `builder(simple)` puts some restriction.
+    if comp_flags.contains(metadata::CompFlags::SIMPLE_BUILDER)
+        && field.field_ty == metadata::FieldType::Const
+        && field.value.is_some()
+        && field.accessors.set.is_some()
+    {
+        ctx.diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: "`const` field may not have both of a default value and a \
+                      setter if the component has `#[builder(simple)]`"
+                .to_string(),
+            code: None,
+            spans: field
+                .ident
+                .span
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
+        }]);
+    }
 
     metadata::FieldDef {
         field_ty: field.field_ty,

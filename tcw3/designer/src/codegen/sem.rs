@@ -1,10 +1,17 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use quote::ToTokens;
 use std::fmt;
-use syn::spanned::Spanned;
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    spanned::Spanned,
+};
 use try_match::try_match;
 
-use super::{diag::Diag, parser, parser::span_to_codemap};
+use super::{
+    diag::Diag,
+    parser,
+    parser::{emit_syn_errors_as_diag, span_to_codemap},
+};
 
 #[derive(Debug, Clone)]
 pub struct Ident {
@@ -333,6 +340,8 @@ impl AnalyzeCtx<'_> {
                 this.flags |= CompFlags::WIDGET;
             } else if attr.path.is_ident("doc") {
                 // TODO: handle doc comments
+            } else if attr.path.is_ident("builder") {
+                self.analyze_comp_builder_attr(&mut this, attr.tokens.clone());
             } else {
                 self.diag.emit(&[Diagnostic {
                     level: Level::Error,
@@ -350,7 +359,58 @@ impl AnalyzeCtx<'_> {
             }
         }
 
+        if this.flags.contains(CompFlags::SIMPLE_BUILDER)
+            && !this.flags.contains(CompFlags::PROTOTYPE_ONLY)
+        {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "`#[builder(simple)]` requires `#[prototype_only]".to_string(),
+                code: None,
+                spans: span_to_codemap(comp.orig_path.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+
         this
+    }
+
+    fn analyze_comp_builder_attr(
+        &mut self,
+        this: &mut CompDef<'_>,
+        input: proc_macro2::TokenStream,
+    ) {
+        struct BuilderAttr;
+
+        mod kw {
+            syn::custom_keyword!(simple);
+        }
+
+        impl Parse for BuilderAttr {
+            fn parse(input: ParseStream) -> Result<Self> {
+                let content;
+                syn::parenthesized!(content in input);
+
+                // currently, only `builder(simple)` is supported
+                let _: kw::simple = content.parse()?;
+
+                if !content.is_empty() {
+                    return Err(content.error("Unexpected token"));
+                }
+                Ok(BuilderAttr)
+            }
+        }
+
+        if let Err(e) = syn::parse2::<BuilderAttr>(input) {
+            emit_syn_errors_as_diag(e, self.diag, self.file);
+        }
+
+        this.flags |= CompFlags::SIMPLE_BUILDER;
     }
 
     fn analyze_comp_item<'a>(

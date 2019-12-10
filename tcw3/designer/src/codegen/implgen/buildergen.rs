@@ -19,6 +19,10 @@ pub fn gen_builder(
     diag: &mut Diag,
     out: &mut String,
 ) {
+    // The simple builder API does not have a builder type. Our codegen can't
+    // generate it anyway.
+    assert!(!comp.flags.contains(metadata::CompFlags::SIMPLE_BUILDER));
+
     let builder_vis = meta_comp.builder_vis();
 
     let settable_fields = comp.items.iter().filter_map(|item| match item {

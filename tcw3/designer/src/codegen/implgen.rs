@@ -252,6 +252,11 @@ impl<T: fmt::Display> fmt::Display for EventInnerSubList<T> {
     fn_fmt_write! { |this| ("subscriptions_{}", this.0) }
 }
 
+struct SetterMethod<T>(T);
+impl<T: fmt::Display> fmt::Display for SetterMethod<T> {
+    fn_fmt_write! { |this| ("set_{}", this.0) }
+}
+
 struct EventDynHandlerTy<'a>(&'a [syn::FnArg]);
 impl fmt::Display for EventDynHandlerTy<'_> {
     fn_fmt_write! { |this| (

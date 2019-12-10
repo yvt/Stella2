@@ -28,6 +28,29 @@
 //!  - **`#[widget]`** indicates that the component is a widget controller type.
 //!    The precise semantics is yet to be defined and this attribute does
 //!    nothing at the moment.
+//!  - **`#[builder(simple)]`** changes the builder API to the simple one used
+//!    by standard widgets. Because Designer does not support generating the
+//!    code generation for the simple builder API, **`#[prototype_only]` must be
+//!    also specified**.
+//!
+//!    The simple builder API does not provide a builder type and instead the
+//!    component is instantiated by its method `new` that accepts initial field
+//!    values in the order defined in the component. Optional `const` fields
+//!    are not allowed to have a setter method because there's no way to set
+//!    them. This means that every `const` field either (1) has no default value
+//!    and must be specified through `new` or (2) has a default value that can't
+//!    be changed from outside.
+//!
+//!    ```rust,no_compile
+//!    // Standard builder
+//!    ScrollbarBuilder::new().vertical(true).build()
+//!    // Simple builder
+//!    Scrollbar::new(true).build()
+//!    ```
+//!
+//!    The reason to support this builder API is to facilitate the integration
+//!    with hand-crafted components since the simple builder API is easier to
+//!    write manually.
 //!
 //! ## Inputs
 //!

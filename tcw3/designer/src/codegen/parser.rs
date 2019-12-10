@@ -20,26 +20,30 @@ pub fn parse_file(
     diag: &mut Diag,
 ) -> std::result::Result<File, EmittedError> {
     parse_str(file.source()).map_err(|e| {
-        // Convert `syn::Error` to `codemap_diagnostic::Diagnostic`s
-        for error in e {
-            diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: format!("{}", error),
-                code: None,
-                spans: span_to_codemap(error.span(), file)
-                    .map(|span| SpanLabel {
-                        span,
-                        label: None,
-                        style: SpanStyle::Primary,
-                    })
-                    .into_iter()
-                    .collect(),
-            }]);
-        }
+        emit_syn_errors_as_diag(e, diag, file);
 
         // Since we already reported the error through `diag`...
         EmittedError
     })
+}
+
+/// Convert `syn::Error` to `codemap_diagnostic::Diagnostic`s.
+pub fn emit_syn_errors_as_diag(e: syn::Error, diag: &mut Diag, file: &codemap::File) {
+    for error in e {
+        diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: format!("{}", error),
+            code: None,
+            spans: span_to_codemap(error.span(), file)
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
+        }]);
+    }
 }
 
 pub fn span_to_codemap(span: proc_macro2::Span, file: &codemap::File) -> Option<codemap::Span> {

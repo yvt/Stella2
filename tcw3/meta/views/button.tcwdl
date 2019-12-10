@@ -3,6 +3,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, p
 
 #[prototype_only]
 #[widget]
+#[builder(simple)]
 pub comp crate::ui::views::Button {
     pub const style_manager: &'static Manager { pub set; }
 

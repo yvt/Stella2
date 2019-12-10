@@ -9,7 +9,7 @@ use std::{fmt::Write, ops::Range};
 use super::super::{diag::Diag, sem};
 use super::{
     analysis, evalgen, fields, paths, CompBuilderTy, CompSharedTy, CompStateTy, CompTy, Ctx,
-    EventInnerSubList, FactorySetterForField, InnerValueField, TempVar,
+    EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
 };
 use crate::metadata;
 
@@ -405,7 +405,7 @@ pub fn gen_construct(
                         let meta_field = meta_comp.items[meta_item_i].field().unwrap();
 
                         if let Some(ty) = &meta_field.ty {
-                            check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);
+                            let initer_map = check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);
 
                             gen_obj_init(
                                 ctx.repo.comp_by_ref(ty),
@@ -414,6 +414,7 @@ pub fn gen_construct(
                                 ctx,
                                 item_meta2sem_map,
                                 &mut func_input_gen,
+                                &initer_map,
                                 out,
                             );
                         } else {
@@ -456,10 +457,18 @@ pub fn gen_construct(
     writeln!(out, "{}", var_this).unwrap();
 }
 
-fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut Diag) {
+/// Analyze `ObjInit` and report errors if any.
+///
+/// Returns a multi-map from indices into `comp.item` to indices into
+/// `obj_init.fields`.
+fn check_obj_init(
+    comp: &metadata::CompDef,
+    obj_init: &sem::ObjInit,
+    diag: &mut Diag,
+) -> Vec<Vec<usize>> {
     let mut initers = vec![Vec::new(); comp.items.len()];
 
-    for init_field in obj_init.fields.iter() {
+    for (init_field_i, init_field) in obj_init.fields.iter().enumerate() {
         let item_i = comp.items.iter().position(|item| {
             item.field()
                 .filter(|f| f.ident == init_field.ident.sym)
@@ -486,7 +495,7 @@ fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut 
                     }]);
                 }
 
-                initers[item_i].push(init_field);
+                initers[item_i].push(init_field_i);
             } else {
                 diag.emit(&[Diagnostic {
                     level: Level::Error,
@@ -520,7 +529,7 @@ fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut 
         if initers.len() > 1 {
             let codemap_spans: Vec<_> = initers
                 .iter()
-                .filter_map(|init_field| init_field.ident.span)
+                .filter_map(|&i| obj_init.fields[i].ident.span)
                 .map(|span| SpanLabel {
                     span,
                     label: None,
@@ -554,36 +563,109 @@ fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut 
             }]);
         }
     }
+
+    initers
 }
 
 /// Generate an expression that instantiates a componen and evaluates to the
 /// component's type.
+///
+/// `initer_map` is a multi-map from indices into `comp.item` to indices into
+/// `obj_init.fields`, returned by `check_obj_init`, and may include errors
+/// reported by `check_obj_init`.
 fn gen_obj_init(
-    _comp: &metadata::CompDef,
+    comp: &metadata::CompDef,
     obj_init: &sem::ObjInit,
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     input_gen: &mut impl evalgen::FuncInputGen,
+    initer_map: &[Vec<usize>],
     out: &mut String,
 ) {
-    writeln!(out, "{}::new()", CompBuilderTy(&obj_init.path)).unwrap();
-    for obj_field in obj_init.fields.iter() {
-        write!(
+    if comp.flags.contains(metadata::CompFlags::SIMPLE_BUILDER) {
+        // Simple builder API
+        let tmp_var = TempVar("built_component");
+        writeln!(out, "{{").unwrap();
+        writeln!(
             out,
-            "    .{meth}(",
-            meth = FactorySetterForField(&obj_field.ident.sym),
+            "    let {} = {}::new(",
+            tmp_var,
+            CompTy(&obj_init.path)
         )
         .unwrap();
-        evalgen::gen_func_eval(
-            &obj_field.value,
-            analysis,
-            ctx,
-            item_meta2sem_map,
-            input_gen,
-            out,
-        );
-        writeln!(out, ")").unwrap();
+        for (item, initers) in comp.items.iter().zip(initer_map.iter()) {
+            let field = if let Some(x) = item.field() {
+                x
+            } else {
+                continue;
+            };
+
+            // `const` is passed to `new`
+            if field.field_ty == metadata::FieldType::Const
+                && field.accessors.set.is_some()
+                && initers.len() > 0
+            {
+                let obj_field = &obj_init.fields[initers[0]];
+                evalgen::gen_func_eval(
+                    &obj_field.value,
+                    analysis,
+                    ctx,
+                    item_meta2sem_map,
+                    input_gen,
+                    out,
+                );
+                writeln!(out, "    ,").unwrap();
+            }
+        }
+        writeln!(out, "    );").unwrap();
+
+        for obj_field in obj_init
+            .fields
+            .iter()
+            .filter(|f| f.field_ty == metadata::FieldType::Prop)
+        {
+            // `prop` is set through a setter method
+            write!(
+                out,
+                "    {}.{}(",
+                tmp_var,
+                SetterMethod(&obj_field.ident.sym)
+            )
+            .unwrap();
+            evalgen::gen_func_eval(
+                &obj_field.value,
+                analysis,
+                ctx,
+                item_meta2sem_map,
+                input_gen,
+                out,
+            );
+            writeln!(out, ");").unwrap();
+        }
+
+        writeln!(out, "    {}", tmp_var).unwrap();
+        write!(out, "}}").unwrap();
+    } else {
+        // Standard builder API
+        writeln!(out, "{}::new()", CompBuilderTy(&obj_init.path)).unwrap();
+        for obj_field in obj_init.fields.iter() {
+            write!(
+                out,
+                "    .{meth}(",
+                meth = FactorySetterForField(&obj_field.ident.sym),
+            )
+            .unwrap();
+            evalgen::gen_func_eval(
+                &obj_field.value,
+                analysis,
+                ctx,
+                item_meta2sem_map,
+                input_gen,
+                out,
+            );
+            writeln!(out, ")").unwrap();
+        }
+        write!(out, "    .build()").unwrap();
     }
-    write!(out, "    .build()").unwrap();
 }
