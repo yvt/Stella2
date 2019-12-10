@@ -21,6 +21,7 @@ mod paths {
     pub const RC: &str = "::std::rc::Rc";
     pub const CELL: &str = "::std::cell::Cell";
     pub const REF_CELL: &str = "::std::cell::RefCell";
+    pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
     pub const SUB_LIST: &str = "::tcw3::designer_runtime::SubscriberList";
     pub const UNSET: &str = "::tcw3::designer_runtime::Unset";

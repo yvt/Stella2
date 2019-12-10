@@ -323,8 +323,9 @@ pub fn gen_construct(
                         sem::CompItemDef::Event(item) => {
                             writeln!(
                                 out,
-                                "    {ident}: Default::default(),",
+                                "    {ident}: {def}::default(),",
                                 ident = EventInnerSubList(&item.ident.sym),
+                                def = paths::DEFAULT,
                             )
                             .unwrap();
                         }
