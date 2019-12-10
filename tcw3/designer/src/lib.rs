@@ -22,6 +22,13 @@
 //!
 //! TODO
 //!
+//! ## Component Attributes
+//!
+//!  - **`#[prototype_only]`** suppresses the generation of implementation code.
+//!  - **`#[widget]`** indicates that the component is a widget controller type.
+//!    The precise semantics is yet to be defined and this attribute does
+//!    nothing at the moment.
+//!
 //! ## Inputs
 //!
 //! *Inputs* (e.g., `this.prop` in `wire foo = |&this.prop| *prop + 42`)

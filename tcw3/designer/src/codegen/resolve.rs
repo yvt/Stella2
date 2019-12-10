@@ -66,6 +66,8 @@ pub fn resolve_paths(
     impl syn::visit_mut::VisitMut for PathResolver<'_> {
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
+        fn visit_attribute_mut(&mut self, _: &mut syn::Attribute) {}
+
         fn visit_path_mut(&mut self, i: &mut Path) {
             let mut applied_map_list: Vec<(&Ident, &Alias)> = Vec::new();
             let path_span = span_to_codemap(i.span(), self.codemap_file);

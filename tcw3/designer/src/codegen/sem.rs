@@ -326,6 +326,30 @@ impl AnalyzeCtx<'_> {
         this.items
             .extend(lifted_fields.into_iter().map(CompItemDef::Field));
 
+        for attr in comp.attrs.iter() {
+            if attr.path.is_ident("prototype_only") {
+                this.flags |= CompFlags::PROTOTYPE_ONLY;
+            } else if attr.path.is_ident("widget") {
+                this.flags |= CompFlags::WIDGET;
+            } else if attr.path.is_ident("doc") {
+                // TODO: handle doc comments
+            } else {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Unknown component attribute".to_string(),
+                    code: None,
+                    spans: span_to_codemap(attr.path.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
+        }
+
         this
     }
 
@@ -520,6 +544,22 @@ impl AnalyzeCtx<'_> {
                 message: "A value is required for this field type".to_string(),
                 code: None,
                 spans: span_to_codemap(item.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+
+        for attr in item.attrs.iter() {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "Unknown field attribute".to_string(),
+                code: None,
+                spans: span_to_codemap(attr.path.span(), self.file)
                     .map(|span| SpanLabel {
                         span,
                         label: None,

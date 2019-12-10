@@ -1,6 +1,7 @@
 
 use tcw3::{ui::{views::{Label, Button}, theming::Manager}, pal};
 
+/// A test widget
 #[widget]
 pub comp crate::TestWidget {
     pub const style_manager: &'static Manager { pub set; }
