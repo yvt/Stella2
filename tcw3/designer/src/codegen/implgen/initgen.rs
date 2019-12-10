@@ -406,6 +406,16 @@ pub fn gen_construct(
 
                         if let Some(ty) = &meta_field.ty {
                             check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);
+
+                            gen_obj_init(
+                                ctx.repo.comp_by_ref(ty),
+                                init,
+                                analysis,
+                                ctx,
+                                item_meta2sem_map,
+                                &mut func_input_gen,
+                                out,
+                            );
                         } else {
                             diag.emit(&[Diagnostic {
                                 level: Level::Error,
@@ -422,27 +432,9 @@ pub fn gen_construct(
                                     .into_iter()
                                     .collect(),
                             }]);
-                        }
 
-                        writeln!(out, "{}::new()", CompBuilderTy(&init.path)).unwrap();
-                        for obj_field in init.fields.iter() {
-                            write!(
-                                out,
-                                "    .{meth}(",
-                                meth = FactorySetterForField(&obj_field.ident.sym),
-                            )
-                            .unwrap();
-                            evalgen::gen_func_eval(
-                                &obj_field.value,
-                                analysis,
-                                ctx,
-                                item_meta2sem_map,
-                                &mut func_input_gen,
-                                out,
-                            );
-                            writeln!(out, ")").unwrap();
+                            write!(out, "panic!(\"codegen failed\")").unwrap();
                         }
-                        write!(out, "    .build()").unwrap();
                     }
                 }
 
@@ -562,4 +554,36 @@ fn check_obj_init(comp: &metadata::CompDef, obj_init: &sem::ObjInit, diag: &mut 
             }]);
         }
     }
+}
+
+/// Generate an expression that instantiates a componen and evaluates to the
+/// component's type.
+fn gen_obj_init(
+    _comp: &metadata::CompDef,
+    obj_init: &sem::ObjInit,
+    analysis: &analysis::Analysis,
+    ctx: &Ctx,
+    item_meta2sem_map: &[usize],
+    input_gen: &mut impl evalgen::FuncInputGen,
+    out: &mut String,
+) {
+    writeln!(out, "{}::new()", CompBuilderTy(&obj_init.path)).unwrap();
+    for obj_field in obj_init.fields.iter() {
+        write!(
+            out,
+            "    .{meth}(",
+            meth = FactorySetterForField(&obj_field.ident.sym),
+        )
+        .unwrap();
+        evalgen::gen_func_eval(
+            &obj_field.value,
+            analysis,
+            ctx,
+            item_meta2sem_map,
+            input_gen,
+            out,
+        );
+        writeln!(out, ")").unwrap();
+    }
+    write!(out, "    .build()").unwrap();
 }
