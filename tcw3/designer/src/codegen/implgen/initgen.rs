@@ -309,7 +309,16 @@ pub fn gen_construct(
                     let val = TempVar(item2node_map[i]);
                     match item {
                         sem::CompItemDef::Field(item) => match item.field_ty {
-                            sem::FieldType::Wire | sem::FieldType::Prop => {}
+                            sem::FieldType::Wire => {}
+                            sem::FieldType::Prop => {
+                                writeln!(
+                                    out,
+                                    "    {ident}: {def}::default(),",
+                                    ident = InnerValueField(&item.ident.sym),
+                                    def = paths::DEFAULT,
+                                )
+                                .unwrap();
+                            }
                             sem::FieldType::Const => {
                                 writeln!(
                                     out,

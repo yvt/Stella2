@@ -218,6 +218,7 @@
 //!
 //! struct ComponentShared {
 //!     state: RefCell<ComponentState>,
+//!     value_prop1: Cell<Option<u32>>, // uncommited value
 //!     value_const1: u32,
 //!     subscriptions_event1: RefCell<_>,
 //!     /* ... */

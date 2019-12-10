@@ -6,6 +6,7 @@ use std::{collections::HashMap, fmt, fmt::Write};
 use super::{diag::Diag, sem};
 use crate::metadata;
 
+mod accessorgen;
 mod analysis;
 mod buildergen;
 mod evalgen;
@@ -23,7 +24,10 @@ mod paths {
     pub const REF_CELL: &str = "::std::cell::RefCell";
     pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
+    pub const DEREF: &str = "::std::ops::Deref";
     pub const SUB_LIST: &str = "::tcw3::designer_runtime::SubscriberList";
+    pub const SUB: &str = "::tcw3::designer_runtime::Sub";
+    pub const OWNING_REF: &str = "::tcw3::designer_runtime::OwningRef";
     pub const UNSET: &str = "::tcw3::designer_runtime::Unset";
 }
 
@@ -132,7 +136,16 @@ pub fn gen_comp(
                 }
                 sem::FieldType::Wire => {}
                 sem::FieldType::Prop => {
-                    // TODO
+                    // Uncommited new value
+                    writeln!(
+                        out,
+                        "    {ident}: {cell}<{opt}<{ty}>>,",
+                        ident = InnerValueField(&item.ident.sym),
+                        cell = paths::CELL,
+                        opt = paths::OPTION,
+                        ty = item.ty.to_token_stream()
+                    )
+                    .unwrap();
                 }
             },
             sem::CompItemDef::Event(item) => {
@@ -190,7 +203,11 @@ pub fn gen_comp(
         &mut out,
     );
 
-    // TODO: setters/getters/subscriptions
+    // Setters and getters
+    // -------------------------------------------------------------------
+    accessorgen::gen_accessors(comp, comp_ident, &mut out);
+
+    // TODO: raise events
 
     out
 }
@@ -253,21 +270,39 @@ impl<T: fmt::Display> fmt::Display for EventInnerSubList<T> {
     fn_fmt_write! { |this| ("subscriptions_{}", this.0) }
 }
 
+struct GetterMethod<T>(T);
+impl<T: fmt::Display> fmt::Display for GetterMethod<T> {
+    fn_fmt_write! { |this| ("{}", this.0) }
+}
+
 struct SetterMethod<T>(T);
 impl<T: fmt::Display> fmt::Display for SetterMethod<T> {
     fn_fmt_write! { |this| ("set_{}", this.0) }
 }
 
-struct EventDynHandlerTy<'a>(&'a [syn::FnArg]);
-impl fmt::Display for EventDynHandlerTy<'_> {
+struct SubscribeMethod<T>(T);
+impl<T: fmt::Display> fmt::Display for SubscribeMethod<T> {
+    fn_fmt_write! { |this| ("subscribe_{}", this.0) }
+}
+
+struct EventHandlerTrait<'a>(&'a [syn::FnArg]);
+impl fmt::Display for EventHandlerTrait<'_> {
     fn_fmt_write! { |this| (
-        "dyn {fn}({params})",
+        "{fn}({params})",
         fn = paths::FN,
         params = CommaSeparated(this.0.iter()
             .map(|arg| match arg {
                 syn::FnArg::Receiver(_) => unreachable!(),
                 syn::FnArg::Typed(pat) => pat.ty.to_token_stream(),
             }))
+    ) }
+}
+
+struct EventDynHandlerTy<'a>(&'a [syn::FnArg]);
+impl fmt::Display for EventDynHandlerTy<'_> {
+    fn_fmt_write! { |this| (
+        "dyn {trait}",
+        trait = EventHandlerTrait(this.0)
     ) }
 }
 
