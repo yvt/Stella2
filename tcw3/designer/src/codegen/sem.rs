@@ -575,6 +575,23 @@ impl AnalyzeCtx<'_> {
 
             Some(ty)
         } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
+            if accessors.set.is_some() {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Can't have a setter if the initializer is an object literal"
+                        .to_string(),
+                    code: None,
+                    spans: span_to_codemap(item.ident.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
+
             Some(syn::Type::Path(syn::TypePath {
                 qself: None,
                 path: init.path.clone(),
