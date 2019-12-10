@@ -1,0 +1,11 @@
+use cggeom::Box2;
+
+use crate::{ui::AlignFlags, uicore::{SizeTraits, HView}};
+
+#[prototype_only]
+#[builder(simple)]
+pub comp crate::ui::layouts::AbsLayout {
+    const size_traits: SizeTraits { pub set; }
+
+    const items: impl IntoIterator<Item = (HView, Box2<f32>, AlignFlags)> { pub set; }
+}

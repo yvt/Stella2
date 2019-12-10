@@ -30,6 +30,4 @@ pub comp crate::TestWidget {
 
         prop caption = |this.text as x, &child.view| format!("text = '{}'", x);
     };
-
-    on (child2.activated) |event.wm| { dbg!(); }
 }

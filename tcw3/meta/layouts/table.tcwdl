@@ -1,0 +1,12 @@
+use cggeom::Box2;
+
+use crate::{ui::AlignFlags, uicore::{SizeTraits, HView}};
+
+/// A `Layout` that arranges subviews on imaginary table cells.
+#[prototype_only]
+#[builder(simple)]
+pub comp crate::ui::layouts::TableLayout {
+    const cells: impl IntoIterator<Item = (HView, [usize; 2], AlignFlags)> { pub set; }
+
+    // TODO: margin
+}
