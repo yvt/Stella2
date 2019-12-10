@@ -555,7 +555,10 @@ fn check_obj_init(
             }]);
         }
 
-        if !field.flags.contains(metadata::FieldFlags::OPTIONAL) && initers.is_empty() {
+        if !field.flags.contains(metadata::FieldFlags::OPTIONAL)
+            && initers.is_empty()
+            && field.field_ty != metadata::FieldType::Wire
+        {
             diag.emit(&[Diagnostic {
                 level: Level::Error,
                 message: format!("Non-optional field `{}` is not initialized", field.ident),
