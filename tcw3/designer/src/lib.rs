@@ -22,35 +22,79 @@
 //!
 //! TODO
 //!
-//! ## Component Attributes
+//! ## Dynamic Expressions: `|prop1| prop1 + 1`, etc.
 //!
-//!  - **`#[prototype_only]`** suppresses the generation of implementation code.
-//!  - **`#[widget]`** indicates that the component is a widget controller type.
-//!    The precise semantics is yet to be defined and this attribute does
-//!    nothing at the moment.
-//!  - **`#[builder(simple)]`** changes the builder API to the simple one used
-//!    by standard widgets. Because Designer does not support generating the
-//!    code generation for the simple builder API, **`#[prototype_only]` must be
-//!    also specified**.
+//! Fields (`const`, `prop`, and `wire`) and event handlers (`on`) may have *a
+//! dynamic expression* that is evaluated to compute their value or take a
+//! responsive action.
 //!
-//!    The simple builder API does not provide a builder type and instead the
-//!    component is instantiated by its method `new` that accepts initial field
-//!    values in the order defined in the component. Optional `const` fields
-//!    are not allowed to have a setter method because there's no way to set
-//!    them. This means that every `const` field either (1) has no default value
-//!    and must be specified through `new` or (2) has a default value that can't
-//!    be changed from outside.
+//! Dynamic expressions are *not* Rust expression by themselves. They take one
+//! of the following forms:
 //!
-//!    ```rust,no_compile
-//!    // Standard builder
-//!    ScrollbarBuilder::new().vertical(true).build()
-//!    // Simple builder
-//!    Scrollbar::new(true).build()
-//!    ```
+//! **Function: `|funcinputs...| rust-expr`** —
+//! `rust-expr` is a Rust expression that is inserted verbatim into the
+//! generated implementation code. `funcinputs...` is zero or more *inputs* to
+//! the expression with optional decorations shown below:
 //!
-//!    The reason to support this builder API is to facilitate the integration
-//!    with hand-crafted components since the simple builder API is easier to
-//!    write manually.
+//!  - **`&input`** — Takes a reference to the value. This is preferred to the
+//!    default (by-value) mode because it avoids potentially expensive cloning.
+//!  - **`input as altname`** — Reads the input under a different name.
+//!
+//! Here are some examples (assuming `ComponentName` is the enclosing component):
+//!
+//!  - `&this` imports `&ComponentName` representing the current component
+//!    as `this`
+//!  - `field.text as x` reads the value of `prop text` of `const field` of
+//!    the current component, clones it, and makes it available as a variable
+//!    named `x`.
+//!  - `field.event` (`event` refers to an event) does not load any value.
+//!    Instead, it instructs the system to re-evaluate the value when the event
+//!    is raised. **Warning:** In an `on` item, this must be specified in the
+//!    trigger part (between `(...)`). It has no effect in the handler part
+//!    (between `|...|`).
+//!  - `init` is similar to the last one, but it's triggered after the enclosing
+//!    component is instantiated.
+//!  - `event.wm` gets the value of an event parameter named `wm`.
+//!
+//! ```tcwdl,no_compile
+//! // `displayed_text` is re-evaluated whenever `count` changes
+//! wire displayed_text: String = |count|
+//!     format!("You pressed this button for {} time(s)!", count);
+//!
+//! // `max_height` is calculated based on `vertical`. `max_height` is `const`,
+//! // so `vertical` must also be `const`.
+//! const default_max_height: f32 = |vertical|
+//!     if vertical { 1.0 / 0.0 } else { 32.0 };
+//!
+//! // The expression after `=` represents the default value of `max_height`.
+//! // `default_max_height` must be `const` because a default value can't change
+//! // over time.
+//! prop max_height: f32 = |default_max_height| default_max_height;
+//!
+//! // An event handler that runs on various occassions.
+//! on (init, button1.activated, displayed_text)
+//!     |displayed_text| { println!("text = {}", displayed_text); }
+//!
+//! // An event handler receiving a parameter.
+//! on (dnd_receiver.drop_file) |event.file| { dbg!(&file); }
+//! ```
+//!
+//! The expression being inserted verbatim means it can access items defined in
+//! the same scope where `designer_impl!` is used.
+//!
+//! **Object initialization literal: `ComponentName { prop foo = ...; ... }`**
+//! Instantiates the component named `ComponentName` *exactly once* when the
+//! current component is created. The component's fields are initialized with
+//! specified dynamic expressions and kept up-to-date by re-evaluating the
+//! expressions as needed.
+//!
+//! ```tcwdl,no_compile
+//! const button = Button {
+//!     const style_manager = |style_manager| style_manager;
+//!     prop caption = |count|
+//!         format!("You pressed this button for {} time(s)!", count);
+//! };
+//! ```
 //!
 //! ## Inputs
 //!
@@ -87,22 +131,33 @@
 //! | obj-init → `const`    | Static   |
 //! | obj-init → `prop`     | Reactive |
 //!
-//! - The role is **Reactive** or **Trigger**, the input must be watchable. That
-//!   is, the referent must be one of the following:
+//! - If the role is **Reactive** or **Trigger**, the input must be watchable.
+//!   That is, the referent must be one of the following:
 //!     - A `const` field.
 //!     - A `prop` or `wire` field in a component other than the enclosing
 //!       component, having a `watch` accessor visible to the enclosing
 //!       component.
 //!     - Any field of the enclosing component.
 //!     - An `event` item.
-//! - The role is **Static**, the referent must be a `const` field.
+//! - If the role is **Static**, the referent must be a `const` field.
+//!
+//! ## Component Attributes
+//!
+//!  - **`#[prototype_only]`** suppresses the generation of implementation code.
+//!  - **`#[widget]`** indicates that the component is a widget controller type.
+//!    The precise semantics is yet to be defined and this attribute does
+//!    nothing at the moment.
+//!  - **`#[builder(simple)]`** changes the builder API to the simple builder
+//!    API often used by standard widgets. Because Designer does not support
+//!    generating the code generation for the simple builder API,
+//!    **`#[prototype_only]` must also be specified**.
 //!
 //! ## Limiations
 //!
 //! - The code generator does not have access to Rust's full type system.
 //!   Therefore, it does not perform type chacking at all.
 //!
-//! # Implementation Details
+//! # Details
 //!
 //! ## Crate Metadata
 //!
@@ -195,6 +250,26 @@
 //! // `build` appears only if these holes are filled
 //! impl ComponentBuilder<u32> { pub fn build() -> Component { /* ... */ } }
 //! ```
+//!
+//! Components with `#[builder(simple)]` use *the simple builder API*.
+//! The simple builder API does not provide a builder type and instead the
+//! component is instantiated by its method `new` that accepts initial field
+//! values in the order defined in the component. Optional `const` fields
+//! are not allowed to have a setter method because there's no way to set
+//! them. This means that every `const` field either (1) has no default value
+//! and must be specified through `new` or (2) has a default value that can't
+//! be changed from outside.
+//!
+//! ```rust,no_compile
+//! // Standard builder
+//! ScrollbarBuilder::new().vertical(true).build()
+//! // Simple builder
+//! Scrollbar::new(true).build()
+//! ```
+//!
+//! The reason to support this builder API is to facilitate the integration
+//! with hand-crafted components since the simple builder API is easier to
+//! write manually.
 //!
 //! ## Component Initialization
 //!
