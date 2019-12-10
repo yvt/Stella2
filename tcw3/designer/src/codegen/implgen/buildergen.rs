@@ -10,20 +10,19 @@ use super::{
 use crate::metadata;
 
 pub fn gen_builder(
-    comp: &sem::CompDef<'_>,
-    meta_comp: &metadata::CompDef,
-    comp_ident: &proc_macro2::Ident,
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     diag: &mut Diag,
     out: &mut String,
 ) {
+    let comp = ctx.cur_comp;
+
     // The simple builder API does not have a builder type. Our codegen can't
     // generate it anyway.
     assert!(!comp.flags.contains(metadata::CompFlags::SIMPLE_BUILDER));
 
-    let builder_vis = meta_comp.builder_vis();
+    let builder_vis = ctx.cur_meta_comp().builder_vis();
 
     let settable_fields = comp.items.iter().filter_map(|item| match item {
         sem::CompItemDef::Field(
@@ -59,7 +58,7 @@ pub fn gen_builder(
         out,
         "{vis} struct {ty}{gen} {{",
         vis = builder_vis,
-        ty = CompBuilderTy(comp_ident),
+        ty = CompBuilderTy(&ctx.cur_comp.ident.sym),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
@@ -89,8 +88,8 @@ pub fn gen_builder(
     // -------------------------------------------------------------------
     writeln!(
         out,
-        "impl {comp}Builder{gen} {{",
-        comp = comp_ident,
+        "impl {ident}{gen} {{",
+        ident = CompBuilderTy(&comp.ident.sym),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(
                 repeat(paths::UNSET).take(num_non_optional_consts),
@@ -124,7 +123,7 @@ pub fn gen_builder(
     writeln!(
         out,
         "impl{gen} {ty}{gen} {{",
-        ty = CompBuilderTy(comp_ident),
+        ty = CompBuilderTy(&comp.ident.sym),
         gen = if non_optional_fields.clone().next().is_some() {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
@@ -158,8 +157,8 @@ pub fn gen_builder(
     for (i, field) in non_optional_fields.clone().enumerate() {
         // They each change one type parameter of `ComponentBuilder`
         let new_builder_ty = format!(
-            "{ident}<{gen}>",
-            ident = CompBuilderTy(comp_ident),
+            "{ty}<{gen}>",
+            ty = CompBuilderTy(&comp.ident.sym),
             gen = CommaSeparated(
                 builder_ty_params
                     .clone()
@@ -179,8 +178,8 @@ pub fn gen_builder(
         .unwrap();
         writeln!(
             out,
-            "        {comp}Builder {{ {fields} }}",
-            comp = comp_ident,
+            "        {ty} {{ {fields} }}",
+            ty = CompBuilderTy(&comp.ident.sym),
             fields = CommaSeparated(settable_fields.clone().map(|field2| {
                 if field2.ident.sym == field.ident.sym {
                     // Replace with the new value
@@ -204,8 +203,8 @@ pub fn gen_builder(
     // -------------------------------------------------------------------
     writeln!(
         out,
-        "impl {comp}Builder{gen} {{",
-        comp = comp_ident,
+        "impl {ty}{gen} {{",
+        ty = CompBuilderTy(&comp.ident.sym),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(builder_complete_ty_params)))
         } else {
@@ -213,17 +212,8 @@ pub fn gen_builder(
         }
     )
     .unwrap();
-    writeln!(out, "    fn build(self) -> {} {{", comp_ident).unwrap();
-    initgen::gen_construct(
-        comp,
-        meta_comp,
-        comp_ident,
-        analysis,
-        ctx,
-        item_meta2sem_map,
-        diag,
-        out,
-    );
+    writeln!(out, "    fn build(self) -> {} {{", comp.ident.sym).unwrap();
+    initgen::gen_construct(analysis, ctx, item_meta2sem_map, diag, out);
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
 }

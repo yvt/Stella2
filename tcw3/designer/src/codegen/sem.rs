@@ -108,6 +108,8 @@ pub struct CompDef<'a> {
     pub flags: CompFlags,
     pub vis: Visibility,
     pub path: Path,
+    /// The last component of `path`.
+    pub ident: Ident,
     pub items: Vec<CompItemDef<'a>>,
     pub syn: &'a parser::Comp,
 }
@@ -322,6 +324,7 @@ impl AnalyzeCtx<'_> {
             flags: CompFlags::empty(),
             vis: Visibility::from_syn(&comp.vis, self.file),
             path: Path::from_syn_with_span_of(&comp.path, &comp.orig_path, self.file),
+            ident: Ident::from_syn(&comp.path.segments.last().unwrap().ident, self.file),
             items: comp
                 .items
                 .iter()

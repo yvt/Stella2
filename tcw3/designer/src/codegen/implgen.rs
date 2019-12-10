@@ -42,14 +42,28 @@ pub struct Ctx<'a> {
 
     /// Mapping from imported crate names to indices into `repo.crates`.
     pub imports_crate_i: &'a HashMap<&'a str, usize>,
+
+    pub cur_comp: &'a sem::CompDef<'a>,
+
+    pub cur_meta_comp_i: usize,
 }
 
-pub fn gen_comp(
-    comp: &sem::CompDef<'_>,
-    meta_comp: &metadata::CompDef,
-    ctx: &Ctx,
-    diag: &mut Diag,
-) -> String {
+impl<'a> Ctx<'a> {
+    fn cur_meta_comp_ref(&self) -> metadata::CompRef {
+        metadata::CompRef {
+            crate_i: self.repo.main_crate_i,
+            comp_i: self.cur_meta_comp_i,
+        }
+    }
+
+    fn cur_meta_comp(&self) -> &'a metadata::CompDef {
+        self.repo.comp_by_ref(&self.cur_meta_comp_ref())
+    }
+}
+
+pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
+    let comp = ctx.cur_comp;
+
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {
         return r#"compile_error!(
             "`designer_impl!` can't generate code because the component is defined with #[prototype_only]"
@@ -58,7 +72,7 @@ pub fn gen_comp(
 
     let mut out = String::new();
 
-    let comp_ident = &comp.path.syn_path.segments.last().unwrap().ident;
+    let comp_ident = &comp.ident.sym;
 
     // String → index into `comp.items`
     // This also checks duplicate item names.
@@ -81,14 +95,15 @@ pub fn gen_comp(
     }
 
     // index into `meta_comp.items` → index into `comp.items`
-    let item_meta2sem_map: Vec<_> = meta_comp
+    let item_meta2sem_map: Vec<_> = ctx
+        .cur_meta_comp()
         .items
         .iter()
         .map(|i| *item_name_map.get(i.ident()).unwrap())
         .collect();
 
     // Analyze input references
-    let analysis = analysis::Analysis::new(comp, meta_comp, ctx, diag);
+    let analysis = analysis::Analysis::new(ctx, diag);
 
     // `struct ComponentType`
     // -------------------------------------------------------------------
@@ -192,20 +207,11 @@ pub fn gen_comp(
 
     // `struct ComponentTypeBuilder`
     // -------------------------------------------------------------------
-    buildergen::gen_builder(
-        comp,
-        meta_comp,
-        comp_ident,
-        &analysis,
-        ctx,
-        &item_meta2sem_map,
-        diag,
-        &mut out,
-    );
+    buildergen::gen_builder(&analysis, ctx, &item_meta2sem_map, diag, &mut out);
 
     // Setters and getters
     // -------------------------------------------------------------------
-    accessorgen::gen_accessors(comp, comp_ident, &mut out);
+    accessorgen::gen_accessors(ctx, &mut out);
 
     // TODO: raise events
 

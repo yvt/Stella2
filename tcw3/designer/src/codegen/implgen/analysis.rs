@@ -107,39 +107,19 @@ struct AnalysisCtx<'a> {
     ctx: &'a Ctx<'a>,
     diag: &'a mut Diag,
     analysis: &'a mut Analysis,
-    cur_comp: &'a metadata::CompDef,
-    cur_comp_crate_i: usize,
-    cur_comp_i: usize,
 }
 
 impl Analysis {
-    pub fn new(
-        comp: &sem::CompDef<'_>,
-        meta_comp: &metadata::CompDef,
-        ctx: &Ctx,
-        diag: &mut Diag,
-    ) -> Self {
-        // Find the `(comp_crate_i, comp_i)` of the enclosing component
-        // TODO: This value should be passed in lieu of `meta_comp`
-        let cur_comp_crate_i = ctx.repo.main_crate_i;
-        let cur_comp_i = ctx.repo.crates[cur_comp_crate_i]
-            .comps
-            .iter()
-            .position(|c| std::ptr::eq(c, meta_comp))
-            .unwrap();
-
+    pub fn new(ctx: &Ctx, diag: &mut Diag) -> Self {
         let mut this = Self { inputs: Vec::new() };
 
         let mut actx = AnalysisCtx {
             ctx,
             diag,
             analysis: &mut this,
-            cur_comp: meta_comp,
-            cur_comp_crate_i,
-            cur_comp_i,
         };
 
-        for item in comp.items.iter() {
+        for item in ctx.cur_comp.items.iter() {
             match item {
                 sem::CompItemDef::Field(item) => match &item.value {
                     None => {}
@@ -475,10 +455,13 @@ fn analyze_input_inner(
                 Event,
             }
 
+            let cur_meta_comp_ref = actx.ctx.cur_meta_comp_ref();
+            let cur_meta_comp = actx.ctx.cur_meta_comp();
+
             let mut state = State::Comp {
-                comp: actx.cur_comp,
-                crate_i: actx.cur_comp_crate_i,
-                comp_i: actx.cur_comp_i,
+                comp: cur_meta_comp,
+                crate_i: cur_meta_comp_ref.crate_i,
+                comp_i: cur_meta_comp_ref.comp_i,
             };
 
             let mut indirections = Vec::new();

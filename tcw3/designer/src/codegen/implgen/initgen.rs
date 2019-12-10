@@ -18,15 +18,15 @@ use crate::metadata;
 ///
 /// Assumes settable fields are in `self` of type `xxxBuilder`.
 pub fn gen_construct(
-    comp: &sem::CompDef<'_>,
-    meta_comp: &metadata::CompDef,
-    comp_ident: &proc_macro2::Ident,
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     diag: &mut Diag,
     out: &mut String,
 ) {
+    let comp = ctx.cur_comp;
+    let comp_ident = &comp.ident.sym;
+
     // Construct a dependency graph to find the initialization order
     // ----------------------------------------------------------------------
     #[derive(Debug)]
@@ -136,7 +136,7 @@ pub fn gen_construct(
     if log::LevelFilter::Debug <= log::max_level() {
         debug!(
             "Planning field initialization for the component `{}`",
-            comp_ident
+            comp.path
         );
         for (i, node) in nodes.iter().enumerate() {
             debug!(
@@ -165,7 +165,7 @@ pub fn gen_construct(
             message: format!(
                 "A circular dependency was detected in the \
                  field initialization of `{}`",
-                comp_ident
+                comp.path
             ),
             code: None,
             spans: comp
@@ -282,7 +282,7 @@ pub fn gen_construct(
                 assert_eq!(var.0, var_this.0);
 
                 // `struct ComponentTypeState`
-                writeln!(out, "let {} = {} {{", var_state, CompStateTy(comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_state, CompStateTy(&comp_ident)).unwrap();
                 for (i, item) in comp.items.iter().enumerate() {
                     let val = TempVar(item2node_map[i]);
                     match item {
@@ -304,7 +304,7 @@ pub fn gen_construct(
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentTypeShared`
-                writeln!(out, "let {} = {} {{", var_shared, CompSharedTy(comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_shared, CompSharedTy(&comp_ident)).unwrap();
                 for (i, item) in comp.items.iter().enumerate() {
                     let val = TempVar(item2node_map[i]);
                     match item {
@@ -352,7 +352,7 @@ pub fn gen_construct(
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentType`
-                writeln!(out, "let {} = {} {{", var_this, CompTy(comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_this, CompTy(&comp_ident)).unwrap();
                 writeln!(
                     out,
                     "    {field}: {rc}::new({shared})",
@@ -412,7 +412,7 @@ pub fn gen_construct(
                         // when `ObjInit` is in use.
                         let meta_item_i =
                             item_meta2sem_map.iter().position(|i| i == item_i).unwrap();
-                        let meta_field = meta_comp.items[meta_item_i].field().unwrap();
+                        let meta_field = ctx.cur_meta_comp().items[meta_item_i].field().unwrap();
 
                         if let Some(ty) = &meta_field.ty {
                             let initer_map = check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);

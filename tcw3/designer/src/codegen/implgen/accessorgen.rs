@@ -3,12 +3,14 @@ use quote::ToTokens;
 use std::fmt::Write;
 
 use super::{
-    fields, paths, sem, CompTy, EventBoxHandlerTy, EventInnerSubList, GetterMethod,
+    fields, paths, sem, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList, GetterMethod,
     InnerValueField, SetterMethod, SubscribeMethod,
 };
 
-pub fn gen_accessors(comp: &sem::CompDef<'_>, comp_ident: &proc_macro2::Ident, out: &mut String) {
-    writeln!(out, "impl {} {{", CompTy(comp_ident)).unwrap();
+pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
+    let comp = ctx.cur_comp;
+
+    writeln!(out, "impl {} {{", CompTy(&comp.ident.sym)).unwrap();
 
     for item in comp.items.iter() {
         match item {

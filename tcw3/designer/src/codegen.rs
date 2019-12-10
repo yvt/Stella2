@@ -298,19 +298,17 @@ impl<'a> BuildScriptConfig<'a> {
         // TODO: Now, generate `Crate` again
 
         // Generate implementation code
-        let implgen_ctx = implgen::Ctx {
-            repo: &repo,
-            imports_crate_i: &imports_crate_i,
-        };
-        let meta_comps = &repo.crates[repo.main_crate_i].comps;
         let comp_code_chunks: Vec<_> = comps
             .iter()
-            .zip(meta_comps.iter())
-            .map(|(comp, meta_comp)| {
-                (
-                    comp,
-                    implgen::gen_comp(comp, meta_comp, &implgen_ctx, &mut diag),
-                )
+            .enumerate()
+            .map(|(comp_i, comp)| {
+                let implgen_ctx = implgen::Ctx {
+                    repo: &repo,
+                    imports_crate_i: &imports_crate_i,
+                    cur_comp: comp,
+                    cur_meta_comp_i: comp_i,
+                };
+                (comp, implgen::gen_comp(&implgen_ctx, &mut diag))
             })
             .collect();
 
