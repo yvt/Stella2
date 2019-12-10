@@ -11,14 +11,14 @@ pub comp crate::uicore::HView {
     const flags: ViewFlags { pub set; pub get clone; }
 
     /// Sets a new `ViewListener` for the view.
-    prop listener: Box<ViewListener> { pub set; }
+    prop listener: Box<ViewListener> { pub set; } = || unreachable!();
 
     /// Sets a new `Layout` for the view.
-    prop layout: Box<dyn Layout> { pub set; }
+    prop layout: Box<dyn Layout> { pub set; } = || unreachable!();
 
     /// Sets or retrieves the desired apperance of the mouse cursor for a given
     /// view.
-    prop cursor_shape: Option<CursorShape> { pub set; pub get clone; }
+    prop cursor_shape: Option<CursorShape> { pub set; pub get clone; } = || unreachable!();
 
     /// Retrieves the frame (bounding rectangle) of a view in the superview's
     /// coordinate space.
