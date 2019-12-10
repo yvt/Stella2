@@ -137,7 +137,7 @@ pub fn gen_builder(
         writeln!(
             out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> Self {{",
-            vis = field.vis,
+            vis = field.accessors.set.as_ref().unwrap().vis,
             method = FactorySetterForField(&field.ident.sym),
             ident = field.ident.sym,
             ty = field.ty.to_token_stream(),
@@ -169,7 +169,7 @@ pub fn gen_builder(
         writeln!(
             out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> {new_bldr_ty} {{",
-            vis = field.vis,
+            vis = field.accessors.set.as_ref().unwrap().vis,
             method = FactorySetterForField(&field.ident.sym),
             ident = field.ident.sym,
             ty = field.ty.to_token_stream(),
@@ -212,7 +212,13 @@ pub fn gen_builder(
         }
     )
     .unwrap();
-    writeln!(out, "    fn build(self) -> {} {{", comp.ident.sym).unwrap();
+    writeln!(
+        out,
+        "    {vis} fn build(self) -> {ty} {{",
+        vis = builder_vis,
+        ty = comp.ident.sym
+    )
+    .unwrap();
     initgen::gen_construct(analysis, ctx, item_meta2sem_map, diag, out);
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
