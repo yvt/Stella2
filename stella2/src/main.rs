@@ -19,8 +19,6 @@ mod windres {
     stella2_windres::attach_windres!();
 }
 
-stella2_meta::designer_impl! { crate::TestWidget }
-
 fn main() {
     crashhandler::init();
 
