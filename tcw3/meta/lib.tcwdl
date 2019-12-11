@@ -5,4 +5,5 @@ import!("layouts/fill.tcwdl");
 import!("layouts/table.tcwdl");
 import!("views/button.tcwdl");
 import!("views/label.tcwdl");
+import!("views/spacer.tcwdl");
 import!("views/split.tcwdl");

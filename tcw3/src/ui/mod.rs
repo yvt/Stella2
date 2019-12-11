@@ -30,6 +30,8 @@ pub mod views {
         split::Split,
         table::{ScrollableTable, Table},
     };
+    tcw3_meta::designer_impl! { crate::ui::views::SpacerWidget }
+    tcw3_meta::designer_impl! { crate::ui::views::FixedSpacer }
 }
 
 /// Theming support

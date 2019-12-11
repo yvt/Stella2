@@ -2,7 +2,7 @@ use harmony::Elem;
 use tcw3::{
     ui::{
         AlignFlags,
-        views::{Label, Button, Split},
+        views::{Label, Button, Split, FixedSpacer},
         layouts::TableLayout,
         theming::{self, Manager},
     },
@@ -90,19 +90,26 @@ pub(crate) comp ToolbarView {
                 |toggle_sidebar_button.view as v1,
                     go_back_button.view as v2,
                     go_forward_button.view as v3,
-                    search_bar.view as v4|
+                    search_bar.view as v4,
+                    spacer1.view as s1,
+                    spacer2.view as s2,
+                    spacer3.view as s3|
                 vec![
                     (v1, [0, 0], AlignFlags::JUSTIFY),
-                    // TODO: spacer of size `10.0` with `HORZ_JUSTIFY`
-                    (v2, [1, 0], AlignFlags::JUSTIFY),
-                    // TODO: spacer of size `10.0` with `HORZ_JUSTIFY`
-                    (v3, [2, 0], AlignFlags::JUSTIFY),
-                    // TODO: spacer with `CENTER`
-                    (v4, [3, 0], AlignFlags::HORZ_JUSTIFY),
+                    (s1, [1, 0], AlignFlags::HORZ_JUSTIFY),
+                    (v2, [2, 0], AlignFlags::JUSTIFY),
+                    (s2, [3, 0], AlignFlags::HORZ_JUSTIFY),
+                    (v3, [4, 0], AlignFlags::JUSTIFY),
+                    (s3, [5, 0], AlignFlags::CENTER),
+                    (v4, [6, 0], AlignFlags::RIGHT),
                 ];
             // TODO: uniform margin `5.0`
         };
     };
+
+    const spacer1 = FixedSpacer { prop size = || [5.0, 0.0].into(); };
+    const spacer2 = FixedSpacer { prop size = || [5.0, 0.0].into(); };
+    const spacer3 = FixedSpacer { };
 
     const toggle_sidebar_button = Button {
         const style_manager = |style_manager as x| x;
