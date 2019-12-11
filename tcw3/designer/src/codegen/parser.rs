@@ -513,7 +513,7 @@ impl Parse for DynExpr {
 
         if la.peek(Token![|]) {
             Ok(DynExpr::Func(input.parse()?))
-        } else if la.peek(Ident) {
+        } else if la.peek(Ident) || la.peek(Token![crate]) {
             Ok(DynExpr::ObjInit(input.parse()?))
         } else {
             Err(la.error())
