@@ -345,6 +345,20 @@ where
     }
 }
 
+struct CommaSeparatedWithTrailingComma<T>(T);
+impl<T> fmt::Display for CommaSeparatedWithTrailingComma<T>
+where
+    T: Clone + IntoIterator,
+    T::Item: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for e in self.0.clone() {
+            write!(f, "{}, ", e)?;
+        }
+        Ok(())
+    }
+}
+
 /// Construct a mapping from names to values of type `T`. Reports an error if
 /// duplicate names are detected.
 fn make_name_map<T>(

@@ -2,7 +2,7 @@
 use quote::ToTokens;
 use std::fmt::Write;
 
-use super::{analysis, paths, sem, CommaSeparated, Ctx};
+use super::{analysis, paths, sem, CommaSeparatedWithTrailingComma, Ctx};
 use crate::metadata;
 
 pub trait FuncInputGen {
@@ -41,29 +41,14 @@ pub fn gen_func_eval(
     //          on (event1, event2) || { body }
     //           ↓
     //          subscribe_event1(Box::new(|| {
-    //              (|| { body })()
+    //              match () { () => { body } )
     //          }));
     //          subscribe_event2(Box::new(|| {
-    //              (|| { body })()
+    //              match () { () => { body } )
     //          }));
 
-    // The closure to catch `return`
-    write!(
-        out,
-        "(|{args}| {{ {body} }})",
-        args = CommaSeparated(func.inputs.iter().filter_map(|func_input| {
-            if analysis.get_input(&func_input.input).has_value(ctx.repo) {
-                Some(&func_input.ident.sym)
-            } else {
-                None
-            }
-        })),
-        body = func.body.to_token_stream(),
-    )
-    .unwrap();
-
-    // Parameters
-    write!(out, "(").unwrap();
+    // `match` input
+    write!(out, "match (").unwrap();
     for func_input in func.inputs.iter() {
         if !analysis.get_input(&func_input.input).has_value(ctx.repo) {
             continue;
@@ -138,4 +123,19 @@ pub fn gen_func_eval(
         write!(out, ", ").unwrap();
     }
     write!(out, ")").unwrap();
+
+    // `match` pattern and body
+    write!(
+        out,
+        " {{ ({args}) => {{ {body} }} }}",
+        args = CommaSeparatedWithTrailingComma(func.inputs.iter().filter_map(|func_input| {
+            if analysis.get_input(&func_input.input).has_value(ctx.repo) {
+                Some(&func_input.ident.sym)
+            } else {
+                None
+            }
+        })),
+        body = func.body.to_token_stream(),
+    )
+    .unwrap();
 }
