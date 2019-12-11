@@ -11,6 +11,7 @@ use crate::metadata;
 
 pub fn gen_builder(
     analysis: &analysis::Analysis,
+    dep_analysis: &initgen::DepAnalysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     diag: &mut Diag,
@@ -224,7 +225,7 @@ pub fn gen_builder(
         ty = comp.ident.sym
     )
     .unwrap();
-    initgen::gen_construct(analysis, ctx, item_meta2sem_map, diag, out);
+    initgen::gen_construct(analysis, dep_analysis, ctx, item_meta2sem_map, diag, out);
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
 }

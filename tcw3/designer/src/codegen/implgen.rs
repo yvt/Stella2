@@ -3,7 +3,7 @@ use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use quote::ToTokens;
 use std::{collections::HashMap, fmt, fmt::Write};
 
-use super::{diag::Diag, sem};
+use super::{diag::Diag, sem, EmittedError};
 use crate::metadata;
 
 mod accessorgen;
@@ -61,13 +61,13 @@ impl<'a> Ctx<'a> {
     }
 }
 
-pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
+pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
     let comp = ctx.cur_comp;
 
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {
-        return r#"compile_error!(
+        return Ok(r#"compile_error!(
             "`designer_impl!` can't generate code because the component is defined with #[prototype_only]"
-        )"#.to_string();
+        )"#.to_string());
     }
 
     let mut out = String::new();
@@ -91,7 +91,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
     if diag.has_error() {
         // Duplicate item names cause may false errors down below, so
         // return early.
-        return out;
+        return Err(EmittedError);
     }
 
     // index into `meta_comp.items` → index into `comp.items`
@@ -104,6 +104,9 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
 
     // Analyze input references
     let analysis = analysis::Analysis::new(ctx, diag);
+
+    // Analyze field dependency
+    let dep_analysis = initgen::DepAnalysis::new(&analysis, ctx, &item_meta2sem_map, diag)?;
 
     // `struct ComponentType`
     // -------------------------------------------------------------------
@@ -207,13 +210,20 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
 
     // `struct ComponentTypeBuilder`
     // -------------------------------------------------------------------
-    buildergen::gen_builder(&analysis, ctx, &item_meta2sem_map, diag, &mut out);
+    buildergen::gen_builder(
+        &analysis,
+        &dep_analysis,
+        ctx,
+        &item_meta2sem_map,
+        diag,
+        &mut out,
+    );
 
     // Setters and getters
     // -------------------------------------------------------------------
     accessorgen::gen_accessors(ctx, &mut out);
 
-    out
+    Ok(out)
 }
 
 // Lower-level codegen utils

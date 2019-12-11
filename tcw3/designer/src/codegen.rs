@@ -308,7 +308,12 @@ impl<'a> BuildScriptConfig<'a> {
                     cur_comp: comp,
                     cur_meta_comp_i: comp_i,
                 };
-                (comp, implgen::gen_comp(&implgen_ctx, &mut diag))
+                (
+                    comp,
+                    implgen::gen_comp(&implgen_ctx, &mut diag).unwrap_or_else(|EmittedError| {
+                        "compile_error!(\"code generation failed.\")".to_string()
+                    }),
+                )
             })
             .collect();
 

@@ -6,39 +6,51 @@ use pathfinding::directed::{
 };
 use std::{fmt::Write, ops::Range};
 
-use super::super::{diag::Diag, sem};
+use super::super::{diag::Diag, sem, EmittedError};
 use super::{
     analysis, evalgen, fields, paths, CompBuilderTy, CompSharedTy, CompStateTy, CompTy, Ctx,
     EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
 };
 use crate::metadata;
 
-/// Generates construction code for a component. The generated expression
-/// evaluates to the type named `CompTy(comp_ident)`.
-///
-/// Assumes settable fields are in `self` of type `xxxBuilder`.
-pub fn gen_construct(
+#[derive(Debug)]
+enum DepNode {
+    Field { item_i: usize },
+    // Actually, this doesn't have to be a node because it could be just
+    // initialized as a part of `Field`. Nevertheless, it's represented as
+    // a node for better reporting of a circular reference.
+    ObjInitField { item_i: usize, field_i: usize },
+    This,
+}
+
+pub struct DepAnalysis {
+    nodes: Vec<DepNode>,
+    item2node_map: Vec<usize>,
+    ordered_node_i_list: Vec<usize>,
+}
+
+impl DepAnalysis {
+    pub fn new(
+        analysis: &analysis::Analysis,
+        ctx: &Ctx,
+        item_meta2sem_map: &[usize],
+        diag: &mut Diag,
+    ) -> Result<Self, EmittedError> {
+        analyze_dep(analysis, ctx, item_meta2sem_map, diag)
+    }
+}
+
+/// Analyze dependencies between fields.
+fn analyze_dep(
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     diag: &mut Diag,
-    out: &mut String,
-) {
+) -> Result<DepAnalysis, EmittedError> {
     let comp = ctx.cur_comp;
-    let comp_ident = &comp.ident.sym;
 
     // Construct a dependency graph to find the initialization order
     // ----------------------------------------------------------------------
-    #[derive(Debug)]
-    enum DepNode {
-        Field { item_i: usize },
-        // Actually, this doesn't have to be a node because it could be just
-        // initialized as a part of `Field`. Nevertheless, it's represented as
-        // a node for better reporting of a circular reference.
-        ObjInitField { item_i: usize, field_i: usize },
-        This,
-    }
-
     let mut nodes = vec![DepNode::This];
 
     // Define nodes
@@ -230,11 +242,37 @@ pub fn gen_construct(
             }]);
         }
 
-        return;
+        return Err(EmittedError);
     };
 
     // The last node should be `this`
     assert_eq!(*ordered_node_i_list.last().unwrap(), 0);
+
+    Ok(DepAnalysis {
+        nodes,
+        item2node_map,
+        ordered_node_i_list,
+    })
+}
+
+/// Generates construction code for a component. The generated expression
+/// evaluates to the type named `CompTy(comp_ident)`.
+///
+/// Assumes settable fields are in `self` of type `xxxBuilder`.
+pub fn gen_construct(
+    analysis: &analysis::Analysis,
+    dep_analysis: &DepAnalysis,
+    ctx: &Ctx,
+    item_meta2sem_map: &[usize],
+    diag: &mut Diag,
+    out: &mut String,
+) {
+    let comp = ctx.cur_comp;
+    let comp_ident = &comp.ident.sym;
+
+    let nodes = &dep_analysis.nodes[..];
+    let item2node_map = &dep_analysis.item2node_map[..];
+    let ordered_node_i_list = &dep_analysis.ordered_node_i_list[..];
 
     // Emit field initializers
     // ----------------------------------------------------------------------
