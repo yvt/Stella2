@@ -531,7 +531,8 @@ fn analyze_input_inner(
                         level: Level::Error,
                         message: format!(
                             "`{}` not have a field named `{}`",
-                            comp.paths[0], sel.sym
+                            comp.paths[0].display(actx.ctx.repo),
+                            sel.sym
                         ),
                         code: None,
                         spans: sel

@@ -15,7 +15,8 @@ pub struct Repo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Crate {
-    /// Should be used only for creating diagnostic messages.
+    /// Should be used only for creating diagnostic messages and generating
+    /// implementation code.
     pub name: String,
     pub uuid: Uuid,
     pub comps: Vec<CompDef>,
@@ -152,35 +153,63 @@ pub struct EventDef {
 // Printing
 // ---------------------------------------------------------------------------
 
-impl fmt::Display for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_ref().fmt(f)
+#[derive(Debug, Clone, Copy)]
+pub struct PathDisplay<'a> {
+    path: PathRef<'a>,
+    repo: &'a Repo,
+}
+
+impl Path {
+    pub fn display<'a>(&'a self, repo: &'a Repo) -> PathDisplay<'a> {
+        self.as_ref().display(repo)
     }
 }
 
-impl fmt::Display for PathRef<'_> {
+impl<'a> PathRef<'a> {
+    pub fn display(&self, repo: &'a Repo) -> PathDisplay<'a> {
+        PathDisplay { path: *self, repo }
+    }
+}
+
+impl fmt::Display for PathDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Add a method like `PathRef::display(&Repo)` to support
-        //       reverse-lookup of crate names
-        write!(f, "{{{}}}", self.crate_i)?;
-        for ident in self.idents.iter() {
+        if self.path.crate_i == self.repo.main_crate_i {
+            write!(f, "crate")?;
+        } else {
+            write!(f, "::{}", self.repo.crates[self.path.crate_i].name)?;
+        }
+
+        for ident in self.path.idents.iter() {
             write!(f, "::{}", ident)?;
         }
         Ok(())
     }
 }
 
-impl fmt::Display for Visibility {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_ref().fmt(f)
+#[derive(Debug, Clone, Copy)]
+pub struct VisibilityDisplay<'a> {
+    vis: VisibilityRef<'a>,
+    repo: &'a Repo,
+}
+
+impl Visibility {
+    #[allow(dead_code)]
+    pub fn display<'a>(&'a self, repo: &'a Repo) -> VisibilityDisplay<'a> {
+        self.as_ref().display(repo)
     }
 }
 
-impl fmt::Display for VisibilityRef<'_> {
+impl<'a> VisibilityRef<'a> {
+    pub fn display(&self, repo: &'a Repo) -> VisibilityDisplay<'a> {
+        VisibilityDisplay { vis: *self, repo }
+    }
+}
+
+impl fmt::Display for VisibilityDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match self.vis {
             VisibilityRef::Private => Ok(()),
-            VisibilityRef::Restricted(p) => write!(f, "pub (in {})", p),
+            VisibilityRef::Restricted(p) => write!(f, "pub (in {})", p.display(self.repo)),
             VisibilityRef::Public => write!(f, "pub"),
         }
     }
@@ -197,7 +226,7 @@ impl Repo {
 }
 
 /// The borrowed version of `Visiblity`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum VisibilityRef<'a> {
     Private,
     Restricted(PathRef<'a>),

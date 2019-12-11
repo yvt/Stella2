@@ -57,7 +57,7 @@ pub fn gen_builder(
     writeln!(
         out,
         "{vis} struct {ty}{gen} {{",
-        vis = builder_vis,
+        vis = builder_vis.display(ctx.repo),
         ty = CompBuilderTy(&ctx.cur_comp.ident.sym),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
@@ -99,7 +99,12 @@ pub fn gen_builder(
         }
     )
     .unwrap();
-    writeln!(out, "    {vis} fn new() -> Self {{", vis = builder_vis).unwrap();
+    writeln!(
+        out,
+        "    {vis} fn new() -> Self {{",
+        vis = builder_vis.display(ctx.repo)
+    )
+    .unwrap();
     writeln!(out, "        Self {{").unwrap();
     for field in settable_fields.clone() {
         writeln!(
@@ -215,7 +220,7 @@ pub fn gen_builder(
     writeln!(
         out,
         "    {vis} fn build(self) -> {ty} {{",
-        vis = builder_vis,
+        vis = builder_vis.display(ctx.repo),
         ty = comp.ident.sym
     )
     .unwrap();
