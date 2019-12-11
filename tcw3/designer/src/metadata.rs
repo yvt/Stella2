@@ -336,7 +336,7 @@ impl CompDef {
                 }) if !flags.contains(FieldFlags::OPTIONAL) => Some(vis.as_ref()),
                 _ => None,
             })
-            .fold(VisibilityRef::Public, VisibilityRef::strictest)
+            .fold(self.vis.as_ref(), VisibilityRef::strictest)
     }
 
     pub fn find_item_by_ident(&self, ident: &str) -> Option<(usize, &CompItemDef)> {
