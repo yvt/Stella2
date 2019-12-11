@@ -213,8 +213,6 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> String {
     // -------------------------------------------------------------------
     accessorgen::gen_accessors(ctx, &mut out);
 
-    // TODO: raise events
-
     out
 }
 
@@ -289,6 +287,11 @@ impl<T: fmt::Display> fmt::Display for SetterMethod<T> {
 struct SubscribeMethod<T>(T);
 impl<T: fmt::Display> fmt::Display for SubscribeMethod<T> {
     fn_fmt_write! { |this| ("subscribe_{}", this.0) }
+}
+
+struct RaiseMethod<T>(T);
+impl<T: fmt::Display> fmt::Display for RaiseMethod<T> {
+    fn_fmt_write! { |this| ("raise_{}", this.0) }
 }
 
 struct EventHandlerTrait<'a>(&'a [syn::FnArg]);

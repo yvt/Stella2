@@ -3,8 +3,8 @@ use quote::ToTokens;
 use std::fmt::Write;
 
 use super::{
-    fields, paths, sem, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList, GetterMethod,
-    InnerValueField, SetterMethod, SubscribeMethod,
+    fields, paths, sem, CommaSeparated, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList,
+    GetterMethod, InnerValueField, RaiseMethod, SetterMethod, SubscribeMethod, TempVar,
 };
 
 pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
@@ -130,7 +130,7 @@ pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
             sem::CompItemDef::Event(event) => {
                 writeln!(
                     out,
-                    "   {vis} fn {meth}(&self, handler: {ty}) -> {sub} {{",
+                    "    {vis} fn {meth}(&self, handler: {ty}) -> {sub} {{",
                     vis = event.vis,
                     meth = SubscribeMethod(&event.ident.sym),
                     ty = EventBoxHandlerTy(&event.inputs),
@@ -147,6 +147,40 @@ pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
                 writeln!(out, "            .borrow_mut()").unwrap();
                 writeln!(out, "            .insert(handler)").unwrap();
                 writeln!(out, "            .untype()").unwrap();
+                writeln!(out, "    }}").unwrap();
+
+                let handler = TempVar("handler");
+                writeln!(
+                    out,
+                    "    fn {meth}(&self, {args}) {{",
+                    meth = RaiseMethod(&event.ident.sym),
+                    args =
+                        CommaSeparated(event.inputs.iter().map(|fn_arg| fn_arg.to_token_stream())),
+                )
+                .unwrap();
+                writeln!(
+                    out,
+                    "        for {i} in self.{shared}.{field}.borrow().iter() {{",
+                    i = handler,
+                    shared = fields::SHARED,
+                    field = EventInnerSubList(&event.ident.sym),
+                )
+                .unwrap();
+                writeln!(
+                    out,
+                    "            {i}({args});",
+                    i = handler,
+                    args = CommaSeparated(event.inputs.iter().map(|arg| match arg {
+                        syn::FnArg::Receiver(_) => unreachable!(),
+                        syn::FnArg::Typed(pat) => format!(
+                            "{clone}::clone(&{val})",
+                            clone = paths::CLONE,
+                            val = pat.pat.to_token_stream()
+                        ),
+                    })),
+                )
+                .unwrap();
+                writeln!(out, "        }}").unwrap();
                 writeln!(out, "    }}").unwrap();
             }
             sem::CompItemDef::On(_) => {}
