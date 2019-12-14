@@ -93,7 +93,7 @@ pub fn gen_builder(
         ident = CompBuilderTy(&comp.ident.sym),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(
-                repeat(paths::UNSET).take(num_non_optional_consts),
+                repeat(ctx.path_unset()).take(num_non_optional_consts),
             )))
         } else {
             Right("")
@@ -113,9 +113,9 @@ pub fn gen_builder(
             "            {ident}: {ty},",
             ident = InnerValueField(&field.ident.sym),
             ty = if field.value.is_some() {
-                "None"
+                Left("None")
             } else {
-                paths::UNSET
+                Right(ctx.path_unset())
             },
         )
         .unwrap();

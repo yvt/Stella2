@@ -26,10 +26,6 @@ mod paths {
     pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
     pub const DEREF: &str = "::std::ops::Deref";
-    pub const SUB_LIST: &str = "::tcw3::designer_runtime::SubscriberList";
-    pub const SUB: &str = "::tcw3::designer_runtime::Sub";
-    pub const OWNING_REF: &str = "::tcw3::designer_runtime::OwningRef";
-    pub const UNSET: &str = "::tcw3::designer_runtime::Unset";
 }
 
 mod fields {
@@ -52,6 +48,9 @@ pub struct Ctx<'a> {
     pub cur_comp: &'a sem::CompDef<'a>,
 
     pub cur_meta_comp_i: usize,
+
+    pub tcw3_path: &'a str,
+    pub designer_runtime_path: &'a str,
 }
 
 impl<'a> Ctx<'a> {
@@ -64,6 +63,26 @@ impl<'a> Ctx<'a> {
 
     fn cur_meta_comp(&self) -> &'a metadata::CompDef {
         self.repo.comp_by_ref(&self.cur_meta_comp_ref())
+    }
+
+    // `::tcw3::designer_runtime::SubscriberList`
+    fn path_sub_list(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::SubscriberList", self.designer_runtime_path))
+    }
+
+    // `::tcw3::designer_runtime::Sub`
+    fn path_sub(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::Sub", self.designer_runtime_path))
+    }
+
+    // `::tcw3::designer_runtime::OwningRef`
+    fn path_owning_ref(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::OwningRef", self.designer_runtime_path))
+    }
+
+    // `::tcw3::designer_runtime::Unset`
+    fn path_unset(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::Unset", self.designer_runtime_path))
     }
 }
 
@@ -186,7 +205,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
                     "    {ident}: {cell}<{list}<{handler}>>,",
                     ident = EventInnerSubList(&item.ident.sym),
                     cell = paths::REF_CELL,
-                    list = paths::SUB_LIST,
+                    list = ctx.path_sub_list(),
                     handler = EventBoxHandlerTy(&item.inputs)
                 )
                 .unwrap();
@@ -390,6 +409,7 @@ where
 }
 
 /// Usage: `DisplayFn(move |f| { write!(f, "{} is best pony!", x) })`
+#[derive(Clone, Copy)]
 struct DisplayFn<T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result>(T);
 impl<T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result> fmt::Display for DisplayFn<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

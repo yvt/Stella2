@@ -20,17 +20,25 @@ mod resolve;
 mod sem;
 
 /// Options for the code generator that generates a meta crate's contents.
-#[derive(Default)]
 pub struct BuildScriptConfig<'a> {
     in_root_source_file: Option<PathBuf>,
     out_source_file: Option<PathBuf>,
     crate_name: Option<String>,
     linked_crates: Vec<(String, Cow<'a, [u8]>)>,
+    tcw3_path: String,
+    designer_runtime_path: String,
 }
 
 impl<'a> BuildScriptConfig<'a> {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            in_root_source_file: None,
+            out_source_file: None,
+            crate_name: None,
+            linked_crates: Vec::new(),
+            tcw3_path: "::tcw3".to_string(),
+            designer_runtime_path: "::tcw3::designer_runtime".to_string(),
+        }
     }
 
     pub fn root_source_file(self, path: impl AsRef<Path>) -> Self {
@@ -57,6 +65,24 @@ impl<'a> BuildScriptConfig<'a> {
     pub fn link(mut self, name: impl Into<String>, metadata: Cow<'a, [u8]>) -> Self {
         self.linked_crates.push((name.into(), metadata));
         self
+    }
+
+    /// Set the path of `tcw3` used by the generated implementation code.
+    /// Defaults to `::tcw3`.
+    pub fn tcw3_path(self, path: impl Into<String>) -> Self {
+        Self {
+            tcw3_path: path.into(),
+            ..self
+        }
+    }
+
+    /// Set the path of `tcw3_designer_runtime` used by the generated
+    /// implementation code. Defaults to `::tcw3::designer_runtime`.
+    pub fn designer_runtime_path(self, path: impl Into<String>) -> Self {
+        Self {
+            designer_runtime_path: path.into(),
+            ..self
+        }
     }
 
     /// Run the code generator. Terminate the current process on failure.
@@ -298,6 +324,8 @@ impl<'a> BuildScriptConfig<'a> {
         // TODO: Now, generate `Crate` again
 
         // Generate implementation code
+        let tcw3_path = self.tcw3_path.as_str();
+        let designer_runtime_path = self.designer_runtime_path.as_str();
         let comp_code_chunks: Vec<_> = comps
             .iter()
             .enumerate()
@@ -307,6 +335,8 @@ impl<'a> BuildScriptConfig<'a> {
                     imports_crate_i: &imports_crate_i,
                     cur_comp: comp,
                     cur_meta_comp_i: comp_i,
+                    tcw3_path,
+                    designer_runtime_path,
                 };
                 (
                     comp,

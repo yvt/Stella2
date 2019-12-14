@@ -41,7 +41,7 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                             writeln!(
                                 out,
                                 "        {or}::new(self.{shared}.{state}.borrow())",
-                                or = paths::OWNING_REF,
+                                or = ctx.path_owning_ref(),
                                 shared = fields::SHARED,
                                 state = fields::STATE,
                             )
@@ -144,7 +144,7 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                     vis = event.vis,
                     meth = SubscribeMethod(&event.ident.sym),
                     ty = EventBoxHandlerTy(&event.inputs),
-                    sub = paths::SUB,
+                    sub = ctx.path_sub(),
                 )
                 .unwrap();
                 writeln!(
