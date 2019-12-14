@@ -10,8 +10,8 @@ use super::super::{diag::Diag, sem, EmittedError};
 use super::{
     analysis,
     bitsetgen::{self, BitsetTy},
-    evalgen, fields, methods, paths, CompBuilderTy, CompSharedTy, CompStateTy, CompTy, Ctx,
-    EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
+    evalgen, fields, known_fields, methods, paths, CompBuilderTy, CompSharedTy, CompStateTy,
+    CompTy, Ctx, EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
 };
 use crate::metadata;
 
@@ -71,9 +71,10 @@ impl DepAnalysis {
         analysis: &analysis::Analysis,
         ctx: &Ctx,
         item_meta2sem_map: &[usize],
+        item_name_map: &HashMap<String, usize>,
         diag: &mut Diag,
     ) -> Result<Self, EmittedError> {
-        analyze_dep(analysis, ctx, item_meta2sem_map, diag)
+        analyze_dep(analysis, ctx, item_meta2sem_map, item_name_map, diag)
     }
 }
 
@@ -82,6 +83,7 @@ fn analyze_dep(
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
+    item_name_map: &HashMap<String, usize>,
     diag: &mut Diag,
 ) -> Result<DepAnalysis, EmittedError> {
     let comp = ctx.cur_comp;
@@ -600,6 +602,98 @@ fn analyze_dep(
         }
     };
 
+    // Check `wm` field
+    // ----------------------------------------------------------------------
+    // The component must have a field named `wm` if we rely on this CDF thing.
+    let needs_wm = trigger_info.triggers.iter().any(|tr| match tr {
+        CommitTrigger::Event { .. } | CommitTrigger::SetItem { .. } => true,
+        CommitTrigger::WatchField { .. } => false,
+    });
+
+    if needs_wm {
+        let item_i = item_name_map.get(known_fields::WM);
+
+        let got_problem = if let Some(&item_i) = item_i {
+            let item = &comp.items[item_i];
+            if let Some(field) = item.field() {
+                if field.field_ty != sem::FieldType::Const {
+                    diag.emit(&[Diagnostic {
+                        level: Level::Error,
+                        message: format!(
+                            "Expected `{}` to be `const`, got `{}`",
+                            known_fields::WM,
+                            field.field_ty
+                        ),
+                        code: None,
+                        spans: (field.ident.span)
+                            .map(|span| SpanLabel {
+                                span,
+                                label: None,
+                                style: SpanStyle::Primary,
+                            })
+                            .into_iter()
+                            .collect(),
+                    }]);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: format!(
+                        "Expected `{}` to be `const`, got something that is not a field",
+                        known_fields::WM,
+                    ),
+                    code: None,
+                    spans: (item.ident().unwrap().span)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+                true
+            }
+        } else {
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "The component does not have a field named `{}`",
+                    known_fields::WM
+                ),
+                code: None,
+                spans: (comp.path.span)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+            true
+        };
+
+        if got_problem {
+            diag.emit(&[Diagnostic {
+                level: Level::Note,
+                message: format!(
+                    "The component needs a `const` field of type `Wm` named `{}` \
+                     because the component has some reactive field and the system \
+                     makes deferred updates to them. Please read the \
+                     documentation for how this works and how to comply with \
+                     this requirement",
+                    known_fields::WM
+                ),
+                code: None,
+                spans: vec![],
+            }]);
+        }
+    }
+
     Ok(DepAnalysis {
         nodes,
         item2node_map,
@@ -1095,10 +1189,14 @@ fn gen_obj_init(
 }
 
 /// Generate `xxxShared::set_dirty_flags` (`methods::SET_DIRTY_FLAGS`).
-pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, out: &mut String) {
+pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut String) {
+    let comp_ident = &ctx.cur_comp.ident.sym;
+
     let arg_this = "this";
     let arg_flags = "flags";
     let cdf_ty = dep_analysis.cdf_ty;
+    let var_shared_weak = TempVar("this_weak");
+    let var_shared = TempVar("this");
 
     writeln!(
         out,
@@ -1111,7 +1209,8 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, out: &mut String) {
     )
     .unwrap();
 
-    // If `xxxShared::dirty` is empty, schedule a next update
+    // If `xxxShared::dirty` is empty, schedule a next update.
+    // Pend a call to `xxx::__commit` using `WmExt::invoke_on_update`
     writeln!(
         out,
         "        if {is_empty} {{",
@@ -1122,8 +1221,42 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, out: &mut String) {
         ),),
     )
     .unwrap();
-    // TODO: call `WmExt::invoke_on_update`
-    writeln!(out, "        }}",).unwrap();
+    writeln!(
+        out,
+        "            let {shared_weak} = {rc}::downgrade(&{this});",
+        shared_weak = var_shared_weak,
+        rc = paths::RC,
+        this = arg_this,
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "            {invoke}({this}.{wm}, move |_| {{",
+        invoke = ctx.path_invoke_on_update(),
+        this = arg_this,
+        wm = InnerValueField(known_fields::WM),
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "                if let {some}({this}) = {shared_weak}.upgrade() {{",
+        some = paths::SOME,
+        this = var_shared,
+        shared_weak = var_shared_weak
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "                    {ty} {{ {field}: {this} }}.{meth}();",
+        ty = CompTy(comp_ident),
+        field = fields::SHARED,
+        this = var_shared,
+        meth = methods::COMMIT
+    )
+    .unwrap();
+    writeln!(out, "                }}",).unwrap();
+    writeln!(out, "            }});",).unwrap();
+    writeln!(out, "        }}",).unwrap(); // end if {is_empty}
 
     // Update `xxxShared::dirty`
     writeln!(
@@ -1141,6 +1274,15 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, out: &mut String) {
         ),
     )
     .unwrap();
+
+    writeln!(out, "    }}",).unwrap();
+}
+
+/// Generate `xxx::__commit` (`methods::COMMIT`).
+pub fn gen_commit(_dep_analysis: &DepAnalysis, out: &mut String) {
+    writeln!(out, "    fn {meth}(&self) {{", meth = methods::COMMIT).unwrap();
+
+    // TODO
 
     writeln!(out, "    }}",).unwrap();
 }

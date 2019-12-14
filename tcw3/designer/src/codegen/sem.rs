@@ -126,6 +126,14 @@ impl CompItemDef<'_> {
     pub fn field(&self) -> Option<&FieldDef<'_>> {
         try_match!(Self::Field(x) = self).ok()
     }
+
+    pub fn ident(&self) -> Option<&Ident> {
+        match self {
+            CompItemDef::Field(field) => Some(&field.ident),
+            CompItemDef::Event(event) => Some(&event.ident),
+            CompItemDef::On(_) => None,
+        }
+    }
 }
 
 pub struct FieldDef<'a> {

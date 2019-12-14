@@ -4,6 +4,8 @@ use crate::{uicore::{HView, SizeTraits}, ui::layouts::EmptyLayout, pal};
 /// Represents a spacer widget, which has size traits but no graphical contents.
 #[widget]
 pub comp crate::ui::views::SpacerWidget {
+    pub const wm: pal::Wm { pub set; }
+
     /// Sets `SizeTraits::min`.
     pub prop min: Vector2<f32> = || [0.0; 2].into();
 
@@ -28,6 +30,8 @@ pub comp crate::ui::views::SpacerWidget {
 /// graphical contents.
 #[widget]
 pub comp crate::ui::views::FixedSpacer {
+    pub const wm: pal::Wm { pub set; }
+
     /// Sets the widget size
     pub prop size: Vector2<f32> = || [0.0; 2].into();
 

@@ -99,6 +99,7 @@ impl WndView {
         let style_manager = theming::Manager::global(wm);
 
         let main_view = MainViewBuilder::new()
+            .with_wm(wm)
             .with_wnd_state(Elem::clone(&wnd_state))
             .with_style_manager(style_manager)
             .build();

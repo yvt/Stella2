@@ -338,6 +338,21 @@
 //! New prop values are stored in a separate location until they are assigned
 //! during a commit operation.
 //!
+//! An access to `Wm` is needed to call `invoke_on_update`. Therefore, the
+//! component **must have a `const` field named `wm`** for the process described
+//! here to happen. The type of `wm` is not checked (because Designer doesn't
+//! have access to Rust's type system), but it must be `tcw3::pal::Wm`.
+//!
+//! ```tcwdl
+//! comp MyComponent {
+//!     const wm: tcw::pal::Wm { pub set; }
+//!
+//!     // Props are updated through the reactive update mechanism, so this
+//!     // component must have `wm` field.
+//!     pub prop prop1: u32 = || 42;
+//! }
+//! ```
+//!
 //! A bit array is used as dirty flags for tracking which fields need to be
 //! recalculated. Basically, each obj-init prop and wire with a functional value
 //! receives a dirty flag. In addition, each event handler watching a field also

@@ -28,6 +28,7 @@ mod paths {
     pub const DEREF: &str = "::std::ops::Deref";
 }
 
+/// The fields of generated types.
 mod fields {
     pub const SHARED: &str = "shared";
     pub const STATE: &str = "state";
@@ -36,6 +37,13 @@ mod fields {
 
 mod methods {
     pub const SET_DIRTY_FLAGS: &str = "set_dirty_flags";
+    pub const COMMIT: &str = "__commit";
+}
+
+/// Recognized field (not Rust field, but our field) names.
+mod known_fields {
+    /// The dirty flag system needs an access to `Wm` to use `invoke_on_update`.
+    pub const WM: &str = "wm";
 }
 
 pub struct Ctx<'a> {
@@ -84,6 +92,11 @@ impl<'a> Ctx<'a> {
     fn path_unset(&self) -> impl std::fmt::Display + Clone + '_ {
         DisplayFn(move |f| write!(f, "{}::Unset", self.designer_runtime_path))
     }
+
+    // `::tcw3::uicore::WmExt::invoke_on_update`
+    fn path_invoke_on_update(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::uicore::WmExt::invoke_on_update", self.tcw3_path))
+    }
 }
 
 pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
@@ -131,7 +144,8 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
     let analysis = analysis::Analysis::new(ctx, diag);
 
     // Analyze field dependency
-    let dep_analysis = initgen::DepAnalysis::new(&analysis, ctx, &item_meta2sem_map, diag)?;
+    let dep_analysis =
+        initgen::DepAnalysis::new(&analysis, ctx, &item_meta2sem_map, &item_name_map, diag)?;
 
     // `struct ComponentType`
     // -------------------------------------------------------------------
@@ -151,6 +165,11 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
         ty = CompSharedTy(comp_ident)
     )
     .unwrap();
+    writeln!(out, "}}").unwrap();
+
+    writeln!(out, "impl {} {{", CompTy(comp_ident)).unwrap();
+    // `ComponentType::__commit`
+    initgen::gen_commit(&dep_analysis, &mut out);
     writeln!(out, "}}").unwrap();
 
     // `struct ComponentTypeShared`
@@ -218,7 +237,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
 
     writeln!(out, "impl {} {{", CompSharedTy(comp_ident)).unwrap();
     // `ComponentTypeShared::set_dirty_flags`
-    initgen::gen_set_dirty_flags(&dep_analysis, &mut out);
+    initgen::gen_set_dirty_flags(&dep_analysis, ctx, &mut out);
     writeln!(out, "}}").unwrap();
 
     // `struct ComponentTypeState`

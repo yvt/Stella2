@@ -14,6 +14,7 @@ use crate::{model, stylesheet::elem_id};
 
 #[widget]
 comp crate::view::MainView {
+    const wm: pal::Wm { pub set; }
     const style_manager: &'static Manager { pub set; }
 
     pub prop wnd_state: Elem<model::WndState>;
@@ -32,6 +33,7 @@ comp crate::view::MainView {
     };
 
     const toolbar = crate::view::toolbar::ToolbarView {
+        const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop wnd_state = |wnd_state as x| x;
     };
@@ -47,6 +49,7 @@ comp crate::view::MainView {
     };
 
     const sidebar_view = PlaceholderView {
+        const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop text = || "sidebar: todo!".to_string();
     };
@@ -60,11 +63,13 @@ comp crate::view::MainView {
     };
 
     const log_view = PlaceholderView {
+        const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop text = || "log: todo!".to_string();
     };
 
     const editor_view = PlaceholderView {
+        const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop text = || "editor: todo!".to_string();
     };
@@ -75,6 +80,7 @@ comp crate::view::MainView {
 use crate::view::toolbar::ToolbarView;
 #[widget]
 pub(crate) comp ToolbarView {
+    const wm: pal::Wm { pub set; }
     const style_manager: &'static Manager { pub set; }
 
     pub prop wnd_state: Elem<model::WndState>;
@@ -107,9 +113,9 @@ pub(crate) comp ToolbarView {
         };
     };
 
-    const spacer1 = FixedSpacer { prop size = || [5.0, 0.0].into(); };
-    const spacer2 = FixedSpacer { prop size = || [5.0, 0.0].into(); };
-    const spacer3 = FixedSpacer { };
+    const spacer1 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
+    const spacer2 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
+    const spacer3 = FixedSpacer { const wm = |wm| wm; };
 
     const toggle_sidebar_button = Button {
         const style_manager = |style_manager as x| x;
@@ -137,6 +143,7 @@ pub(crate) comp ToolbarView {
 
     // TODO
     const search_bar = PlaceholderView {
+        const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop text = || "search: todo!".to_string();
     };
@@ -145,6 +152,7 @@ pub(crate) comp ToolbarView {
 use crate::view::PlaceholderView;
 #[widget]
 pub(crate) comp PlaceholderView {
+    const wm: pal::Wm { pub set; }
     const style_manager: &'static Manager { pub set; }
     pub prop text: String;
 
