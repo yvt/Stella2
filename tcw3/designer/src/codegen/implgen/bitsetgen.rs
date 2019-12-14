@@ -5,8 +5,9 @@ use super::DisplayFn;
 pub struct TooLargeError;
 
 #[derive(Debug, Clone, Copy)]
-pub struct BitsetTy {
-    ty: &'static str,
+pub enum BitsetTy {
+    Empty,
+    Ux { ty: &'static str },
 }
 
 impl BitsetTy {
@@ -22,15 +23,16 @@ impl BitsetTy {
         //    application)
         //  - `u128` is not natively supported by x86, so it generates code that is
         //    larger and slower (by like a few nanoseconds).
-        // TODO: optimize `size == 0`
-        if size <= 8 {
-            Ok(Self { ty: "u8" })
+        if size == 0 {
+            Ok(Self::Empty)
+        } else if size <= 8 {
+            Ok(Self::Ux { ty: "u8" })
         } else if size <= 32 {
-            Ok(Self { ty: "u32" })
+            Ok(Self::Ux { ty: "u32" })
         } else if size <= 64 {
-            Ok(Self { ty: "u64" })
+            Ok(Self::Ux { ty: "u64" })
         } else if size <= 128 {
-            Ok(Self { ty: "u128" })
+            Ok(Self::Ux { ty: "u128" })
         } else {
             // Maybe we support a larger bitset in the future
             Err(TooLargeError)
@@ -39,12 +41,18 @@ impl BitsetTy {
 
     /// Get a `Display`-able type name.
     pub fn gen_ty(&self) -> impl std::fmt::Display + '_ {
-        self.ty
+        match self {
+            Self::Empty => "()",
+            Self::Ux { ty } => *ty,
+        }
     }
 
     /// Generate an expression representing an empty set.
     pub fn gen_empty<'a>(&'a self) -> impl std::fmt::Display + 'a {
-        DisplayFn(move |f| write!(f, "0{}", self.ty))
+        DisplayFn(move |f| match self {
+            Self::Empty => write!(f, "()"),
+            Self::Ux { ty } => write!(f, "0{}", ty),
+        })
     }
 
     /// Generate an expression that evaluates to a `bool` value indicating
@@ -53,7 +61,10 @@ impl BitsetTy {
         &'a self,
         expr: impl std::fmt::Display + 'a,
     ) -> impl std::fmt::Display + 'a {
-        DisplayFn(move |f| write!(f, "{} == 0", expr))
+        DisplayFn(move |f| match self {
+            Self::Empty => write!(f, "true"),
+            Self::Ux { .. } => write!(f, "{} == 0", expr),
+        })
     }
 
     /// Generate an expression that evaluates to a `bool` value indicating
@@ -73,7 +84,10 @@ impl BitsetTy {
         expr: impl std::fmt::Display + 'a,
         elements: impl IntoIterator<Item = usize> + Clone + 'a,
     ) -> impl std::fmt::Display + 'a {
-        DisplayFn(move |f| write!(f, "({} & {}) != 0", expr, self.gen_multi(elements.clone())))
+        DisplayFn(move |f| match self {
+            Self::Empty => write!(f, "false"),
+            Self::Ux { .. } => write!(f, "({} & {}) != 0", expr, self.gen_multi(elements.clone())),
+        })
     }
 
     /// Generate an expression that inserts specified elements to `expr`, and
@@ -83,16 +97,23 @@ impl BitsetTy {
         expr: impl std::fmt::Display + 'a,
         elements: impl IntoIterator<Item = usize> + Clone + 'a,
     ) -> impl std::fmt::Display + 'a {
-        DisplayFn(move |f| write!(f, "{} |= {}", expr, self.gen_multi(elements.clone())))
+        DisplayFn(move |f| match self {
+            Self::Empty => panic!("vector size is 0, can't insert any elements"),
+            Self::Ux { .. } => write!(f, "{} |= {}", expr, self.gen_multi(elements.clone())),
+        })
     }
 
     /// Generate an expression that evaluates the union of `expr1` and `expr2`.
+    /// `expr1` and `expr2` may or may not be evaluated.
     pub fn gen_union<'a>(
         &'a self,
         expr1: impl std::fmt::Display + 'a,
         expr2: impl std::fmt::Display + 'a,
     ) -> impl std::fmt::Display + 'a {
-        DisplayFn(move |f| write!(f, "{} | {}", expr1, expr2))
+        DisplayFn(move |f| match self {
+            Self::Empty => write!(f, "()"),
+            Self::Ux { .. } => write!(f, "{} | {}", expr1, expr2),
+        })
     }
 
     /// Generate an expression representing the specified set.
@@ -118,6 +139,7 @@ impl BitsetTy {
                     write!(f, "{}", self.gen_empty())
                 }
             } else {
+                // will panic anyway if `self` is `Self::Empty`
                 let mut elements = elements.clone().into_iter();
                 write!(f, "({})", self.gen_one(elements.next().unwrap()))?;
                 for x in elements {
@@ -130,11 +152,14 @@ impl BitsetTy {
 
     /// Generate an expression representing the set `{i}`.
     fn gen_one(&self, i: usize) -> impl std::fmt::Display + '_ {
-        DisplayFn(move |f| {
-            if i == 0 {
-                write!(f, "1{}", self.ty)
-            } else {
-                write!(f, "1{} << {}", self.ty, i)
+        DisplayFn(move |f| match self {
+            Self::Empty => panic!("vector size is 0, can't have any elements"),
+            Self::Ux { ty } => {
+                if i == 0 {
+                    write!(f, "1{}", ty)
+                } else {
+                    write!(f, "1{} << {}", ty, i)
+                }
             }
         })
     }
