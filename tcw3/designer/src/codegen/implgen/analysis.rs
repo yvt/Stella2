@@ -48,6 +48,7 @@ pub struct EventParamInput {
     pub param_i: Vec<usize>,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ItemInput {
     /// Starts at the enclosing component. Must be non-empty.
     ///
@@ -67,7 +68,7 @@ pub struct ItemInput {
     pub indirections: Vec<ItemIndirection>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ItemIndirection {
     /// An index into `ctx.repo.crates`.
     pub comp_crate_i: usize,

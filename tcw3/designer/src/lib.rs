@@ -291,12 +291,37 @@
 //! used as an input.
 //!
 //! **Events** —
-//! Event handlers are hooked up to child objects. `on (obj.event)` and
-//! `on (obj.prop)` explicitly create event handlers. Props and wires with
-//! functions like `|obj.prop| expr` register automatically-generated event
-//! handlers for observing changes in the input values.
+//! Event handlers are hooked up to child objects. The following table
+//! summarizes how each combination of a trigger type and its context is
+//! handled:
 //!
-//! The registration functions return `tcw3::designer_runtime::Sub`.
+//! | Position          | Input              | Mode                |
+//! | ----------------- | ------------------ | ------------------- |
+//! | `on` trigger      | `this.event`       | Direct              |
+//! | ↑                 | `this.field.event` | ↑                   |
+//! | `on` trigger      | `this.field`       | Dirty Flag Internal |
+//! | `wire`            | ↑                  | ↑                   |
+//! | obj-init → `prop` | ↑                  | ↑                   |
+//! | `on` trigger      | `this.field.field` | Dirty Flag External |
+//! | `wire`            | ↑                  | ↑                   |
+//! | obj-init → `prop` | ↑                  | ↑                   |
+//! | `on` trigger      | `this.field.event` | Dirty Flag External |
+//! | `wire`            | ↑                  | ↑                   |
+//! | obj-init → `prop` | ↑                  | ↑                   |
+//!
+//!  - If the mode is **Direct**, the given Rust expression is directly
+//!    registered as the event handler.
+//!  - If the mode is **Dirty Flag**, a dirty flag is created to indicate
+//!    whether the given expression should be evaluated on an upcoming commit
+//!    operation. **Internal** and **External** specifies the possible pathway
+//!    through which the dirty flag is set.
+//!      - **Internal** means the dirty flag is set in response to a change in
+//!        the same component's another field, e.g., by a `prop`'s setter or
+//!        a `wire`'s recalculation.
+//!      - **External** means an event handler is registered and the dirty flag
+//!        is set by the handler.
+//!
+//! The subscription functions return `tcw3::designer_runtime::Sub`.
 //! They are automatically unsubscribed when `Component` is dropped.
 //!
 //! Event handlers maintain weak references to `ComponentShared`.
@@ -314,8 +339,130 @@
 //! during a commit operation.
 //!
 //! A bit array is used as dirty flags for tracking which fields need to be
-//! recalculated. Basically, each prop and wire with a functional value receives
-//! a dirty flag. (TODO: Optimize dirty flag mapping and propagation)
+//! recalculated. Basically, each obj-init prop and wire with a functional value
+//! receives a dirty flag. In addition, each event handler watching a field also
+//! receives a dirty flag (see *Component Initialization* for more).
+//!
+//! ```tcwdl
+//! // `foo`'s setter sets the dirty flags for `bar1` and `bar2`.
+//! prop foo: u32;
+//! wire bar1: u32 = |foo| foo + 1;
+//! wire bar2: u32 = |foo| foo + 2;
+//! // After the new value of `bar1` is calculated and it's different from the
+//! // old value, `hoge`'s dirty flag is set and the new value of `hoge` is
+//! // calculated in turn.
+//! wire hoge: u32 = |bar1| bar1 * 2;
+//! ```
+//!
+//! The dirty flags are sorted in the evaluation order.
+//!
+//! In order to optimize the usage of dirty flags, a group of flags which are
+//! set at the same time is combined into a single bit. The optimized flags are
+//! called *compressed dirty flags*. Each compressed dirty flag corresponds to
+//! zero or more raw dirty flags.
+//!
+//! The generated commiting function looks like the following
+//! (**work in progress**):
+//!
+//! ```rust,no_compile
+//! // Note: The final code will be much simpler because we use `panic = abort`.
+//! fn commit(&self) {
+//!     let mut dirty = Cell::new(self.dirty.replace(0));
+//!     let mut dirty_processed = Cel::new(!0u64);
+//!
+//!     // Uncommited props must be read first because we reset `self.dirty`
+//!     // at the same time. Otherwise, `uncommited_foo` gets leaked on panic
+//!     let new_foo = UnsafeCell::new(replace(self.uncommited_foo, MaybeUninit::uninit()));
+//!     let new_bar1 = UnsafeCell::new(MaybeUninit::uninit());
+//!     let new_bar2 = UnsafeCell::new(MaybeUninit::uninit());
+//!     let new_hoge = UnsafeCell::new(MaybeUninit::uninit());
+//!
+//!     let _guard = OnDrop(|| unsafe {
+//!         // Imitates drop flags using the information from `dirty` and
+//!         // `dirty_processed`
+//!         if (dirty.get() & (1 << 0)) != 0 {
+//!             (&mut *new_foo.get()).as_ptr().drop_in_place();
+//!         }
+//!         if (dirty_processed.get() & (1 << 0)) != 0 {
+//!             (&mut *new_bar1.get()).as_ptr().drop_in_place();
+//!             (&mut *new_bar2.get()).as_ptr().drop_in_place();
+//!         }
+//!         if (dirty_processed.get() & (1 << 1)) != 0 {
+//!             (&mut *new_hoge.get()).as_ptr().drop_in_place();
+//!         }
+//!     });
+//!
+//!     {
+//!         let state = self.state.borrow();
+//!         let mut foo = &state.foo;
+//!         let mut bar1 = &state.bar1;
+//!         let mut bar2 = &state.bar2;
+//!         let mut hoge = &state.hoge;
+//!         loop {
+//!             let bit = (dirty.get() & !dirty_processed).trailing_zeros();
+//!             match bit {
+//!                 0 => {
+//!                     // Commit `prop`
+//!                     foo = unsafe { new_foo.get_ref() };
+//!                     // TODO: should check if the value has changed
+//!
+//!                     // Commit `bar1` and `bar2`
+//!                     // may unwind: start
+//!                     let new_bar1_t = *foo + 1;
+//!                     let new_bar2_t = *foo + 2;
+//!                     // TODO: should check if the values have changed
+//!                     // may unwind: end
+//!                     new_bar1 = UnsafeCell::new(MaybeUninit::new(new_bar1_t));
+//!                     new_bar2 = UnsafeCell::new(MaybeUninit::new(new_bar2_t));
+//!                     bar1 = unsafe { (&*new_bar1.get()).get_ref() };
+//!                     bar2 = unsafe { (&*new_bar2.get()).get_ref() };
+//!                     dirty.set(dirty.get() | 1 << 1);
+//!                 }
+//!                 1 => {
+//!                     // Commit `hoge`
+//!                     // may unwind: start
+//!                     let new_hoge_t = *bar1 * 2;
+//!                     // may unwind: end
+//!                     new_hoge = UnsafeCell::new(MaybeUninit::new(new_hoge_t));
+//!                     hoge = unsafe { (&*new_hoge.get()).get_ref() };
+//!                 }
+//!                 _ => break,
+//!             }
+//!             dirty_processed.set(dirty_processed.get() | 1u64 << bit);
+//!         }
+//!         assert_eq!(dirty.get(), dirty_processed.get());
+//!     }
+//!
+//!     // Write back
+//!     let mut state = self.state.borrow_mut();
+//!
+//!     let _ = if (dirty.get() & (1 << 0)) != 0 {
+//!         let t = replace(&mut state.foo, unsafe { (&mut *new_foo.get()).read() });
+//!         dirty.set(dirty.get() & !(1 << 0));
+//!         Some(t)
+//!     } else { None };
+//!     let _ = if (dirty_processed.get() & (1 << 0)) != 0 {
+//!         let t = (
+//!             replace(&mut state.bar1, unsafe { (&mut *new_bar1.get()).read() }),
+//!             replace(&mut state.bar2, unsafe { (&mut *new_bar2.get()).read() }),
+//!         );
+//!         dirty_processed.set(dirty_processed.get() & !(1 << 0));
+//!         Some(t)
+//!     } else { None };
+//!     let _ = if (dirty_processed.get() & (1 << 1)) != 0 {
+//!         let t = replace(&mut state.hoge, unsafe { (&mut *new_hoge.get()).read() });
+//!         dirty_processed.set(dirty_processed.get() & !(1 << 1));
+//!         Some(t)
+//!     } else { None };
+//!     assert_eq!(dirty.get(), 0);
+//!     assert_eq!(dirty_processed.get(), 0);
+//!     drop(state);
+//!
+//!     if (dirty_processed.get() & (1 << 1)) != 0 {
+//!         self.raise_hoge_changed();
+//!     }
+//! }
+//! ```
 //!
 mod codegen;
 mod metadata;

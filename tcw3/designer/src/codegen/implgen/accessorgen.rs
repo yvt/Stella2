@@ -3,16 +3,16 @@ use quote::ToTokens;
 use std::fmt::Write;
 
 use super::{
-    fields, paths, sem, CommaSeparated, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList,
+    fields, initgen, paths, sem, CommaSeparated, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList,
     GetterMethod, InnerValueField, RaiseMethod, SetterMethod, SubscribeMethod, TempVar,
 };
 
-pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
+pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &mut String) {
     let comp = ctx.cur_comp;
 
     writeln!(out, "impl {} {{", CompTy(&comp.ident.sym)).unwrap();
 
-    for item in comp.items.iter() {
+    for (item_i, item) in comp.items.iter().enumerate() {
         match item {
             sem::CompItemDef::Field(field) => {
                 use super::sem::{
@@ -123,7 +123,17 @@ pub fn gen_accessors(ctx: &Ctx<'_>, out: &mut String) {
                         some = paths::SOME,
                     )
                     .unwrap();
-                    // TODO: Set a dirty flag
+
+                    // Set relevant dirty flags
+                    let trigger = initgen::CommitTrigger::SetItem { item_i };
+                    initgen::gen_activate_trigger(
+                        dep_analysis,
+                        ctx,
+                        &trigger,
+                        &format_args!("&self.{}", fields::SHARED),
+                        out,
+                    );
+
                     writeln!(out, "    }}").unwrap();
                 } // let Some(set) = &field.accessors.set
             }

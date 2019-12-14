@@ -8,6 +8,7 @@ use crate::metadata;
 
 mod accessorgen;
 mod analysis;
+mod bitsetgen;
 mod buildergen;
 mod evalgen;
 mod initgen;
@@ -34,6 +35,11 @@ mod paths {
 mod fields {
     pub const SHARED: &str = "shared";
     pub const STATE: &str = "state";
+    pub const DIRTY: &str = "dirty";
+}
+
+mod methods {
+    pub const SET_DIRTY_FLAGS: &str = "set_dirty_flags";
 }
 
 pub struct Ctx<'a> {
@@ -139,6 +145,14 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
         ty = CompStateTy(comp_ident)
     )
     .unwrap();
+    writeln!(
+        out,
+        "    {field}: {cell}<{ty}>,",
+        field = fields::DIRTY,
+        cell = paths::CELL,
+        ty = dep_analysis.cdf_ty.gen_ty(), // "compressed dirty flags"
+    )
+    .unwrap();
 
     for item in comp.items.iter() {
         match item {
@@ -177,12 +191,15 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
                 )
                 .unwrap();
             }
-            sem::CompItemDef::On(_) => {
-                // TODO
-            }
+            sem::CompItemDef::On(_) => {}
         }
     }
 
+    writeln!(out, "}}").unwrap();
+
+    writeln!(out, "impl {} {{", CompSharedTy(comp_ident)).unwrap();
+    // `ComponentTypeShared::set_dirty_flags`
+    initgen::gen_set_dirty_flags(&dep_analysis, &mut out);
     writeln!(out, "}}").unwrap();
 
     // `struct ComponentTypeState`
@@ -221,7 +238,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
 
     // Setters and getters
     // -------------------------------------------------------------------
-    accessorgen::gen_accessors(ctx, &mut out);
+    accessorgen::gen_accessors(&dep_analysis, ctx, &mut out);
 
     Ok(out)
 }
@@ -369,6 +386,14 @@ where
             write!(f, "{}, ", e)?;
         }
         Ok(())
+    }
+}
+
+/// Usage: `DisplayFn(move |f| { write!(f, "{} is best pony!", x) })`
+struct DisplayFn<T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result>(T);
+impl<T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result> fmt::Display for DisplayFn<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        (self.0)(f)
     }
 }
 

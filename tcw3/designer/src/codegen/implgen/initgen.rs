@@ -4,11 +4,13 @@ use pathfinding::directed::{
     strongly_connected_components::strongly_connected_components,
     topological_sort::topological_sort,
 };
-use std::{fmt::Write, ops::Range};
+use std::{cell::Cell, collections::HashMap, fmt::Write, ops::Range};
 
 use super::super::{diag::Diag, sem, EmittedError};
 use super::{
-    analysis, evalgen, fields, paths, CompBuilderTy, CompSharedTy, CompStateTy, CompTy, Ctx,
+    analysis,
+    bitsetgen::{self, BitsetTy},
+    evalgen, fields, methods, paths, CompBuilderTy, CompSharedTy, CompStateTy, CompTy, Ctx,
     EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
 };
 use crate::metadata;
@@ -23,10 +25,45 @@ enum DepNode {
     This,
 }
 
+#[derive(Debug)]
+enum CommitNode {
+    /// `FieldType::{Prop, Wire}` (`CompItemDef::Field`), or `CompItemDef::On`
+    Item { item_i: usize },
+    /// `prop`
+    ObjInitField { item_i: usize, field_i: usize },
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum CommitTrigger {
+    /// `prop`'s setter method is called.
+    SetItem { item_i: usize },
+    /// The value of a `prop` or `wire` field of the current component has
+    /// changed. This can only happen as a result of the commitment of another
+    /// field, thus it's said to be not *an initiator*.
+    /// `item_i` is an index into `sem::CompDef::items`.
+    WatchField { item_i: usize },
+    /// An event is raised. `input` must refer to an event.
+    Event { input: analysis::ItemInput },
+}
+
 pub struct DepAnalysis {
     nodes: Vec<DepNode>,
     item2node_map: Vec<usize>,
     ordered_node_i_list: Vec<usize>,
+
+    commit_nodes: Vec<CommitNode>,
+    triggers: Vec<CommitTrigger>,
+    trigger2trigger_i: HashMap<CommitTrigger, usize>,
+    trigger2commitnode_map: Vec<Vec<usize>>,
+    /// Each `Vec<usize>` is sorted
+    commitnode2trigger_map: Vec<Vec<usize>>,
+    cdf2node_map: Vec<Vec<usize>>,
+    cdf_triggers_cdf_map: Vec<Vec<usize>>,
+    bit2cdf_map: Vec<usize>,
+    cdf2bit_map: Vec<usize>,
+    /// Each `Vec<usize>` comes from `commitnode2trigger_map`, thus is sorted.
+    cdf2triggerset: Vec<Vec<usize>>,
+    pub cdf_ty: BitsetTy,
 }
 
 impl DepAnalysis {
@@ -248,10 +285,337 @@ fn analyze_dep(
     // The last node should be `this`
     assert_eq!(*ordered_node_i_list.last().unwrap(), 0);
 
+    // Enumerate works to do in the committing function
+    // ----------------------------------------------------------------------
+    let mut commit_nodes = Vec::new();
+
+    #[derive(Default)]
+    struct TriggerInfo {
+        triggers: Vec<CommitTrigger>,
+        trigger2trigger_i: HashMap<CommitTrigger, usize>,
+        trigger2commitnode_map: Vec<Vec<usize>>,
+        commitnode2trigger_map: Vec<Vec<usize>>,
+    }
+    let mut trigger_info = TriggerInfo::default();
+    let trigger_emitted = Cell::new(false); // set when `define_trigger` is called
+
+    let define_trigger = |trigger_info: &mut TriggerInfo, node_i, trigger: CommitTrigger| {
+        let TriggerInfo {
+            triggers,
+            trigger2commitnode_map,
+            trigger2trigger_i,
+            ..
+        } = trigger_info;
+
+        let trigger_i = *trigger2trigger_i.entry(trigger.clone()).or_insert_with(|| {
+            let i = trigger2commitnode_map.len();
+            triggers.push(trigger);
+            trigger2commitnode_map.push(Vec::new());
+            i
+        });
+
+        trigger2commitnode_map[trigger_i].push(node_i);
+        trigger_emitted.set(true);
+    };
+
+    let define_input_trigger =
+        |trigger_info: &mut _, diag: &mut Diag, input: &sem::Input, node_i, skip_events| {
+            match analysis.get_input(input) {
+                analysis::InputInfo::EventParam(_) => {}
+                analysis::InputInfo::Item(item_input) => {
+                    let ind0 = item_input.indirections.first().unwrap();
+
+                    let local_delivery = item_input.indirections.len() == 1
+                        && ctx.cur_meta_comp().items[ind0.item_i].field().is_some();
+
+                    if local_delivery {
+                        let sem_item_i = item_meta2sem_map[ind0.item_i];
+
+                        let item = ind0.item(ctx.repo);
+                        if item.field().unwrap().field_ty == metadata::FieldType::Const {
+                            // `const` never changes
+                            return;
+                        }
+
+                        define_trigger(
+                            trigger_info,
+                            node_i,
+                            CommitTrigger::WatchField { item_i: sem_item_i },
+                        );
+                    } else {
+                        let item_input = item_input.clone();
+
+                        // Find the referred item
+                        let ind_last = item_input.indirections.last().unwrap();
+                        let item = ind_last.item(ctx.repo);
+
+                        // If it's a field, find the event for watching the field
+                        if let Some(field) = item.field() {
+                            if item.field().unwrap().field_ty == metadata::FieldType::Const {
+                                // `const` never changes
+                                return;
+                            }
+
+                            if let Some(_) = field.accessors.watch {
+                                // TODO: Find the event
+                                diag.emit(&[Diagnostic {
+                                    level: Level::Warning,
+                                    message: "Watching remote prop is unimplemented".to_string(),
+                                    code: None,
+                                    spans: vec![],
+                                }]);
+                                return;
+                            } else {
+                                // TODO: We can't watch a prop without a `watch` accessor.
+                                //       This should probably be checked in `analysis.rs`
+                                diag.emit(&[Diagnostic {
+                                    level: Level::Error,
+                                    message: format!(
+                                        "Prop `{}` does not have a `watch` accessor",
+                                        field.ident
+                                    ),
+                                    code: None,
+                                    spans: vec![],
+                                }]);
+                                return;
+                            }
+                        } else if skip_events {
+                            return;
+                        }
+
+                        define_trigger(
+                            trigger_info,
+                            node_i,
+                            CommitTrigger::Event { input: item_input },
+                        );
+                    }
+                }
+                analysis::InputInfo::This => {}
+                analysis::InputInfo::Invalid => {}
+            }
+        };
+
+    let define_func_trigger = |trigger_info: &mut _, diag: &mut Diag, func: &sem::Func, node_i| {
+        for func_input in func.inputs.iter() {
+            define_input_trigger(trigger_info, diag, &func_input.input, node_i, false);
+        }
+    };
+
+    let define_on_trigger = |trigger_info: &mut _, diag: &mut Diag, on: &sem::OnDef, node_i| {
+        for trigger in on.triggers.iter() {
+            if let sem::Trigger::Input(input) = trigger {
+                // `skip_events = true` because event triggers on `on` are
+                // treated specially and are not handled here
+                define_input_trigger(trigger_info, diag, input, node_i, true);
+            }
+        }
+    };
+
+    for (item_i, item) in comp.items.iter().enumerate() {
+        item2node_map.push(nodes.len());
+
+        match item {
+            sem::CompItemDef::Field(item) => match item.field_ty {
+                sem::FieldType::Const => {
+                    if let Some(sem::DynExpr::ObjInit(init)) = &item.value {
+                        for (field_i, field) in init.fields.iter().enumerate() {
+                            if field.field_ty == sem::FieldType::Prop {
+                                let node_i = commit_nodes.len();
+                                trigger_emitted.set(false);
+                                define_func_trigger(&mut trigger_info, diag, &field.value, node_i);
+                                // Emit a node only if it has a trigger
+                                if trigger_emitted.get() {
+                                    commit_nodes.push(CommitNode::ObjInitField { item_i, field_i });
+                                }
+                            }
+                        }
+                    }
+                }
+                sem::FieldType::Prop => {
+                    let node_i = commit_nodes.len();
+                    define_trigger(&mut trigger_info, node_i, CommitTrigger::SetItem { item_i });
+                    commit_nodes.push(CommitNode::Item { item_i });
+                }
+                sem::FieldType::Wire => {
+                    let node_i = commit_nodes.len();
+                    // `wire` must have a value. `DynExpr::ObjInit` is only allowed
+                    // for `FieldType::Const`, so it must be `DynExpr::Func`.
+                    let func = item.value.as_ref().unwrap().func().unwrap();
+
+                    trigger_emitted.set(false);
+                    define_func_trigger(&mut trigger_info, diag, func, node_i);
+
+                    // Emit a node only if it has a trigger
+                    if trigger_emitted.get() {
+                        commit_nodes.push(CommitNode::Item { item_i });
+                    }
+                }
+            },
+            sem::CompItemDef::On(on) => {
+                let node_i = commit_nodes.len();
+
+                trigger_emitted.set(false);
+                define_on_trigger(&mut trigger_info, diag, on, node_i);
+
+                // Emit a node only if it has a trigger
+                if trigger_emitted.get() {
+                    commit_nodes.push(CommitNode::Item { item_i });
+                }
+            }
+            sem::CompItemDef::Event(_) => {}
+        }
+    }
+
+    // Initialize `commitnode2trigger_map`
+    trigger_info
+        .commitnode2trigger_map
+        .resize_with(commit_nodes.len(), Vec::new);
+    for (trigger_i, node_i_list) in trigger_info.trigger2commitnode_map.iter().enumerate() {
+        for &node_i in node_i_list.iter() {
+            trigger_info.commitnode2trigger_map[node_i].push(trigger_i);
+        }
+    }
+
+    // Create dirty flags
+    // ----------------------------------------------------------------------
+    // `trigger2commitnode_map` defines the set `(t, n) ∈ T`. It can be viewed
+    // as two multivalued functions, which can be quickly evaluated by indexing
+    // into `trigger2commitnode_map` and `commitnode2trigger_map`, respectively.
+    //
+    // In some extension, evaluating one node *unconditionally* activates other
+    // triggers, guaranteeing other nodes' evaluation. Example: Let
+    // `n₁ = Item { item_i: i }`. Evaluating `n₁` activates the trigger
+    // `t₂ = WatchField { item_i: i }`. If `T` had an element `(t₂, n₂)`, `n₂`
+    // would be evaluated too. In this way, we could construct a closure `T*`.
+    // **But** we actually don't use this extension (for now we *conditionally*
+    // trigger a chain reaction), so `T*` is identical to `T`.
+    //
+    //  NOTE: The above premise (that we conditionally trigger a chain reaction)
+    //        means that nodes in the same CDF have no dependencies to each
+    //        other. If the premise changes, we will have to care about the
+    //        nodes' ordering!
+    //
+    // Nodes `N'` with identical sets of triggers (to be more precise, [1]) can
+    // be combined and have a single dirty flag, which we call a compressed
+    // dirty flag (CDF). In other words, every distinct element of
+    // `{{t|(t,n)∈T*}|n∈N}` (where `N` represents the universal set of nodes)
+    // receives a CDF.
+    //   [1]: ∀n₁,n₂∈N'. {t|(t,n₁)∈T*} = {t|(t,n₂)∈T}
+
+    let mut cdf2triggerset: Vec<Vec<usize>> = Vec::new();
+    let node2cdf: Vec<usize>;
+    {
+        let mut triggerset2cdf = HashMap::new();
+        node2cdf = trigger_info
+            .commitnode2trigger_map
+            .iter()
+            .map(|trigger_i_list| {
+                let trigger_i_list = &trigger_i_list[..];
+
+                assert_eq!(trigger_i_list.is_empty(), false);
+
+                *triggerset2cdf.entry(trigger_i_list).or_insert_with(|| {
+                    let i = cdf2triggerset.len();
+                    cdf2triggerset.push(trigger_i_list.to_owned());
+                    i
+                })
+            })
+            .collect();
+    }
+
+    let mut cdf2node_map = vec![Vec::new(); cdf2triggerset.len()];
+    for (node_i, &cdf_i) in node2cdf.iter().enumerate() {
+        cdf2node_map[cdf_i].push(node_i);
+    }
+
+    // Sort the CDFs by the topological order of the relationship R_WF defined
+    // by `WatchField`. The order is guaranteed to exist because of the
+    // following preconditions:
+    //
+    //  - `R_WF` is actually a subset of the relationship that dictates the
+    //    order of field initialization, which we've already checked that is
+    //    acyclic.
+    //  - An alternative way to do this is to construct a graph `(N, R_WF)` and
+    //    merge two nodes having the same set of predecessors one by one.
+    //    The resulting graph is still a DAG. This can be proven by showing that
+    //    there exists a topologically-sorted list of `N` and the merging
+    //    operation can be done simultaneously on the list while preserving the
+    //    topological ordering.
+
+    // `cdf_triggers_cdf_map[cdf_i]`: Suppose nodes belonging to `cdf_i` are updated.
+    //     Through `CommitTrigger::WatchField`, another set of nodes is going to
+    //     be updated. This function tells which CDF this new set of nodes
+    //     belongs to.
+    let cdf_triggers_cdf_map: Vec<Vec<usize>> = cdf2node_map
+        .iter()
+        .map(|node_i_list| {
+            node_i_list
+                .iter()
+                .filter_map(|&node_i| match commit_nodes[node_i] {
+                    CommitNode::Item { item_i } => Some(item_i),
+                    CommitNode::ObjInitField { .. } => None,
+                })
+                .map(|item_i| CommitTrigger::WatchField { item_i })
+                .filter_map(|trigger| trigger_info.trigger2trigger_i.get(&trigger))
+                .flat_map(|&trigger_i| trigger_info.trigger2commitnode_map[trigger_i].iter())
+                .map(|&node_i| node2cdf[node_i])
+                .collect()
+        })
+        .collect();
+    let cdf_triggers_cdf_map_fn = |i: &usize| cdf_triggers_cdf_map[*i].iter().cloned();
+
+    // Find the topological order
+    let cdf_i_list: Vec<usize> = (0..cdf2triggerset.len()).collect();
+    let ordered_cdf_i = topological_sort(&cdf_i_list, cdf_triggers_cdf_map_fn).unwrap();
+
+    // `ordered_cdf_i` defines the CDFs' actual bit positions (in `BitsetTy`).
+    let bit2cdf_map = ordered_cdf_i;
+    let mut cdf2bit_map = vec![0; bit2cdf_map.len()];
+    for (bit_i, &cdf_i) in bit2cdf_map.iter().enumerate() {
+        cdf2bit_map[cdf_i] = bit_i;
+    }
+
+    // Construct a `BitsetTy` that represents a run-time type large enough to
+    // store all the CDFs.
+    let cdf_ty = match BitsetTy::new(cdf2triggerset.len()) {
+        Ok(x) => x,
+        Err(bitsetgen::TooLargeError) => {
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "The component requires more dirty flags than \
+                          currently supported by the code generator"
+                    .to_string(),
+                code: None,
+                spans: (comp.path.span)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+
+            BitsetTy::new(0).unwrap()
+        }
+    };
+
     Ok(DepAnalysis {
         nodes,
         item2node_map,
         ordered_node_i_list,
+
+        commit_nodes,
+        triggers: trigger_info.triggers,
+        trigger2trigger_i: trigger_info.trigger2trigger_i,
+        trigger2commitnode_map: trigger_info.trigger2commitnode_map,
+        commitnode2trigger_map: trigger_info.commitnode2trigger_map,
+        cdf2node_map,
+        cdf_triggers_cdf_map,
+        bit2cdf_map,
+        cdf2bit_map,
+        cdf2triggerset,
+        cdf_ty,
     })
 }
 
@@ -387,6 +751,14 @@ pub fn gen_construct(
                     val = var_state,
                 )
                 .unwrap();
+                writeln!(
+                    out,
+                    "    {field}: {cell}::new({val}),",
+                    field = fields::DIRTY,
+                    cell = paths::CELL,
+                    val = dep_analysis.cdf_ty.gen_empty(),
+                )
+                .unwrap();
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentType`
@@ -500,7 +872,8 @@ pub fn gen_construct(
         }
     }
 
-    // TODO: Setup event handlers (maybe in another source file?)
+    // TODO: Regisetr event handlers for event triggers of `on`
+    // TODO: Rgeister event handlers for CDF triggers (`Event` in `trigger_info.triggers`)
 
     writeln!(out, "{}", var_this).unwrap();
 }
@@ -719,4 +1092,95 @@ fn gen_obj_init(
         }
         write!(out, "    .build()").unwrap();
     }
+}
+
+/// Generate `xxxShared::set_dirty_flags` (`methods::SET_DIRTY_FLAGS`).
+pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, out: &mut String) {
+    let arg_this = "this";
+    let arg_flags = "flags";
+    let cdf_ty = dep_analysis.cdf_ty;
+
+    writeln!(
+        out,
+        "    fn {meth}({this}: &{rc}<Self>, {arg}: {ty}) {{",
+        meth = methods::SET_DIRTY_FLAGS,
+        this = arg_this,
+        rc = paths::RC,
+        arg = arg_flags,
+        ty = cdf_ty.gen_ty(),
+    )
+    .unwrap();
+
+    // If `xxxShared::dirty` is empty, schedule a next update
+    writeln!(
+        out,
+        "        if {is_empty} {{",
+        is_empty = cdf_ty.gen_is_empty(format_args!(
+            "{this}.{dirty}.get()",
+            this = arg_this,
+            dirty = fields::DIRTY
+        ),),
+    )
+    .unwrap();
+    // TODO: call `WmExt::invoke_on_update`
+    writeln!(out, "        }}",).unwrap();
+
+    // Update `xxxShared::dirty`
+    writeln!(
+        out,
+        "        {this}.{dirty}.set({new_flags});",
+        this = arg_this,
+        dirty = fields::DIRTY,
+        new_flags = cdf_ty.gen_union(
+            format_args!(
+                "{this}.{dirty}.get()",
+                this = arg_this,
+                dirty = fields::DIRTY
+            ),
+            arg_flags,
+        ),
+    )
+    .unwrap();
+
+    writeln!(out, "    }}",).unwrap();
+}
+
+/// Generates a statament that activates the specified trigger.
+pub fn gen_activate_trigger(
+    dep_analysis: &DepAnalysis,
+    ctx: &Ctx<'_>,
+    trigger: &CommitTrigger,
+    expr_shared: &impl std::fmt::Display,
+    out: &mut String,
+) {
+    let comp_ident = &ctx.cur_comp.ident.sym;
+
+    let trigger_i = if let Some(&x) = dep_analysis.trigger2trigger_i.get(trigger) {
+        x
+    } else {
+        return;
+    };
+
+    let cdf_i_list = dep_analysis
+        .cdf2triggerset
+        .iter()
+        .enumerate()
+        .filter(|(_, triggerset)| triggerset.binary_search(&trigger_i).is_ok())
+        .map(|x| x.0);
+
+    let bit_i_list: Vec<_> = cdf_i_list.map(|i| dep_analysis.cdf2bit_map[i]).collect();
+
+    if bit_i_list.is_empty() {
+        return;
+    }
+
+    writeln!(
+        out,
+        "{ty}::{set_dirty_flags}({shared}, {flags});",
+        ty = CompSharedTy(comp_ident),
+        set_dirty_flags = methods::SET_DIRTY_FLAGS,
+        shared = expr_shared,
+        flags = dep_analysis.cdf_ty.gen_multi(bit_i_list),
+    )
+    .unwrap();
 }

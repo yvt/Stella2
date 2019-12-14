@@ -237,6 +237,10 @@ pub enum DynExpr {
 }
 
 impl DynExpr {
+    pub fn func(&self) -> Option<&Func> {
+        try_match!(Self::Func(x) = self).ok()
+    }
+
     pub fn obj_init(&self) -> Option<&ObjInit> {
         try_match!(Self::ObjInit(x) = self).ok()
     }
