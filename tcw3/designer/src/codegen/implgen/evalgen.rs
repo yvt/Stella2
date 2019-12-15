@@ -5,9 +5,14 @@ use std::fmt::Write;
 use super::{analysis, paths, sem, CommaSeparatedWithTrailingComma, Ctx};
 use crate::metadata;
 
+/// Provides a set of methods to generate an expression appropriate in the
+/// current context to access various things.
+///
+/// The generated expression should be parenthesized so that attaching `.`
+/// at the end does not alter the parsed syntax tree.
 pub trait FuncInputGen {
     /// Generate an expression that evaluates to the specified field's value
-    /// or reference.
+    /// or reference and append it to `out`.
     ///
     /// `item_i` is an index into the current component's `sem::CompDef::items`.
     fn gen_field_ref(&mut self, item_i: usize, by_ref: bool, out: &mut String);

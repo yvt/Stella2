@@ -1004,26 +1004,22 @@ pub fn gen_construct(
             let inner_field = InnerValueField(&field.ident.sym);
 
             if !by_ref {
-                write!(out, "{}::clone(", paths::CLONE).unwrap();
+                write!(out, "{}::clone", paths::CLONE).unwrap();
             }
 
             match field.field_ty {
                 sem::FieldType::Const => {
-                    write!(out, "&{}.{}", self.var_shared, inner_field).unwrap();
+                    write!(out, "(&{}.{})", self.var_shared, inner_field).unwrap();
                 }
                 sem::FieldType::Prop | sem::FieldType::Wire => {
                     self.needs_state = true;
-                    write!(out, "&{}.{}", self.var_state, inner_field).unwrap();
+                    write!(out, "(&{}.{})", self.var_state, inner_field).unwrap();
                 }
-            }
-
-            if !by_ref {
-                write!(out, ")").unwrap();
             }
         }
 
         fn gen_this(&mut self, out: &mut String) {
-            write!(out, "&{}", self.var_this).unwrap();
+            write!(out, "(&{})", self.var_this).unwrap();
         }
 
         // `init` handlers are not allowed to access event parameters, so the
