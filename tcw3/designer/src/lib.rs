@@ -376,104 +376,86 @@
 //! called *compressed dirty flags*. Each compressed dirty flag corresponds to
 //! zero or more raw dirty flags.
 //!
-//! The generated commiting function looks like the following
-//! (**work in progress**):
+//! The generated commiting function looks like the following:
 //!
 //! ```rust,no_compile
-//! // Note: The final code will be much simpler because we use `panic = abort`.
+//! use std::{hint::unreachable_unchecked, mem::forget};
 //! fn commit(&self) {
-//!     let mut dirty = Cell::new(self.dirty.replace(0));
-//!     let mut dirty_processed = Cel::new(!0u64);
+//!     let shared = &*self.shared;
+//!     let dirty = shared.dirty.replace(0);
 //!
 //!     // Uncommited props must be read first because we reset `self.dirty`
 //!     // at the same time. Otherwise, `uncommited_foo` gets leaked on panic
-//!     let new_foo = UnsafeCell::new(replace(self.uncommited_foo, MaybeUninit::uninit()));
-//!     let new_bar1 = UnsafeCell::new(MaybeUninit::uninit());
-//!     let new_bar2 = UnsafeCell::new(MaybeUninit::uninit());
-//!     let new_hoge = UnsafeCell::new(MaybeUninit::uninit());
+//!     let new_foo = if (dirty & 1 != 0) {
+//!         Some(shared.uncommited_foo.replace(MaybeUninit::uninit()).read())
+//!     } else {
+//!         None
+//!     };
 //!
-//!     let _guard = OnDrop(|| unsafe {
-//!         // Imitates drop flags using the information from `dirty` and
-//!         // `dirty_processed`
-//!         if (dirty.get() & (1 << 0)) != 0 {
-//!             (&mut *new_foo.get()).as_ptr().drop_in_place();
+//!     let state = shared.state.borrow();
+//!     let mut foo = &state.foo;
+//!     let mut bar1 = &state.bar1;
+//!     let mut bar2 = &state.bar2;
+//!     let mut hoge = &state.hoge;
+//!     if (dirty & (1 << 0)) != 0 {
+//!         // Commit `prop`
+//!         let new_foo_t = new_foo.as_ref().unwrap_or_else(unsafe { unreachable_unchecked () });
+//!         if foo != new_foo_t {
+//!             dirty |= 1 << 1;
 //!         }
-//!         if (dirty_processed.get() & (1 << 0)) != 0 {
-//!             (&mut *new_bar1.get()).as_ptr().drop_in_place();
-//!             (&mut *new_bar2.get()).as_ptr().drop_in_place();
-//!         }
-//!         if (dirty_processed.get() & (1 << 1)) != 0 {
-//!             (&mut *new_hoge.get()).as_ptr().drop_in_place();
-//!         }
-//!     });
-//!
-//!     {
-//!         let state = self.state.borrow();
-//!         let mut foo = &state.foo;
-//!         let mut bar1 = &state.bar1;
-//!         let mut bar2 = &state.bar2;
-//!         let mut hoge = &state.hoge;
-//!         loop {
-//!             let bit = (dirty.get() & !dirty_processed).trailing_zeros();
-//!             match bit {
-//!                 0 => {
-//!                     // Commit `prop`
-//!                     foo = unsafe { new_foo.get_ref() };
-//!                     // TODO: should check if the value has changed
-//!
-//!                     // Commit `bar1` and `bar2`
-//!                     // may unwind: start
-//!                     let new_bar1_t = *foo + 1;
-//!                     let new_bar2_t = *foo + 2;
-//!                     // TODO: should check if the values have changed
-//!                     // may unwind: end
-//!                     new_bar1 = UnsafeCell::new(MaybeUninit::new(new_bar1_t));
-//!                     new_bar2 = UnsafeCell::new(MaybeUninit::new(new_bar2_t));
-//!                     bar1 = unsafe { (&*new_bar1.get()).get_ref() };
-//!                     bar2 = unsafe { (&*new_bar2.get()).get_ref() };
-//!                     dirty.set(dirty.get() | 1 << 1);
-//!                 }
-//!                 1 => {
-//!                     // Commit `hoge`
-//!                     // may unwind: start
-//!                     let new_hoge_t = *bar1 * 2;
-//!                     // may unwind: end
-//!                     new_hoge = UnsafeCell::new(MaybeUninit::new(new_hoge_t));
-//!                     hoge = unsafe { (&*new_hoge.get()).get_ref() };
-//!                 }
-//!                 _ => break,
-//!             }
-//!             dirty_processed.set(dirty_processed.get() | 1u64 << bit);
-//!         }
-//!         assert_eq!(dirty.get(), dirty_processed.get());
+//!         foo = new_foo_t;
 //!     }
+//!     let new_bar1;
+//!     let new_bar2;
+//!     if (dirty & (1 << 1)) != 0 {
+//!         // Commit `bar1` and `bar2`
+//!         let new_bar1_t = *foo + 1;
+//!         if *bar1 != new_bar1_t {
+//!             dirty |= 1 << 2;
+//!         }
+//!         new_bar1 = Some(new_bar1_t);
+//!         bar1 = new_bar1.as_ref().unwrap();
 //!
-//!     // Write back
-//!     let mut state = self.state.borrow_mut();
-//!
-//!     let _ = if (dirty.get() & (1 << 0)) != 0 {
-//!         let t = replace(&mut state.foo, unsafe { (&mut *new_foo.get()).read() });
-//!         dirty.set(dirty.get() & !(1 << 0));
-//!         Some(t)
-//!     } else { None };
-//!     let _ = if (dirty_processed.get() & (1 << 0)) != 0 {
-//!         let t = (
-//!             replace(&mut state.bar1, unsafe { (&mut *new_bar1.get()).read() }),
-//!             replace(&mut state.bar2, unsafe { (&mut *new_bar2.get()).read() }),
-//!         );
-//!         dirty_processed.set(dirty_processed.get() & !(1 << 0));
-//!         Some(t)
-//!     } else { None };
-//!     let _ = if (dirty_processed.get() & (1 << 1)) != 0 {
-//!         let t = replace(&mut state.hoge, unsafe { (&mut *new_hoge.get()).read() });
-//!         dirty_processed.set(dirty_processed.get() & !(1 << 1));
-//!         Some(t)
-//!     } else { None };
-//!     assert_eq!(dirty.get(), 0);
-//!     assert_eq!(dirty_processed.get(), 0);
+//!         let new_bar2_t = *foo + 2;
+//!         new_bar2 = Some(new_bar2_t);
+//!         bar2 = new_bar2.as_ref().unwrap();
+//!     } else {
+//!         new_bar1 = None;
+//!         new_bar2 = None;
+//!     }
+//!     let new_hoge;
+//!     if (dirty & (1 << 2)) != 0 {
+//!         // Commit `hoge`
+//!         let new_hoge_t = *bar1 * 2;
+//!         new_hoge = Some(new_hoge_t);
+//!         hoge = new_hoge.as_ref().unwrap();
+//!     } else {
+//!         new_hoge = None;
+//!     }
 //!     drop(state);
 //!
-//!     if (dirty_processed.get() & (1 << 1)) != 0 {
+//!     // Write back
+//!     let mut state = shared.state.borrow_mut();
+//!     if (dirty & (1 << 0)) != 0 {
+//!         state.foo = new_foo.unwrap_or_else(unsafe { unreachable_unchecked () });
+//!     } else {
+//!         forget(new_foo);
+//!     }
+//!     if (dirty & (1 << 1)) != 0 {
+//!         state.bar1 = new_bar1.unwrap_or_else(unsafe { unreachable_unchecked () });
+//!         state.bar2 = new_bar2.unwrap_or_else(unsafe { unreachable_unchecked () });
+//!     } else {
+//!         forget(new_bar1);
+//!         forget(new_bar2);
+//!     }
+//!     if (dirty & (1 << 2)) != 0 {
+//!         state.hoge = new_hoge.unwrap_or_else(unsafe { unreachable_unchecked () });
+//!     } else {
+//!         forget(new_hoge);
+//!     }
+//!     drop(state);
+//!
+//!     if (dirty & (1 << 1)) != 0 {
 //!         self.raise_hoge_changed();
 //!     }
 //! }

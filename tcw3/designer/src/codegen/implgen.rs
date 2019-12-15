@@ -26,6 +26,9 @@ mod paths {
     pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
     pub const DEREF: &str = "::std::ops::Deref";
+    pub const UNREACHABLE_UNCHECKED: &str = "::std::hint::unreachable_unchecked";
+    pub const FN_DROP: &str = "::std::mem::drop";
+    pub const FORGET: &str = "::std::mem::forget";
 }
 
 /// The fields of generated types.
@@ -169,7 +172,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
 
     writeln!(out, "impl {} {{", CompTy(comp_ident)).unwrap();
     // `ComponentType::__commit`
-    initgen::gen_commit(&dep_analysis, &mut out);
+    initgen::gen_commit(&analysis, &dep_analysis, ctx, &item_meta2sem_map, &mut out);
     writeln!(out, "}}").unwrap();
 
     // `struct ComponentTypeShared`
@@ -389,6 +392,7 @@ impl fmt::Display for EventBoxHandlerTy<'_> {
     ) }
 }
 
+#[derive(Clone, Copy)]
 struct TempVar<T>(T);
 impl<T: fmt::Display> fmt::Display for TempVar<T> {
     fn_fmt_write! { |this| ("__tmp_{}", this.0) }

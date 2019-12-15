@@ -125,6 +125,8 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                     .unwrap();
 
                     // Set relevant dirty flags
+                    // Warning: The flags and `field.is_some()` must be strictly
+                    // synchronized. Otherwise, a memory safety issue will occur.
                     let trigger = initgen::CommitTrigger::SetItem { item_i };
                     initgen::gen_activate_trigger(
                         dep_analysis,

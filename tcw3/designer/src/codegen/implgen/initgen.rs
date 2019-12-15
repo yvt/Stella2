@@ -1,10 +1,12 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use either::{Left, Right};
 use log::debug;
 use pathfinding::directed::{
     strongly_connected_components::strongly_connected_components,
     topological_sort::topological_sort,
 };
 use std::{cell::Cell, collections::HashMap, fmt::Write, ops::Range};
+use try_match::try_match;
 
 use super::super::{diag::Diag, sem, EmittedError};
 use super::{
@@ -27,7 +29,10 @@ enum DepNode {
 
 #[derive(Debug)]
 enum CommitNode {
-    /// `FieldType::{Prop, Wire}` (`CompItemDef::Field`), or `CompItemDef::On`
+    /// - `CompItemDef::Field`
+    ///     - `FieldType::Prop`: Assign the uncommited value
+    ///     - `FieldType::Wire`: Calculate the new value
+    /// - `CompItemDef::On`: Call the handler
     Item { item_i: usize },
     /// `prop`
     ObjInitField { item_i: usize, field_i: usize },
@@ -1279,12 +1284,385 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut 
 }
 
 /// Generate `xxx::__commit` (`methods::COMMIT`).
-pub fn gen_commit(_dep_analysis: &DepAnalysis, out: &mut String) {
+pub fn gen_commit(
+    analysis: &analysis::Analysis,
+    dep_analysis: &DepAnalysis,
+    ctx: &Ctx<'_>,
+    item_meta2sem_map: &[usize],
+    out: &mut String,
+) {
+    let comp = ctx.cur_comp;
+
     writeln!(out, "    fn {meth}(&self) {{", meth = methods::COMMIT).unwrap();
+
+    macro_rules! gen {
+        ($fmt:literal $($rest:tt)*) => {
+            write!(out, concat!("        ", $fmt) $($rest)*).unwrap()
+        };
+    }
+    macro_rules! genln {
+        ($fmt:literal $($rest:tt)*) => {
+            writeln!(out, concat!("        ", $fmt) $($rest)*).unwrap()
+        };
+    }
+
+    const VAR_SHARED: TempVar<&str> = TempVar("shared");
+    let var_shared = VAR_SHARED;
+    genln!(
+        "let {var_shared} = &*self.{shared};",
+        var_shared = var_shared,
+        shared = fields::SHARED,
+    );
+
+    let var_dirty = TempVar("dirty");
+    let cdf_ty = dep_analysis.cdf_ty;
+    genln!(
+        "let {var_dirty} = {shared}.{dirty}.replace({empty});",
+        var_dirty = var_dirty,
+        shared = var_shared,
+        dirty = fields::DIRTY,
+        empty = cdf_ty.gen_empty(),
+    );
+
+    // After a new value is calculated by `CommitNode::Item`, it's stored to
+    // `var_new`, whather it's identical to the old value or not.
+    // Whether it has a value or not is strictly tied to the corresponding CDFs.
+    // Violation might result in a memory error.
+    let var_new = |item_i: usize| TempVar(item_i); // Option<T>
+
+    // Read out the uncommited values of props. This must be done before
+    // doing anything that possibly triggers unwinding because we reset
+    // `self.dirty` at the same time
+    for (item_i, field) in dep_analysis
+        .commit_nodes
+        .iter()
+        .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
+        .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)))
+    {
+        if field.field_ty == sem::FieldType::Prop {
+            genln!(
+                "let {var} = {shared}.{fld}.take();",
+                var = var_new(item_i),
+                shared = var_shared,
+                fld = InnerValueField(&field.ident.sym),
+            );
+        }
+    }
+
+    // Evaluate nodes
+    // ----------------------------------------------------------------------
+    let var_state = TempVar("state"); // scope = 'state
+    let var_latest = |item_i: usize| TempVar(item_i + comp.items.len()); // &'state T
+
+    // Borrow `ComponentTypeState`
+    genln!(
+        "let {var} = {shared}.{state}.borrow();",
+        var = var_state,
+        shared = var_shared,
+        state = fields::STATE,
+    );
+
+    // Lay out references to the stateful fields. At first, each reference
+    // points to the original value, and later may or may not be replaced with
+    // a reference to `var_new(_)` as a new value is calculated. Some references
+    // are not updated at all if their corresponding fields have no reactive
+    // inputs. These references are used as input to nodes. When each
+    // `var_latest` is read for the first time, it's guaranteed to point to the
+    // final value for the current commit operation.
+    for (item_i, item) in comp.items.iter().enumerate() {
+        if let Some(field) = item.field() {
+            if field.field_ty == sem::FieldType::Const {
+                continue;
+            }
+            genln!(
+                "let mut {var} = &{state}.{fld};",
+                var = var_latest(item_i),
+                state = var_state,
+                fld = InnerValueField(&field.ident.sym),
+            );
+        }
+    }
+
+    struct RecalcFuncInputGen<'a> {
+        comp: &'a sem::CompDef<'a>,
+        var_latest: &'a dyn Fn(usize) -> TempVar<usize>,
+    }
+
+    impl evalgen::FuncInputGen for RecalcFuncInputGen<'_> {
+        fn gen_field_ref(&mut self, item_i: usize, by_ref: bool, out: &mut String) {
+            let field = self.comp.items[item_i].field().unwrap();
+
+            if !by_ref {
+                write!(out, "{}::clone", paths::CLONE).unwrap();
+            }
+
+            if field.field_ty == sem::FieldType::Const {
+                write!(
+                    out,
+                    "(&{}.{})",
+                    VAR_SHARED,
+                    InnerValueField(&field.ident.sym)
+                )
+                .unwrap();
+            } else {
+                write!(out, "({})", (self.var_latest)(item_i)).unwrap();
+            }
+        }
+
+        fn gen_this(&mut self, out: &mut String) {
+            out.push_str("self");
+        }
+
+        // `Func` evaluated through this route is not allowed to use
+        // event parameters, so the following two methods are never called
+        fn trigger_i(&mut self) -> usize {
+            unreachable!()
+        }
+        fn gen_event_param(&mut self, _param_i: usize, _out: &mut String) {
+            unreachable!()
+        }
+    }
+
+    let mut func_input_gen = RecalcFuncInputGen {
+        comp,
+        var_latest: &var_latest,
+    };
+
+    for (bit_i, &cdf_i) in dep_analysis.bit2cdf_map.iter().enumerate() {
+        let node_i_list = &dep_analysis.cdf2node_map[cdf_i];
+        let nodes = node_i_list.iter().map(|&i| &dep_analysis.commit_nodes[i]);
+
+        let wires = nodes
+            .clone()
+            .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
+            .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)))
+            .filter(|(_, field)| field.field_ty == sem::FieldType::Wire);
+
+        // Define `var_new` for wires. (Props are already defined)
+        for (item_i, _) in wires.clone() {
+            genln!("let {};", var_new(item_i));
+        }
+
+        // Evaluate the nodes only if the dirty flag is set
+        genln!("if {} {{", cdf_ty.gen_has(var_dirty, bit_i));
+
+        for node in nodes {
+            let var_fresh_value = TempVar("fresh");
+
+            match node {
+                CommitNode::Item { item_i } => match &comp.items[*item_i] {
+                    sem::CompItemDef::Field(field) => {
+                        // Find another set of CDFs to be set when the field
+                        // is updated with a new value
+                        let bit_i_list: Vec<_> = bit_i_list_for_trigger(
+                            dep_analysis,
+                            &CommitTrigger::WatchField { item_i: *item_i },
+                        )
+                        .collect();
+
+                        match field.field_ty {
+                            sem::FieldType::Wire => {
+                                // Derive the fresh value
+                                gen!("    let {} = ", var_fresh_value);
+                                evalgen::gen_func_eval(
+                                    field.value.as_ref().unwrap().func().unwrap(),
+                                    analysis,
+                                    ctx,
+                                    item_meta2sem_map,
+                                    &mut func_input_gen,
+                                    out,
+                                );
+                                writeln!(out, ";\n").unwrap();
+
+                                if !bit_i_list.is_empty() {
+                                    // Set CDFs if the value has changed
+                                    genln!(
+                                        "    if {} != *{} {{",
+                                        var_fresh_value,
+                                        var_latest(*item_i)
+                                    );
+                                    genln!(
+                                        "        {};",
+                                        cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
+                                    );
+                                    genln!("    }}");
+                                }
+
+                                // Write `var_new`
+                                genln!(
+                                    "    {new} = {some}({fresh});",
+                                    new = var_new(*item_i),
+                                    some = paths::SOME,
+                                    fresh = var_fresh_value
+                                );
+
+                                // Update `var_latest`
+                                genln!(
+                                    "    {latest} = {new}.as_ref().unwrap();",
+                                    latest = var_latest(*item_i),
+                                    new = var_new(*item_i),
+                                );
+                            }
+                            sem::FieldType::Prop => {
+                                // `var_new.is_some()` must be congruent with the
+                                // CDF for `CommitTrigger::SetItem { item_i }`
+                                // TODO: Add `debug_assert!`
+                                genln!(
+                                    "    let {fresh} = {new}.as_ref().unwrap_or_else(\
+                                     || unsafe {{ {unreachable}() }});",
+                                    fresh = var_fresh_value,
+                                    new = var_new(*item_i),
+                                    unreachable = paths::UNREACHABLE_UNCHECKED,
+                                );
+
+                                if !bit_i_list.is_empty() {
+                                    // Set CDFs if the value has changed
+                                    genln!(
+                                        "    if {} != {} {{",
+                                        var_fresh_value,
+                                        var_latest(*item_i)
+                                    );
+                                    genln!(
+                                        "        {};",
+                                        cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
+                                    );
+                                    genln!("    }}");
+                                }
+
+                                // Update `var_latest`
+                                genln!(
+                                    "    {latest} = {fresh};",
+                                    latest = var_latest(*item_i),
+                                    fresh = var_fresh_value,
+                                );
+                            }
+                            sem::FieldType::Const => unreachable!(),
+                        }
+                    }
+                    sem::CompItemDef::On(on) => {
+                        gen!("(");
+                        evalgen::gen_func_eval(
+                            &on.func,
+                            analysis,
+                            ctx,
+                            item_meta2sem_map,
+                            &mut func_input_gen,
+                            out,
+                        );
+                        writeln!(out, ");\n").unwrap();
+                    }
+                    sem::CompItemDef::Event(_) => unreachable!(),
+                },
+                CommitNode::ObjInitField { item_i, field_i } => {
+                    let field = comp.items[*item_i].field().unwrap();
+                    let init = field.value.as_ref().unwrap().obj_init().unwrap();
+                    let init_field = &init.fields[*field_i];
+                    gen!(
+                        "{shared}.{field}.{setter}(",
+                        shared = var_shared,
+                        field = InnerValueField(&field.ident.sym),
+                        setter = SetterMethod(&init_field.ident.sym),
+                    );
+                    evalgen::gen_func_eval(
+                        &init_field.value,
+                        analysis,
+                        ctx,
+                        item_meta2sem_map,
+                        &mut func_input_gen,
+                        out,
+                    );
+                    writeln!(out, ");\n").unwrap();
+                }
+            }
+        }
+
+        // If the dirty flag is not set, assign `None` to `var_new`
+        genln!("}} else {{");
+        for (item_i, _) in wires {
+            genln!("    {} = None;", var_new(item_i));
+        }
+        genln!("}}");
+    }
+
+    // Unborrow `ComponentTypeState`
+    genln!("{drop}({state});", drop = paths::FN_DROP, state = var_state);
+
+    // Store the final values
+    // ----------------------------------------------------------------------
+
+    // Borrow `ComponentTypeState`
+    genln!(
+        "let mut {var} = {shared}.{state}.borrow_mut();",
+        var = var_state,
+        shared = var_shared,
+        state = fields::STATE,
+    );
+
+    for (bit_i, &cdf_i) in dep_analysis.bit2cdf_map.iter().enumerate() {
+        let node_i_list = &dep_analysis.cdf2node_map[cdf_i];
+        let nodes = node_i_list.iter().map(|&i| &dep_analysis.commit_nodes[i]);
+        let fields = nodes
+            .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
+            .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)));
+
+        // Store the final values only if the dirty flag is set
+        genln!("if {} {{", cdf_ty.gen_has(var_dirty, bit_i));
+        for (item_i, field) in fields.clone() {
+            genln!(
+                "    {state}.{field} = \
+                 {var}.unwrap_or_else(|| unsafe {{ {unreachable}() }});",
+                state = var_state,
+                field = InnerValueField(&field.ident.sym),
+                var = var_new(item_i),
+                unreachable = paths::UNREACHABLE_UNCHECKED,
+            );
+        }
+
+        // If the dirty flag is not set, `var_new` should be empty, so we can
+        // safely "forget" them
+        genln!("}} else {{");
+        for (item_i, _) in fields {
+            // TODO: add `debug_assert!`
+            genln!(
+                "    {forget}({var});",
+                forget = paths::FORGET,
+                var = var_new(item_i),
+            );
+        }
+        genln!("}}");
+    }
+
+    // Unborrow `ComponentTypeState`
+    genln!("{drop}({state});", drop = paths::FN_DROP, state = var_state);
+
+    // Raise "value changed" events
+    // ----------------------------------------------------------------------
 
     // TODO
 
     writeln!(out, "    }}",).unwrap();
+}
+
+/// Find the bit positions of the dirty flags to be set when the given trigger
+/// is activated.
+fn bit_i_list_for_trigger<'a>(
+    dep_analysis: &'a DepAnalysis,
+    trigger: &CommitTrigger,
+) -> impl Iterator<Item = usize> + 'a {
+    let trigger_i = if let Some(&x) = dep_analysis.trigger2trigger_i.get(trigger) {
+        x
+    } else {
+        return Left(std::iter::empty());
+    };
+
+    let cdf_i_list = dep_analysis
+        .cdf2triggerset
+        .iter()
+        .enumerate()
+        .filter(move |(_, triggerset)| triggerset.binary_search(&trigger_i).is_ok())
+        .map(|x| x.0);
+
+    Right(cdf_i_list.map(move |i| dep_analysis.cdf2bit_map[i]))
 }
 
 /// Generates a statament that activates the specified trigger.
@@ -1297,20 +1675,7 @@ pub fn gen_activate_trigger(
 ) {
     let comp_ident = &ctx.cur_comp.ident.sym;
 
-    let trigger_i = if let Some(&x) = dep_analysis.trigger2trigger_i.get(trigger) {
-        x
-    } else {
-        return;
-    };
-
-    let cdf_i_list = dep_analysis
-        .cdf2triggerset
-        .iter()
-        .enumerate()
-        .filter(|(_, triggerset)| triggerset.binary_search(&trigger_i).is_ok())
-        .map(|x| x.0);
-
-    let bit_i_list: Vec<_> = cdf_i_list.map(|i| dep_analysis.cdf2bit_map[i]).collect();
+    let bit_i_list: Vec<_> = bit_i_list_for_trigger(dep_analysis, trigger).collect();
 
     if bit_i_list.is_empty() {
         return;
