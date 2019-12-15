@@ -456,7 +456,7 @@ fn analyze_dep(
                     if trigger_emitted.get() {
                         commit_nodes.push(CommitNode::Item { item_i });
                     }
-                }
+                } // TODO: Emit `watch` event
             },
             sem::CompItemDef::On(on) => {
                 let node_i = commit_nodes.len();
@@ -1477,7 +1477,7 @@ pub fn gen_commit(
                                 if !bit_i_list.is_empty() {
                                     // Set CDFs if the value has changed
                                     genln!(
-                                        "    if {} != *{} {{",
+                                        "    if {} != *{} {{", // TODO: use `ShallowEq`
                                         var_fresh_value,
                                         var_latest(*item_i)
                                     );
@@ -1518,7 +1518,7 @@ pub fn gen_commit(
                                 if !bit_i_list.is_empty() {
                                     // Set CDFs if the value has changed
                                     genln!(
-                                        "    if {} != {} {{",
+                                        "    if {} != {} {{", // TODO: use `ShallowEq`
                                         var_fresh_value,
                                         var_latest(*item_i)
                                     );
