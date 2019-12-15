@@ -4,6 +4,7 @@ use super::DisplayFn;
 #[derive(Debug, Clone, Copy)]
 pub struct TooLargeError;
 
+#[allow(dead_code)] // Work-around rust-lang/rust#64362
 #[derive(Debug, Clone, Copy)]
 pub enum BitsetTy {
     Empty,
