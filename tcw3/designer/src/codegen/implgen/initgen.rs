@@ -974,6 +974,118 @@ pub fn gen_construct(
     // TODO: Regisetr event handlers for event triggers of `on`
     // TODO: Rgeister event handlers for CDF triggers (`Event` in `trigger_info.triggers`)
 
+    // Activate `init` trigger
+    // ----------------------------------------------------------------------
+
+    struct PostInitFuncInputGen<'a> {
+        comp: &'a sem::CompDef<'a>,
+        var_this: &'a dyn std::fmt::Display,
+        var_shared: &'a dyn std::fmt::Display,
+        var_state: &'a dyn std::fmt::Display,
+        needs_state: bool,
+    }
+
+    // Borrow `shared` as `var_shared`.
+    writeln!(
+        out,
+        "let {} = &*{}.{};",
+        var_shared,
+        var_this,
+        fields::SHARED
+    )
+    .unwrap();
+
+    // `var_state` is borrowed on demand.
+
+    let mut func_input_gen = PostInitFuncInputGen {
+        comp,
+        var_this: &var_this,
+        var_shared: &var_shared,
+        var_state: &var_state,
+        needs_state: false,
+    };
+
+    impl evalgen::FuncInputGen for PostInitFuncInputGen<'_> {
+        fn gen_field_ref(&mut self, item_i: usize, by_ref: bool, out: &mut String) {
+            let field = self.comp.items[item_i].field().unwrap();
+
+            let inner_field = InnerValueField(&field.ident.sym);
+
+            if !by_ref {
+                write!(out, "{}::clone(", paths::CLONE).unwrap();
+            }
+
+            match field.field_ty {
+                sem::FieldType::Const => {
+                    write!(out, "&{}.{}", self.var_shared, inner_field).unwrap();
+                }
+                sem::FieldType::Prop | sem::FieldType::Wire => {
+                    self.needs_state = true;
+                    write!(out, "&{}.{}", self.var_state, inner_field).unwrap();
+                }
+            }
+
+            if !by_ref {
+                write!(out, ")").unwrap();
+            }
+        }
+
+        fn gen_this(&mut self, out: &mut String) {
+            write!(out, "&{}", self.var_this).unwrap();
+        }
+
+        // `init` handlers are not allowed to access event parameters, so the
+        // following two methods are never called
+        fn trigger_i(&mut self) -> usize {
+            unreachable!()
+        }
+        fn gen_event_param(&mut self, _param_i: usize, _out: &mut String) {
+            unreachable!()
+        }
+    }
+
+    let mut postinit_code = String::new();
+
+    for item in comp.items.iter().filter_map(|item| item.on()) {
+        let has_init_trigger = item
+            .triggers
+            .iter()
+            .any(|tr| try_match!(sem::Trigger::Init(_) = tr).is_ok());
+        if !has_init_trigger {
+            continue;
+        }
+
+        evalgen::gen_func_eval(
+            &item.func,
+            analysis,
+            ctx,
+            item_meta2sem_map,
+            &mut func_input_gen,
+            &mut postinit_code,
+        );
+    }
+
+    if func_input_gen.needs_state {
+        write!(
+            out,
+            "let {state} = {shared}.{field}.borrow();",
+            state = var_state,
+            shared = var_shared,
+            field = fields::STATE
+        )
+        .unwrap();
+        write!(out, "{}", postinit_code).unwrap();
+        write!(
+            out,
+            "{drop}({state});",
+            drop = paths::FN_DROP,
+            state = var_state
+        )
+        .unwrap();
+    } else {
+        write!(out, "{}", postinit_code).unwrap();
+    }
+
     writeln!(out, "{}", var_this).unwrap();
 }
 

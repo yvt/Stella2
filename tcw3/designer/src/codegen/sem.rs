@@ -127,6 +127,10 @@ impl CompItemDef<'_> {
         try_match!(Self::Field(x) = self).ok()
     }
 
+    pub fn on(&self) -> Option<&OnDef<'_>> {
+        try_match!(Self::On(x) = self).ok()
+    }
+
     pub fn ident(&self) -> Option<&Ident> {
         match self {
             CompItemDef::Field(field) => Some(&field.ident),
