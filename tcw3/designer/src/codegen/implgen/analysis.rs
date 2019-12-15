@@ -551,6 +551,8 @@ fn analyze_input_inner(
                 };
 
                 // TODO: Check accessibility
+                // TODO: `const` should not be allowed to depend on `prop` or `wire`
+                // TODO: Check if the target has a `watch` accessor
 
                 indirections.push(ItemIndirection {
                     comp_crate_i: crate_i,
