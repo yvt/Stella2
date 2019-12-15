@@ -25,7 +25,7 @@ pub trait FuncInputGen {
     fn trigger_i(&mut self) -> usize;
 
     /// Generate an expression that evaluates to an event parameter.
-    fn gen_event_param(&mut self, param_i: usize, out: &mut String);
+    fn gen_event_param(&mut self, param_i: usize, by_ref: bool, out: &mut String);
 }
 
 /// Generates an expression that evaluates the given `Func`.
@@ -61,12 +61,9 @@ pub fn gen_func_eval(
 
         match analysis.get_input(&func_input.input) {
             analysis::InputInfo::EventParam(param_input) => {
-                if func_input.by_ref {
-                    out.push_str("&");
-                }
                 let trigger_i = input_gen.trigger_i();
                 let param_i = param_input.param_i[trigger_i];
-                input_gen.gen_event_param(param_i, out);
+                input_gen.gen_event_param(param_i, func_input.by_ref, out);
             }
             analysis::InputInfo::Item(item_input) => {
                 let ind0 = item_input.indirections.first().unwrap();

@@ -38,7 +38,7 @@ comp crate::view::MainView {
         prop wnd_state = |wnd_state as x| x;
     };
 
-    on (toolbar.dispatch) |event.action| raise_dispatch(action);
+    on (toolbar.dispatch) |&this, event.action| this.raise_dispatch(action);
 
     const split_side = Split {
         const style_manager = |style_manager as x| x;

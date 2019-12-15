@@ -276,6 +276,12 @@ pub enum Trigger {
     Input(Input),
 }
 
+impl Trigger {
+    pub fn input(&self) -> Option<&Input> {
+        try_match!(Self::Input(x) = self).ok()
+    }
+}
+
 pub struct InitTrigger {
     pub span: Option<codemap::Span>,
 }

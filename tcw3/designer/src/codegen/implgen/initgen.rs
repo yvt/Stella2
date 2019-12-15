@@ -12,8 +12,9 @@ use super::super::{diag::Diag, sem, EmittedError};
 use super::{
     analysis,
     bitsetgen::{self, BitsetTy},
-    evalgen, fields, known_fields, methods, paths, CompBuilderTy, CompSharedTy, CompStateTy,
-    CompTy, Ctx, EventInnerSubList, FactorySetterForField, InnerValueField, SetterMethod, TempVar,
+    evalgen, fields, known_fields, methods, paths, CommaSeparated, CompBuilderTy, CompSharedTy,
+    CompStateTy, CompTy, Ctx, EventInnerSubList, FactorySetterForField, InnerValueField,
+    SetterMethod, SubscribeMethod, TempVar,
 };
 use crate::metadata;
 
@@ -38,6 +39,8 @@ enum CommitNode {
     ObjInitField { item_i: usize, field_i: usize },
 }
 
+// TODO: Rename "trigger" to something else. It's confusing that `OnDef` has
+//       the same-named thing, and it hurts code readability
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum CommitTrigger {
     /// `prop`'s setter method is called.
@@ -51,12 +54,21 @@ pub enum CommitTrigger {
     Event { input: analysis::ItemInput },
 }
 
+enum EventHandler {
+    /// The event sets CDFs (compressed dirty flags).
+    Trigger { trigger_i: usize },
+    /// `on` item handles the event. `on_trigger_i` is the position of the
+    /// event within `OnDef::triggers`.
+    On { item_i: usize, on_trigger_i: usize },
+}
+
 pub struct DepAnalysis {
     nodes: Vec<DepNode>,
     item2node_map: Vec<usize>,
     ordered_node_i_list: Vec<usize>,
 
     commit_nodes: Vec<CommitNode>,
+    triggers: Vec<CommitTrigger>,
     trigger2trigger_i: HashMap<CommitTrigger, usize>,
     cdf2node_map: Vec<Vec<usize>>,
     bit2cdf_map: Vec<usize>,
@@ -64,6 +76,8 @@ pub struct DepAnalysis {
     /// Each `Vec<usize>` comes from `commitnode2trigger_map`, thus is sorted.
     cdf2triggerset: Vec<Vec<usize>>,
     pub cdf_ty: BitsetTy,
+
+    input2handlers: HashMap<analysis::ItemInput, Vec<EventHandler>>,
 }
 
 impl DepAnalysis {
@@ -695,18 +709,79 @@ fn analyze_dep(
         }
     }
 
+    // Compile the list of events to subscribe
+    // ----------------------------------------------------------------------
+    let mut input2handlers = HashMap::new();
+
+    // Some events are channeled to the CDF system.
+    for (trigger_i, trigger) in trigger_info.triggers.iter().enumerate() {
+        if let CommitTrigger::Event { input } = trigger {
+            let new = input2handlers
+                .insert(input.clone(), vec![EventHandler::Trigger { trigger_i }])
+                .is_none();
+            assert!(new);
+        }
+    }
+
+    // Event triggers in `on` do not go through the CDF system because the
+    // handlers might want to access event parameters.
+    for (item_i, on) in comp
+        .items
+        .iter()
+        .enumerate()
+        .filter_map(|(item_i, item)| Some((item_i, item.on()?)))
+    {
+        for (on_trigger_i, input) in on
+            .triggers
+            .iter()
+            .enumerate()
+            .filter_map(|(trigger_i, trigger)| Some((trigger_i, trigger.input()?)))
+        {
+            match analysis.get_input(input) {
+                analysis::InputInfo::EventParam(_) => {
+                    // invalid, already reported by `analysis.rs`
+                    unreachable!();
+                }
+                analysis::InputInfo::This => {}
+                analysis::InputInfo::Invalid => {}
+                analysis::InputInfo::Item(item_input) => {
+                    // Find the referred item
+                    let ind_last = item_input.indirections.last().unwrap();
+                    let item = ind_last.item(ctx.repo);
+
+                    // Only interested in events
+                    if item.event().is_none() {
+                        continue;
+                    }
+
+                    let item_input = item_input.clone();
+
+                    // Insert `(item_input, (item_i, on_trigger_i))` to `input2handlers`
+                    let handlers = input2handlers.entry(item_input).or_default();
+                    handlers.push(EventHandler::On {
+                        item_i,
+                        on_trigger_i,
+                    });
+                }
+            }
+        }
+    }
+
     Ok(DepAnalysis {
         nodes,
         item2node_map,
         ordered_node_i_list,
 
         commit_nodes,
+        triggers: trigger_info.triggers,
         trigger2trigger_i: trigger_info.trigger2trigger_i,
         cdf2node_map,
         bit2cdf_map,
         cdf2bit_map,
         cdf2triggerset,
         cdf_ty,
+
+        input2handlers,
     })
 }
 
@@ -756,7 +831,7 @@ pub fn gen_construct(
         fn trigger_i(&mut self) -> usize {
             unreachable!()
         }
-        fn gen_event_param(&mut self, _param_i: usize, _out: &mut String) {
+        fn gen_event_param(&mut self, _param_i: usize, _by_ref: bool, _out: &mut String) {
             unreachable!()
         }
     }
@@ -963,10 +1038,7 @@ pub fn gen_construct(
         }
     }
 
-    // TODO: Regisetr event handlers for event triggers of `on`
-    // TODO: Rgeister event handlers for CDF triggers (`Event` in `trigger_info.triggers`)
-
-    // Activate `init` trigger
+    // Wrapping up things...
     // ----------------------------------------------------------------------
 
     struct PostInitFuncInputGen<'a> {
@@ -1027,12 +1099,208 @@ pub fn gen_construct(
         fn trigger_i(&mut self) -> usize {
             unreachable!()
         }
-        fn gen_event_param(&mut self, _param_i: usize, _out: &mut String) {
+        fn gen_event_param(&mut self, _param_i: usize, _by_ref: bool, _out: &mut String) {
             unreachable!()
         }
     }
 
     let mut postinit_code = String::new();
+
+    // Hook up event handlers
+    // ----------------------------------------------------------------------
+
+    struct EvtHandlerFuncInputGen<'a> {
+        comp: &'a sem::CompDef<'a>,
+        var_this: &'a dyn std::fmt::Display,
+        var_shared: &'a dyn std::fmt::Display,
+        var_state: &'a dyn std::fmt::Display,
+        on_trigger_i: usize,
+        can_move_out_event_param: bool,
+        needs_state: bool,
+    }
+
+    impl evalgen::FuncInputGen for EvtHandlerFuncInputGen<'_> {
+        fn gen_field_ref(&mut self, item_i: usize, by_ref: bool, out: &mut String) {
+            let field = self.comp.items[item_i].field().unwrap();
+
+            let inner_field = InnerValueField(&field.ident.sym);
+
+            if !by_ref {
+                write!(out, "{}::clone", paths::CLONE).unwrap();
+            }
+
+            match field.field_ty {
+                sem::FieldType::Const => {
+                    write!(out, "(&{}.{})", self.var_shared, inner_field).unwrap();
+                }
+                sem::FieldType::Prop | sem::FieldType::Wire => {
+                    self.needs_state = true;
+                    write!(out, "(&{}.{})", self.var_state, inner_field).unwrap();
+                }
+            }
+        }
+
+        fn gen_this(&mut self, out: &mut String) {
+            write!(out, "(&{})", self.var_this).unwrap();
+        }
+
+        fn trigger_i(&mut self) -> usize {
+            self.on_trigger_i
+        }
+
+        fn gen_event_param(&mut self, param_i: usize, by_ref: bool, out: &mut String) {
+            // `TempVar(0)` is occupied by `var_this`, so this starts at 1
+            let var = TempVar(param_i + 1);
+            match (self.can_move_out_event_param, by_ref) {
+                (_, true) => write!(out, "(&{})", var).unwrap(),
+                (true, false) => write!(out, "{}", var).unwrap(),
+                (false, false) => write!(out, "{}::clone(&{})", paths::CLONE, var).unwrap(),
+            }
+        }
+    }
+
+    for (item_input, handlers) in dep_analysis.input2handlers.iter() {
+        // Generate a call to `subscribe_xxx` method
+        let var_shared_weak = TempVar("this_weak");
+
+        writeln!(
+            postinit_code,
+            "let {this_weak} = {rc}::downgrade(&{this}.{shared});",
+            this_weak = var_shared_weak,
+            rc = paths::RC,
+            this = var_this,
+            shared = fields::SHARED,
+        )
+        .unwrap();
+
+        // TODO: Save `Sub` returned by `subscribe_xxx` to unsubscribe on drop
+
+        gen_subscribe_event(
+            &mut func_input_gen,
+            ctx,
+            item_meta2sem_map,
+            item_input,
+            |out, event| {
+                // Emit a boxed closure
+                let num_params = event.inputs.len();
+                write!(
+                    out,
+                    "Box::new(move |{}| {{",
+                    // `TempVar(0)` is occupied by `var_this`
+                    CommaSeparated((1..=num_params).map(TempVar))
+                )
+                .unwrap();
+
+                // Try to upgrade `this_weak`. Do this regardless of
+                // whether `var_shared_weak` is actually used or not.
+                writeln!(
+                    out,
+                    " if let Some({}) = {}.upgrade() {{",
+                    var_shared, var_shared_weak
+                )
+                .unwrap();
+
+                // Reconstruct `ComponentThis` from `Rc<ComponentThisShared>`
+                writeln!(
+                    out,
+                    "    let {this} = {ty} {{ {field}: {shared} }};",
+                    this = var_this,
+                    ty = CompTy(comp_ident),
+                    field = fields::SHARED,
+                    shared = var_shared,
+                )
+                .unwrap();
+
+                // Borrow `shared` as `var_shared`.
+                writeln!(
+                    out,
+                    "    let {} = &*{}.{};",
+                    var_shared,
+                    var_this,
+                    fields::SHARED
+                )
+                .unwrap();
+
+                // `var_state` is borrowed on demand.
+
+                let mut code_frag = String::new();
+
+                let mut func_input_gen2 = EvtHandlerFuncInputGen {
+                    comp,
+                    var_this: &var_this,
+                    var_shared: &var_shared,
+                    var_state: &var_state,
+                    on_trigger_i: 0, // set later
+                    can_move_out_event_param: false,
+                    needs_state: false,
+                };
+
+                for (i, handler) in handlers.iter().enumerate() {
+                    if i + 1 == handlers.len() {
+                        func_input_gen2.can_move_out_event_param = true;
+                    }
+
+                    match handler {
+                        EventHandler::Trigger { trigger_i } => {
+                            write!(code_frag, "    ").unwrap();
+                            gen_activate_trigger(
+                                dep_analysis,
+                                ctx,
+                                &dep_analysis.triggers[*trigger_i],
+                                &var_shared,
+                                &mut code_frag,
+                            )
+                        }
+                        EventHandler::On {
+                            item_i,
+                            on_trigger_i,
+                        } => {
+                            let on = comp.items[*item_i].on().unwrap();
+                            func_input_gen2.on_trigger_i = *on_trigger_i;
+
+                            write!(code_frag, "    (").unwrap();
+                            evalgen::gen_func_eval(
+                                &on.func,
+                                analysis,
+                                ctx,
+                                item_meta2sem_map,
+                                &mut func_input_gen2,
+                                &mut code_frag,
+                            );
+                            writeln!(code_frag, ");").unwrap();
+                        }
+                    }
+                }
+
+                if func_input_gen2.needs_state {
+                    writeln!(
+                        out,
+                        "    let {state} = {shared}.{field}.borrow();",
+                        state = var_state,
+                        shared = var_shared,
+                        field = fields::STATE
+                    )
+                    .unwrap();
+                    write!(out, "{}", code_frag).unwrap();
+                    writeln!(
+                        out,
+                        "    {drop}({state});",
+                        drop = paths::FN_DROP,
+                        state = var_state
+                    )
+                    .unwrap();
+                } else {
+                    write!(out, "{}", code_frag).unwrap();
+                }
+
+                write!(out, "}} }})").unwrap();
+            },
+            &mut postinit_code,
+        );
+    }
+
+    // Activate `init` trigger
+    // ----------------------------------------------------------------------
 
     for item in comp.items.iter().filter_map(|item| item.on()) {
         let has_init_trigger = item
@@ -1077,6 +1345,37 @@ pub fn gen_construct(
     }
 
     writeln!(out, "{}", var_this).unwrap();
+}
+
+/// Generate code to subscribe to the event specified by `item_input` by
+/// registering `expr` as the event handler.
+fn gen_subscribe_event(
+    input_gen: &mut dyn evalgen::FuncInputGen,
+    ctx: &Ctx,
+    item_meta2sem_map: &[usize],
+    item_input: &analysis::ItemInput,
+    expr: impl FnOnce(&mut String, &metadata::EventDef),
+    out: &mut String,
+) {
+    // The first part is dereferenced using `input_gen`
+    if item_input.indirections.len() == 1 {
+        input_gen.gen_this(out);
+    } else {
+        let ind0 = item_input.indirections.first().unwrap();
+        input_gen.gen_field_ref(item_meta2sem_map[ind0.item_i], true, out);
+    }
+
+    for ind in item_input.indirections[1..item_input.indirections.len() - 1].iter() {
+        let item = ind.item(ctx.repo).field().unwrap();
+        write!(out, ".{}()", item.ident).unwrap();
+    }
+
+    // The last part refers to the event
+    let ind_last = item_input.indirections.last().unwrap();
+    let event = ind_last.item(ctx.repo).event().unwrap();
+    write!(out, ".{}(", SubscribeMethod(&event.ident)).unwrap();
+    expr(out, event);
+    writeln!(out, ");").unwrap();
 }
 
 /// Analyze `ObjInit` and report errors if any.
@@ -1520,7 +1819,7 @@ pub fn gen_commit(
         fn trigger_i(&mut self) -> usize {
             unreachable!()
         }
-        fn gen_event_param(&mut self, _param_i: usize, _out: &mut String) {
+        fn gen_event_param(&mut self, _param_i: usize, _by_ref: bool, _out: &mut String) {
             unreachable!()
         }
     }

@@ -310,7 +310,9 @@
 //! | obj-init → `prop` | ↑                  | ↑                   |
 //!
 //!  - If the mode is **Direct**, the given Rust expression is directly
-//!    registered as the event handler.
+//!    registered as the event handler. This makes it possible for the
+//!    expression to access the event parameters, which might not outlive
+//!    the duration of the handler function call.
 //!  - If the mode is **Dirty Flag**, a dirty flag is created to indicate
 //!    whether the given expression should be evaluated on an upcoming commit
 //!    operation. **Internal** and **External** specifies the possible pathway
