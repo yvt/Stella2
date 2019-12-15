@@ -12,6 +12,9 @@ pub use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
 #[doc(no_inline)]
 pub use owning_ref::OwningRef;
 
+#[doc(no_inline)]
+pub use harmony::ShallowEq;
+
 /// A placeholder value for unset mandatory parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Unset;

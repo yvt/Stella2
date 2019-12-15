@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 owning_ref = "0.4.0"
 subscriber_list = { path = "../../support/subscriber_list" }
+harmony = { path = "../../harmony" }

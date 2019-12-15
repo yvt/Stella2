@@ -1477,7 +1477,8 @@ pub fn gen_commit(
                                 if !bit_i_list.is_empty() {
                                     // Set CDFs if the value has changed
                                     genln!(
-                                        "    if {} != *{} {{", // TODO: use `ShallowEq`
+                                        "    if !{}::shallow_eq(&{}, {}) {{",
+                                        ctx.path_shallow_eq(),
                                         var_fresh_value,
                                         var_latest(*item_i)
                                     );
@@ -1516,7 +1517,8 @@ pub fn gen_commit(
                                 if !bit_i_list.is_empty() {
                                     // Set CDFs if the value has changed
                                     genln!(
-                                        "    if {} != {} {{", // TODO: use `ShallowEq`
+                                        "    if !{}::shallow_eq({}, {}) {{",
+                                        ctx.path_shallow_eq(),
                                         var_fresh_value,
                                         var_latest(*item_i)
                                     );

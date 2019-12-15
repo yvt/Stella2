@@ -105,6 +105,11 @@ impl<'a> Ctx<'a> {
     fn path_unwrap_unchecked(&self) -> impl std::fmt::Display + Clone + '_ {
         DisplayFn(move |f| write!(f, "{}::unwrap_unchecked", self.designer_runtime_path))
     }
+
+    // `::tcw3::designer_runtime::ShallowEq`
+    fn path_shallow_eq(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::ShallowEq", self.designer_runtime_path))
+    }
 }
 
 pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {

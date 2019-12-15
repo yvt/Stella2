@@ -380,6 +380,7 @@
 //!
 //! ```rust,no_compile
 //! use std::{hint::unreachable_unchecked, mem::forget};
+//! use harmony::ShallowEq;
 //! fn commit(&self) {
 //!     let shared = &*self.shared;
 //!     let dirty = shared.dirty.replace(0);
@@ -410,7 +411,7 @@
 //!     if (dirty & (1 << 1)) != 0 {
 //!         // Commit `bar1` and `bar2`
 //!         let new_bar1_t = *foo + 1;
-//!         if *bar1 != new_bar1_t {
+//!         if !ShallowEq::shallow_eq(bar1, &new_bar1_t) {
 //!             dirty |= 1 << 2;
 //!         }
 //!         new_bar1 = Some(new_bar1_t);
