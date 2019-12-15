@@ -134,6 +134,14 @@ impl<T> ErasedPool for IterablePool<T> {
     }
 }
 
+enum Never {}
+
+impl ErasedPool for Never {
+    fn deallocate(&mut self, _: PoolPtr) {
+        match *self {}
+    }
+}
+
 impl fmt::Debug for UntypedSubscription {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("UntypedSubscription")
@@ -142,7 +150,21 @@ impl fmt::Debug for UntypedSubscription {
     }
 }
 
+impl Default for UntypedSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UntypedSubscription {
+    /// Construct an `UntypedSubscription` that refers to no backing object.
+    pub fn new() -> Self {
+        Self {
+            pool: Weak::<RefCell<Never>>::new(),
+            ptr: PoolPtr::uninitialized(),
+        }
+    }
+
     /// Remove the element that `self` represents.
     pub fn unsubscribe(self) -> Result<Option<()>, IterationActive> {
         if let Some(pool) = self.pool.upgrade() {
