@@ -90,6 +90,10 @@ impl DepAnalysis {
     ) -> Result<Self, EmittedError> {
         analyze_dep(analysis, ctx, item_meta2sem_map, item_name_map, diag)
     }
+
+    pub fn num_subs(&self) -> usize {
+        self.input2handlers.len()
+    }
 }
 
 /// Analyze dependencies between fields.
@@ -617,13 +621,72 @@ fn analyze_dep(
         }
     };
 
+    // Compile the list of events to subscribe
+    // ----------------------------------------------------------------------
+    let mut input2handlers = HashMap::new();
+
+    // Some events are channeled to the CDF system.
+    for (trigger_i, trigger) in trigger_info.triggers.iter().enumerate() {
+        if let CommitTrigger::Event { input } = trigger {
+            let new = input2handlers
+                .insert(input.clone(), vec![EventHandler::Trigger { trigger_i }])
+                .is_none();
+            assert!(new);
+        }
+    }
+
+    // Event triggers in `on` do not go through the CDF system because the
+    // handlers might want to access event parameters.
+    for (item_i, on) in comp
+        .items
+        .iter()
+        .enumerate()
+        .filter_map(|(item_i, item)| Some((item_i, item.on()?)))
+    {
+        for (on_trigger_i, input) in on
+            .triggers
+            .iter()
+            .enumerate()
+            .filter_map(|(trigger_i, trigger)| Some((trigger_i, trigger.input()?)))
+        {
+            match analysis.get_input(input) {
+                analysis::InputInfo::EventParam(_) => {
+                    // invalid, already reported by `analysis.rs`
+                    unreachable!();
+                }
+                analysis::InputInfo::This => {}
+                analysis::InputInfo::Invalid => {}
+                analysis::InputInfo::Item(item_input) => {
+                    // Find the referred item
+                    let ind_last = item_input.indirections.last().unwrap();
+                    let item = ind_last.item(ctx.repo);
+
+                    // Only interested in events
+                    if item.event().is_none() {
+                        continue;
+                    }
+
+                    let item_input = item_input.clone();
+
+                    // Insert `(item_input, (item_i, on_trigger_i))` to `input2handlers`
+                    let handlers = input2handlers.entry(item_input).or_default();
+                    handlers.push(EventHandler::On {
+                        item_i,
+                        on_trigger_i,
+                    });
+                }
+            }
+        }
+    }
+
     // Check `wm` field
     // ----------------------------------------------------------------------
-    // The component must have a field named `wm` if we rely on this CDF thing.
+    // The component must have a field named `wm` if we rely on this CDF thing
+    // or the component has at least one event handler.
     let needs_wm = trigger_info.triggers.iter().any(|tr| match tr {
         CommitTrigger::Event { .. } | CommitTrigger::SetItem { .. } => true,
         CommitTrigger::WatchField { .. } => false,
-    });
+    }) || !input2handlers.is_empty();
 
     if needs_wm {
         let item_i = item_name_map.get(known_fields::WM);
@@ -698,72 +761,14 @@ fn analyze_dep(
                 message: format!(
                     "The component needs a `const` field of type `Wm` named `{}` \
                      because the component has some reactive field and the system \
-                     makes deferred updates to them. Please read the \
-                     documentation for how this works and how to comply with \
-                     this requirement",
+                     makes deferred updates to them, or at least one event
+                     handler. Please consult the documentation for how this
+                     works and how to comply with this requirement",
                     known_fields::WM
                 ),
                 code: None,
                 spans: vec![],
             }]);
-        }
-    }
-
-    // Compile the list of events to subscribe
-    // ----------------------------------------------------------------------
-    let mut input2handlers = HashMap::new();
-
-    // Some events are channeled to the CDF system.
-    for (trigger_i, trigger) in trigger_info.triggers.iter().enumerate() {
-        if let CommitTrigger::Event { input } = trigger {
-            let new = input2handlers
-                .insert(input.clone(), vec![EventHandler::Trigger { trigger_i }])
-                .is_none();
-            assert!(new);
-        }
-    }
-
-    // Event triggers in `on` do not go through the CDF system because the
-    // handlers might want to access event parameters.
-    for (item_i, on) in comp
-        .items
-        .iter()
-        .enumerate()
-        .filter_map(|(item_i, item)| Some((item_i, item.on()?)))
-    {
-        for (on_trigger_i, input) in on
-            .triggers
-            .iter()
-            .enumerate()
-            .filter_map(|(trigger_i, trigger)| Some((trigger_i, trigger.input()?)))
-        {
-            match analysis.get_input(input) {
-                analysis::InputInfo::EventParam(_) => {
-                    // invalid, already reported by `analysis.rs`
-                    unreachable!();
-                }
-                analysis::InputInfo::This => {}
-                analysis::InputInfo::Invalid => {}
-                analysis::InputInfo::Item(item_input) => {
-                    // Find the referred item
-                    let ind_last = item_input.indirections.last().unwrap();
-                    let item = ind_last.item(ctx.repo);
-
-                    // Only interested in events
-                    if item.event().is_none() {
-                        continue;
-                    }
-
-                    let item_input = item_input.clone();
-
-                    // Insert `(item_input, (item_i, on_trigger_i))` to `input2handlers`
-                    let handlers = input2handlers.entry(item_input).or_default();
-                    handlers.push(EventHandler::On {
-                        item_i,
-                        on_trigger_i,
-                    });
-                }
-            }
         }
     }
 
@@ -925,6 +930,23 @@ pub fn gen_construct(
                     val = dep_analysis.cdf_ty.gen_empty(),
                 )
                 .unwrap();
+                if dep_analysis.num_subs() > 0 {
+                    writeln!(out, "    {field}: [", field = fields::SUBS,).unwrap();
+                    for _ in 0..dep_analysis.num_subs() {
+                        // `subs` must be filled with `MaybeUninit` in an initialized state. `drop`
+                        // assumes they are initialized with something. For now, assign `Sub::new()`
+                        // to them.
+                        writeln!(
+                            out,
+                            "        {cell}::new({mu}::new({sub}::new()))",
+                            cell = paths::CELL,
+                            mu = paths::MAYBE_UNINIT,
+                            sub = ctx.path_sub(),
+                        )
+                        .unwrap();
+                    }
+                    writeln!(out, "    ],",).unwrap();
+                }
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentType`
@@ -1159,7 +1181,7 @@ pub fn gen_construct(
         }
     }
 
-    for (item_input, handlers) in dep_analysis.input2handlers.iter() {
+    for (i, (item_input, handlers)) in dep_analysis.input2handlers.iter().enumerate() {
         // Generate a call to `subscribe_xxx` method
         let var_shared_weak = TempVar("this_weak");
 
@@ -1173,8 +1195,8 @@ pub fn gen_construct(
         )
         .unwrap();
 
-        // TODO: Save `Sub` returned by `subscribe_xxx` to unsubscribe on drop
-
+        let var_sub = TempVar("sub");
+        write!(postinit_code, "let {sub} = ", sub = var_sub).unwrap();
         gen_subscribe_event(
             &mut func_input_gen,
             ctx,
@@ -1296,7 +1318,27 @@ pub fn gen_construct(
                 write!(out, "}} }})").unwrap();
             },
             &mut postinit_code,
-        );
+        ); // gen_subscribe_event
+
+        // Save the returned `Sub` to unsubscribe later.
+        //
+        // The registered event handler will be inert when the ref count of
+        // `Rc<Shared>` drops to zero, but the slot in `SubscriberList` is never
+        // released until the handler is explicitly unregistered.
+        //
+        // Calling `set` replaces the placeholder value of `Sub` with an actual
+        // one. The placeholder value is dropped, but it's zero-cost because
+        // it's wrapped in `MaybeUninit`.
+        writeln!(
+            postinit_code,
+            "{shared}.{subs}[{i}].set({mu}::new({sub}));",
+            shared = var_shared,
+            subs = fields::SUBS,
+            i = i,
+            mu = paths::MAYBE_UNINIT,
+            sub = var_sub,
+        )
+        .unwrap();
     }
 
     // Activate `init` trigger

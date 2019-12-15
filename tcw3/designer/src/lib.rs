@@ -218,6 +218,8 @@
 //!
 //! struct ComponentShared {
 //!     state: RefCell<ComponentState>,
+//!     dirty: Cell<u8>,
+//!     subs: [std::mem::MaybeUninit<subscription_list::Sub>; 10],
 //!     value_prop1: Cell<Option<u32>>, // uncommited value
 //!     value_const1: u32,
 //!     subscriptions_event1: RefCell<_>,
@@ -323,8 +325,13 @@
 //!      - **External** means an event handler is registered and the dirty flag
 //!        is set by the handler.
 //!
-//! The subscription functions return `tcw3::designer_runtime::Sub`.
-//! They are automatically unsubscribed when `Component` is dropped.
+//! **Direct** and **Dirty Flag External** modes are implemented by calling the
+//! subscription function of the observed event, which returns
+//! `tcw3::designer_runtime::Sub`.
+//! They are automatically unsubscribed when `ComponentShared` is dropped. The
+//! way this is implemented in (see *Component Destruction*) requires an access
+//! to `Wm`, so the component **must have a `const` field named `wm`** if it has
+//! anything handled in any of these modes.
 //!
 //! Event handlers maintain weak references to `ComponentShared`.
 //!
@@ -463,6 +470,15 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## Component Destruction
+//!
+//! In the `Drop` implementation of `ComponentShared`, event handlers are
+//! unregistered from their respective events. This is done by calling
+//! `subscriber_list::Sub::unsubscribe()`, but the caveat is that this method
+//! fails if it is called from the same event's handler. For this reason, the
+//! `Drop` implementation just enqueues a closure using `Wm::invoke`, and this
+//! closure unregisters the event handlers.
 //!
 mod codegen;
 mod metadata;

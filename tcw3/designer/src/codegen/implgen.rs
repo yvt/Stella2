@@ -10,6 +10,7 @@ mod accessorgen;
 mod analysis;
 mod bitsetgen;
 mod buildergen;
+mod dropgen;
 mod evalgen;
 mod initgen;
 mod iterutils;
@@ -26,9 +27,11 @@ mod paths {
     pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
     pub const DEREF: &str = "::std::ops::Deref";
+    pub const TRAIT_DROP: &str = "::std::ops::Drop";
     pub const FN_DROP: &str = "::std::mem::drop";
     pub const FORGET: &str = "::std::mem::forget";
     pub const DEBUG_ASSERT: &str = "::std::debug_assert";
+    pub const MAYBE_UNINIT: &str = "::std::mem::MaybeUninit";
 }
 
 /// The fields of generated types.
@@ -36,6 +39,9 @@ mod fields {
     pub const SHARED: &str = "shared";
     pub const STATE: &str = "state";
     pub const DIRTY: &str = "dirty";
+    /// `subs: [MaybeUninit<Sub>; num_subs()]`, used in a manner similar to
+    /// `ManuallyDrop`
+    pub const SUBS: &str = "subs";
 }
 
 mod methods {
@@ -109,6 +115,17 @@ impl<'a> Ctx<'a> {
     // `::tcw3::designer_runtime::ShallowEq`
     fn path_shallow_eq(&self) -> impl std::fmt::Display + Clone + '_ {
         DisplayFn(move |f| write!(f, "{}::ShallowEq", self.designer_runtime_path))
+    }
+
+    // `::tcw3::designer_runtime::unsubscribe_subs_unchecked`
+    fn path_unsubscribe_subs_unchecked(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| {
+            write!(
+                f,
+                "{}::unsubscribe_subs_unchecked",
+                self.designer_runtime_path
+            )
+        })
     }
 }
 
@@ -204,6 +221,18 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
         ty = dep_analysis.cdf_ty.gen_ty(), // "compressed dirty flags"
     )
     .unwrap();
+    if dep_analysis.num_subs() > 0 {
+        writeln!(
+            out,
+            "    {field}: [{cell}<{mu}<{sub}>>; {len}],",
+            field = fields::SUBS,
+            cell = paths::CELL,
+            mu = paths::MAYBE_UNINIT,
+            sub = ctx.path_sub(),
+            len = dep_analysis.num_subs(),
+        )
+        .unwrap();
+    }
 
     for item in comp.items.iter() {
         match item {
@@ -252,6 +281,9 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
     // `ComponentTypeShared::set_dirty_flags`
     initgen::gen_set_dirty_flags(&dep_analysis, ctx, &mut out);
     writeln!(out, "}}").unwrap();
+
+    // `<ComponentTypeShared as Drop>::drop`
+    dropgen::gen_shared_drop(ctx, &dep_analysis, &mut out);
 
     // `struct ComponentTypeState`
     // -------------------------------------------------------------------
