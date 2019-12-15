@@ -26,9 +26,9 @@ mod paths {
     pub const DEFAULT: &str = "::std::default::Default";
     pub const FN: &str = "::std::ops::Fn";
     pub const DEREF: &str = "::std::ops::Deref";
-    pub const UNREACHABLE_UNCHECKED: &str = "::std::hint::unreachable_unchecked";
     pub const FN_DROP: &str = "::std::mem::drop";
     pub const FORGET: &str = "::std::mem::forget";
+    pub const DEBUG_ASSERT: &str = "::std::debug_assert";
 }
 
 /// The fields of generated types.
@@ -99,6 +99,11 @@ impl<'a> Ctx<'a> {
     // `::tcw3::uicore::WmExt::invoke_on_update`
     fn path_invoke_on_update(&self) -> impl std::fmt::Display + Clone + '_ {
         DisplayFn(move |f| write!(f, "{}::uicore::WmExt::invoke_on_update", self.tcw3_path))
+    }
+
+    // `::tcw3::designer_runtime::unwrap_unchecked`
+    fn path_unwrap_unchecked(&self) -> impl std::fmt::Display + Clone + '_ {
+        DisplayFn(move |f| write!(f, "{}::unwrap_unchecked", self.designer_runtime_path))
     }
 }
 

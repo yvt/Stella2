@@ -1506,13 +1506,11 @@ pub fn gen_commit(
                             sem::FieldType::Prop => {
                                 // `var_new.is_some()` must be congruent with the
                                 // CDF for `CommitTrigger::SetItem { item_i }`
-                                // TODO: Add `debug_assert!`
                                 genln!(
-                                    "    let {fresh} = {new}.as_ref().unwrap_or_else(\
-                                     || unsafe {{ {unreachable}() }});",
+                                    "    let {fresh} = unsafe {{ {unwrap}({new}.as_ref()) }};",
                                     fresh = var_fresh_value,
                                     new = var_new(*item_i),
-                                    unreachable = paths::UNREACHABLE_UNCHECKED,
+                                    unwrap = ctx.path_unwrap_unchecked(),
                                 );
 
                                 if !bit_i_list.is_empty() {
@@ -1609,12 +1607,11 @@ pub fn gen_commit(
         genln!("if {} {{", cdf_ty.gen_has(var_dirty, bit_i));
         for (item_i, field) in fields.clone() {
             genln!(
-                "    {state}.{field} = \
-                 {var}.unwrap_or_else(|| unsafe {{ {unreachable}() }});",
+                "    {state}.{field} = unsafe {{ {unwrap}({var}) }};",
                 state = var_state,
                 field = InnerValueField(&field.ident.sym),
+                unwrap = ctx.path_unwrap_unchecked(),
                 var = var_new(item_i),
-                unreachable = paths::UNREACHABLE_UNCHECKED,
             );
         }
 
@@ -1622,7 +1619,11 @@ pub fn gen_commit(
         // safely "forget" them
         genln!("}} else {{");
         for (item_i, _) in fields {
-            // TODO: add `debug_assert!`
+            genln!(
+                "    {assert}!({var}.is_none());",
+                assert = paths::DEBUG_ASSERT,
+                var = var_new(item_i),
+            );
             genln!(
                 "    {forget}({var});",
                 forget = paths::FORGET,
