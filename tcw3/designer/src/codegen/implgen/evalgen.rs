@@ -29,7 +29,7 @@ pub fn gen_func_eval(
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
-    input_gen: &mut impl FuncInputGen,
+    input_gen: &mut dyn FuncInputGen,
     out: &mut String,
 ) {
     // TODO: Stop duplicating the body on every instance of the evaluation.
