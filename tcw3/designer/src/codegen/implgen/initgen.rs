@@ -1620,18 +1620,21 @@ pub fn gen_commit(
         // If the dirty flag is not set, `var_new` should be empty, so we can
         // safely "forget" them
         genln!("}} else {{");
+        genln!("    #[allow(clippy::forget_copy)]");
+        genln!("    {{");
         for (item_i, _) in fields {
             genln!(
-                "    {assert}!({var}.is_none());",
+                "        {assert}!({var}.is_none());",
                 assert = paths::DEBUG_ASSERT,
                 var = var_new(item_i),
             );
             genln!(
-                "    {forget}({var});",
+                "        {forget}({var});",
                 forget = paths::FORGET,
                 var = var_new(item_i),
             );
         }
+        genln!("    }}");
         genln!("}}");
     }
 
