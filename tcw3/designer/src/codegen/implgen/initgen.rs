@@ -1056,7 +1056,7 @@ pub fn gen_construct(
     }
 
     if func_input_gen.needs_state {
-        write!(
+        writeln!(
             out,
             "let {state} = {shared}.{field}.borrow();",
             state = var_state,
@@ -1065,7 +1065,7 @@ pub fn gen_construct(
         )
         .unwrap();
         write!(out, "{}", postinit_code).unwrap();
-        write!(
+        writeln!(
             out,
             "{drop}({state});",
             drop = paths::FN_DROP,
