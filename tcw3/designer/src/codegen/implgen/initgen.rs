@@ -57,13 +57,8 @@ pub struct DepAnalysis {
     ordered_node_i_list: Vec<usize>,
 
     commit_nodes: Vec<CommitNode>,
-    triggers: Vec<CommitTrigger>,
     trigger2trigger_i: HashMap<CommitTrigger, usize>,
-    trigger2commitnode_map: Vec<Vec<usize>>,
-    /// Each `Vec<usize>` is sorted
-    commitnode2trigger_map: Vec<Vec<usize>>,
     cdf2node_map: Vec<Vec<usize>>,
-    cdf_triggers_cdf_map: Vec<Vec<usize>>,
     bit2cdf_map: Vec<usize>,
     cdf2bit_map: Vec<usize>,
     /// Each `Vec<usize>` comes from `commitnode2trigger_map`, thus is sorted.
@@ -301,6 +296,7 @@ fn analyze_dep(
         triggers: Vec<CommitTrigger>,
         trigger2trigger_i: HashMap<CommitTrigger, usize>,
         trigger2commitnode_map: Vec<Vec<usize>>,
+        /// Each `Vec<usize>` is sorted
         commitnode2trigger_map: Vec<Vec<usize>>,
     }
     let mut trigger_info = TriggerInfo::default();
@@ -705,12 +701,8 @@ fn analyze_dep(
         ordered_node_i_list,
 
         commit_nodes,
-        triggers: trigger_info.triggers,
         trigger2trigger_i: trigger_info.trigger2trigger_i,
-        trigger2commitnode_map: trigger_info.trigger2commitnode_map,
-        commitnode2trigger_map: trigger_info.commitnode2trigger_map,
         cdf2node_map,
-        cdf_triggers_cdf_map,
         bit2cdf_map,
         cdf2bit_map,
         cdf2triggerset,
