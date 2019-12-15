@@ -1043,6 +1043,7 @@ pub fn gen_construct(
             continue;
         }
 
+        write!(postinit_code, "(").unwrap();
         evalgen::gen_func_eval(
             &item.func,
             analysis,
@@ -1051,6 +1052,7 @@ pub fn gen_construct(
             &mut func_input_gen,
             &mut postinit_code,
         );
+        writeln!(postinit_code, ");").unwrap();
     }
 
     if func_input_gen.needs_state {
