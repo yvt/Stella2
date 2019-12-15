@@ -1317,7 +1317,7 @@ pub fn gen_commit(
     let var_dirty = TempVar("dirty");
     let cdf_ty = dep_analysis.cdf_ty;
     genln!(
-        "let {var_dirty} = {shared}.{dirty}.replace({empty});",
+        "let mut {var_dirty} = {shared}.{dirty}.replace({empty});",
         var_dirty = var_dirty,
         shared = var_shared,
         dirty = fields::DIRTY,
