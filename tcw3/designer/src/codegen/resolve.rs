@@ -306,6 +306,7 @@ fn process_use_tree(
                             .into_iter()
                             .collect(),
                     }]);
+                    return;
                 }
             } else {
                 path.segments.push(PathSegment {
