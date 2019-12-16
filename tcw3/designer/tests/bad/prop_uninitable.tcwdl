@@ -1,0 +1,4 @@
+pub comp crate::Comp1 {
+    // `field` has no way to initialize
+    prop field: u32 {}
+}

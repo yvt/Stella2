@@ -1,0 +1,4 @@
+pub comp crate::Comp2 {
+    // `Comp1` is not a known component
+    const comp1 = crate::Comp1 {};
+}

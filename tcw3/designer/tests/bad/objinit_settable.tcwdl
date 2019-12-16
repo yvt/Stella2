@@ -1,0 +1,5 @@
+pub comp crate::Comp1 {}
+pub comp crate::Comp2 {
+    // A field having obj-init must not be settable
+    const comp1: crate::Comp1 { pub set; } = crate::Comp1 {};
+}
