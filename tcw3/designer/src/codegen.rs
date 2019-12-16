@@ -20,20 +20,27 @@ mod resolve;
 mod sem;
 
 /// Options for the code generator that generates a meta crate's contents.
-pub struct BuildScriptConfig<'a> {
+pub struct BuildScriptConfig<'a, 'b> {
     in_root_source_file: Option<PathBuf>,
-    out_source_file: Option<PathBuf>,
+    out_source_file: OutputFile<'b>,
     crate_name: Option<String>,
     linked_crates: Vec<(String, Cow<'a, [u8]>)>,
     tcw3_path: String,
     designer_runtime_path: String,
 }
 
-impl<'a> BuildScriptConfig<'a> {
+enum OutputFile<'a> {
+    /// Guessed from an environment variable.
+    FromEnv,
+    File(Cow<'a, Path>),
+    Custom(&'a mut dyn Write),
+}
+
+impl<'a, 'b> BuildScriptConfig<'a, 'b> {
     pub fn new() -> Self {
         Self {
             in_root_source_file: None,
-            out_source_file: None,
+            out_source_file: OutputFile::FromEnv,
             crate_name: None,
             linked_crates: Vec::new(),
             tcw3_path: "::tcw3".to_string(),
@@ -50,7 +57,14 @@ impl<'a> BuildScriptConfig<'a> {
 
     pub fn out_source_file(self, path: impl AsRef<Path>) -> Self {
         Self {
-            out_source_file: Some(path.as_ref().to_path_buf()),
+            out_source_file: OutputFile::File(path.as_ref().to_path_buf().into()),
+            ..self
+        }
+    }
+
+    pub fn out_source_stream(self, path: &'b mut dyn Write) -> Self {
+        Self {
+            out_source_file: OutputFile::Custom(path),
             ..self
         }
     }
@@ -140,12 +154,12 @@ impl<'a> BuildScriptConfig<'a> {
             Path::new(&dir).join("lib.tcwdl")
         };
 
-        let out_source_file = if let Some(x) = self.out_source_file {
-            x
-        } else {
+        let out_source_file = if let OutputFile::FromEnv = self.out_source_file {
             let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::OutDirMissing)?;
             info!("OUT_DIR = {:?}", out_dir);
-            Path::new(&out_dir).join("designer.rs")
+            OutputFile::File(Path::new(&out_dir).join("designer.rs").into())
+        } else {
+            self.out_source_file
         };
 
         let mut diag = diag::Diag::new();
@@ -356,11 +370,29 @@ impl<'a> BuildScriptConfig<'a> {
 
         let meta_bin = bincode::serialize(&repo).unwrap();
 
-        let out_f = File::create(&out_source_file)
-            .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;
+        // Move out `PathBuf` from `out_source_file`, leaving `Cow::Borrowed`
+        let out_source_file_path_storage;
+        let (mut out_source_file, out_source_file_path) = match out_source_file {
+            OutputFile::FromEnv => unreachable!(),
+            OutputFile::File(file) => {
+                out_source_file_path_storage = file;
+                let path: &Path = &*out_source_file_path_storage;
+                (OutputFile::File(path.into()), Some(path))
+            }
+            OutputFile::Custom(stream) => (OutputFile::Custom(stream), None),
+        };
 
         (move || -> std::io::Result<()> {
-            let mut out_f = BufWriter::new(out_f);
+            let mut out_file;
+
+            let out_f: &mut dyn Write = match &mut out_source_file {
+                OutputFile::FromEnv => unreachable!(),
+                OutputFile::File(file) => {
+                    out_file = BufWriter::new(File::create(&**file)?);
+                    &mut out_file
+                }
+                OutputFile::Custom(stream) => *stream,
+            };
 
             writeln!(out_f, "// Please do not edit!")?;
             writeln!(
@@ -395,7 +427,13 @@ impl<'a> BuildScriptConfig<'a> {
 
             Ok(())
         })()
-        .map_err(|e| BuildError::OutputFileError(out_source_file.clone(), e))?;
+        .map_err(|e| {
+            if let Some(path) = out_source_file_path {
+                BuildError::OutputFileError(path.to_path_buf(), e)
+            } else {
+                BuildError::OutputStreamError(e)
+            }
+        })?;
 
         if diag.has_error() {
             Err(BuildError::Emitted)
@@ -439,6 +477,8 @@ enum BuildError {
     MetadataDeserializationFailure(String, bincode::Error),
     /// Could not write the output file `{0}`: {1}
     OutputFileError(PathBuf, std::io::Error),
+    /// Could not write the output stream: {0}
+    OutputStreamError(std::io::Error),
     /// Build failed.
     Emitted,
 }
