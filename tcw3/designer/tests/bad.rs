@@ -20,7 +20,17 @@ macro_rules! should_error {
     };
 }
 
+should_error!(comp_path_external, "comp_path_external.tcwdl");
+should_error!(comp_path_super, "comp_path_super.tcwdl");
 should_error!(const_uninitable, "const_uninitable.tcwdl");
+should_error!(input_circular, "input_circular.tcwdl");
+should_error!(input_circular2, "input_circular2.tcwdl");
+should_error!(input_circular_objinit, "input_circular_objinit.tcwdl");
+should_error!(input_circular_this, "input_circular_this.tcwdl");
+should_error!(input_field_not_comp, "input_field_not_comp.tcwdl");
+should_error!(input_field_not_comp2, "input_field_not_comp2.tcwdl");
+should_error!(input_field_not_comp3, "input_field_not_comp3.tcwdl");
+should_error!(input_field_unknown, "input_field_unknown.tcwdl");
 should_error!(objinit_comp_unknown, "objinit_comp_unknown.tcwdl");
 should_error!(objinit_explicit_type, "objinit_explicit_type.tcwdl");
 should_error!(objinit_settable, "objinit_settable.tcwdl");
@@ -29,4 +39,7 @@ should_error!(objinit_field_unknown, "objinit_field_unknown.tcwdl");
 should_error!(objinit_field_wrong_field_ty, "objinit_field_wrong_field_ty.tcwdl");
 should_error!(objinit_field_wrong_ty, "objinit_field_wrong_ty.tcwdl");
 should_error!(prop_uninitable, "prop_uninitable.tcwdl");
+should_error!(use_dupe, "use_dupe.tcwdl");
+should_error!(use_self, "use_self.tcwdl");
 should_error!(use_super, "use_super.tcwdl");
+should_error!(use_unknown, "use_unknown.tcwdl");
