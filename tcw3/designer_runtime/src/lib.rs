@@ -6,7 +6,7 @@
 //! This crate re-exports items from some crates so that the implementors
 //! of Designer components do not have to depend on `subscriber_list` by
 //! themselves.
-use std::{mem::MaybeUninit, cell::Cell};
+use std::{cell::Cell, mem::MaybeUninit};
 use tcw3_pal as pal;
 use tcw3_pal::prelude::*;
 
