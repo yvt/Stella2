@@ -134,7 +134,6 @@ pub fn visit_field_setter_mut(v: &mut (impl VisitMut + ?Sized), i: &mut FieldSet
 
 pub fn visit_field_watcher_mut(v: &mut (impl VisitMut + ?Sized), i: &mut FieldWatcher) {
     v.visit_visibility_mut(&mut i.vis);
-    v.visit_ident_mut(&mut i.event);
 }
 
 pub fn visit_event_def_mut(v: &mut (impl VisitMut + ?Sized), i: &mut EventDef) {

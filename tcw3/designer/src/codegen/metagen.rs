@@ -130,28 +130,74 @@ impl CompResolver<'_> {
 }
 
 fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
+    use super::implgen::iterutils::Iterutils;
+
     let path = gen_path(ctx, &comp.path);
 
     validate_comp_path(ctx, &path, &comp.path);
 
-    metadata::CompDef {
+    let mut relocs = Vec::new();
+    let mut item_sem2meta_map = Vec::new();
+
+    let mut this = metadata::CompDef {
         flags: comp.flags,
         vis: gen_vis(ctx, &comp.vis),
         paths: vec![gen_path(ctx, &comp.path)], // TODO: validate path
         items: comp
             .items
             .iter()
-            .filter_map(|item| match item {
-                sem::CompItemDef::Field(field) => Some(metadata::CompItemDef::Field(gen_field(
-                    ctx, field, comp.flags,
-                ))),
-                sem::CompItemDef::Event(event) => {
-                    Some(metadata::CompItemDef::Event(gen_event(ctx, event)))
+            .filter_map_with_out_position(|item, meta_item_i| {
+                item_sem2meta_map.push(meta_item_i);
+
+                match item {
+                    sem::CompItemDef::Field(field) => Some(metadata::CompItemDef::Field(
+                        gen_field(ctx, field, comp.flags, |reloc| {
+                            relocs.push(reloc.with_item_i(meta_item_i));
+                        }),
+                    )),
+                    sem::CompItemDef::Event(event) => {
+                        Some(metadata::CompItemDef::Event(gen_event(ctx, event)))
+                    }
+                    // `on` is invisible to outside
+                    sem::CompItemDef::On(_) => None,
                 }
-                // `on` is invisible to outside
-                sem::CompItemDef::On(_) => None,
             })
             .collect(),
+    };
+
+    for reloc in relocs {
+        match reloc {
+            CompReloc::FieldWatchEvent {
+                item_i,
+                event_sem_item_i,
+            } => {
+                let field = this.items[item_i.unwrap()].field_mut().unwrap();
+                let accessor = field.accessors.watch.as_mut().unwrap();
+                accessor.event_item_i = item_sem2meta_map[event_sem_item_i];
+            }
+        }
+    }
+
+    this
+}
+
+enum CompReloc {
+    FieldWatchEvent {
+        item_i: Option<usize>,
+        event_sem_item_i: usize,
+    },
+}
+
+impl CompReloc {
+    fn with_item_i(self, item_i: usize) -> Self {
+        match self {
+            CompReloc::FieldWatchEvent {
+                event_sem_item_i, ..
+            } => CompReloc::FieldWatchEvent {
+                item_i: Some(item_i),
+                event_sem_item_i,
+            },
+        }
     }
 }
 
@@ -232,6 +278,7 @@ fn gen_field(
     ctx: &mut Ctx<'_>,
     field: &sem::FieldDef<'_>,
     comp_flags: metadata::CompFlags,
+    mut reloc: impl FnMut(CompReloc),
 ) -> metadata::FieldDef {
     let mut flags = field.flags;
 
@@ -289,14 +336,16 @@ fn gen_field(
                 vis: gen_vis(ctx, &a.vis),
                 mode: a.mode,
             }),
-            watch: field
-                .accessors
-                .watch
-                .as_ref()
-                .map(|a| metadata::FieldWatcher {
+            watch: field.accessors.watch.as_ref().map(|a| {
+                reloc(CompReloc::FieldWatchEvent {
+                    item_i: None, // set by a caller
+                    event_sem_item_i: a.event_item_i,
+                });
+                metadata::FieldWatcher {
                     vis: gen_vis(ctx, &a.vis),
-                    event: gen_sem_ident(&a.event),
-                }),
+                    event_item_i: 0, // set later using relocation
+                }
+            }),
         },
     }
 }

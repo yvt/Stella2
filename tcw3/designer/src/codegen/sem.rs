@@ -122,13 +122,17 @@ pub enum CompItemDef<'a> {
     Event(EventDef<'a>),
 }
 
-impl CompItemDef<'_> {
-    pub fn field(&self) -> Option<&FieldDef<'_>> {
+impl<'a> CompItemDef<'a> {
+    pub fn field(&self) -> Option<&FieldDef<'a>> {
         try_match!(Self::Field(x) = self).ok()
     }
 
-    pub fn on(&self) -> Option<&OnDef<'_>> {
+    pub fn on(&self) -> Option<&OnDef<'a>> {
         try_match!(Self::On(x) = self).ok()
+    }
+
+    pub fn field_mut(&mut self) -> Option<&mut FieldDef<'a>> {
+        try_match!(Self::Field(x) = self).ok()
     }
 
     pub fn ident(&self) -> Option<&Ident> {
@@ -227,7 +231,7 @@ pub use self::parser::FieldGetMode;
 
 pub struct FieldWatcher {
     pub vis: Visibility,
-    pub event: Ident,
+    pub event_item_i: usize,
 }
 
 pub struct OnDef<'a> {
@@ -338,9 +342,25 @@ struct AnalyzeCtx<'a> {
     next_input_index: usize,
 }
 
+enum CompReloc {
+    FieldWatchEvent { item_i: Option<usize>, ident: Ident },
+}
+
+impl CompReloc {
+    fn with_item_i(self, item_i: usize) -> Self {
+        match self {
+            CompReloc::FieldWatchEvent { ident, .. } => CompReloc::FieldWatchEvent {
+                item_i: Some(item_i),
+                ident,
+            },
+        }
+    }
+}
+
 impl AnalyzeCtx<'_> {
     fn analyze_comp<'a>(&mut self, comp: &'a parser::Comp) -> CompDef<'a> {
         let mut lifted_fields = Vec::new();
+        let mut relocs = Vec::new();
 
         let mut this = CompDef {
             flags: CompFlags::empty(),
@@ -350,13 +370,54 @@ impl AnalyzeCtx<'_> {
             items: comp
                 .items
                 .iter()
-                .map(|i| self.analyze_comp_item(i, &mut lifted_fields))
+                .enumerate()
+                .map(|(item_i, item)| {
+                    self.analyze_comp_item(item, &mut lifted_fields, |reloc| {
+                        relocs.push(reloc.with_item_i(item_i))
+                    })
+                })
                 .collect(),
             syn: comp,
         };
 
         this.items
             .extend(lifted_fields.into_iter().map(CompItemDef::Field));
+
+        for reloc in relocs {
+            match reloc {
+                CompReloc::FieldWatchEvent { item_i, ident } => {
+                    let item_i = item_i.unwrap();
+                    let event_item_i = this.items.iter().position(|item| match item {
+                        CompItemDef::Event(ev) => ev.ident.sym == ident.sym,
+                        _ => false,
+                    });
+
+                    if let Some(event_item_i) = event_item_i {
+                        let field = this.items[item_i].field_mut().unwrap();
+                        let watcher = field.accessors.watch.as_mut().unwrap();
+                        watcher.event_item_i = event_item_i;
+                    } else {
+                        self.diag.emit(&[Diagnostic {
+                            level: Level::Error,
+                            message: format!(
+                                "The component does not have an event named `{}`",
+                                ident.sym
+                            ),
+                            code: None,
+                            spans: ident
+                                .span
+                                .map(|span| SpanLabel {
+                                    span,
+                                    label: None,
+                                    style: SpanStyle::Primary,
+                                })
+                                .into_iter()
+                                .collect(),
+                        }]);
+                    }
+                }
+            }
+        }
 
         for attr in comp.attrs.iter() {
             if attr.path.is_ident("prototype_only") {
@@ -442,10 +503,11 @@ impl AnalyzeCtx<'_> {
         &mut self,
         item: &'a parser::CompItem,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
+        reloc: impl FnMut(CompReloc),
     ) -> CompItemDef<'a> {
         match item {
             parser::CompItem::Field(i) => {
-                CompItemDef::Field(self.analyze_field(i, out_lifted_fields))
+                CompItemDef::Field(self.analyze_field(i, out_lifted_fields, reloc))
             }
             parser::CompItem::On(i) => CompItemDef::On(self.analyze_on(i)),
             parser::CompItem::Event(i) => CompItemDef::Event(self.analyze_event(i)),
@@ -456,6 +518,7 @@ impl AnalyzeCtx<'_> {
         &mut self,
         item: &'a parser::CompItemField,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
+        mut reloc: impl FnMut(CompReloc),
     ) -> FieldDef<'a> {
         let mut accessors;
         let default_accessors = match item.field_ty {
@@ -501,9 +564,14 @@ impl AnalyzeCtx<'_> {
                     } => {
                         accessors.watch = Some(FieldWatcher {
                             vis: Visibility::from_syn(vis, self.file),
-                            event: match mode {
+                            event_item_i: match mode {
                                 parser::FieldWatchMode::Event { event } => {
-                                    Ident::from_syn(event, self.file)
+                                    // Lookup the event name later
+                                    reloc(CompReloc::FieldWatchEvent {
+                                        item_i: None,
+                                        ident: Ident::from_syn(event, self.file),
+                                    });
+                                    0
                                 }
                             },
                         });

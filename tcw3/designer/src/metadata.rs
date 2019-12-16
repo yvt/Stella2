@@ -140,7 +140,7 @@ pub enum FieldGetMode {
 pub struct FieldWatcher {
     pub vis: Visibility,
     /// Refers to an event in the same component where the field is defined.
-    pub event: Ident,
+    pub event_item_i: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -327,6 +327,10 @@ impl CompItemDef {
 
     pub fn event(&self) -> Option<&EventDef> {
         try_match!(Self::Event(event) = self).ok()
+    }
+
+    pub fn field_mut(&mut self) -> Option<&mut FieldDef> {
+        try_match!(Self::Field(field) = self).ok()
     }
 
     pub fn ident(&self) -> &Ident {

@@ -13,7 +13,7 @@ mod buildergen;
 mod dropgen;
 mod evalgen;
 mod initgen;
-mod iterutils;
+pub mod iterutils;
 
 /// Paths to standard library items.
 mod paths {
