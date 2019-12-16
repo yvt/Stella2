@@ -103,7 +103,7 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
     ///
     /// This method automatically sets up a logger using `env_logger`.
     pub fn run_and_exit_on_error(self) {
-        env_logger::init();
+        let _ = env_logger::try_init();
 
         if self.run().is_err() {
             std::process::exit(1);
