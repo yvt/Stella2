@@ -3,12 +3,15 @@ macro_rules! should_error {
         #[test]
         fn $name() {
             let _ = env_logger::try_init();
+            let mut out_diag = Vec::<u8>::new();
             let mut out_stream = Vec::new();
             let e = tcw3_designer::BuildScriptConfig::new()
                 .root_source_file(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/bad/", $path))
                 .out_source_stream(&mut out_stream)
+                .out_diag_stream(&mut out_diag)
                 .crate_name("designer_test")
                 .run();
+            eprintln!("{}", std::str::from_utf8(&out_diag).unwrap());
             if !out_stream.is_empty() {
                 println!("output:");
                 println!("```rust");
