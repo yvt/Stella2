@@ -104,14 +104,14 @@ impl ItemIndirection {
     }
 }
 
-struct AnalysisCtx<'a> {
+struct AnalysisCtx<'a, 'b> {
     ctx: &'a Ctx<'a>,
-    diag: &'a mut Diag,
+    diag: &'a mut Diag<'b>,
     analysis: &'a mut Analysis,
 }
 
 impl Analysis {
-    pub fn new(ctx: &Ctx, diag: &mut Diag) -> Self {
+    pub fn new(ctx: &Ctx, diag: &mut Diag<'_>) -> Self {
         let mut this = Self { inputs: Vec::new() };
 
         let mut actx = AnalysisCtx {
@@ -146,7 +146,7 @@ impl Analysis {
     }
 }
 
-fn analyze_on(actx: &mut AnalysisCtx<'_>, item: &sem::OnDef) {
+fn analyze_on(actx: &mut AnalysisCtx<'_, '_>, item: &sem::OnDef) {
     analyze_inputs(
         actx,
         item.triggers.iter().filter_map(|trigger| match &trigger {
@@ -215,7 +215,7 @@ fn analyze_on(actx: &mut AnalysisCtx<'_>, item: &sem::OnDef) {
     );
 }
 
-fn analyze_obj_init(actx: &mut AnalysisCtx<'_>, init: &sem::ObjInit) {
+fn analyze_obj_init(actx: &mut AnalysisCtx<'_, '_>, init: &sem::ObjInit) {
     for field in init.fields.iter() {
         analyze_inputs(
             actx,
@@ -251,7 +251,7 @@ enum EventTrigger {
 }
 
 fn analyze_inputs<'a>(
-    actx: &mut AnalysisCtx<'_>,
+    actx: &mut AnalysisCtx<'_, '_>,
     inputs: impl IntoIterator<Item = &'a sem::Input> + Clone,
     event_triggers: Result<&[EventTrigger], EventTriggerUnavailableReason>,
 ) {
@@ -327,7 +327,7 @@ fn analyze_inputs<'a>(
 } // analyze_inputs
 
 fn analyze_input(
-    actx: &mut AnalysisCtx<'_>,
+    actx: &mut AnalysisCtx<'_, '_>,
     input: &sem::Input,
     event_triggers: Result<&[EventTrigger], ()>,
 ) {
@@ -344,7 +344,7 @@ fn analyze_input(
 }
 
 fn analyze_input_inner(
-    actx: &mut AnalysisCtx<'_>,
+    actx: &mut AnalysisCtx<'_, '_>,
     input: &sem::Input,
     event_triggers: Result<&[EventTrigger], ()>,
 ) -> InputInfo {

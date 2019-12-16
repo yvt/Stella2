@@ -335,9 +335,9 @@ pub fn analyze_comp<'a>(
     .analyze_comp(comp)
 }
 
-struct AnalyzeCtx<'a> {
+struct AnalyzeCtx<'a, 'b> {
     file: &'a codemap::File,
-    diag: &'a mut Diag,
+    diag: &'a mut Diag<'b>,
 
     next_input_index: usize,
 }
@@ -357,7 +357,7 @@ impl CompReloc {
     }
 }
 
-impl AnalyzeCtx<'_> {
+impl AnalyzeCtx<'_, '_> {
     fn analyze_comp<'a>(&mut self, comp: &'a parser::Comp) -> CompDef<'a> {
         let mut lifted_fields = Vec::new();
         let mut relocs = Vec::new();

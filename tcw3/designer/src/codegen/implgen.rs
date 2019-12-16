@@ -129,7 +129,7 @@ impl<'a> Ctx<'a> {
     }
 }
 
-pub fn gen_comp(ctx: &Ctx, diag: &mut Diag) -> Result<String, EmittedError> {
+pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> {
     let comp = ctx.cur_comp;
 
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {

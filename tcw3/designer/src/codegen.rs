@@ -20,13 +20,14 @@ mod resolve;
 mod sem;
 
 /// Options for the code generator that generates a meta crate's contents.
-pub struct BuildScriptConfig<'a, 'b> {
+pub struct BuildScriptConfig<'a, 'b, 'c> {
     in_root_source_file: Option<PathBuf>,
     out_source_file: OutputFile<'b>,
     crate_name: Option<String>,
     linked_crates: Vec<(String, Cow<'a, [u8]>)>,
     tcw3_path: String,
     designer_runtime_path: String,
+    out_diag: Option<&'c mut (dyn std::io::Write + Send)>,
 }
 
 enum OutputFile<'a> {
@@ -36,7 +37,7 @@ enum OutputFile<'a> {
     Custom(&'a mut dyn Write),
 }
 
-impl<'a, 'b> BuildScriptConfig<'a, 'b> {
+impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
     pub fn new() -> Self {
         Self {
             in_root_source_file: None,
@@ -45,6 +46,7 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
             linked_crates: Vec::new(),
             tcw3_path: "::tcw3".to_string(),
             designer_runtime_path: "::tcw3::designer_runtime".to_string(),
+            out_diag: None,
         }
     }
 
@@ -99,6 +101,14 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
         }
     }
 
+    /// Set the destination of the diagnostic output.
+    pub fn out_diag_stream(self, out_diag: &'c mut (dyn std::io::Write + Send)) -> Self {
+        Self {
+            out_diag: Some(out_diag),
+            ..self
+        }
+    }
+
     /// Run the code generator. Terminate the current process on failure.
     ///
     /// This method automatically sets up a logger using `env_logger`.
@@ -110,10 +120,15 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
         }
     }
 
-    pub fn run(self) -> Result<(), EmittedError> {
-        let result = self.run_inner();
+    pub fn run(mut self) -> Result<(), EmittedError> {
+        let mut out_diag = self.out_diag.take();
+        let result = self.run_inner(out_diag.as_mut().map(|x| x as _));
         if let Err(e) = result {
-            let mut emitter = Emitter::stderr(ColorConfig::Auto, None);
+            let mut emitter = if let Some(out_diag) = out_diag {
+                Emitter::new(Box::new(&mut *out_diag), None)
+            } else {
+                Emitter::stderr(ColorConfig::Auto, None)
+            };
             emitter.emit(&[Diagnostic {
                 level: Level::Error,
                 message: if let BuildError::Emitted = e {
@@ -131,7 +146,10 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
         }
     }
 
-    fn run_inner(self) -> Result<(), BuildError> {
+    fn run_inner(
+        self,
+        out_diag: Option<&mut (dyn std::io::Write + Send)>,
+    ) -> Result<(), BuildError> {
         let crate_name = if let Some(x) = self.crate_name {
             x
         } else {
@@ -162,7 +180,7 @@ impl<'a, 'b> BuildScriptConfig<'a, 'b> {
             self.out_source_file
         };
 
-        let mut diag = diag::Diag::new();
+        let mut diag = diag::Diag::new(out_diag);
 
         // Parse the input source files
         let mut files = Vec::new();

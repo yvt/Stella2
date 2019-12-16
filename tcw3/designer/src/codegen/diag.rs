@@ -6,16 +6,18 @@ use super::EmittedError;
 
 pub type FileRef = Arc<codemap::File>;
 
-pub struct Diag {
+pub struct Diag<'a> {
     codemap: codemap::CodeMap,
     has_error: bool,
+    out_diag: Option<&'a mut (dyn std::io::Write + Send)>,
 }
 
-impl Diag {
-    pub fn new() -> Self {
+impl<'a> Diag<'a> {
+    pub fn new(out_diag: Option<&'a mut (dyn std::io::Write + Send)>) -> Self {
         Self {
             codemap: codemap::CodeMap::new(),
             has_error: false,
+            out_diag,
         }
     }
 
@@ -61,7 +63,12 @@ impl Diag {
             .iter()
             .any(|m| m.level == Level::Error || m.level == Level::Bug);
 
-        Emitter::stderr(ColorConfig::Auto, Some(&self.codemap)).emit(msgs);
+        let mut emitter = if let Some(out_diag) = &mut self.out_diag {
+            Emitter::new(Box::new(&mut *out_diag), Some(&self.codemap))
+        } else {
+            Emitter::stderr(ColorConfig::Auto, Some(&self.codemap))
+        };
+        emitter.emit(msgs);
     }
 }
 

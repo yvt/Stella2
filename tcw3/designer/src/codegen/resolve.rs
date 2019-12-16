@@ -57,13 +57,13 @@ pub fn resolve_paths(
         }
     }
 
-    struct PathResolver<'a> {
+    struct PathResolver<'a, 'b> {
         codemap_file: &'a codemap::File,
-        diag: &'a mut Diag,
+        diag: &'a mut Diag<'b>,
         alias_map: &'a HashMap<Ident, Vec<Alias>>,
     }
 
-    impl syn::visit_mut::VisitMut for PathResolver<'_> {
+    impl syn::visit_mut::VisitMut for PathResolver<'_, '_> {
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
         fn visit_attribute_mut(&mut self, _: &mut syn::Attribute) {}
@@ -192,7 +192,7 @@ pub fn resolve_paths(
         }
     }
 
-    impl visit_mut::TcwdlVisitMut for PathResolver<'_> {
+    impl visit_mut::TcwdlVisitMut for PathResolver<'_, '_> {
         fn visit_func_mut(&mut self, _: &mut Func) {
             // Ignore `i.inputs` because it does not include a path.
             // Ignore `i.body` because it's inserted to the implementation code

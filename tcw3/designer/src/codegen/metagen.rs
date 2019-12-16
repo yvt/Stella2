@@ -56,9 +56,9 @@ impl metadata::visit_mut::VisitMut for MapCrateIndex<'_> {
     }
 }
 
-struct Ctx<'a> {
+struct Ctx<'a, 'b> {
     resolver: CompResolver<'a>,
-    diag: &'a mut Diag,
+    diag: &'a mut Diag<'b>,
 }
 
 struct CompResolver<'a> {
@@ -129,7 +129,7 @@ impl CompResolver<'_> {
     }
 }
 
-fn gen_comp(ctx: &mut Ctx<'_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
+fn gen_comp(ctx: &mut Ctx<'_, '_>, comp: &sem::CompDef<'_>) -> metadata::CompDef {
     use super::implgen::iterutils::Iterutils;
 
     let path = gen_path(ctx, &comp.path);
@@ -201,7 +201,7 @@ impl CompReloc {
     }
 }
 
-fn validate_comp_path(ctx: &mut Ctx<'_>, path: &metadata::Path, orig_path: &sem::Path) {
+fn validate_comp_path(ctx: &mut Ctx<'_, '_>, path: &metadata::Path, orig_path: &sem::Path) {
     if path.crate_i != ctx.resolver.local_crate_i {
         ctx.diag.emit(&[Diagnostic {
             level: Level::Error,
@@ -221,7 +221,7 @@ fn validate_comp_path(ctx: &mut Ctx<'_>, path: &metadata::Path, orig_path: &sem:
     }
 }
 
-fn gen_vis(ctx: &mut Ctx<'_>, vis: &sem::Visibility) -> metadata::Visibility {
+fn gen_vis(ctx: &mut Ctx<'_, '_>, vis: &sem::Visibility) -> metadata::Visibility {
     match vis {
         sem::Visibility::Inherited => metadata::Visibility::Private,
         sem::Visibility::Public { .. } => metadata::Visibility::Public,
@@ -237,7 +237,7 @@ fn gen_vis(ctx: &mut Ctx<'_>, vis: &sem::Visibility) -> metadata::Visibility {
 }
 
 /// Assumes `path` is already rooted by `super::resolve`.
-fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
+fn gen_path(ctx: &mut Ctx<'_, '_>, path: &sem::Path) -> metadata::Path {
     // For now, `path` is actually not allowed to be anything from dependent
     // crates, but anyway...
     let crate_i = if let Some(i) = ctx.resolver.find_crate_by_path(&path.syn_path) {
@@ -275,7 +275,7 @@ fn gen_path(ctx: &mut Ctx<'_>, path: &sem::Path) -> metadata::Path {
 }
 
 fn gen_field(
-    ctx: &mut Ctx<'_>,
+    ctx: &mut Ctx<'_, '_>,
     field: &sem::FieldDef<'_>,
     comp_flags: metadata::CompFlags,
     mut reloc: impl FnMut(CompReloc),
@@ -350,7 +350,7 @@ fn gen_field(
     }
 }
 
-fn gen_event(ctx: &mut Ctx<'_>, event: &sem::EventDef<'_>) -> metadata::EventDef {
+fn gen_event(ctx: &mut Ctx<'_, '_>, event: &sem::EventDef<'_>) -> metadata::EventDef {
     metadata::EventDef {
         vis: gen_vis(ctx, &event.vis),
         ident: gen_sem_ident(&event.ident),
