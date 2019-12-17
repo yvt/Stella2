@@ -480,6 +480,15 @@
 //! `Drop` implementation just enqueues a closure using `Wm::invoke`, and this
 //! closure unregisters the event handlers.
 //!
+//! # Tests
+//!
+//! This crate includes two categories of tests:
+//!
+//!  - `tests/bad`: A set of TCWDL source files expected to be rejected by the
+//!    code generator.
+//!  - `tests_impl`: Processes TCWDL source files and validates the behavior of
+//!    the generated code.
+//!
 mod codegen;
 mod metadata;
 

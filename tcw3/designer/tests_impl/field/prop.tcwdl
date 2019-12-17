@@ -1,0 +1,6 @@
+use tcw3::pal;
+
+comp crate::field::prop::Comp {
+    const wm: pal::Wm { set; }
+    prop prop1: u32 = || 1;
+}

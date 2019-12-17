@@ -2246,6 +2246,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcw3_designer_tests_impl"
+version = "0.1.0"
+dependencies = [
+ "tcw3 0.1.0",
+ "tcw3_designer 0.1.0",
+]
+
+[[package]]
 name = "tcw3_images"
 version = "0.1.0"
 dependencies = [
