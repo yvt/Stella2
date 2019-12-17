@@ -96,9 +96,12 @@ impl CompResolver<'_> {
         }
 
         let crate_name = &path.segments[0].ident;
-        if *crate_name == self.local_crate_name
-            || (*crate_name == "crate" && path.leading_colon.is_none())
-        {
+        let is_local_crate = if path.leading_colon.is_none() {
+            *crate_name == "crate"
+        } else {
+            *crate_name == self.local_crate_name
+        };
+        if is_local_crate {
             // Search the local components
             let comp_i = self
                 .local_comps
@@ -114,6 +117,11 @@ impl CompResolver<'_> {
                 })?;
 
             return Some((self.local_crate_i, comp_i));
+        }
+
+        if path.leading_colon.is_none() {
+            // Refers to Rust's built-in type
+            return None;
         }
 
         // Search the dependencies

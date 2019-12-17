@@ -2,7 +2,7 @@ use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use std::collections::HashMap;
 use syn::{
     punctuated::Punctuated, spanned::Spanned, Ident, ItemUse, Path, PathArguments, PathSegment,
-    Token, UseTree,
+    Token, Type, UseTree,
 };
 
 use super::{
@@ -16,6 +16,9 @@ use super::{
 /// The postcondition of the resulting paths is defined by
 /// `is_path_rooted_or_crate`. It might not be upheld if there were any errors,
 /// which will be reported through `diag`.
+///
+/// A path inside `syn::Type::Path` might be left unprocessed if it resolves to
+/// a built-in type.
 pub fn resolve_paths(
     file: &mut File,
     codemap_file: &codemap::File,
@@ -67,6 +70,27 @@ pub fn resolve_paths(
         fn visit_item_use_mut(&mut self, _: &mut syn::ItemUse) {}
 
         fn visit_attribute_mut(&mut self, _: &mut syn::Attribute) {}
+
+        fn visit_type_mut(&mut self, i: &mut Type) {
+            if let Type::Path(type_path) = i {
+                // Look for `u32[::...]`
+                let first_ident = &type_path.path.segments[0].ident;
+                if type_path.path.leading_colon.is_none()
+                    && type_path.qself.is_none()
+                    && is_builtin_type_ident(first_ident)
+                {
+                    // Built-in types can be shadowed by imports. Surprisingly,
+                    // Rust works this way
+                    if !self.alias_map.contains_key(first_ident) {
+                        return;
+                    }
+
+                    // A resolved path never refers to a built-in type
+                }
+            }
+
+            syn::visit_mut::visit_type_mut(self, i);
+        }
 
         fn visit_path_mut(&mut self, i: &mut Path) {
             let mut applied_map_list: Vec<(&Ident, &Alias)> = Vec::new();
@@ -217,6 +241,15 @@ fn is_path_rooted_or_crate(path: &Path) -> bool {
         let first = path.segments.first().unwrap().ident.to_string();
         first == "crate"
     }
+}
+
+fn is_builtin_type_ident(ident: &Ident) -> bool {
+    [
+        "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f32", "f64", "bool",
+        "char", "str",
+    ]
+    .iter()
+    .any(|&s| *ident == s)
 }
 
 #[derive(Clone)]
