@@ -483,7 +483,7 @@ impl<T: fmt::Display> fmt::Display for DisplayArray<'_, T> {
 #[non_exhaustive]
 enum BuildError {
     /// Could not guess the crate name from `CARGO_PKG_NAME`; are we really in
-    /// a build script?
+    /// a build script and does the crate name end with `_meta`?
     CrateNameMissing,
     /// `in_root_source_file` is not specified but `CARGO_MANIFEST_DIR` is
     /// missing; are we really in a build script?
