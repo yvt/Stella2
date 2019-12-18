@@ -933,7 +933,7 @@ pub fn gen_construct(
                         // to them.
                         writeln!(
                             out,
-                            "        {cell}::new({mu}::new({sub}::new()))",
+                            "        {cell}::new({mu}::new({sub}::new())),",
                             cell = paths::CELL,
                             mu = paths::MAYBE_UNINIT,
                             sub = ctx.path_sub(),
