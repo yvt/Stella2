@@ -487,8 +487,13 @@
 //!  - `tests/bad`: A set of TCWDL source files expected to be rejected by the
 //!    code generator.
 //!  - `tests_impl`: Processes TCWDL source files and validates the behavior of
-//!    the generated code.
+//!    the generated code. Relies on `testing` backend.
 //!
+//! To run all tests for Designer, do the following:
+//!
+//! ```shell
+//! cargo test -p tcw3_designer -p tcw3_designer_tests_impl --all-features
+//! ```
 mod codegen;
 mod metadata;
 
