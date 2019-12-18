@@ -30,11 +30,11 @@ enum DepNode {
 
 #[derive(Debug)]
 enum CommitNode {
-    /// - `CompItemDef::Field`
-    ///     - `FieldType::Prop`: Assign the uncommited value
-    ///     - `FieldType::Wire`: Calculate the new value
-    /// - `CompItemDef::On`: Call the handler
-    Item { item_i: usize },
+    /// - `FieldType::Prop`: Assign the uncommited value
+    /// - `FieldType::Wire`: Calculate the new value
+    Field { item_i: usize },
+    /// Call the handler
+    On { item_i: usize },
     /// `prop`
     ObjInitField { item_i: usize, field_i: usize },
 }
@@ -450,7 +450,7 @@ fn analyze_dep(
                 sem::FieldType::Prop => {
                     let node_i = commit_nodes.len();
                     define_trigger(&mut trigger_info, node_i, CommitTrigger::SetItem { item_i });
-                    commit_nodes.push(CommitNode::Item { item_i });
+                    commit_nodes.push(CommitNode::Field { item_i });
                 }
                 sem::FieldType::Wire => {
                     let node_i = commit_nodes.len();
@@ -463,7 +463,7 @@ fn analyze_dep(
 
                     // Emit a node only if it has a trigger
                     if trigger_emitted.get() {
-                        commit_nodes.push(CommitNode::Item { item_i });
+                        commit_nodes.push(CommitNode::Field { item_i });
                     }
                 } // TODO: Emit `watch` event
             },
@@ -475,7 +475,7 @@ fn analyze_dep(
 
                 // Emit a node only if it has a trigger
                 if trigger_emitted.get() {
-                    commit_nodes.push(CommitNode::Item { item_i });
+                    commit_nodes.push(CommitNode::On { item_i });
                 }
             }
             sem::CompItemDef::Event(_) => {}
@@ -567,11 +567,9 @@ fn analyze_dep(
         .map(|node_i_list| {
             node_i_list
                 .iter()
-                .filter_map(|&node_i| match commit_nodes[node_i] {
-                    CommitNode::Item { item_i } => Some(item_i),
-                    CommitNode::ObjInitField { .. } => None,
-                })
-                .map(|item_i| CommitTrigger::WatchField { item_i })
+                .map(|&node_i| &commit_nodes[node_i])
+                .filter_map(|node| try_match!(CommitNode::Field { item_i } = node).ok())
+                .map(|&item_i| CommitTrigger::WatchField { item_i })
                 .filter_map(|trigger| trigger_info.trigger2trigger_i.get(&trigger))
                 .flat_map(|&trigger_i| trigger_info.trigger2commitnode_map[trigger_i].iter())
                 .map(|&node_i| node2cdf[node_i])
@@ -1762,7 +1760,7 @@ pub fn gen_commit(
         empty = cdf_ty.gen_empty(),
     );
 
-    // After a new value is calculated by `CommitNode::Item`, it's stored to
+    // After a new value is calculated by `CommitNode::Field`, it's stored to
     // `var_new`, whather it's identical to the old value or not.
     // Whether it has a value or not is strictly tied to the corresponding CDFs.
     // Violation might result in a memory error.
@@ -1774,8 +1772,8 @@ pub fn gen_commit(
     for (item_i, field) in dep_analysis
         .commit_nodes
         .iter()
-        .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
-        .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)))
+        .filter_map(|node| try_match!(CommitNode::Field { item_i } = node).ok())
+        .map(|&item_i| (item_i, comp.items[item_i].field().unwrap()))
     {
         if field.field_ty == sem::FieldType::Prop {
             genln!(
@@ -1872,8 +1870,8 @@ pub fn gen_commit(
 
         let wires = nodes
             .clone()
-            .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
-            .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)))
+            .filter_map(|node| try_match!(CommitNode::Field { item_i } = node).ok())
+            .map(|&item_i| (item_i, comp.items[item_i].field().unwrap()))
             .filter(|(_, field)| field.field_ty == sem::FieldType::Wire);
 
         // Define `var_new` for wires. (Props are already defined)
@@ -1888,109 +1886,108 @@ pub fn gen_commit(
             let var_fresh_value = TempVar("fresh");
 
             match node {
-                CommitNode::Item { item_i } => match &comp.items[*item_i] {
-                    sem::CompItemDef::Field(field) => {
-                        // Find another set of CDFs to be set when the field
-                        // is updated with a new value
-                        let bit_i_list: Vec<_> = bit_i_list_for_trigger(
-                            dep_analysis,
-                            &CommitTrigger::WatchField { item_i: *item_i },
-                        )
-                        .collect();
+                CommitNode::Field { item_i } => {
+                    let field = comp.items[*item_i].field().unwrap();
+                    // Find another set of CDFs to be set when the field
+                    // is updated with a new value
+                    let bit_i_list: Vec<_> = bit_i_list_for_trigger(
+                        dep_analysis,
+                        &CommitTrigger::WatchField { item_i: *item_i },
+                    )
+                    .collect();
 
-                        match field.field_ty {
-                            sem::FieldType::Wire => {
-                                // Derive the fresh value
-                                gen!("    let {} = ", var_fresh_value);
-                                evalgen::gen_func_eval(
-                                    field.value.as_ref().unwrap().func().unwrap(),
-                                    analysis,
-                                    ctx,
-                                    item_meta2sem_map,
-                                    &mut func_input_gen,
-                                    out,
-                                );
-                                writeln!(out, ";\n").unwrap();
+                    match field.field_ty {
+                        sem::FieldType::Wire => {
+                            // Derive the fresh value
+                            gen!("    let {} = ", var_fresh_value);
+                            evalgen::gen_func_eval(
+                                field.value.as_ref().unwrap().func().unwrap(),
+                                analysis,
+                                ctx,
+                                item_meta2sem_map,
+                                &mut func_input_gen,
+                                out,
+                            );
+                            writeln!(out, ";\n").unwrap();
 
-                                if !bit_i_list.is_empty() {
-                                    // Set CDFs if the value has changed
-                                    genln!(
-                                        "    if !{}::shallow_eq(&{}, {}) {{",
-                                        ctx.path_shallow_eq(),
-                                        var_fresh_value,
-                                        var_latest(*item_i)
-                                    );
-                                    genln!(
-                                        "        {};",
-                                        cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
-                                    );
-                                    genln!("    }}");
-                                }
-
-                                // Write `var_new`
+                            if !bit_i_list.is_empty() {
+                                // Set CDFs if the value has changed
                                 genln!(
-                                    "    {new} = {some}({fresh});",
-                                    new = var_new(*item_i),
-                                    some = paths::SOME,
-                                    fresh = var_fresh_value
+                                    "    if !{}::shallow_eq(&{}, {}) {{",
+                                    ctx.path_shallow_eq(),
+                                    var_fresh_value,
+                                    var_latest(*item_i)
                                 );
-
-                                // Update `var_latest`
                                 genln!(
-                                    "    {latest} = {new}.as_ref().unwrap();",
-                                    latest = var_latest(*item_i),
-                                    new = var_new(*item_i),
+                                    "        {};",
+                                    cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
                                 );
+                                genln!("    }}");
                             }
-                            sem::FieldType::Prop => {
-                                // `var_new.is_some()` must be congruent with the
-                                // CDF for `CommitTrigger::SetItem { item_i }`
-                                genln!(
-                                    "    let {fresh} = unsafe {{ {unwrap}({new}.as_ref()) }};",
-                                    fresh = var_fresh_value,
-                                    new = var_new(*item_i),
-                                    unwrap = ctx.path_unwrap_unchecked(),
-                                );
 
-                                if !bit_i_list.is_empty() {
-                                    // Set CDFs if the value has changed
-                                    genln!(
-                                        "    if !{}::shallow_eq({}, {}) {{",
-                                        ctx.path_shallow_eq(),
-                                        var_fresh_value,
-                                        var_latest(*item_i)
-                                    );
-                                    genln!(
-                                        "        {};",
-                                        cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
-                                    );
-                                    genln!("    }}");
-                                }
+                            // Write `var_new`
+                            genln!(
+                                "    {new} = {some}({fresh});",
+                                new = var_new(*item_i),
+                                some = paths::SOME,
+                                fresh = var_fresh_value
+                            );
 
-                                // Update `var_latest`
-                                genln!(
-                                    "    {latest} = {fresh};",
-                                    latest = var_latest(*item_i),
-                                    fresh = var_fresh_value,
-                                );
-                            }
-                            sem::FieldType::Const => unreachable!(),
+                            // Update `var_latest`
+                            genln!(
+                                "    {latest} = {new}.as_ref().unwrap();",
+                                latest = var_latest(*item_i),
+                                new = var_new(*item_i),
+                            );
                         }
+                        sem::FieldType::Prop => {
+                            // `var_new.is_some()` must be congruent with the
+                            // CDF for `CommitTrigger::SetItem { item_i }`
+                            genln!(
+                                "    let {fresh} = unsafe {{ {unwrap}({new}.as_ref()) }};",
+                                fresh = var_fresh_value,
+                                new = var_new(*item_i),
+                                unwrap = ctx.path_unwrap_unchecked(),
+                            );
+
+                            if !bit_i_list.is_empty() {
+                                // Set CDFs if the value has changed
+                                genln!(
+                                    "    if !{}::shallow_eq({}, {}) {{",
+                                    ctx.path_shallow_eq(),
+                                    var_fresh_value,
+                                    var_latest(*item_i)
+                                );
+                                genln!(
+                                    "        {};",
+                                    cdf_ty.gen_insert(var_dirty, bit_i_list.iter().cloned())
+                                );
+                                genln!("    }}");
+                            }
+
+                            // Update `var_latest`
+                            genln!(
+                                "    {latest} = {fresh};",
+                                latest = var_latest(*item_i),
+                                fresh = var_fresh_value,
+                            );
+                        }
+                        sem::FieldType::Const => unreachable!(),
                     }
-                    sem::CompItemDef::On(on) => {
-                        gen!("(");
-                        evalgen::gen_func_eval(
-                            &on.func,
-                            analysis,
-                            ctx,
-                            item_meta2sem_map,
-                            &mut func_input_gen,
-                            out,
-                        );
-                        writeln!(out, ");\n").unwrap();
-                    }
-                    sem::CompItemDef::Event(_) => unreachable!(),
-                },
+                }
+                CommitNode::On { item_i } => {
+                    let on = comp.items[*item_i].on().unwrap();
+                    gen!("(");
+                    evalgen::gen_func_eval(
+                        &on.func,
+                        analysis,
+                        ctx,
+                        item_meta2sem_map,
+                        &mut func_input_gen,
+                        out,
+                    );
+                    writeln!(out, ");\n").unwrap();
+                }
                 CommitNode::ObjInitField { item_i, field_i } => {
                     let field = comp.items[*item_i].field().unwrap();
                     let init = field.value.as_ref().unwrap().obj_init().unwrap();
@@ -2040,8 +2037,8 @@ pub fn gen_commit(
         let node_i_list = &dep_analysis.cdf2node_map[cdf_i];
         let nodes = node_i_list.iter().map(|&i| &dep_analysis.commit_nodes[i]);
         let fields = nodes
-            .filter_map(|node| try_match!(CommitNode::Item { item_i } = node).ok())
-            .filter_map(|&item_i| Some((item_i, comp.items[item_i].field()?)));
+            .filter_map(|node| try_match!(CommitNode::Field { item_i } = node).ok())
+            .map(|&item_i| (item_i, comp.items[item_i].field().unwrap()));
 
         // Store the final values only if the dirty flag is set
         genln!("if {} {{", cdf_ty.gen_has(var_dirty, bit_i));
