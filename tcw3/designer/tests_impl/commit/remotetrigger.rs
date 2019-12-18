@@ -14,7 +14,7 @@ fn watch_prop(twm: &dyn TestingWm) {
     assert_eq!(0, comp.state().get());
 
     twm.step_unsend();
-    // TOOD: assert_eq!(1, comp.state().get());
+    assert_eq!(1, comp.state().get());
 }
 
 #[use_testing_wm]

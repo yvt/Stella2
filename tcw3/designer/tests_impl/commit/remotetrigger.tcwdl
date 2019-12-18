@@ -8,7 +8,7 @@ comp Comp {
 
     const other = CompOther { const wm = |wm| wm; };
 
-    // TODO: on (other.prop1) |&state| state.set(state.get() + 1);
+    on (other.prop1) |&state| state.set(state.get() + 1);
     on (other.event1) |&state| state.set(state.get() + 4);
 }
 
