@@ -1264,7 +1264,7 @@ pub fn gen_construct(
                                 dep_analysis,
                                 ctx,
                                 &dep_analysis.triggers[*trigger_i],
-                                &var_shared,
+                                &format_args!("&{}.{}", var_this, fields::SHARED),
                                 &mut code_frag,
                             )
                         }
