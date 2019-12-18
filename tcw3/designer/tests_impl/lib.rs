@@ -4,6 +4,10 @@
 
 include!(concat!(env!("OUT_DIR"), "/designer.rs"));
 
+mod commit {
+    mod remotetrigger;
+}
+
 mod field {
     mod prop;
 }
