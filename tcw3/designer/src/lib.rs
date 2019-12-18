@@ -22,6 +22,107 @@
 //!
 //! TODO
 //!
+//! ## Fields: `const name: u32`, etc.
+//!
+//! Fields are values stored in each instance of a component. There are three
+//! types of fields:
+//!
+//! - **`const`**: Consts are initialized once when the component is created.
+//! - **`prop`**: Props are initialized once when the component is created, and
+//!   can be mutated through a setter method.
+//! - **`wire`**: Wires are reactive values and automatically (re-)evaluated
+//!   using a dynamic expression.
+//!
+//! **Accessors:**
+//!
+//! ```text
+//! prop prop1: u32; // Default accessor set
+//! prop prop2: u32 { set; pub get; } // Read/write prop, but the setter is private
+//! const const1: u32 { pub set; } // Initialized through the builder type, but
+//!                                // can never be read
+//! const const2: u32 {} = || 42; // Initialized as a fixed value 42. Cannot be
+//!                               // overridden through the builder type. And
+//!                               // can never be read.
+//! const const3: u32 { pub set; pub get clone; }
+//!                                // This is a customizable constant value.
+//!                                // The getter returns a cloned value on
+//!                                // contrary to the default behavior of `const`.
+//! wire wire1: u32 { pub get; pub watch event (event1); } = || expr...;
+//!                                // `event1` is raised whenever the value
+//!                                // changes
+//! ```
+//!
+//! Fields have zero or more accessors:
+//!
+//! - **`get`** creates a getter method. There are two kinds of getter methods:
+//!     - `get clone` generates a getter method like `fn fieldname(&self) -> T`
+//!       that returns a cloned value.
+//!     - `get borrow` generates a getter method like
+//!       `fn fieldname(&self) -> impl Deref<Target = T> + '_` that returns a
+//!       borrowed value. For `const`, it returns a reference. For other kinds
+//!       of fields, it returns a smart pointer (this is an implementation
+//!       detail that shouldn't matter for most cases).
+//!     - `get` chooses a default kind based on the default accessor set for
+//!       the field.
+//!
+//! - (all except `wire`) **`set`** creates setter methods in two places: (1)
+//!   `fn with_fieldname(self, new_value: T)` for the component's builder type.
+//!   (2, `prop` only) `fn set_fieldname(&self, new_value: T)` for the compoent
+//!   type. Note that the latter method does not instantly update the value.
+//!   Please see the section *Updating State*.
+//!
+//! - (all except `const`) **`watch`** associates the field with an event.
+//!     - The event is raised whenever the field is updated with a new value
+//!       (more precisely, after *a commit operation* that updated the field
+//!       with a value that is not equal to the old value). The event must have
+//!       no parameters.
+//!     - `watch` makes it possible for other components to use the field's
+//!       value through a dynamic expression.
+//!
+//! When accessors are omitted, the default accessor set for the field type
+//! (shown in the table below) is used. The accessors will have the field's
+//! visibility specifier. (Actually, this is the only case where the field's
+//! visibility specifier matters.)
+//!
+//! | Field Type | `get`        | `set` | `watch` |
+//! | ---------- | ------------ | ----- | ------- |
+//! | `const`    | `get borrow` |       | N/A     |
+//! | `prop`     | `get clone`  | `set` |         |
+//! | `wire`     | `get clone`  | N/A   |         |
+//!
+//! (N/A: not applicable for the field type)
+//!
+//! > **Rationale:** The reason the kinds of `get` differ between `const` and
+//! > other kinds of fields is that the latter kinds of fields are stored behind
+//! > `RefCell` and require a runtime check to borrow safely.
+//!
+//! **Values:**
+//! The optionally-specified dynamic expression in the right-hand side of `=` is
+//! *a default value* (`const`, `prop`) or *a reactive value* (`wire`).
+//!
+//! ```text
+//! prop prop1: u32 = || 42; // Defaults to 42 but can be changed later or
+//!                       // when constructing the component
+//! const const1: u32 = || 42; // 42 all the time
+//!
+//! // RHS of `wire` is a reactive value
+//! wire wire1: u32 = |prop1| prop1 + 1; // Automatically updated based on the
+//!                                      // value of `prop1`
+//! ```
+//!
+//! If the value is omitted, the field must be explicitly initialized through
+//! a setter method of the builder type. If the field doesn't have a setter
+//! either, the field will be impossible to initialize, which is illegal:
+//!
+//! ```text,should_error
+//! const const1: u32 = || 42;            // ok: initialized to 42
+//! const const2: u32 { pub(crate) set; } // ok: the builder provides a value
+//! const const3: u32;                    // ERROR
+//!
+//! prop prop1: u32;                      // ok: the builder provides a value
+//! prop prop2: u32 {}                    // ERROR
+//! ```
+//!
 //! ## Dynamic Expressions: `|prop1| prop1 + 1`, etc.
 //!
 //! Fields (`const`, `prop`, and `wire`) and event handlers (`on`) may have *a
@@ -86,12 +187,12 @@
 //! Instantiates the component named `ComponentName` *exactly once* when the
 //! current component is created. The component's fields are initialized with
 //! specified dynamic expressions and kept up-to-date by re-evaluating the
-//! expressions as needed.
+//! expressions as needed in a way similar to `const` and `wire`.
 //!
 //! ```tcwdl,no_compile
 //! const button = Button {
 //!     const style_manager = |style_manager| style_manager;
-//!     prop caption = |count|
+//!     prop caption = |this.count|
 //!         format!("You pressed this button for {} time(s)!", count);
 //! };
 //! ```
