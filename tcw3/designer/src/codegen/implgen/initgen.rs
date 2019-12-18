@@ -364,10 +364,10 @@ fn analyze_dep(
                             CommitTrigger::WatchField { item_i: sem_item_i },
                         );
                     } else {
-                        let item_input = item_input.clone();
+                        let mut item_input = item_input.clone();
 
                         // Find the referred item
-                        let ind_last = item_input.indirections.last().unwrap();
+                        let ind_last = item_input.indirections.last_mut().unwrap();
                         let item = ind_last.item(ctx.repo);
 
                         // If it's a field, find the event for watching the field
@@ -377,15 +377,10 @@ fn analyze_dep(
                                 return;
                             }
 
-                            if let Some(_) = field.accessors.watch {
-                                // TODO: Find the event
-                                diag.emit(&[Diagnostic {
-                                    level: Level::Warning,
-                                    message: "Watching remote prop is unimplemented".to_string(),
-                                    code: None,
-                                    spans: vec![],
-                                }]);
-                                return;
+                            if let Some(watch) = &field.accessors.watch {
+                                // Use the event `watch.event_item_i` to monitor
+                                // for changes in the field's value
+                                ind_last.item_i = watch.event_item_i;
                             } else {
                                 // TODO: We can't watch a prop without a `watch` accessor.
                                 //       This should probably be checked in `analysis.rs`
