@@ -55,6 +55,7 @@ pub fn gen_builder(
         .clone()
         .map(|field| field.ty.to_token_stream());
 
+    writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
         out,
         "{vis} struct {ty}{gen} {{",
@@ -87,6 +88,7 @@ pub fn gen_builder(
 
     // `ComponentBuilder::<Unset, ...>::new`
     // -------------------------------------------------------------------
+    writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
         out,
         "impl {ident}{gen} {{",
@@ -126,6 +128,7 @@ pub fn gen_builder(
 
     // `ComponentBuilder::{with_*}`
     // -------------------------------------------------------------------
+    writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
         out,
         "impl{gen} {ty}{gen} {{",

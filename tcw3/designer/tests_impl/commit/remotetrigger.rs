@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use tcw3::testing::{prelude::*, use_testing_wm};
 
 designer_impl! { crate::commit::remotetrigger::Comp }
