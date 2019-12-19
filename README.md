@@ -83,7 +83,7 @@ When testing the whole workspace, specifying features on individual crates won't
 
 The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work.
 
-When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system.
+When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system. You also need **GTK3** when building for a Linux system.
 
 Fedora:
 
@@ -95,12 +95,7 @@ Nix:
 
 ```shell
 # Assumes `cargo` and the nightly toolchain are already available.
-#
-# `x11-rs` searches additional paths if non-standard paths are detected during
-# compile time. For this reason, `xorg.*` must be available when building.
-# See <https://github.com/erlepereira/x11-rs/pull/46> for more about this
-# behavior.
-nix-shell -p glib pkgconfig pango harfbuzz xorg.libXcursor xorg.libXrandr xorg.libXi \
+nix-shell -p glib gtk3 pkgconfig pango harfbuzz \
   --run 'cargo build --release -p stella2'
 ```
 
