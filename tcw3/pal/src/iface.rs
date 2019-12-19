@@ -83,6 +83,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// The implementations may set a hard limit on the number of pending calls.
     /// An attempt to surpass the limit causes a panic. The lower bound of the
     /// limit is currently `64` (the hard-coded limit of `TimerQueue`).
+    ///
+    /// The delay must be shorter than 2³¹ milliseconds.
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke;
 
     /// Cancel a pending function call enqueued by `invoke_after`. Does nothing
