@@ -50,3 +50,4 @@ should_error!(use_dupe, "use_dupe.tcwdl");
 should_error!(use_self, "use_self.tcwdl");
 should_error!(use_super, "use_super.tcwdl");
 should_error!(use_unknown, "use_unknown.tcwdl");
+should_error!(watch_nonnullary, "watch_nonnullary.tcwdl");

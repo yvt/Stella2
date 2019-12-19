@@ -25,3 +25,13 @@ fn prop_set(twm: &dyn TestingWm) {
     twm.step_unsend();
     assert_eq!(3, comp.prop1());
 }
+
+#[use_testing_wm]
+#[test]
+fn prop_watch(twm: &dyn TestingWm) {
+    let comp = CompBuilder::new().with_wm(twm.wm()).build();
+    comp.set_prop1(3);
+    assert!(comp.prop1_history().borrow().is_empty());
+    twm.step_unsend();
+    assert_eq!(vec![(3, 3)], *comp.prop1_history().borrow());
+}

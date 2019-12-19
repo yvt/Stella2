@@ -131,6 +131,10 @@ impl<'a> CompItemDef<'a> {
         try_match!(Self::On(x) = self).ok()
     }
 
+    pub fn event(&self) -> Option<&EventDef<'a>> {
+        try_match!(Self::Event(x) = self).ok()
+    }
+
     pub fn field_mut(&mut self) -> Option<&mut FieldDef<'a>> {
         try_match!(Self::Field(x) = self).ok()
     }
@@ -232,6 +236,7 @@ pub use self::parser::FieldGetMode;
 pub struct FieldWatcher {
     pub vis: Visibility,
     pub event_item_i: usize,
+    pub event_span: Option<codemap::Span>,
 }
 
 pub struct OnDef<'a> {
@@ -562,19 +567,24 @@ impl AnalyzeCtx<'_, '_> {
                         vis,
                         mode,
                     } => {
+                        let event_span = match mode {
+                            parser::FieldWatchMode::Event { event } => {
+                                // Lookup the event name later
+                                reloc(CompReloc::FieldWatchEvent {
+                                    item_i: None,
+                                    ident: Ident::from_syn(event, self.file),
+                                });
+
+                                span_to_codemap(event.span(), self.file)
+                            }
+                        };
+
                         accessors.watch = Some(FieldWatcher {
                             vis: Visibility::from_syn(vis, self.file),
-                            event_item_i: match mode {
-                                parser::FieldWatchMode::Event { event } => {
-                                    // Lookup the event name later
-                                    reloc(CompReloc::FieldWatchEvent {
-                                        item_i: None,
-                                        ident: Ident::from_syn(event, self.file),
-                                    });
-                                    0
-                                }
-                            },
+                            event_item_i: 0, // set later with `CompReloc::FieldWatchEvent`
+                            event_span,
                         });
+
                         (2, watch_token.span())
                     }
                 };

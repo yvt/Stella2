@@ -14,7 +14,7 @@ use super::{
     bitsetgen::{self, BitsetTy},
     evalgen, fields, known_fields, methods, paths, CommaSeparated, CompBuilderTy, CompSharedTy,
     CompStateTy, CompTy, Ctx, EventInnerSubList, FactorySetterForField, InnerValueField,
-    SetterMethod, SubscribeMethod, TempVar,
+    RaiseMethod, SetterMethod, SubscribeMethod, TempVar,
 };
 use crate::metadata;
 
@@ -35,6 +35,8 @@ enum CommitNode {
     Field { item_i: usize },
     /// Call the handler
     On { item_i: usize },
+    /// Raise the event with no parameters
+    Event { item_i: usize },
     /// `prop`
     ObjInitField { item_i: usize, field_i: usize },
 }
@@ -465,7 +467,7 @@ fn analyze_dep(
                     if trigger_emitted.get() {
                         commit_nodes.push(CommitNode::Field { item_i });
                     }
-                } // TODO: Emit `watch` event
+                }
             },
             sem::CompItemDef::On(on) => {
                 let node_i = commit_nodes.len();
@@ -480,6 +482,49 @@ fn analyze_dep(
             }
             sem::CompItemDef::Event(_) => {}
         }
+    }
+
+    // Raise the associated event when a field is updated with a new value
+    // if the field has a `watch` accessor
+    for (item_i, watch) in comp
+        .items
+        .iter()
+        .enumerate()
+        .filter_map(|(item_i, item)| Some((item_i, item.field()?)))
+        .filter_map(|(item_i, field)| Some((item_i, field.accessors.watch.as_ref()?)))
+    {
+        // Find the associated event
+        let event = comp.items[watch.event_item_i].event().unwrap();
+
+        if event.inputs.len() > 0 {
+            // This may be a temporary restriction. We could pick up values
+            // such as `wm` from the component's fields.
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "The event used for `watch` accessor must have no parameters".to_string(),
+                code: None,
+                spans: watch
+                    .event_span
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+
+        let node_i = commit_nodes.len();
+        commit_nodes.push(CommitNode::Event {
+            item_i: watch.event_item_i,
+        });
+
+        define_trigger(
+            &mut trigger_info,
+            node_i,
+            CommitTrigger::WatchField { item_i },
+        );
     }
 
     // Initialize `commitnode2trigger_map`
@@ -1988,6 +2033,9 @@ pub fn gen_commit(
                     );
                     writeln!(out, ");\n").unwrap();
                 }
+                CommitNode::Event { .. } => {
+                    // Events are raised after storing the final values
+                }
                 CommitNode::ObjInitField { item_i, field_i } => {
                     let field = comp.items[*item_i].field().unwrap();
                     let init = field.value.as_ref().unwrap().obj_init().unwrap();
@@ -2079,7 +2127,19 @@ pub fn gen_commit(
     // Raise "value changed" events
     // ----------------------------------------------------------------------
 
-    // TODO
+    for (bit_i, &cdf_i) in dep_analysis.bit2cdf_map.iter().enumerate() {
+        let node_i_list = &dep_analysis.cdf2node_map[cdf_i];
+        let nodes = node_i_list.iter().map(|&i| &dep_analysis.commit_nodes[i]);
+
+        genln!("if {} {{", cdf_ty.gen_has(var_dirty, bit_i));
+
+        for item_i in nodes.filter_map(|n| try_match!(CommitNode::Event { item_i } = n).ok()) {
+            let event = comp.items[*item_i].event().unwrap();
+            genln!("    self.{raise}();", raise = RaiseMethod(&event.ident.sym));
+        }
+
+        genln!("}}");
+    }
 
     writeln!(out, "    }}",).unwrap();
 }
