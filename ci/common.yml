@@ -3,5 +3,5 @@ variables:
   linuxPrestep: |
     sudo apt-get update &&
     sudo apt-get install -y \
-      libglib2.0-dev libcairo2-dev libcairo-gobject2 libpango1.0-dev
+      libgtk-3-dev libglib2.0-dev libcairo2-dev libcairo-gobject2 libpango1.0-dev
   linuxVmImage: ubuntu-18.04
