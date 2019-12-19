@@ -1398,11 +1398,11 @@ fn gen_subscribe_event(
     } else {
         let ind0 = item_input.indirections.first().unwrap();
         input_gen.gen_field_ref(item_meta2sem_map[ind0.item_i], true, out);
-    }
 
-    for ind in item_input.indirections[1..item_input.indirections.len() - 1].iter() {
-        let item = ind.item(ctx.repo).field().unwrap();
-        write!(out, ".{}()", item.ident).unwrap();
+        for ind in item_input.indirections[1..item_input.indirections.len() - 1].iter() {
+            let item = ind.item(ctx.repo).field().unwrap();
+            write!(out, ".{}()", item.ident).unwrap();
+        }
     }
 
     // The last part refers to the event
