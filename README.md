@@ -18,6 +18,8 @@ TODO
 
 - **Reasonable user experience.**
 - **Reasonable developer experience.**
+- **High quality rendering.**
+- **Accurate color reproduction.**
 - **Low power consumption.** This is related to some of the other goals: Smaller memory footprint leads to lower power consumption because fewer data has to be moved between different levels of the memory hierarchy. Fast-reacting UI correlates with this, but it is also important that simply doing work in a background thread does not reduce the power consumption. This goal ultimately leads to a better user experience because of a prolonged battery lifetime and less frequent thermal throttling of CPU.
 - **Space-efficient UI** that doesn't fill the desktop of an 11-inch netbook.
 - **UI localization.** Preferably with platform-independent translation data.
