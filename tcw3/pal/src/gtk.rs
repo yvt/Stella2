@@ -26,7 +26,7 @@ pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
-static TIMER_POOL: MtLock<RefCell<timer::TimerPool>> =
+static TIMER_POOL: MtLock<RefCell<timer::TimerPool>, Wm> =
     MtLock::new(RefCell::new(timer::TimerPool::new()));
 
 impl iface::Wm for Wm {
