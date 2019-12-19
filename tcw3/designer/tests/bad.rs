@@ -26,6 +26,7 @@ macro_rules! should_error {
 should_error!(comp_path_external, "comp_path_external.tcwdl");
 should_error!(comp_path_super, "comp_path_super.tcwdl");
 should_error!(const_uninitable, "const_uninitable.tcwdl");
+should_error!(const_watch, "const_watch.tcwdl");
 should_error!(input_circular, "input_circular.tcwdl");
 should_error!(input_circular2, "input_circular2.tcwdl");
 should_error!(input_circular_objinit, "input_circular_objinit.tcwdl");
