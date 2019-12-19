@@ -439,6 +439,9 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
                 )?;
             }
 
+            // Prevent the compilation error when there are no components
+            writeln!(out_f, "    () => {{}};")?;
+
             writeln!(out_f, "}}")?;
 
             out_f.flush()?;
