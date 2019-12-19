@@ -24,15 +24,16 @@ members = [
     "support/sorted_diff",
     "res/mkmacosbundle",
     "res/windres",
+    "fimvm",
 ]
 
 [profile.release]
 debug = true
 panic = "abort"
-lto = true
+lto = "thin"
 
 [profile.bench]
-lto = true
+lto = "thin"
 debug = true
 
 [profile.dev.overrides]

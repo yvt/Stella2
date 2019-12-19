@@ -530,6 +530,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "fimvm"
+version = "0.1.0"
+
+[[package]]
 name = "flags-macro"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
