@@ -7,15 +7,12 @@ stella2_meta::designer_impl! {
 
 impl ToolbarView {
     /// Handle `init` event.
-    fn init(&self) {
-        // TODO: there is no way to get a weak reference at the moment
-        //  self.toggle_sidebar_button()
-        //      .set_on_activate(enclose!((this_weak) move |_| {
-        //          if let Some(this) = this_weak.upgrade() {
-        //              // Toggle the sidebar
-        //              let visible = this.wnd_state.borrow().sidebar_visible;
-        //              this.dispatch.borrow()(model::WndAction::ToggleSidebar(!visible));
-        //          }
-        //      }));
+    fn init(&self) {}
+
+    /// Handle `toggle_sidebar_button.activate` event.
+    fn toggle_sidebar(&self) {
+        // Toggle the sidebar
+        let visible = self.wnd_state().sidebar_visible;
+        self.raise_dispatch(model::WndAction::ToggleSidebar(!visible));
     }
 }

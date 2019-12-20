@@ -6,9 +6,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, p
 pub comp crate::ui::views::Button {
     const style_manager: &'static Manager { pub set; }
 
-    // TODO: pub event activated(wm: pal::Wm);
-    prop on_activate: impl Fn(pal::Wm) + 'static { pub set; }
-        = || unreachable!();
+    pub event activated(wm: pal::Wm);
 
     prop caption: String { pub set; } = || unreachable!();
     prop class_set: ClassSet { pub set; get clone; } = || unreachable!();

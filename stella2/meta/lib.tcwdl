@@ -129,17 +129,20 @@ pub(crate) comp ToolbarView {
         // TODO: `on_activate` is set by `init` for now
     };
 
+    on (toggle_sidebar_button.activated) |&this| this.toggle_sidebar();
+
     const go_back_button = Button {
         const style_manager = |style_manager as x| x;
         prop class_set = || theming::ClassSet::BUTTON | elem_id::GO_BACK;
-        prop on_activate = || |_| { dbg!(); };
     };
 
     const go_forward_button = Button {
         const style_manager = |style_manager as x| x;
         prop class_set = || theming::ClassSet::BUTTON | elem_id::GO_FORWARD;
-        prop on_activate = || |_| { dbg!(); };
     };
+
+    on (go_back_button.activated) || dbg!();
+    on (go_forward_button.activated) || dbg!();
 
     // TODO
     const search_bar = PlaceholderView {

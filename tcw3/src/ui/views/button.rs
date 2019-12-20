@@ -1,5 +1,6 @@
 use cgmath::Point2;
 use std::{cell::RefCell, fmt, rc::Rc};
+use subscriber_list::SubscriberList;
 
 use crate::{
     pal,
@@ -10,7 +11,7 @@ use crate::{
         theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Label,
     },
-    uicore::{HView, ViewFlags, ViewListener},
+    uicore::{HView, Sub, ViewFlags, ViewListener},
 };
 
 /// A push button widget.
@@ -24,7 +25,7 @@ struct Inner {
     button_mixin: ButtonMixin,
     styled_box: StyledBox,
     label: Label,
-    activate_handler: RefCell<Box<dyn Fn(pal::Wm)>>,
+    activate_handlers: RefCell<SubscriberList<Box<dyn Fn(pal::Wm)>>>,
 }
 
 impl fmt::Debug for Inner {
@@ -33,7 +34,7 @@ impl fmt::Debug for Inner {
             .field("button_mixin", &self.button_mixin)
             .field("styled_box", &self.styled_box)
             .field("label", &self.label)
-            .field("activate_handler", &())
+            .field("activate_handlers", &())
             .finish()
     }
 }
@@ -59,7 +60,7 @@ impl Button {
             button_mixin: ButtonMixin::new(),
             styled_box,
             label,
-            activate_handler: RefCell::new(Box::new(|_| {})),
+            activate_handlers: RefCell::new(SubscriberList::new()),
         });
 
         view.set_listener(ButtonViewListener {
@@ -103,13 +104,17 @@ impl Button {
         self.inner.styled_box.class_set()
     }
 
-    /// Set the function called when a push button widget is activated.
+    /// Add a function called when a push button widget is activated.
     ///
     /// The function is called via `Wm::invoke`, thus allowed to modify
     /// view hierarchy and view attributes. However, it's not allowed to call
-    /// `set_on_activate` on the activated `Button`.
-    pub fn set_on_activate(&self, cb: impl Fn(pal::Wm) + 'static) {
-        *self.inner.activate_handler.borrow_mut() = Box::new(cb);
+    /// `subscribe_activate` when one of the handlers is being called.
+    pub fn subscribe_activated(&self, cb: Box<dyn Fn(pal::Wm)>) -> Sub {
+        self.inner
+            .activate_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
     }
 }
 
@@ -175,8 +180,10 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
     fn activate(&self, wm: pal::Wm, _: &HView) {
         let inner = Rc::clone(&self.inner);
         wm.invoke(move |wm| {
-            let handler = inner.activate_handler.borrow();
-            handler(wm);
+            let handlers = inner.activate_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(wm);
+            }
         });
     }
 }
