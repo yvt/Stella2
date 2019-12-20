@@ -1,0 +1,7 @@
+pub comp crate::Comp2 {
+    const wm: tcw3_pal::Wm { pub set; }
+    const const1: u32 { pub set; }
+
+    // `const1` is not a component
+    wire wire1: u32 = |const1.field| field;
+}

@@ -296,6 +296,8 @@ impl fmt::Debug for TableCell {
 ///   a placeholder content until the real measurement is ready.
 ///
 pub trait TableModelQuery: AsAny + Any {
+    // TODO: Support `HElem` (styling elements)
+
     /// Create a subview for the specified table cell.
     fn new_view(&mut self, cell: CellIdx) -> (HView, Box<dyn CellCtrler>);
 

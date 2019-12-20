@@ -122,30 +122,31 @@ impl RuleProps {
 
 impl Selector {
     fn matches(&self, path: &ElemClassPath) -> bool {
-        if !self.target.matches(&path.class_set) {
+        let mut it = path.iter().rev();
+        if !self.target.matches(&it.next().unwrap()) {
             return false;
         }
 
-        let mut cur_maybe = &path.tail;
+        let mut cur_maybe = it.next();
 
         for (direct, criteria) in self.ancestors.iter() {
             if *direct {
                 if let Some(cur) = cur_maybe {
-                    if !criteria.matches(&cur.class_set) {
+                    if !criteria.matches(&cur) {
                         return false;
                     }
-                    cur_maybe = &cur.tail;
+                    cur_maybe = it.next();
                 } else {
                     return false;
                 }
             } else {
                 loop {
                     if let Some(cur) = cur_maybe {
-                        if criteria.matches(&cur.class_set) {
-                            cur_maybe = &cur.tail;
+                        if criteria.matches(&cur) {
+                            cur_maybe = it.next();
                             break;
                         } else {
-                            cur_maybe = &cur.tail;
+                            cur_maybe = it.next();
                         }
                     } else {
                         return false;

@@ -13,6 +13,7 @@ default-run = "stella2"
 tcw3 = { path = "../tcw3" }
 harmony = { path = "../harmony" }
 stella2_assets = { path = "../stella2_assets" }
+stella2_meta = { path = "meta" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"

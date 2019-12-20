@@ -1,0 +1,8 @@
+use crate::uicore::SizeTraits;
+
+/// A `Layout` that doesn't have subviews.
+#[prototype_only]
+#[builder(simple)]
+pub comp crate::ui::layouts::EmptyLayout {
+    const size_traits: SizeTraits { pub set; }
+}

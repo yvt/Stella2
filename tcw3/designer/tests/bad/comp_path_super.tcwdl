@@ -1,0 +1,1 @@
+pub comp super::Foo {}

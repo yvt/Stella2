@@ -1,0 +1,6 @@
+pub comp crate::Comp1 {
+    const wm: tcw3_pal::Wm { pub set; }
+
+    prop field: u32 { pub set; pub watch event(event1); }
+    event event1(x: u32);
+}

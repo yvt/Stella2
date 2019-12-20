@@ -1,0 +1,33 @@
+[package]
+name = "tcw3_designer"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+bincode = "1.2.0"
+bitflags = "1.1.0"
+codemap = "0.1.0"
+codemap-diagnostic = "0.1.1"
+displaydoc = "0.1.5"
+either = "1"
+env_logger = "0.7.0"
+log = "0.4"
+pathfinding = "2"
+quote = "1.0.0"
+serde = { version = "1.0", features = ["derive"] }
+try_match = "0.2.1"
+uuid = { version = "0.8.1", features = ["serde", "v4"] }
+
+[dependencies.syn]
+version = "1.0.8"
+default-features = false
+features = ["derive", "full", "parsing", "printing", "visit-mut"]
+
+[dependencies.proc-macro2]
+version = "1.0.4"
+default-features = false
+features = ["span-locations"]

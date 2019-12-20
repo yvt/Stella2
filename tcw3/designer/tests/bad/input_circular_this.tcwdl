@@ -1,0 +1,4 @@
+pub comp crate::Comp2 {
+    // `this` is available only after all fields are initialized
+    wire wire: *const () = |&this| this as *const _ as *const ();
+}

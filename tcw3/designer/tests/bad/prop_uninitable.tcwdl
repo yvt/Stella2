@@ -1,0 +1,6 @@
+pub comp crate::Comp1 {
+    const wm: tcw3_pal::Wm { pub set; }
+
+    // `field` has no way to initialize
+    prop field: u32 {}
+}

@@ -13,6 +13,7 @@
 // The size on memory hardly relates to how they are passed via a parameter
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
+pub use tcw3_designer_runtime as designer_runtime;
 pub use tcw3_images as images;
 pub use tcw3_pal as pal;
 pub use tcw3_testing as testing;

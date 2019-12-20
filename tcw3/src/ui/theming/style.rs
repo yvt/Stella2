@@ -1,7 +1,6 @@
 use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Rad, Vector2};
-use std::rc::Rc;
 
 use crate::pal::{SysFontType, RGBAF32};
 
@@ -73,36 +72,22 @@ impl ClassSet {
     }
 }
 
-/// `ClassSet` of an element and its ancestors.
-#[derive(Debug, Clone)]
-pub struct ElemClassPath {
-    pub tail: Option<Rc<ElemClassPath>>,
-    pub class_set: ClassSet,
-}
-
-impl ElemClassPath {
-    pub fn new(class_set: ClassSet, tail: Option<Rc<ElemClassPath>>) -> Self {
-        Self { tail, class_set }
-    }
-}
-
-impl Default for ElemClassPath {
-    fn default() -> Self {
-        Self {
-            tail: None,
-            class_set: ClassSet::empty(),
-        }
-    }
-}
+/// `ClassSet` of an element and its descendants.
+pub type ElemClassPath = [ClassSet];
 
 /// A role of a subview.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
     /// The default role.
-    Generic,
+    Generic = 0,
     HorizontalScrollbar,
     VerticalScrollbar,
+
+    #[doc(hidden)]
+    __Count,
 }
+
+pub const ROLE_COUNT: usize = Role::__Count as usize;
 
 /// Represents a single styling property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

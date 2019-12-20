@@ -13,7 +13,7 @@ use crate::{
     pal::prelude::*,
     ui::{
         layouts::FillLayout,
-        theming::{ClassSet, ElemClassPath, Manager, StyledBox},
+        theming::{ClassSet, HElem, Manager, StyledBox, Widget},
     },
     uicore::{
         CursorShape, HView, HWnd, Layout, LayoutCtx, MouseDragListener, SizeTraits, UpdateCtx,
@@ -165,6 +165,11 @@ impl Split {
         &self.container
     }
 
+    /// Get the styling element representing the widget.
+    pub fn style_elem(&self) -> HElem {
+        self.shared.splitter_sb.style_elem()
+    }
+
     /// Get a raw (unclipped) value representing the split position.
     ///
     /// The interpretation of this value differs depending on the value of `fix`
@@ -201,11 +206,15 @@ impl Split {
     pub fn set_on_drag(&self, handler: impl Fn(pal::Wm) -> Box<dyn SplitDragListener> + 'static) {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
+}
 
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let styled_box = &self.shared.splitter_sb;
-        styled_box.set_parent_class_path(parent_class_path);
+impl Widget for Split {
+    fn view(&self) -> &HView {
+        self.view()
+    }
+
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 
