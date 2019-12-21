@@ -4,7 +4,7 @@ use tcw3::{
         AlignFlags,
         views::{Label, Button, Split, FixedSpacer},
         layouts::TableLayout,
-        theming::{self, Manager},
+        theming::{self, Manager, StyledBox},
     },
     uicore::HView,
     pal,
@@ -88,30 +88,36 @@ pub(crate) comp ToolbarView {
 
     on (init) |&this| this.init();
 
-    pub const view = HView {
-        const flags = || Default::default();
+    pub const wrapper = StyledBox {
+        const style_manager = |style_manager as x| x;
+        const view_flags = || Default::default();
+        prop class_set = || elem_id::TOOLBAR;
+        prop subview_generic = HView {
+            const flags = || Default::default();
 
-        prop layout = TableLayout {
-            const cells =
-                |toggle_sidebar_button.view as v1,
-                    go_back_button.view as v2,
-                    go_forward_button.view as v3,
-                    search_bar.view as v4,
-                    spacer1.view as s1,
-                    spacer2.view as s2,
-                    spacer3.view as s3|
-                vec![
-                    (v1, [0, 0], AlignFlags::JUSTIFY),
-                    (s1, [1, 0], AlignFlags::HORZ_JUSTIFY),
-                    (v2, [2, 0], AlignFlags::JUSTIFY),
-                    (s2, [3, 0], AlignFlags::HORZ_JUSTIFY),
-                    (v3, [4, 0], AlignFlags::JUSTIFY),
-                    (s3, [5, 0], AlignFlags::CENTER),
-                    (v4, [6, 0], AlignFlags::RIGHT),
-                ];
-            // TODO: uniform margin `5.0`
+            prop layout = TableLayout {
+                const cells =
+                    |toggle_sidebar_button.view as v1,
+                        go_back_button.view as v2,
+                        go_forward_button.view as v3,
+                        search_bar.view as v4,
+                        spacer1.view as s1,
+                        spacer2.view as s2,
+                        spacer3.view as s3|
+                    vec![
+                        (v1, [0, 0], AlignFlags::JUSTIFY),
+                        (s1, [1, 0], AlignFlags::HORZ_JUSTIFY),
+                        (v2, [2, 0], AlignFlags::JUSTIFY),
+                        (s2, [3, 0], AlignFlags::HORZ_JUSTIFY),
+                        (v3, [4, 0], AlignFlags::JUSTIFY),
+                        (s3, [5, 0], AlignFlags::CENTER),
+                        (v4, [6, 0], AlignFlags::RIGHT),
+                    ];
+            };
         };
     };
+
+    pub const view: HView = |wrapper.view| view;
 
     const spacer1 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
     const spacer2 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
