@@ -6,6 +6,13 @@
 #import "TCWWindowController.h"
 #import "TCWWindowView.h"
 
+// Undocumented API (warning: the use of this is rejected by App Store)
+typedef void *CGSConnection;
+extern OSStatus CGSSetWindowBackgroundBlurRadius(CGSConnection connection,
+                                                 NSInteger windowNumber,
+                                                 int radius);
+extern CGSConnection CGSDefaultConnectionForThread();
+
 @implementation TCWWindowController {
     NSWindow *window;
 
@@ -46,6 +53,21 @@
         self->window.contentView =
             [[TCWWindowView alloc] initWithController:self];
         self->window.contentView.wantsLayer = YES;
+
+        // Remove titlebar and background. The alpha component of
+        // `backgroundColor` must be non-zero. Otherwise, the window shadow is
+        // calculated based on opaque contents, which has a severe performance
+        // impact. However, it must be at least `0.01` for the blur behind
+        // effect to work.
+        self->window.titlebarAppearsTransparent = YES;
+        self->window.backgroundColor =
+            [[NSColor clearColor] colorWithAlphaComponent:0.01];
+        self->window.opaque = NO;
+
+        // Enable "blur behind"
+        CGSConnection connection = CGSDefaultConnectionForThread();
+        CGSSetWindowBackgroundBlurRadius(connection, self->window.windowNumber,
+                                         100);
 
         // Create the first gesture handler view
         self->gestureHandler = [self newGestureHandlerView];
