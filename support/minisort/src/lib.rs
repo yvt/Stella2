@@ -1,4 +1,8 @@
 //! Provides an insertion sort implementation.
+//!
+//! # Performances
+//!
+//! It's never faster than `[T]::sort_unstable` for `N > 16`.
 #![feature(slice_patterns)]
 #![cfg_attr(test, feature(is_sorted))]
 
