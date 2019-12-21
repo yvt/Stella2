@@ -253,49 +253,125 @@ impl NewSheetSetCtx<'_> {
     }
 }
 
+/// Adjust the interface boundary for optimal dynamic dispatch.
+///
+/// Stylesheets are defined by implementing `Stylesheet` trait. For performance
+/// and code size optimization, we don't turn them into `dyn Stylesheet` but
+/// instead into `dyn StylesheetWrap`. This way, the boundary for dynamic
+/// dispatch can be adjusted to our favor.
+///
+/// An alternative is to add these methods to `Stylesheet` with a default
+/// implementation, but this has a downside of including unnecessary methods in
+/// the vtable.
+trait StylesheetWrap {
+    fn match_rules_wrap(
+        &self,
+        path: &ElemClassPath,
+        sheet_id: SheetId,
+        out_rules: &mut dyn FnMut(RuleTag),
+    );
+
+    fn get_rule_prop_kinds_wrap(&self, id: RuleId) -> PropKindFlags;
+
+    #[allow(clippy::option_option)]
+    fn get_rule_prop_value_wrap(&self, id: RuleId, prop: &Prop) -> Option<&PropValue>;
+}
+
+impl<T: Stylesheet> StylesheetWrap for T {
+    fn match_rules_wrap(
+        &self,
+        path: &ElemClassPath,
+        sheet_id: SheetId,
+        out_rules: &mut dyn FnMut(RuleTag),
+    ) {
+        self.match_rules(path, &mut |rule_id| {
+            let pri = self.get_rule_priority(rule_id).unwrap();
+            out_rules(RuleTag::new(sheet_id, rule_id, pri));
+        });
+    }
+
+    fn get_rule_prop_kinds_wrap(&self, id: RuleId) -> PropKindFlags {
+        self.get_rule_prop_kinds(id).unwrap()
+    }
+
+    fn get_rule_prop_value_wrap(&self, id: RuleId, prop: &Prop) -> Option<&PropValue> {
+        self.get_rule_prop_value(id, prop).unwrap()
+    }
+}
+
+/// A packed value containing `SheetId`, `RuleId`, and a rule priority.
+///
+/// They are packed in a single `u32` because it's significantly faster to
+/// compare than a tuple `(i16, SheetId, RuleId)`.
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+struct RuleTag(u32);
+
+impl fmt::Debug for RuleTag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("RuleTag")
+            .field("sheet_id", &self.sheet_id())
+            .field("rule_id", &self.rule_id())
+            .field("priority", &self.priority())
+            .finish()
+    }
+}
+
+impl RuleTag {
+    fn new(sheet_id: SheetId, rule_id: RuleId, pri: i16) -> Self {
+        // These limitations are based on Internet Explorer 8 and earlier
+        debug_assert!(sheet_id < 0x10);
+        debug_assert!(rule_id < 0x1000);
+
+        let pri = pri as u32 + 0x8000;
+
+        Self((pri << 16) | ((sheet_id as u32) << 12) | (rule_id as u32))
+    }
+
+    fn sheet_id(&self) -> SheetId {
+        ((self.0 >> 12) & 0xf) as SheetId
+    }
+
+    fn rule_id(&self) -> RuleId {
+        (self.0 & 0xfff) as SheetId
+    }
+
+    fn priority(&self) -> i16 {
+        ((self.0 >> 16) as i32 - 0x8000) as i16
+    }
+}
+
 /// A stylesheet set.
 pub(crate) struct SheetSet {
-    sheets: Vec<Box<dyn Stylesheet>>,
+    sheets: Vec<Box<dyn StylesheetWrap>>,
 }
 
 impl SheetSet {
-    fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(SheetId, RuleId)) {
+    fn match_rules(&self, path: &ElemClassPath, out_rules: &mut dyn FnMut(RuleTag)) {
         for (i, sheet) in self.sheets.iter().enumerate() {
-            sheet.match_rules(path, &mut |rule_id| out_rules(i, rule_id));
+            sheet.match_rules_wrap(path, i, out_rules);
         }
     }
 
-    fn get_rule(&self, id: (SheetId, RuleId)) -> Option<Rule<'_>> {
-        self.sheets.get(id.0).and_then(|stylesheet| {
-            if stylesheet.get_rule_priority(id.1).is_some() {
-                Some(Rule {
-                    stylesheet: &**stylesheet,
-                    rule_id: id.1,
-                })
-            } else {
-                None
-            }
+    fn get_rule(&self, id: RuleTag) -> Option<Rule<'_>> {
+        self.sheets.get(id.sheet_id()).map(|stylesheet| Rule {
+            stylesheet: &**stylesheet,
+            rule_id: id.rule_id(),
         })
     }
 }
 
 #[derive(Clone, Copy)]
 struct Rule<'a> {
-    stylesheet: &'a dyn Stylesheet,
+    stylesheet: &'a dyn StylesheetWrap,
     rule_id: RuleId,
 }
 
 impl Rule<'_> {
-    fn priority(&self) -> i32 {
-        self.stylesheet.get_rule_priority(self.rule_id).unwrap()
-    }
     fn prop_kinds(&self) -> PropKindFlags {
-        self.stylesheet.get_rule_prop_kinds(self.rule_id).unwrap()
+        self.stylesheet.get_rule_prop_kinds_wrap(self.rule_id)
     }
     fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
-        self.stylesheet
-            .get_rule_prop_value(self.rule_id, prop)
-            .unwrap()
+        self.stylesheet.get_rule_prop_value_wrap(self.rule_id, prop)
     }
 }
 
@@ -399,10 +475,8 @@ struct ElemInner {
 
 #[derive(Debug)]
 struct ElemRules {
-    // Currently-active rules, sorted by a lexicographical order.
-    rules_by_ord: Vec<(SheetId, RuleId)>,
     // Currently-active rules, sorted by an ascending order of priority.
-    rules_by_prio: Vec<(SheetId, RuleId)>,
+    rules_sorted: Vec<RuleTag>,
 }
 
 impl fmt::Debug for ElemInner {
@@ -457,8 +531,7 @@ impl Elem {
         let inner = ElemInner {
             class_set: Cell::new(ClassSet::empty()),
             rules: RefCell::new(ElemRules {
-                rules_by_ord: Vec::new(),
-                rules_by_prio: Vec::new(),
+                rules_sorted: Vec::new(),
             }),
             change_handler: RefCell::new(Box::new(|_, _| {})),
 
@@ -598,8 +671,8 @@ impl ElemRules {
         let mut computed_value = PropValue::default_for_prop(&prop);
         let kind = prop.kind_flags();
 
-        for &id in self.rules_by_prio.iter() {
-            let rule = sheet_set.get_rule(id).unwrap();
+        for &tag in self.rules_sorted.iter() {
+            let rule = sheet_set.get_rule(tag).unwrap();
             if rule.prop_kinds().intersects(kind) {
                 if let Some(specified_value) = rule.get_prop_value(&prop) {
                     computed_value = specified_value.clone();
@@ -624,9 +697,9 @@ impl ElemRules {
         class_path: &ElemClassPath,
         invalidate: bool,
     ) -> PropKindFlags {
-        let mut new_rules = Vec::with_capacity(self.rules_by_ord.len());
-        sheet_set.match_rules(class_path, &mut |sheet_id, rule_id| {
-            new_rules.push((sheet_id, rule_id));
+        let mut new_rules = Vec::with_capacity(self.rules_sorted.len());
+        sheet_set.match_rules(class_path, &mut |rule_tag| {
+            new_rules.push(rule_tag);
         });
         new_rules.sort_unstable();
 
@@ -638,7 +711,7 @@ impl ElemRules {
         } else {
             flags = PropKindFlags::empty();
 
-            for diff in sorted_diff(self.rules_by_ord.iter(), new_rules.iter()) {
+            for diff in sorted_diff(self.rules_sorted.iter(), new_rules.iter()) {
                 match diff {
                     In::Left(&id) | In::Right(&id) => {
                         flags |= sheet_set.get_rule(id).unwrap().prop_kinds();
@@ -653,17 +726,8 @@ impl ElemRules {
             }
         }
 
-        self.rules_by_ord = new_rules;
-        self.update_rules_by_prio(sheet_set);
+        self.rules_sorted = new_rules;
 
         flags
-    }
-
-    /// Update `self.rules_by_prio` based on `self.rules_by_ord`.
-    fn update_rules_by_prio(&mut self, sheet_set: &SheetSet) {
-        self.rules_by_prio.clear();
-        self.rules_by_prio.extend(self.rules_by_ord.iter().cloned());
-        self.rules_by_prio
-            .sort_unstable_by_key(|id| sheet_set.get_rule(*id).unwrap().priority());
     }
 }

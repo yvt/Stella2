@@ -18,7 +18,7 @@ pub trait Stylesheet {
     /// Get the priority of a stylesheet rule in this `Stylesheet`.
     ///
     /// Returns `None` if `id` is invalid.
-    fn get_rule_priority(&self, id: RuleId) -> Option<i32>;
+    fn get_rule_priority(&self, id: RuleId) -> Option<i16>;
 
     /// Get a `PropKindFlags` representing an approximate set of styling
     /// properties specified by a stylesheet rule in this `Stylesheet`.
@@ -58,7 +58,7 @@ pub struct RuleProps {
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct Rule {
-    pub priority: i32,
+    pub priority: i16,
     pub prop_kinds: PropKindFlags,
     pub selector: Selector,
 }
@@ -88,7 +88,7 @@ impl Stylesheet for StylesheetMacroOutput {
         }
     }
 
-    fn get_rule_priority(&self, id: RuleId) -> Option<i32> {
+    fn get_rule_priority(&self, id: RuleId) -> Option<i16> {
         self.rules.get(id).map(Rule::priority)
     }
     fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags> {
@@ -100,7 +100,7 @@ impl Stylesheet for StylesheetMacroOutput {
 }
 
 impl Rule {
-    fn priority(&self) -> i32 {
+    fn priority(&self) -> i16 {
         self.priority
     }
 
@@ -558,7 +558,7 @@ impl Stylesheet for DefaultStylesheet {
         DEFAULT_STYLESHEET.match_rules(path, out_rules)
     }
 
-    fn get_rule_priority(&self, id: RuleId) -> Option<i32> {
+    fn get_rule_priority(&self, id: RuleId) -> Option<i16> {
         DEFAULT_STYLESHEET.get_rule_priority(id)
     }
     fn get_rule_prop_kinds(&self, id: RuleId) -> Option<PropKindFlags> {
