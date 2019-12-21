@@ -28,6 +28,7 @@ itertools = "0.8.0"
 ndarray = "0.13.0"
 log = "0.4"
 neo_linked_list = { path = "../support/neo_linked_list" }
+minisort = { path = "../support/minisort" }
 
 tcw3_designer_runtime = { path = "designer_runtime" }
 tcw3_images = { path = "images" }

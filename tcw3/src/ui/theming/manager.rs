@@ -701,7 +701,10 @@ impl ElemRules {
         sheet_set.match_rules(class_path, &mut |rule_tag| {
             new_rules.push(rule_tag);
         });
-        new_rules.sort_unstable();
+
+        // Usually, the number of matching rules is fairly low (< 4), so a
+        // simple insertion sort sufficies (and may be actually faster)
+        minisort::insertion_sort(&mut new_rules);
 
         // Calculate `PropKindFlags`
         let mut flags;
