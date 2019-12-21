@@ -96,6 +96,7 @@ impl std::iter::Sum for LineState {
 
 /// Stores the amount by which the corresponding line can be expanded/shrunken.
 #[derive(Debug, Clone, Default)]
+#[repr(align(8))] // A 16-byte block is faster to copy than a 12-byte block
 struct Clearance {
     /// The index of the line.
     index: usize,
@@ -328,7 +329,9 @@ fn solve_lines(
         debug_assert!(clearance.amount >= 0.0);
     }
 
-    clearances.sort_unstable_by_key(|c| c.amount.to_bits());
+    // Usually, the number of lines is fairly low (< 16), so a simple insertion
+    // sort sufficies (and may be actually faster)
+    minisort::insertion_sort_by_key(clearances, |c| c.amount.to_bits());
 
     // Expand/shrink lines uniformly. When some line gets saturated, i.e., hits
     // the clearance (the maximum delta allowed by the size traits), remove it
