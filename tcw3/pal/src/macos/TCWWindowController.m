@@ -53,6 +53,7 @@ extern CGSConnection CGSDefaultConnectionForThread();
         self->window.contentView =
             [[TCWWindowView alloc] initWithController:self];
         self->window.contentView.wantsLayer = YES;
+        self->window.contentView.layer.masksToBounds = NO;
 
         // Remove titlebar and background. The alpha component of
         // `backgroundColor` must be non-zero. Otherwise, the window shadow is
