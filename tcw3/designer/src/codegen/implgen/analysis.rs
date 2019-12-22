@@ -531,7 +531,7 @@ fn analyze_input_inner(
                     actx.diag.emit(&[Diagnostic {
                         level: Level::Error,
                         message: format!(
-                            "`{}` not have a field named `{}`",
+                            "`{}` does not have a field named `{}`",
                             comp.paths[0].display(actx.ctx.repo),
                             sel.sym
                         ),
