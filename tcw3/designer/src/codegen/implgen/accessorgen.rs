@@ -3,6 +3,7 @@ use quote::ToTokens;
 use std::fmt::Write;
 
 use super::{
+    docgen::{gen_doc_attrs, MdCode},
     fields, initgen, paths, sem, CommaSeparated, CompTy, Ctx, EventBoxHandlerTy, EventInnerSubList,
     GetterMethod, InnerValueField, RaiseMethod, SetterMethod, SubscribeMethod, TempVar,
 };
@@ -21,6 +22,15 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                 };
 
                 if let Some(get) = &field.accessors.get {
+                    writeln!(
+                        out,
+                        "    {}",
+                        doc_attr!("Get the value of {} property.", MdCode(&field.ident.sym))
+                    )
+                    .unwrap();
+                    writeln!(out, "    {}", doc_attr!("")).unwrap();
+                    gen_doc_attrs(&field.doc_attrs, "    ", out);
+
                     write!(
                         out,
                         "   {vis} fn {meth}(&self) -> ",
@@ -109,6 +119,15 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                 if let (Some(set), Prop) = (&field.accessors.set, field.field_ty) {
                     writeln!(
                         out,
+                        "    {}",
+                        doc_attr!("Set the value of {} property.", MdCode(&field.ident.sym))
+                    )
+                    .unwrap();
+                    writeln!(out, "    {}", doc_attr!("")).unwrap();
+                    gen_doc_attrs(&field.doc_attrs, "    ", out);
+
+                    writeln!(
+                        out,
                         "   {vis} fn {meth}(&self, new_value: {ty}) {{",
                         vis = set.vis,
                         meth = SetterMethod(&field.ident.sym),
@@ -140,6 +159,18 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                 } // let Some(set) = &field.accessors.set
             }
             sem::CompItemDef::Event(event) => {
+                writeln!(
+                    out,
+                    "    {}",
+                    doc_attr!(
+                        "Register an event handler for {} event.",
+                        MdCode(&event.ident.sym)
+                    )
+                )
+                .unwrap();
+                writeln!(out, "    {}", doc_attr!("")).unwrap();
+                gen_doc_attrs(&event.doc_attrs, "    ", out);
+
                 writeln!(
                     out,
                     "    {vis} fn {meth}(&self, handler: {ty}) -> {sub} {{",

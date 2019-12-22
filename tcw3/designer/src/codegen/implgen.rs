@@ -6,6 +6,9 @@ use std::{collections::HashMap, fmt, fmt::Write};
 use super::{diag::Diag, sem, EmittedError};
 use crate::metadata;
 
+#[macro_use]
+mod docgen;
+
 mod accessorgen;
 mod analysis;
 mod bitsetgen;
@@ -177,9 +180,22 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
     let dep_analysis =
         initgen::DepAnalysis::new(&analysis, ctx, &item_meta2sem_map, &item_name_map, diag)?;
 
+    use docgen::{CodegenInfoDoc, MdCode};
+
     // `struct ComponentType`
     // -------------------------------------------------------------------
     writeln!(out, "#[derive(Clone)]").unwrap();
+
+    docgen::gen_doc_attrs(&comp.doc_attrs, "", &mut out);
+    writeln!(out, "{}", doc_attr!("")).unwrap();
+    writeln!(out, "{}", doc_attr!("")).unwrap();
+    writeln!(
+        out,
+        "{}",
+        CodegenInfoDoc(comp.path.span.map(|s| s.low()), diag)
+    )
+    .unwrap();
+
     writeln!(
         out,
         "{vis} struct {ty} {{",
@@ -204,6 +220,18 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
 
     // `struct ComponentTypeShared`
     // -------------------------------------------------------------------
+    writeln!(
+        out,
+        "{}",
+        doc_attr!(
+            "The immutable portion of {} component's instance-specific data.",
+            MdCode(comp_ident)
+        )
+    )
+    .unwrap();
+    writeln!(out, "{}", doc_attr!("")).unwrap();
+    writeln!(out, "{}", CodegenInfoDoc(None, diag)).unwrap();
+
     writeln!(out, "struct {} {{", CompSharedTy(comp_ident)).unwrap();
     writeln!(
         out,
@@ -287,6 +315,18 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
 
     // `struct ComponentTypeState`
     // -------------------------------------------------------------------
+    writeln!(
+        out,
+        "{}",
+        doc_attr!(
+            "The mutable portion of {} component's instance-specific data.",
+            MdCode(comp_ident)
+        )
+    )
+    .unwrap();
+    writeln!(out, "{}", doc_attr!("")).unwrap();
+    writeln!(out, "{}", CodegenInfoDoc(None, diag)).unwrap();
+
     writeln!(out, "struct {} {{", CompStateTy(comp_ident)).unwrap();
     for item in comp.items.iter() {
         match item {
@@ -468,6 +508,20 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for e in self.0.clone() {
             write!(f, "{}, ", e)?;
+        }
+        Ok(())
+    }
+}
+
+struct Concat<T>(T);
+impl<T> fmt::Display for Concat<T>
+where
+    T: Clone + IntoIterator,
+    T::Item: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for e in self.0.clone() {
+            write!(f, "{}", e)?;
         }
         Ok(())
     }

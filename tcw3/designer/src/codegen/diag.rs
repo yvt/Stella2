@@ -58,6 +58,15 @@ impl<'a> Diag<'a> {
         self.has_error
     }
 
+    pub fn look_up_pos(&self, pos: codemap::Pos) -> Loc {
+        let loc = self.codemap.look_up_pos(pos);
+        Loc {
+            name: loc.file.name().to_string(),
+            line: loc.position.line,
+            column: loc.position.column,
+        }
+    }
+
     pub fn emit(&mut self, msgs: &[Diagnostic]) {
         self.has_error |= msgs
             .iter()
@@ -77,4 +86,12 @@ fn read_file(path: &Path) -> std::io::Result<String> {
     let mut s = String::new();
     f.read_to_string(&mut s)?;
     Ok(s)
+}
+
+pub struct Loc {
+    pub name: String,
+    // The line number within the file (0-indexed).
+    pub line: usize,
+    /// The column within the line (0-indexed).
+    pub column: usize,
 }

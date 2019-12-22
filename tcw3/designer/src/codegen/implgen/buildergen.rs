@@ -4,8 +4,8 @@ use std::{fmt::Write, iter::repeat};
 
 use super::super::{diag::Diag, sem};
 use super::{
-    analysis, initgen, iterutils::Iterutils, paths, Angle, CommaSeparated, CompBuilderTy, Ctx,
-    FactoryGenParamNameForField, FactorySetterForField, InnerValueField,
+    analysis, initgen, iterutils::Iterutils, paths, Angle, CommaSeparated, CompBuilderTy, CompTy,
+    Ctx, FactoryGenParamNameForField, FactorySetterForField, InnerValueField,
 };
 use crate::metadata;
 
@@ -18,6 +18,7 @@ pub fn gen_builder(
     out: &mut String,
 ) {
     let comp = ctx.cur_comp;
+    let comp_ident = &comp.ident.sym;
 
     // The simple builder API does not have a builder type. Our codegen can't
     // generate it anyway.
@@ -27,7 +28,9 @@ pub fn gen_builder(
 
     let settable_fields = comp.items.iter().filter_map(|item| match item {
         sem::CompItemDef::Field(
-            field @ sem::FieldDef {
+            field
+            @
+            sem::FieldDef {
                 accessors: sem::FieldAccessors { set: Some(_), .. },
                 ..
             },
@@ -54,6 +57,16 @@ pub fn gen_builder(
     let builder_complete_ty_params = non_optional_fields
         .clone()
         .map(|field| field.ty.to_token_stream());
+
+    use super::docgen::{gen_doc_attrs, CodegenInfoDoc, MdCode};
+    writeln!(
+        out,
+        "{}",
+        doc_attr!("The builder type of {} component.", MdCode(comp_ident))
+    )
+    .unwrap();
+    writeln!(out, "{}", doc_attr!("")).unwrap();
+    writeln!(out, "{}", CodegenInfoDoc(None, diag)).unwrap();
 
     writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
@@ -102,6 +115,13 @@ pub fn gen_builder(
         }
     )
     .unwrap();
+
+    writeln!(
+        out,
+        "    {}",
+        doc_attr!("Construct {}.", MdCode(CompBuilderTy(&comp.ident.sym)))
+    )
+    .unwrap();
     writeln!(
         out,
         "    {vis} fn new() -> Self {{",
@@ -141,8 +161,21 @@ pub fn gen_builder(
     )
     .unwrap();
 
+    let gen_setter_doc = |out: &mut String, field: &sem::FieldDef<'_>| {
+        writeln!(
+            out,
+            "    {}",
+            doc_attr!("Set the value of {} property.", MdCode(&field.ident.sym))
+        )
+        .unwrap();
+        writeln!(out, "    {}", doc_attr!("")).unwrap();
+        gen_doc_attrs(&field.doc_attrs, "    ", out);
+    };
+
     for field in optional_fields.clone() {
         // They just assign a new value to `Option<T>`
+        gen_setter_doc(out, field);
+
         writeln!(
             out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> Self {{",
@@ -165,6 +198,8 @@ pub fn gen_builder(
 
     for (i, field) in non_optional_fields.clone().enumerate() {
         // They each change one type parameter of `ComponentBuilder`
+        gen_setter_doc(out, field);
+
         let new_builder_ty = format!(
             "{ty}<{gen}>",
             ty = CompBuilderTy(&comp.ident.sym),
@@ -221,6 +256,14 @@ pub fn gen_builder(
         }
     )
     .unwrap();
+
+    writeln!(
+        out,
+        "    {}",
+        doc_attr!("Construct {}.", MdCode(CompTy(&comp.ident.sym)))
+    )
+    .unwrap();
+
     writeln!(
         out,
         "    {vis} fn build(self) -> {ty} {{",

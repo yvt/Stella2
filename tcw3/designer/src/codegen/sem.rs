@@ -104,9 +104,34 @@ impl fmt::Display for Path {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DocAttr {
+    pub text: String,
+    pub span: Option<codemap::Span>,
+}
+
+impl DocAttr {
+    pub fn from_syn(i: &syn::Attribute, file: &codemap::File) -> Result<Self> {
+        let text = match i.parse_meta()? {
+            syn::Meta::NameValue(syn::MetaNameValue {
+                lit: syn::Lit::Str(text),
+                ..
+            }) => text.value(),
+            _ => {
+                return Err(syn::Error::new_spanned(i, "Invalid doc comment"));
+            }
+        };
+        Ok(Self {
+            text,
+            span: parser::span_to_codemap(i.span(), file),
+        })
+    }
+}
+
 pub struct CompDef<'a> {
     pub flags: CompFlags,
     pub vis: Visibility,
+    pub doc_attrs: Vec<DocAttr>,
     pub path: Path,
     /// The last component of `path`.
     pub ident: Ident,
@@ -150,6 +175,7 @@ impl<'a> CompItemDef<'a> {
 
 pub struct FieldDef<'a> {
     pub vis: Visibility, // FIXME: maybe not needed
+    pub doc_attrs: Vec<DocAttr>,
     pub field_ty: FieldType,
     pub flags: FieldFlags,
     pub ident: Ident,
@@ -247,6 +273,7 @@ pub struct OnDef<'a> {
 
 pub struct EventDef<'a> {
     pub vis: Visibility,
+    pub doc_attrs: Vec<DocAttr>,
     pub ident: Ident,
     pub inputs: Vec<syn::FnArg>,
     pub syn: &'a parser::CompItemEvent,
@@ -370,6 +397,7 @@ impl AnalyzeCtx<'_, '_> {
         let mut this = CompDef {
             flags: CompFlags::empty(),
             vis: Visibility::from_syn(&comp.vis, self.file),
+            doc_attrs: Vec::new(),
             path: Path::from_syn_with_span_of(&comp.path, &comp.orig_path, self.file),
             ident: Ident::from_syn(&comp.path.segments.last().unwrap().ident, self.file),
             items: comp
@@ -430,7 +458,10 @@ impl AnalyzeCtx<'_, '_> {
             } else if attr.path.is_ident("widget") {
                 this.flags |= CompFlags::WIDGET;
             } else if attr.path.is_ident("doc") {
-                // TODO: handle doc comments
+                match DocAttr::from_syn(attr, self.file) {
+                    Ok(da) => this.doc_attrs.push(da),
+                    Err(e) => emit_syn_errors_as_diag(e, self.diag, self.file),
+                }
             } else if attr.path.is_ident("builder") {
                 self.analyze_comp_builder_attr(&mut this, attr.tokens.clone());
             } else {
@@ -734,9 +765,14 @@ impl AnalyzeCtx<'_, '_> {
             }]);
         }
 
+        let mut doc_attrs = Vec::new();
+
         for attr in item.attrs.iter() {
             if attr.path.is_ident("doc") {
-                // TODO: handle doc comments
+                match DocAttr::from_syn(attr, self.file) {
+                    Ok(da) => doc_attrs.push(da),
+                    Err(e) => emit_syn_errors_as_diag(e, self.diag, self.file),
+                }
             } else {
                 self.diag.emit(&[Diagnostic {
                     level: Level::Error,
@@ -756,6 +792,7 @@ impl AnalyzeCtx<'_, '_> {
 
         FieldDef {
             vis: Visibility::from_syn(&item.vis, self.file),
+            doc_attrs,
             field_ty: item.field_ty,
             flags: FieldFlags::empty(),
             ident: Ident::from_syn(&item.ident, self.file),
@@ -791,8 +828,34 @@ impl AnalyzeCtx<'_, '_> {
     }
 
     fn analyze_event<'a>(&mut self, item: &'a parser::CompItemEvent) -> EventDef<'a> {
+        let mut doc_attrs = Vec::new();
+
+        for attr in item.attrs.iter() {
+            if attr.path.is_ident("doc") {
+                match DocAttr::from_syn(attr, self.file) {
+                    Ok(da) => doc_attrs.push(da),
+                    Err(e) => emit_syn_errors_as_diag(e, self.diag, self.file),
+                }
+            } else {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: "Unknown event attribute".to_string(),
+                    code: None,
+                    spans: span_to_codemap(attr.path.span(), self.file)
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
+        }
+
         EventDef {
             vis: Visibility::from_syn(&item.vis, self.file),
+            doc_attrs,
             ident: Ident::from_syn(&item.ident, self.file),
             inputs: item.inputs.iter().cloned().collect(),
             syn: item,
@@ -949,6 +1012,7 @@ impl AnalyzeCtx<'_, '_> {
 
         out_lifted_fields.push(FieldDef {
             vis: Visibility::Inherited,
+            doc_attrs: Vec::new(),
             field_ty: FieldType::Const,
             flags: FieldFlags::empty(),
             ident: Ident {
