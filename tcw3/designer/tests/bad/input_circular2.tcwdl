@@ -1,4 +1,5 @@
 pub comp crate::Comp2 {
+    //~^ ERROR A circular dependency was detected
     const wm: tcw3_pal::Wm { pub set; }
 
     wire wire1: u32 = |wire2| wire2;

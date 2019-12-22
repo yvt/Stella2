@@ -1,1 +1,2 @@
 pub comp super::Foo {}
+//~^ ERROR `super` is not allowed to use

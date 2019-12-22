@@ -1,5 +1,6 @@
 // `A` is defined for multiple times
 use tcw3::{A, B as A};
+//~^ ERROR is imported for multiple times
 
 pub comp crate::Comp1 {
     prop field: A;

@@ -1,9 +1,11 @@
 pub comp crate::Comp1 {
+    const wm: tcw3_pal::Wm { pub set; } = || unreachable!();
     prop field: u32;
 }
 pub comp crate::Comp2 {
-    const comp1: crate::Comp1 = crate::Comp1 {
+    const comp1 = crate::Comp1 {
         // `Comp1::field` is actually `prop`
         const field = || 42;
+        //~^ ERROR Field type mismatch; the field `prop` is of type `const`
     };
 }

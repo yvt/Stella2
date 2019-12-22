@@ -7,4 +7,5 @@ pub comp crate::Comp2 {
 
     // `const1.const2` is not a component
     wire wire1: u32 = |const1.const2.field| field;
+    //~^ ERROR Events do not have a field
 }

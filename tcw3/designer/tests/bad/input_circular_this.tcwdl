@@ -1,4 +1,5 @@
 pub comp crate::Comp2 {
+    //~^ ERROR A circular dependency was detected
     // `this` is available only after all fields are initialized
     wire wire: *const () = |&this| this as *const _ as *const ();
 }

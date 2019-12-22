@@ -3,4 +3,5 @@ pub comp crate::Comp1 {
 
     // `field` has no way to initialize
     prop field: u32 {}
+    //~^ ERROR Must have a default value or a setter because otherwise it's impossible to initialize
 }

@@ -31,3 +31,7 @@ features = ["derive", "full", "parsing", "printing", "visit-mut"]
 version = "1.0.4"
 default-features = false
 features = ["span-locations"]
+
+[dev-dependencies]
+regex = "1"
+lazy_static = "1"

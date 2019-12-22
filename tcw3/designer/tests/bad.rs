@@ -1,3 +1,5 @@
+use regex::Regex;
+
 macro_rules! should_error {
     ($name:ident, $path:literal) => {
         #[test]
@@ -17,7 +19,8 @@ fn run_should_error(source_path: &str) {
         .out_diag_stream(&mut out_diag)
         .crate_name("designer_test")
         .run();
-    eprintln!("{}", std::str::from_utf8(&out_diag).unwrap());
+    let out_diag = std::str::from_utf8(&out_diag).unwrap();
+    eprintln!("{}", out_diag);
     if !out_stream.is_empty() {
         println!("output:");
         println!("```rust");
@@ -25,9 +28,45 @@ fn run_should_error(source_path: &str) {
         println!("```");
     }
     assert!(e.is_err(), "codegen did not fail");
+
+    // Extract error messages
+    lazy_static::lazy_static! {
+        static ref RE: Regex = Regex::new(r#"error: ((?m).+?)\s*--> .*:(\d+):\d+$"#)
+            .unwrap();
+    }
+
+    let errors: Vec<(&str, usize)> = RE
+        .captures_iter(out_diag)
+        .map(|caps| (caps.get(1).unwrap().as_str(), caps[2].parse().unwrap()))
+        .collect();
+
+    // Look for annotations
+    let source = std::fs::read_to_string(source_path).unwrap();
+    let mut has_annotation = false;
+
+    for (line_i, line) in (1..).zip(source.lines()) {
+        let line = line.trim();
+        if line.starts_with("//~^ ERROR") {
+            has_annotation = true;
+
+            let target_line_i = line_i - 1;
+            let needle = &line[11..];
+
+            let found_matching_error = errors
+                .iter()
+                .any(|(msg, line_i)| *line_i == target_line_i && msg.contains(needle));
+
+            if !found_matching_error {
+                panic!("missing: '{}'", needle);
+            }
+        }
+    }
+
+    assert!(has_annotation, "error annotation not found");
 }
 
-should_error!(comp_path_external, "comp_path_external.tcwdl");
+// TODO: `comp_path_external`
+should_error!(comp_path_unknown, "comp_path_unknown.tcwdl");
 should_error!(comp_path_super, "comp_path_super.tcwdl");
 should_error!(const_uninitable, "const_uninitable.tcwdl");
 should_error!(const_watch, "const_watch.tcwdl");

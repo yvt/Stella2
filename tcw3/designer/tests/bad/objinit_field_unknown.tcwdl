@@ -1,7 +1,8 @@
 pub comp crate::Comp1 {}
 pub comp crate::Comp2 {
-    const comp1: crate::Comp1 = crate::Comp1 {
+    const comp1 = crate::Comp1 {
         // `Comp1` does not have `unknown_field`
         prop unknown_field = || 42;
+        //~^ ERROR Component `Comp1` does not have a field named `unknown_field`
     };
 }
