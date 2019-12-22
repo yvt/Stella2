@@ -233,6 +233,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
     writeln!(out, "{}", CodegenInfoDoc(None, diag)).unwrap();
 
     writeln!(out, "struct {} {{", CompSharedTy(comp_ident)).unwrap();
+    writeln!(out, "    #[allow(dead_code)]").unwrap();
     writeln!(
         out,
         "    {field}: {cell}<{ty}>,",
@@ -241,6 +242,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
         ty = CompStateTy(comp_ident)
     )
     .unwrap();
+    writeln!(out, "    #[allow(dead_code)]").unwrap();
     writeln!(
         out,
         "    {field}: {cell}<{ty}>,",
