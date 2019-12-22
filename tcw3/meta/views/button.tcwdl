@@ -4,7 +4,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, p
 #[widget]
 #[builder(simple)]
 pub comp crate::ui::views::Button {
-    const style_manager: &'static Manager { pub set; }
+    const style_manager: &Manager { pub set; }
 
     pub event activated(wm: pal::Wm);
 

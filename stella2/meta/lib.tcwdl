@@ -15,7 +15,7 @@ use crate::{model, stylesheet::elem_id};
 #[widget]
 comp crate::view::MainView {
     const wm: pal::Wm { pub set; }
-    const style_manager: &'static Manager { pub set; }
+    const style_manager: &Manager { pub set; }
 
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
@@ -81,7 +81,7 @@ use crate::view::toolbar::ToolbarView;
 #[widget]
 pub(crate) comp ToolbarView {
     const wm: pal::Wm { pub set; }
-    const style_manager: &'static Manager { pub set; }
+    const style_manager: &Manager { pub set; }
 
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
@@ -162,7 +162,7 @@ use crate::view::PlaceholderView;
 #[widget]
 pub(crate) comp PlaceholderView {
     const wm: pal::Wm { pub set; }
-    const style_manager: &'static Manager { pub set; }
+    const style_manager: &Manager { pub set; }
     pub prop text: String;
 
     pub const view = HView {

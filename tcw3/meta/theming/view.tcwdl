@@ -7,7 +7,7 @@ use crate::{
 #[widget]
 #[builder(simple)]
 pub comp crate::ui::theming::StyledBox {
-    const style_manager: &'static Manager { pub set; }
+    const style_manager: &Manager { pub set; }
     const view_flags: ViewFlags { pub set; }
 
     prop class_set: ClassSet { pub set; pub get; } = || unreachable!();
