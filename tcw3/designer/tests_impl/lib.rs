@@ -9,5 +9,6 @@ mod commit {
 }
 
 mod field {
+    mod lifetime_elision;
     mod prop;
 }

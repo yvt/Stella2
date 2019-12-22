@@ -1,0 +1,29 @@
+use std::cell::RefCell;
+use tcw3::pal;
+
+comp crate::field::lifetime_elision::Comp {
+    // `&'static str`
+    const field1a: &str { get; set; }
+
+    // `&'static str`
+    const field1b: &'_ str { get; set; }
+
+    // `for <'a> fn(&'a str) -> &'a str`
+    const field2a: fn(&str) -> &str { get; set; }
+
+    // unchanged
+    const field2b: for <'a> fn(&'a str) -> &'a str { get; set; }
+
+    // `&'static dyn Fn(&str) -> &str`
+    // (compiler further expands it to `&'static dyn for<'a> Fn(&'a str) -> &'a str`)
+    const field3a: &dyn Fn(&str) -> &str { get; set; }
+
+    // `&'static dyn for<'a> Fn(&'a str) -> &'a str`
+    const field3b: &dyn for<'a> Fn(&'a str) -> &'a str { get; set; }
+
+    // `&'static dyn for<'a> std::cmp::PartialEq<&'a u32>`
+    const field4a: &dyn for<'a> std::cmp::PartialEq<&'a u32> { get; set; }
+
+    // `&'static dyn std::cmp::PartialEq<&'static u32>`
+    const field4b: &dyn std::cmp::PartialEq<&u32> { get; set; }
+}

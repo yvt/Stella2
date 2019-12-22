@@ -1,6 +1,6 @@
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
 use quote::ToTokens;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 use syn::{
     parse::{Parse, ParseStream, Result},
     spanned::Spanned,
@@ -687,7 +687,7 @@ impl AnalyzeCtx<'_, '_> {
             }]);
         }
 
-        let ty = if let Some(ty) = item.ty.clone() {
+        let ty = if let Some(mut ty) = item.ty.clone() {
             if let Some(parser::DynExpr::ObjInit(_)) = item.dyn_expr {
                 // Because we can't check if the type is compatible with
                 // the object literal in a reliable way.
@@ -706,6 +706,16 @@ impl AnalyzeCtx<'_, '_> {
                         .collect(),
                 }]);
             }
+
+            // `'static` lifetime elision
+            syn::visit_mut::visit_type_mut(
+                &mut InferStaticLifetime {
+                    bound: HashMap::new(),
+                    file: self.file,
+                    diag: self.diag,
+                },
+                &mut ty,
+            );
 
             Some(ty)
         } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
@@ -1058,5 +1068,84 @@ impl AnalyzeCtx<'_, '_> {
         let ret = self.next_input_index;
         self.next_input_index += 1;
         ret
+    }
+}
+
+/// Implements `syn::visit_mut::VisitMut` to deduce all unspecified lifetimes
+/// in a `Type` as `'static`. Ignores lifetime positions which are automatically
+/// quantified by the compiler (e.g., everything inside `fn`). Elided lifetime
+/// parameters (e.g., `std::cell::Ref<T>`; unidiomatic in Rust 2018) are left
+/// untouched because we have no access to the type information.
+pub struct InferStaticLifetime<'a, 'b> {
+    bound: HashMap<syn::Ident, usize>,
+    file: &'a codemap::File,
+    diag: &'a mut Diag<'b>,
+}
+
+impl syn::visit_mut::VisitMut for InferStaticLifetime<'_, '_> {
+    fn visit_lifetime_mut(&mut self, i: &mut syn::Lifetime) {
+        if i.ident == "_" {
+            *i = syn::Lifetime::new("'static", proc_macro2::Span::call_site());
+        } else if i.ident != "static" {
+            // Is the variable bound?
+            if self.bound.get(&i.ident).cloned().unwrap_or(0) > 0 {
+                return;
+            }
+
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!("Undefined lifetime variable `{}`", i.to_token_stream()),
+                code: None,
+                spans: span_to_codemap(i.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+    }
+
+    fn visit_type_reference_mut(&mut self, i: &mut syn::TypeReference) {
+        syn::visit_mut::visit_type_reference_mut(self, i);
+
+        if i.lifetime.is_none() {
+            i.lifetime = Some(syn::Lifetime::new(
+                "'static",
+                proc_macro2::Span::call_site(),
+            ));
+        }
+    }
+
+    fn visit_type_bare_fn_mut(&mut self, _: &mut syn::TypeBareFn) {
+        // Stop recursion; the Rust compiler automatically adds `for <'a>`
+        // for `fn(&T) -> &S`
+    }
+
+    fn visit_parenthesized_generic_arguments_mut(
+        &mut self,
+        _: &mut syn::ParenthesizedGenericArguments,
+    ) {
+        // Stop recursion; the Rust compiler automatically adds `for <'a>`
+        // for `FnMut(&T) -> &S`
+    }
+
+    fn visit_trait_bound_mut(&mut self, tb: &mut syn::TraitBound) {
+        if let Some(lifetimes) = &tb.lifetimes {
+            for lifetime_def in lifetimes.lifetimes.iter() {
+                *self
+                    .bound
+                    .entry(lifetime_def.lifetime.ident.clone())
+                    .or_default() += 1;
+            }
+            self.visit_path_mut(&mut tb.path);
+            for lifetime_def in lifetimes.lifetimes.iter() {
+                *self.bound.get_mut(&lifetime_def.lifetime.ident).unwrap() -= 1;
+            }
+        } else {
+            syn::visit_mut::visit_trait_bound_mut(self, tb);
+        }
     }
 }

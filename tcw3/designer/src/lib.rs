@@ -253,6 +253,29 @@
 //!    generating the code generation for the simple builder API,
 //!    **`#[prototype_only]` must also be specified**.
 //!
+//! ## Lifetime Elision
+//!
+//! Fields have implicit `'static` lifetimes like constant and static
+//! declarations in Rust.
+//!
+//! ```text
+//! // prop1: &'static str
+//! prop prop1: &str;
+//! ```
+//!
+//! Due to the code generator's lack of access to Rust's type system, it can't
+//! deduce lifetimes for implicit lifetime parameters (this is unidiomatic in
+//! Rust 2018). They will cause a compilation error when the generated code is
+//! compiled.
+//!
+//! ```text
+//! // ok: std::borrow::Cow<'static, str>
+//! prop ok: std::borrow::Cow<'_, str>;
+//!
+//! // bad: Designer doesn't report any errors, but this will not compile
+//! prop bad: std::borrow::Cow<str>;
+//! ```
+//!
 //! ## Doc comments
 //!
 //! Components, fields, and events can have doc comments. They work in the
