@@ -253,6 +253,19 @@
 //!    generating the code generation for the simple builder API,
 //!    **`#[prototype_only]` must also be specified**.
 //!
+//! ## Doc comments
+//!
+//! Components, fields, and events can have doc comments. They work in the
+//! same way as in Rust.
+//!
+//! ```text
+//! /** `MyComponent`'s description */
+//! comp MyComponent {
+//!     /// `prop1`'s description
+//!     prop prop1: u32 = || 42;
+//! }
+//! ```
+//!
 //! ## Limiations
 //!
 //! - The code generator does not have access to Rust's full type system.
