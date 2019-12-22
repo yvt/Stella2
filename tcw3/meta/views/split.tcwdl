@@ -38,6 +38,5 @@ pub comp crate::ui::views::Split {
     /// resizes the panels.
     ///
     /// The function is called when the user starts a mouse drag gesture.
-    prop on_drag: impl Fn(Wm) -> Box<dyn SplitDragListener> + 'static { pub set; }
-        = || unreachable!();
+    prop on_drag: impl Fn(Wm) -> Box<dyn SplitDragListener> { pub set; } = || unreachable!();
 }
