@@ -229,7 +229,7 @@ fn analyze_dep(
         x
     } else {
         // If none was found, find cycles and report them as an error.
-        let sccs = strongly_connected_components(&node_i_list, node_depends_on);
+        let mut sccs = strongly_connected_components(&node_i_list, node_depends_on);
 
         diag.emit(&[Diagnostic {
             level: Level::Error,
@@ -251,9 +251,11 @@ fn analyze_dep(
                 .collect(),
         }]);
 
-        let num_cycles = sccs.iter().filter(|scc| scc.len() > 1).count();
+        sccs.retain(|scc| scc.len() > 1);
 
-        for (i, scc) in sccs.iter().filter(|scc| scc.len() > 1).enumerate() {
+        let num_cycles = sccs.len();
+
+        for (i, scc) in sccs.iter().enumerate() {
             let codemap_spans: Vec<_> = scc
                 .iter()
                 .rev()
@@ -286,11 +288,7 @@ fn analyze_dep(
             }]);
         }
 
-        let involves_this = sccs
-            .iter()
-            .filter(|scc| scc.len() > 1 && scc.contains(&0))
-            .nth(0)
-            .is_some();
+        let involves_this = sccs.iter().any(|scc| scc.contains(&0));
 
         if involves_this {
             diag.emit(&[Diagnostic {
@@ -299,6 +297,45 @@ fn analyze_dep(
                 code: None,
                 spans: vec![],
             }]);
+        }
+
+        // Report nodes directly dependent on themselves. Such nodes can't be
+        // found by SCC analysis.
+        let mut nodes_in_nontrivial_scc = vec![false; nodes.len()];
+        sccs.iter()
+            .flatten()
+            .for_each(|&node_i| nodes_in_nontrivial_scc[node_i] = true);
+
+        for (node_i, _) in nodes_in_nontrivial_scc
+            .iter()
+            .enumerate()
+            .filter(|&(_, in_nontrivial_scc)| !in_nontrivial_scc)
+        {
+            let self_dep = node_depends_on(&node_i).any(|i| i == node_i);
+            if self_dep {
+                let ident = match &nodes[node_i] {
+                    DepNode::Field { item_i } => {
+                        let field = comp.items[*item_i].field().unwrap();
+                        &field.ident
+                    }
+                    DepNode::ObjInitField { .. } | DepNode::This => unreachable!(),
+                };
+
+                diag.emit(&[Diagnostic {
+                    level: Level::Note,
+                    message: format!("Field `{}` depends on itself", ident.sym),
+                    code: None,
+                    spans: ident
+                        .span
+                        .map(|span| SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        })
+                        .into_iter()
+                        .collect(),
+                }]);
+            }
         }
 
         return Err(EmittedError);
