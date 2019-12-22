@@ -1678,6 +1678,11 @@ fn gen_obj_init(
 pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut String) {
     let comp_ident = &ctx.cur_comp.ident.sym;
 
+    if dep_analysis.cdf2triggerset.is_empty() {
+        // The component has no dirty flags
+        return;
+    }
+
     let arg_this = "this";
     let arg_flags = "flags";
     let cdf_ty = dep_analysis.cdf_ty;
