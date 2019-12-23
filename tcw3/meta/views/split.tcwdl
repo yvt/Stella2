@@ -14,8 +14,8 @@ pub comp crate::ui::views::Split {
     /// changed. It must be one of Some(0), Some(1), and None.
     const fix: Option<usize> { pub set; }
 
-    const view: HView { pub get borrow; } = || unreachable!();
-    const style_elem: HElem { pub get clone; } = || unreachable!();
+    const view: HView { pub get borrow; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
 
     /// Sets or retrieves a raw (unclipped) value representing the split position.
     ///
@@ -27,16 +27,14 @@ pub comp crate::ui::views::Split {
     /// The returned value is raw and unclipped, meaning it does not take the
     /// size contraints of the panels into consideration. Also, it does not
     /// change when the overall size is changed.
-    prop value: f32 { pub set; pub get clone; }
-        = || unreachable!();
+    prop value: f32 { pub set; pub get clone; } = unreachable!();
 
     /// Set the views placed in the panels.
-    prop subviews: [HView; 2] { pub set; }
-        = || unreachable!();
+    prop subviews: [HView; 2] { pub set; } = unreachable!();
 
     /// Set the factory function for gesture event handlers used when the user
     /// resizes the panels.
     ///
     /// The function is called when the user starts a mouse drag gesture.
-    prop on_drag: impl Fn(Wm) -> Box<dyn SplitDragListener> { pub set; } = || unreachable!();
+    prop on_drag: impl Fn(Wm) -> Box<dyn SplitDragListener> { pub set; } = unreachable!();
 }

@@ -509,27 +509,53 @@ pub enum DynExpr {
 
 impl Parse for DynExpr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let la = input.lookahead1();
+        if input.peek(Ident) || input.peek(Token![crate]) {
+            // Recognize obj-init only at the top-level for now
+            let is_obj_init = if let Ok(m) = input.fork().parse::<syn::Macro>() {
+                m.path.segments.len() > 1 && m.path.segments.last().unwrap().ident == "new"
+            } else {
+                false
+            };
 
-        if la.peek(Token![|]) {
-            Ok(DynExpr::Func(input.parse()?))
-        } else if la.peek(Ident) || la.peek(Token![crate]) {
-            Ok(DynExpr::ObjInit(input.parse()?))
+            if is_obj_init {
+                Ok(DynExpr::ObjInit(input.parse()?))
+            } else {
+                Ok(DynExpr::Func(input.parse()?))
+            }
         } else {
-            Err(la.error())
+            Ok(DynExpr::Func(input.parse()?))
         }
     }
 }
 
-/// |&this, this.prop|
+/// `42`, `|&this| 42`
 pub struct Func {
-    pub or1_token: Token![|],
-    pub inputs: Vec<FuncInput>,
-    pub or2_token: Token![|],
+    pub inputs: Option<FuncInputs>,
     pub body: Expr,
 }
 
 impl Parse for Func {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let inputs = if input.peek(Token![|]) {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
+        let body = input.parse()?;
+
+        Ok(Self { inputs, body })
+    }
+}
+
+/// `|&this, this.prop|`
+pub struct FuncInputs {
+    pub or1_token: Token![|],
+    pub inputs: Vec<FuncInput>,
+    pub or2_token: Token![|],
+}
+
+impl Parse for FuncInputs {
     fn parse(input: ParseStream) -> Result<Self> {
         let or1_token = input.parse()?;
         let mut first = true;
@@ -551,13 +577,11 @@ impl Parse for Func {
         })
         .collect::<Result<_>>()?;
         let or2_token = input.parse()?;
-        let body = input.parse()?;
 
         Ok(Self {
             or1_token,
             inputs,
             or2_token,
-            body,
         })
     }
 }
@@ -677,33 +701,59 @@ impl ToTokens for InputSelector {
     }
 }
 
-/// `FillLayout { ... }`
+/// `FillLayout::new! { ... }`
 pub struct ObjInit {
+    /// Includes `::new`
     pub path: Path,
     /// `path` before being resolved by `resolve_paths`
     pub orig_path: Path,
+    pub bang_token: Token![!],
     pub brace_token: token::Brace,
     pub fields: Vec<ObjInitField>,
 }
 
 impl Parse for ObjInit {
     fn parse(input: ParseStream) -> Result<Self> {
-        let path = input.call(Path::parse_mod_style)?;
-        let content;
-        let brace_token = syn::braced!(content in input);
-
-        let fields = std::iter::from_fn(|| {
-            if content.is_empty() {
-                None
-            } else {
-                Some(content.parse())
+        let mac: syn::Macro = input.parse()?;
+        let brace_token = match mac.delimiter {
+            syn::MacroDelimiter::Brace(brace) => brace,
+            _ => {
+                return Err(Error::new_spanned(
+                    mac,
+                    "Invalid delimiter for object initialization literal",
+                ))
             }
-        })
-        .collect::<Result<_>>()?;
+        };
+
+        if mac.path.segments.last().unwrap().ident != "new" {
+            return Err(Error::new_spanned(
+                &mac.path.segments.last().unwrap().ident,
+                "Expected `new`",
+            ));
+        }
+
+        if mac.path.segments.len() <= 1 {
+            return Err(Error::new_spanned(
+                &mac.path,
+                "Expected a component path followed by `::new`",
+            ));
+        }
+
+        let fields = mac.parse_body_with(|content: ParseStream| {
+            std::iter::from_fn(|| {
+                if content.is_empty() {
+                    None
+                } else {
+                    Some(content.parse())
+                }
+            })
+            .collect::<Result<_>>()
+        })?;
 
         Ok(Self {
-            orig_path: path.clone(),
-            path,
+            orig_path: mac.path.clone(),
+            path: mac.path,
+            bang_token: mac.bang_token,
             brace_token,
             fields,
         })

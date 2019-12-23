@@ -736,10 +736,10 @@ impl AnalyzeCtx<'_, '_> {
                 }]);
             }
 
-            Some(syn::Type::Path(syn::TypePath {
-                qself: None,
-                path: init.path.clone(),
-            }))
+            let mut path = init.path.clone();
+            path_remove_trailing_new(&mut path);
+
+            Some(syn::Type::Path(syn::TypePath { qself: None, path }))
         } else {
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
@@ -889,11 +889,15 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_func(&mut self, func: &parser::Func) -> Func {
         // TODO: Check `FuncInput::rename` collision
         Func {
-            inputs: func
-                .inputs
-                .iter()
-                .map(|i| self.analyze_func_input(i))
-                .collect(),
+            inputs: if let Some(inputs) = &func.inputs {
+                inputs
+                    .inputs
+                    .iter()
+                    .map(|i| self.analyze_func_input(i))
+                    .collect()
+            } else {
+                vec![]
+            },
             body: func.body.clone(),
         }
     }
@@ -988,8 +992,12 @@ impl AnalyzeCtx<'_, '_> {
         init: &parser::ObjInit,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> ObjInit {
+        let mut path = Path::from_syn_with_span_of(&init.path, &init.orig_path, self.file);
+
+        path_remove_trailing_new(&mut path.syn_path);
+
         ObjInit {
-            path: Path::from_syn_with_span_of(&init.path, &init.orig_path, self.file),
+            path,
             fields: init
                 .fields
                 .iter()
@@ -1020,6 +1028,9 @@ impl AnalyzeCtx<'_, '_> {
         //
         let lifted_field_name = format!("__lifted_{}", out_lifted_fields.len());
 
+        let mut ty_path = init.path.clone();
+        path_remove_trailing_new(&mut ty_path);
+
         out_lifted_fields.push(FieldDef {
             vis: Visibility::Inherited,
             doc_attrs: Vec::new(),
@@ -1031,7 +1042,7 @@ impl AnalyzeCtx<'_, '_> {
             },
             ty: Some(syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: init.path.clone(),
+                path: ty_path,
             })),
             accessors: FieldAccessors::default_none(),
             value: Some(DynExpr::ObjInit(obj_init)),
@@ -1148,4 +1159,14 @@ impl syn::visit_mut::VisitMut for InferStaticLifetime<'_, '_> {
             syn::visit_mut::visit_trait_bound_mut(self, tb);
         }
     }
+}
+
+/// Remove the trailing `::new` from a given path.
+fn path_remove_trailing_new(path: &mut syn::Path) {
+    // Remove the trailing `new`
+    assert_eq!(path.segments.pop().unwrap().value().ident, "new");
+
+    // Remove the trailing `::`
+    let last = path.segments.pop().unwrap().into_value();
+    path.segments.push_value(last);
 }

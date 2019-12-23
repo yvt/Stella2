@@ -9,8 +9,8 @@ pub comp crate::ui::views::Label {
     // The initializers specified here are not actually used because
     // this component has `#[prototype_only]`. Without initializers, the consts
     // are considered non-initializable and the component inconstructible
-    prop text: String { pub set; } = || unreachable!();
+    prop text: String { pub set; } = unreachable!();
 
-    const view: HView { pub get; } = || unreachable!();
-    const style_elem: HElem { pub get clone; } = || unreachable!();
+    const view: HView { pub get; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
 }

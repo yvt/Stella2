@@ -20,10 +20,10 @@ comp crate::view::MainView {
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
 
-    pub const view = HView {
-        const flags = || Default::default();
+    pub const view = HView::new! {
+        const flags = Default::default();
 
-        prop layout = TableLayout {
+        prop layout = TableLayout::new! {
             const cells = |toolbar.view as v1, split_side.view as v2|
                 vec![
                     (v1, [0, 0], AlignFlags::JUSTIFY),
@@ -32,7 +32,7 @@ comp crate::view::MainView {
         };
     };
 
-    const toolbar = crate::view::toolbar::ToolbarView {
+    const toolbar = crate::view::toolbar::ToolbarView::new! {
         const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
         prop wnd_state = |wnd_state as x| x;
@@ -40,38 +40,38 @@ comp crate::view::MainView {
 
     on (toolbar.dispatch) |&this, event.action| this.raise_dispatch(action);
 
-    const split_side = Split {
+    const split_side = Split::new! {
         const style_manager = |style_manager as x| x;
-        const vertical = || false;
-        const fix = || Some(0); // Fix the sidebar
+        const vertical = false;
+        const fix = Some(0); // Fix the sidebar
         prop subviews = |sidebar_view.view as v1, split_editor.view as v2| [v1, v2];
         prop value = |&wnd_state| wnd_state.sidebar_width;
     };
 
-    const sidebar_view = PlaceholderView {
+    const sidebar_view = PlaceholderView::new! {
         const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
-        prop text = || "sidebar: todo!".to_string();
+        prop text = "sidebar: todo!".to_string();
     };
 
-    const split_editor = Split {
+    const split_editor = Split::new! {
         const style_manager = |style_manager as x| x;
-        const vertical = || true;
-        const fix = || Some(1); // Fix the editor
+        const vertical = true;
+        const fix = Some(1); // Fix the editor
         prop subviews = |log_view.view as v1, editor_view.view as v2| [v1, v2];
         prop value = |&wnd_state| wnd_state.editor_height;
     };
 
-    const log_view = PlaceholderView {
+    const log_view = PlaceholderView::new! {
         const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
-        prop text = || "log: todo!".to_string();
+        prop text = "log: todo!".to_string();
     };
 
-    const editor_view = PlaceholderView {
+    const editor_view = PlaceholderView::new! {
         const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
-        prop text = || "editor: todo!".to_string();
+        prop text = "editor: todo!".to_string();
     };
 
     on (init) |&this| this.init();
@@ -88,14 +88,14 @@ pub(crate) comp ToolbarView {
 
     on (init) |&this| this.init();
 
-    pub const wrapper = StyledBox {
+    pub const wrapper = StyledBox::new! {
         const style_manager = |style_manager as x| x;
-        const view_flags = || Default::default();
-        prop class_set = || elem_id::TOOLBAR;
-        prop subview_generic = HView {
-            const flags = || Default::default();
+        const view_flags = Default::default();
+        prop class_set = elem_id::TOOLBAR;
+        prop subview_generic = HView::new! {
+            const flags = Default::default();
 
-            prop layout = TableLayout {
+            prop layout = TableLayout::new! {
                 const cells =
                     |toggle_sidebar_button.view as v1,
                         go_back_button.view as v2,
@@ -119,11 +119,11 @@ pub(crate) comp ToolbarView {
 
     pub const view: HView = |wrapper.view| view;
 
-    const spacer1 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
-    const spacer2 = FixedSpacer { const wm = |wm| wm; prop size = || [5.0, 0.0].into(); };
-    const spacer3 = FixedSpacer { const wm = |wm| wm; };
+    const spacer1 = FixedSpacer::new! { const wm = |wm| wm; prop size = [5.0, 0.0].into(); };
+    const spacer2 = FixedSpacer::new! { const wm = |wm| wm; prop size = [5.0, 0.0].into(); };
+    const spacer3 = FixedSpacer::new! { const wm = |wm| wm; };
 
-    const toggle_sidebar_button = Button {
+    const toggle_sidebar_button = Button::new! {
         const style_manager = |style_manager as x| x;
 
         prop class_set = |&wnd_state| {
@@ -137,24 +137,24 @@ pub(crate) comp ToolbarView {
 
     on (toggle_sidebar_button.activated) |&this| this.toggle_sidebar();
 
-    const go_back_button = Button {
+    const go_back_button = Button::new! {
         const style_manager = |style_manager as x| x;
-        prop class_set = || theming::ClassSet::BUTTON | elem_id::GO_BACK;
+        prop class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK;
     };
 
-    const go_forward_button = Button {
+    const go_forward_button = Button::new! {
         const style_manager = |style_manager as x| x;
-        prop class_set = || theming::ClassSet::BUTTON | elem_id::GO_FORWARD;
+        prop class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD;
     };
 
-    on (go_back_button.activated) || dbg!();
-    on (go_forward_button.activated) || dbg!();
+    on (go_back_button.activated) dbg!();
+    on (go_forward_button.activated) dbg!();
 
     // TODO
-    const search_bar = PlaceholderView {
+    const search_bar = PlaceholderView::new! {
         const wm = |wm| wm;
         const style_manager = |style_manager as x| x;
-        prop text = || "search: todo!".to_string();
+        prop text = "search: todo!".to_string();
     };
 }
 
@@ -165,15 +165,15 @@ pub(crate) comp PlaceholderView {
     const style_manager: &Manager { pub set; }
     pub prop text: String;
 
-    pub const view = HView {
-        const flags = || Default::default();
-        prop layout = TableLayout {
+    pub const view = HView::new! {
+        const flags = Default::default();
+        prop layout = TableLayout::new! {
             const cells = |label.view as v|
                 vec![(v, [0, 0],  AlignFlags::TOP | AlignFlags::LEFT)];
         };
     };
 
-    const label = Label {
+    const label = Label::new! {
         const style_manager = |style_manager as x| x;
         prop text = |text as x| x;
     };

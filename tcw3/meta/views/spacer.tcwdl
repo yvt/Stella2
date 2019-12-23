@@ -7,19 +7,19 @@ pub comp crate::ui::views::SpacerWidget {
     pub const wm: pal::Wm { pub set; }
 
     /// Sets `SizeTraits::min`.
-    pub prop min: Vector2<f32> = || [0.0; 2].into();
+    pub prop min: Vector2<f32> = [0.0; 2].into();
 
     /// Sets `SizeTraits::max`.
-    pub prop max: Vector2<f32> = || [std::f32::INFINITY; 2].into();
+    pub prop max: Vector2<f32> = [std::f32::INFINITY; 2].into();
 
     /// Sets `SizeTraits::preferred`.
-    pub prop preferred: Vector2<f32> = || [0.0; 2].into();
+    pub prop preferred: Vector2<f32> = [0.0; 2].into();
 
     /// Retrieves `HView` representing the widget.
-    pub const view = HView {
-        const flags = || Default::default();
+    pub const view = HView::new! {
+        const flags = Default::default();
 
-        prop layout = EmptyLayout {
+        prop layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
             const size_traits = |min, max, preferred|
                 crate::uicore::SizeTraits { min, max, preferred };
@@ -34,13 +34,13 @@ pub comp crate::ui::views::FixedSpacer {
     pub const wm: pal::Wm { pub set; }
 
     /// Sets the widget size
-    pub prop size: Vector2<f32> = || [0.0; 2].into();
+    pub prop size: Vector2<f32> = [0.0; 2].into();
 
     /// Retrieves `HView` representing the widget.
-    pub const view = HView {
-        const flags = || Default::default();
+    pub const view = HView::new! {
+        const flags = Default::default();
 
-        prop layout = EmptyLayout {
+        prop layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
             const size_traits = |size|
                 crate::uicore::SizeTraits { min: size, max: size, preferred: size };
