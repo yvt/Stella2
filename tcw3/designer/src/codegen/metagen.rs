@@ -1,5 +1,7 @@
 //! Metadata generation
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use log::debug;
+use quote::ToTokens;
 use std::collections::HashMap;
 
 use super::{diag::Diag, sem};
@@ -294,16 +296,33 @@ fn gen_field(
         flags |= metadata::FieldFlags::OPTIONAL;
     }
 
+    debug!("Analyzing the field `{}`", field.ident.sym);
+
     // See if `field.ty` refers to a known component.
     let comp_ty = match field.ty.as_ref().unwrap() {
         syn::Type::Path(syn::TypePath { qself: None, path }) => {
             if let Some((crate_i, comp_i)) = ctx.resolver.find_comp_by_path(path) {
+                debug!(
+                    "`{}` refers to a component {:?}",
+                    path.to_token_stream(),
+                    (crate_i, comp_i)
+                );
                 Some(metadata::CompRef { crate_i, comp_i })
             } else {
+                debug!(
+                    "`{}` does not refer to any known component",
+                    path.to_token_stream()
+                );
                 None
             }
         }
-        _ => None,
+        ty => {
+            debug!(
+                "`{}` is not a `TypePath`, thus does not refer to any known component",
+                ty.to_token_stream()
+            );
+            None
+        }
     };
 
     // `builder(simple)` puts some restriction.
