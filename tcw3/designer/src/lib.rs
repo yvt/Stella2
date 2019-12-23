@@ -207,7 +207,7 @@
 //! positives/negatives may occur inside a macro invocation because Designer
 //! doesn't know how the macro is going to be processed.
 //!
-//! **Object initialization literal: `ComponentName::new! { prop foo = ...; ... }`**
+//! **Object initialization literal: `ComponentName::new! { foo = ..., ... }`**
 //! Instantiates the component named `ComponentName` *exactly once* when the
 //! current component is created. The component's fields are initialized with
 //! specified dynamic expressions and kept up-to-date by re-evaluating the
@@ -215,9 +215,8 @@
 //!
 //! ```tcwdl,no_compile
 //! const button = Button::new! {
-//!     const style_manager = |style_manager| style_manager;
-//!     prop caption = |this.count|
-//!         format!("You pressed this button for {} time(s)!", count);
+//!     style_manager = |style_manager| style_manager,
+//!     caption = format!("You pressed this button for {} time(s)!", get!(count)),
 //! };
 //! ```
 //!

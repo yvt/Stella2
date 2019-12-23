@@ -257,19 +257,7 @@ fn analyze_obj_init(
             });
 
             if let Some(item_i) = item_i {
-                if let Some(field) = target_comp.items[item_i].field() {
-                    if init_field.field_ty != field.field_ty {
-                        diag.emit(&[Diagnostic {
-                            level: Level::Error,
-                            message: format!(
-                                "Field type mismatch; the field `{}` is of type `{}`",
-                                field.field_ty, init_field.field_ty
-                            ),
-                            code: None,
-                            spans: init_field_span.into_iter().collect(),
-                        }]);
-                    }
-
+                if target_comp.items[item_i].field().is_some() {
                     Some(item_i)
                 } else {
                     diag.emit(&[Diagnostic {

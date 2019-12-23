@@ -17,13 +17,13 @@ pub comp crate::ui::views::SpacerWidget {
 
     /// Retrieves `HView` representing the widget.
     pub const view = HView::new! {
-        const flags = Default::default();
+        flags = Default::default(),
 
-        prop layout = EmptyLayout::new! {
+        layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
-            const size_traits = |min, max, preferred|
-                crate::uicore::SizeTraits { min, max, preferred };
-        };
+            size_traits = |min, max, preferred|
+                crate::uicore::SizeTraits { min, max, preferred },
+        },
     };
 }
 
@@ -38,12 +38,12 @@ pub comp crate::ui::views::FixedSpacer {
 
     /// Retrieves `HView` representing the widget.
     pub const view = HView::new! {
-        const flags = Default::default();
+        flags = Default::default(),
 
-        prop layout = EmptyLayout::new! {
+        layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
-            const size_traits = |size|
-                crate::uicore::SizeTraits { min: size, max: size, preferred: size };
-        };
+            size_traits = |size|
+                crate::uicore::SizeTraits { min: size, max: size, preferred: size },
+        },
     };
 }

@@ -85,10 +85,6 @@ should_error!(objinit_settable, "objinit_settable.tcwdl");
 should_error!(objinit_subexpr, "objinit_subexpr.tcwdl");
 should_error!(objinit_field_dupe, "objinit_field_dupe.tcwdl");
 should_error!(objinit_field_unknown, "objinit_field_unknown.tcwdl");
-should_error!(
-    objinit_field_wrong_field_ty,
-    "objinit_field_wrong_field_ty.tcwdl"
-);
 should_error!(objinit_field_wrong_ty, "objinit_field_wrong_ty.tcwdl");
 should_error!(prop_uninitable, "prop_uninitable.tcwdl");
 should_error!(use_dupe, "use_dupe.tcwdl");

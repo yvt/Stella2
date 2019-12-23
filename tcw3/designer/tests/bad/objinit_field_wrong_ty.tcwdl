@@ -1,11 +1,10 @@
 pub comp crate::Comp1 {
-    const wm: tcw3_pal::Wm { pub set; } = || unreachable!();
-    prop field: u32;
+    pub event evt();
 }
 pub comp crate::Comp2 {
     const comp1 = crate::Comp1::new! {
-        // `Comp1::field` is actually `prop`
-        const field = 42;
-        //~^ ERROR Field type mismatch; the field `prop` is of type `const`
+        // `Comp1::evt` is actually `event`
+        evt = 42,
+        //~^ ERROR Component `Comp1` does not have a field named `evt`
     };
 }

@@ -21,56 +21,56 @@ comp crate::view::MainView {
     pub event dispatch(action: model::WndAction);
 
     pub const view = HView::new! {
-        const flags = Default::default();
+        flags = Default::default(),
 
-        prop layout = TableLayout::new! {
-            const cells = vec![
+        layout = TableLayout::new! {
+            cells = vec![
                 (get!(toolbar.view), [0, 0], AlignFlags::JUSTIFY),
                 (get!(split_side.view), [0, 1], AlignFlags::JUSTIFY),
-            ];
-        };
+            ],
+        },
     };
 
     const toolbar = crate::view::toolbar::ToolbarView::new! {
-        const wm = get!(wm);
-        const style_manager = get!(style_manager);
-        prop wnd_state = get!(wnd_state);
+        wm = get!(wm),
+        style_manager = get!(style_manager),
+        wnd_state = get!(wnd_state),
     };
 
     on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
 
     const split_side = Split::new! {
-        const style_manager = get!(style_manager);
-        const vertical = false;
-        const fix = Some(0); // Fix the sidebar
-        prop subviews = [get!(sidebar_view.view), get!(split_editor.view)];
-        prop value = get!(&wnd_state).sidebar_width;
+        style_manager = get!(style_manager),
+        vertical = false,
+        fix = Some(0), // Fix the sidebar
+        subviews = [get!(sidebar_view.view), get!(split_editor.view)],
+        value = get!(&wnd_state).sidebar_width,
     };
 
     const sidebar_view = PlaceholderView::new! {
-        const wm = get!(wm);
-        const style_manager = get!(style_manager);
-        prop text = "sidebar: todo!".to_string();
+        wm = get!(wm),
+        style_manager = get!(style_manager),
+        text = "sidebar: todo!".to_string(),
     };
 
     const split_editor = Split::new! {
-        const style_manager = get!(style_manager);
-        const vertical = true;
-        const fix = Some(1); // Fix the editor
-        prop subviews = [get!(log_view.view), get!(editor_view.view)];
-        prop value = get!(&wnd_state).editor_height;
+        style_manager = get!(style_manager),
+        vertical = true,
+        fix = Some(1), // Fix the editor
+        subviews = [get!(log_view.view), get!(editor_view.view)],
+        value = get!(&wnd_state).editor_height,
     };
 
     const log_view = PlaceholderView::new! {
-        const wm = get!(wm);
-        const style_manager = get!(style_manager);
-        prop text = "log: todo!".to_string();
+        wm = get!(wm),
+        style_manager = get!(style_manager),
+        text = "log: todo!".to_string(),
     };
 
     const editor_view = PlaceholderView::new! {
-        const wm = get!(wm);
-        const style_manager = get!(style_manager);
-        prop text = "editor: todo!".to_string();
+        wm = get!(wm),
+        style_manager = get!(style_manager),
+        text = "editor: todo!".to_string(),
     };
 
     on (init) get!(&this).init();
@@ -88,14 +88,14 @@ pub(crate) comp ToolbarView {
     on (init) get!(&this).init();
 
     pub const wrapper = StyledBox::new! {
-        const style_manager = get!(style_manager);
-        const view_flags = Default::default();
-        prop class_set = elem_id::TOOLBAR;
-        prop subview_generic = HView::new! {
-            const flags = Default::default();
+        style_manager = get!(style_manager),
+        view_flags = Default::default(),
+        class_set = elem_id::TOOLBAR,
+        subview_generic = HView::new! {
+            flags = Default::default(),
 
-            prop layout = TableLayout::new! {
-                const cells = vec![
+            layout = TableLayout::new! {
+                cells = vec![
                     (get!(toggle_sidebar_button.view), [0, 0], AlignFlags::JUSTIFY),
                     (get!(spacer1.view), [1, 0], AlignFlags::HORZ_JUSTIFY),
                     (get!(go_back_button.view), [2, 0], AlignFlags::JUSTIFY),
@@ -103,23 +103,23 @@ pub(crate) comp ToolbarView {
                     (get!(go_forward_button.view), [4, 0], AlignFlags::JUSTIFY),
                     (get!(spacer3.view), [5, 0], AlignFlags::CENTER),
                     (get!(search_bar.view), [6, 0], AlignFlags::RIGHT),
-                ];
-            };
-        };
+                ],
+            },
+        },
     };
 
     pub const view: HView = get!(wrapper.view);
 
-    const spacer1 = FixedSpacer::new! { const wm = get!(wm); prop size = [5.0, 0.0].into(); };
-    const spacer2 = FixedSpacer::new! { const wm = get!(wm); prop size = [5.0, 0.0].into(); };
-    const spacer3 = FixedSpacer::new! { const wm = get!(wm); };
+    const spacer1 = FixedSpacer::new! { wm = get!(wm), size = [5.0, 0.0].into() };
+    const spacer2 = FixedSpacer::new! { wm = get!(wm), size = [5.0, 0.0].into() };
+    const spacer3 = FixedSpacer::new! { wm = get!(wm) };
 
     const toggle_sidebar_button = Button::new! {
-        const style_manager = get!(style_manager);
+        style_manager = get!(style_manager),
 
-        prop class_set = theming::ClassSet::BUTTON
+        class_set = theming::ClassSet::BUTTON
             | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
-                [get!(&wnd_state).sidebar_visible as usize];
+                [get!(&wnd_state).sidebar_visible as usize],
 
         // TODO: `on_activate` is set by `init` for now
     };
@@ -127,13 +127,13 @@ pub(crate) comp ToolbarView {
     on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
 
     const go_back_button = Button::new! {
-        const style_manager = get!(style_manager);
-        prop class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK;
+        style_manager = get!(style_manager),
+        class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK,
     };
 
     const go_forward_button = Button::new! {
-        const style_manager = get!(style_manager);
-        prop class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD;
+        style_manager = get!(style_manager),
+        class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD,
     };
 
     on (go_back_button.activated) dbg!();
@@ -141,9 +141,9 @@ pub(crate) comp ToolbarView {
 
     // TODO
     const search_bar = PlaceholderView::new! {
-        const wm = get!(wm);
-        const style_manager = get!(style_manager);
-        prop text = "search: todo!".to_string();
+        wm = get!(wm),
+        style_manager = get!(style_manager),
+        text = "search: todo!".to_string(),
     };
 }
 
@@ -155,15 +155,14 @@ pub(crate) comp PlaceholderView {
     pub prop text: String;
 
     pub const view = HView::new! {
-        const flags = Default::default();
-        prop layout = TableLayout::new! {
-            const cells =
-                vec![(get!(label.view), [0, 0],  AlignFlags::TOP | AlignFlags::LEFT)];
-        };
+        flags = Default::default(),
+        layout = TableLayout::new! {
+            cells = vec![(get!(label.view), [0, 0],  AlignFlags::TOP | AlignFlags::LEFT)],
+        },
     };
 
     const label = Label::new! {
-        const style_manager = get!(style_manager);
-        prop text = get!(text);
+        style_manager = get!(style_manager),
+        text = get!(text),
     };
 }

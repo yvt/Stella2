@@ -6,7 +6,7 @@ comp Comp {
     const wm: pal::Wm { set; }
     const state: std::cell::Cell<u32> = std::cell::Cell::new(0);
 
-    const other = CompOther::new! { const wm = |wm| wm; };
+    const other = CompOther::new! { wm = |wm| wm };
 
     on (other.prop1) |&state| state.set(state.get() + 1);
     on (other.event1) |&state| state.set(state.get() + 4);

@@ -349,7 +349,6 @@ pub struct ObjInit {
 
 pub struct ObjInitField {
     /// `prop` or `const`. `wire` is not valid here
-    pub field_ty: FieldType,
     pub ident: Ident,
     pub value: Func,
 }
@@ -1158,7 +1157,6 @@ impl AnalyzeCtx<'_, '_> {
                 .fields
                 .iter()
                 .map(|field| ObjInitField {
-                    field_ty: field.field_ty,
                     ident: Ident::from_syn(&field.ident, self.file),
                     value: self.analyze_dyn_expr_as_func(&field.dyn_expr, out_lifted_fields),
                 })

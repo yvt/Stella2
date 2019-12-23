@@ -723,7 +723,7 @@ pub struct ObjInit {
     pub orig_path: Path,
     pub bang_token: Token![!],
     pub brace_token: token::Brace,
-    pub fields: Vec<ObjInitField>,
+    pub fields: Punctuated<ObjInitField, Token![,]>,
 }
 
 impl Parse for ObjInit {
@@ -753,16 +753,7 @@ impl Parse for ObjInit {
             ));
         }
 
-        let fields = mac.parse_body_with(|content: ParseStream| {
-            std::iter::from_fn(|| {
-                if content.is_empty() {
-                    None
-                } else {
-                    Some(content.parse())
-                }
-            })
-            .collect::<Result<_>>()
-        })?;
+        let fields = mac.parse_body_with(Punctuated::parse_terminated)?;
 
         Ok(Self {
             orig_path: mac.path.clone(),
@@ -776,22 +767,17 @@ impl Parse for ObjInit {
 
 /// `prop x = value;`
 pub struct ObjInitField {
-    /// `prop` or `const`. `wire` is not valid here
-    pub field_ty: FieldType,
     pub ident: Ident,
     pub eq_token: Token![=],
     pub dyn_expr: DynExpr,
-    pub semi_token: Token![;],
 }
 
 impl Parse for ObjInitField {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
-            field_ty: input.parse()?,
             ident: input.parse()?,
             eq_token: input.parse()?,
             dyn_expr: input.parse()?,
-            semi_token: input.parse()?,
         })
     }
 }
