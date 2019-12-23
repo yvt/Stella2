@@ -1,7 +1,7 @@
 designer_impl! { crate::field::lifetime_elision::Comp }
 
 #[test]
-fn prop_init_default() {
+fn have_correct_types() {
     let comp = CompBuilder::new()
         .with_field1a("hello")
         .with_field1b("hello")
