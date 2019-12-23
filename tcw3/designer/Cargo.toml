@@ -8,6 +8,7 @@ edition = "2018"
 crate-type = ["dylib"]
 
 [dependencies]
+arrayvec = "0.5"
 bincode = "1.2.0"
 bitflags = "1.1.0"
 codemap = "0.1.0"

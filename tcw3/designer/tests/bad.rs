@@ -78,9 +78,11 @@ should_error!(input_field_not_comp, "input_field_not_comp.tcwdl");
 should_error!(input_field_not_comp2, "input_field_not_comp2.tcwdl");
 should_error!(input_field_not_comp3, "input_field_not_comp3.tcwdl");
 should_error!(input_field_unknown, "input_field_unknown.tcwdl");
+should_error!(input_inline_unsyntactic, "input_inline_unsyntactic.tcwdl");
 should_error!(objinit_comp_unknown, "objinit_comp_unknown.tcwdl");
 should_error!(objinit_explicit_type, "objinit_explicit_type.tcwdl");
 should_error!(objinit_settable, "objinit_settable.tcwdl");
+should_error!(objinit_subexpr, "objinit_subexpr.tcwdl");
 should_error!(objinit_field_dupe, "objinit_field_dupe.tcwdl");
 should_error!(objinit_field_unknown, "objinit_field_unknown.tcwdl");
 should_error!(

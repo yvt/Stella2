@@ -629,6 +629,20 @@ impl Parse for FuncInput {
     }
 }
 
+impl FuncInput {
+    /// Parse `FuncInput` for inline inputs (`get!(...)`).
+    pub fn parse_inline(input: ParseStream) -> Result<Self> {
+        let by_ref = input.parse().ok();
+        let input_parsed = input.parse()?;
+
+        Ok(Self {
+            by_ref,
+            input: input_parsed,
+            rename: None,
+        })
+    }
+}
+
 /// `this.prop`
 pub struct Input {
     pub selectors: Vec<InputSelector>,

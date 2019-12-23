@@ -1,3 +1,4 @@
 import!("commit/remotetrigger.tcwdl");
 import!("field/lifetime_elision.tcwdl");
 import!("field/prop.tcwdl");
+import!("func/inline.tcwdl");

@@ -12,3 +12,7 @@ mod field {
     mod lifetime_elision;
     mod prop;
 }
+
+mod func {
+    mod inline;
+}

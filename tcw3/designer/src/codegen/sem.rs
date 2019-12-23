@@ -1,4 +1,6 @@
+use arrayvec::ArrayVec;
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use proc_macro2::{TokenStream, TokenTree};
 use quote::ToTokens;
 use std::{collections::HashMap, fmt};
 use syn::{
@@ -888,7 +890,7 @@ impl AnalyzeCtx<'_, '_> {
 
     fn analyze_func(&mut self, func: &parser::Func) -> Func {
         // TODO: Check `FuncInput::rename` collision
-        Func {
+        let mut this = Func {
             inputs: if let Some(inputs) = &func.inputs {
                 inputs
                     .inputs
@@ -899,7 +901,149 @@ impl AnalyzeCtx<'_, '_> {
                 vec![]
             },
             body: func.body.clone(),
+        };
+
+        // Create `FuncInput` from occurrences of `get!`
+        struct ReplaceInlineInput<'a, 'b> {
+            inputs: &'a mut Vec<parser::FuncInput>,
+            file: &'a codemap::File,
+            diag: &'a mut Diag<'b>,
         }
+
+        fn inline_input_name(i: usize) -> String {
+            format!("_input_{}", i)
+        }
+
+        impl ReplaceInlineInput<'_, '_> {
+            fn replace_get(&mut self, input: TokenStream) -> syn::Ident {
+                let name = inline_input_name(self.inputs.len());
+                let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
+
+                struct InlineFuncInput(parser::FuncInput);
+
+                impl Parse for InlineFuncInput {
+                    fn parse(input: ParseStream) -> Result<Self> {
+                        input.call(parser::FuncInput::parse_inline).map(Self)
+                    }
+                }
+
+                let mut input = match syn::parse2::<InlineFuncInput>(input) {
+                    Ok(parsed) => parsed.0,
+                    Err(e) => {
+                        emit_syn_errors_as_diag(e, self.diag, self.file);
+                        return ident;
+                    }
+                };
+
+                // Give an explicit name for the input
+                input.rename = Some((
+                    syn::Token![as](proc_macro2::Span::call_site()),
+                    ident.clone(),
+                ));
+
+                // TODO: Disallow referencing an event by an inline input
+
+                self.inputs.push(input);
+
+                ident
+            }
+
+            fn visit_token_stream(&mut self, i: &mut TokenStream) {
+                let tokens = std::mem::replace(i, TokenStream::new());
+                let mut new_tokens = TokenStream::new();
+
+                // The state machine to detect `get` `!` `(...)`
+                let mut pending = ArrayVec::<[TokenTree; 2]>::new();
+
+                for tree in tokens {
+                    match tree {
+                        TokenTree::Ident(ref idt) if *idt == "get" => {
+                            new_tokens.extend(pending.drain(..));
+                            pending.push(tree);
+                        }
+                        TokenTree::Punct(ref pun) if pun.as_char() == '!' && pending.len() == 1 => {
+                            pending.push(tree);
+                        }
+                        TokenTree::Group(ref g)
+                            if g.delimiter() == proc_macro2::Delimiter::Parenthesis
+                                && pending.len() == 2 =>
+                        {
+                            // Found `get!(...)`
+                            let ident = self.replace_get(g.stream());
+                            new_tokens.extend(Some(TokenTree::Ident(ident)));
+                            pending.clear();
+                        }
+                        _ => {
+                            new_tokens.extend(pending.drain(..));
+                        }
+                    }
+                }
+
+                new_tokens.extend(pending.drain(..));
+
+                *i = new_tokens;
+            }
+        }
+
+        impl syn::visit_mut::VisitMut for ReplaceInlineInput<'_, '_> {
+            fn visit_expr_mut(&mut self, i: &mut syn::Expr) {
+                if let syn::Expr::Macro(m) = i {
+                    let m = &mut m.mac;
+                    if m.path.is_ident("get")
+                        && try_match!(syn::MacroDelimiter::Paren(_) = &m.delimiter).is_ok()
+                    {
+                        // Replace this `get!(...)`
+                        let ident = self.replace_get(std::mem::take(&mut m.tokens));
+
+                        *i = syn::Expr::Path(syn::ExprPath {
+                            attrs: vec![],
+                            qself: None,
+                            path: ident.into(),
+                        });
+                    } else if m.path.segments.len() > 1
+                        && m.path.segments.last().unwrap().ident == "new"
+                    {
+                        // obj-init literal is not allowed to appear as an
+                        // arbitrary subexpression (for now)
+                        self.diag.emit(&[Diagnostic {
+                            level: Level::Error,
+                            message: "`Component::new!` is unsupported in this position"
+                                .to_string(),
+                            code: None,
+                            spans: span_to_codemap(m.path.span(), self.file)
+                                .map(|span| SpanLabel {
+                                    span,
+                                    label: None,
+                                    style: SpanStyle::Primary,
+                                })
+                                .into_iter()
+                                .collect(),
+                        }]);
+                    } else {
+                        // `get!` may be used inside this macro invocation.
+                        self.visit_token_stream(&mut m.tokens);
+                    }
+                } else {
+                    syn::visit_mut::visit_expr_mut(self, i);
+                }
+            }
+        }
+
+        let mut inline_inputs: Vec<parser::FuncInput> = Vec::new();
+
+        syn::visit_mut::VisitMut::visit_expr_mut(
+            &mut ReplaceInlineInput {
+                inputs: &mut inline_inputs,
+                file: self.file,
+                diag: self.diag,
+            },
+            &mut this.body,
+        );
+
+        this.inputs
+            .extend(inline_inputs.iter().map(|i| self.analyze_func_input(i)));
+
+        this
     }
 
     fn analyze_func_input(&mut self, func: &parser::FuncInput) -> FuncInput {
