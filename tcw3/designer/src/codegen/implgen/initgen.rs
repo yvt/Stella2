@@ -1491,14 +1491,23 @@ fn gen_obj_init(
         .comp_by_ref(obj_init_info.comp_ref.as_ref().unwrap());
     let initer_map = &obj_init_info.initers;
 
-    let inited_fields = obj_init_info
-        .item_i_list
-        .iter()
-        .map(|e| e.map(|item_i| comp.items[item_i].field().unwrap()));
-
     if comp.flags.contains(metadata::CompFlags::SIMPLE_BUILDER) {
-        // Simple builder API
+        // The component is constructed using a simple builder API.
+
+        // `[(metadata::FieldDef, Vec<usize>)]` where the field is settable
+        // and the field is set by `obj_init`
+        let inited_field_and_initers = |field_ty| {
+            (comp.items.iter())
+                .zip(initer_map.iter())
+                .filter_map(|(item, initers)| Some((item.field()?, initers)))
+                .filter(move |(field, initers)| {
+                    field.field_ty == field_ty && field.accessors.set.is_some() && initers.len() > 0
+                })
+        };
+
         let tmp_var = TempVar("built_component");
+
+        // Construct the target component by calling its `new` method
         writeln!(out, "{{").unwrap();
         writeln!(
             out,
@@ -1507,49 +1516,27 @@ fn gen_obj_init(
             CompTy(&obj_init.path)
         )
         .unwrap();
-        for (item, initers) in comp.items.iter().zip(initer_map.iter()) {
-            let field = if let Some(x) = item.field() {
-                x
-            } else {
-                continue;
-            };
-
+        for (_, initers) in inited_field_and_initers(metadata::FieldType::Const) {
             // `const` is passed to `new`
-            if field.field_ty == metadata::FieldType::Const
-                && field.accessors.set.is_some()
-                && initers.len() > 0
-            {
-                let obj_field = &obj_init.fields[initers[0]];
-                evalgen::gen_func_eval(
-                    &obj_field.value,
-                    analysis,
-                    ctx,
-                    item_meta2sem_map,
-                    input_gen,
-                    out,
-                );
-                writeln!(out, "    ,").unwrap();
-            }
+            let obj_init_field = &obj_init.fields[initers[0]];
+            evalgen::gen_func_eval(
+                &obj_init_field.value,
+                analysis,
+                ctx,
+                item_meta2sem_map,
+                input_gen,
+                out,
+            );
+            writeln!(out, "    ,").unwrap();
         }
         writeln!(out, "    );").unwrap();
 
-        for (obj_field, _) in obj_init
-            .fields
-            .iter()
-            .zip(inited_fields)
-            .filter_map(|(obj_field, inited_field)| Some((obj_field, inited_field?)))
-            .filter(|(_, inited_field)| inited_field.field_ty == metadata::FieldType::Prop)
-        {
+        for (field, initers) in inited_field_and_initers(metadata::FieldType::Prop) {
             // `prop` is set through a setter method
-            write!(
-                out,
-                "    {}.{}(",
-                tmp_var,
-                SetterMethod(&obj_field.ident.sym)
-            )
-            .unwrap();
+            write!(out, "    {}.{}(", tmp_var, SetterMethod(&field.ident)).unwrap();
+            let obj_init_field = &obj_init.fields[initers[0]];
             evalgen::gen_func_eval(
-                &obj_field.value,
+                &obj_init_field.value,
                 analysis,
                 ctx,
                 item_meta2sem_map,
