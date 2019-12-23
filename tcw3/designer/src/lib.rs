@@ -40,7 +40,7 @@
 //! prop prop2: u32 { set; pub get; } // Read/write prop, but the setter is private
 //! const const1: u32 { pub set; } // Initialized through the builder type, but
 //!                                // can never be read
-//! const const2: u32 {} = || 42; // Initialized as a fixed value 42. Cannot be
+//! const const2: u32 {} = 42; // Initialized as a fixed value 42. Cannot be
 //!                               // overridden through the builder type. And
 //!                               // can never be read.
 //! const const3: u32 { pub set; pub get clone; }
@@ -101,9 +101,9 @@
 //! *a default value* (`const`, `prop`) or *a reactive value* (`wire`).
 //!
 //! ```text
-//! prop prop1: u32 = || 42; // Defaults to 42 but can be changed later or
+//! prop prop1: u32 = 42; // Defaults to 42 but can be changed later or
 //!                       // when constructing the component
-//! const const1: u32 = || 42; // 42 all the time
+//! const const1: u32 = 42; // 42 all the time
 //!
 //! // RHS of `wire` is a reactive value
 //! wire wire1: u32 = |prop1| prop1 + 1; // Automatically updated based on the
@@ -115,7 +115,7 @@
 //! either, the field will be impossible to initialize, which is illegal:
 //!
 //! ```text,should_error
-//! const const1: u32 = || 42;            // ok: initialized to 42
+//! const const1: u32 = 42;               // ok: initialized to 42
 //! const const2: u32 { pub(crate) set; } // ok: the builder provides a value
 //! const const3: u32;                    // ERROR
 //!
@@ -140,6 +140,8 @@
 //!  - **`&input`** — Takes a reference to the value. This is preferred to the
 //!    default (by-value) mode because it avoids potentially expensive cloning.
 //!  - **`input as altname`** — Reads the input under a different name.
+//!
+//! `||` (zero inputs) can be elided.
 //!
 //! Here are some examples (assuming `ComponentName` is the enclosing component):
 //!
@@ -183,14 +185,14 @@
 //! The expression being inserted verbatim means it can access items defined in
 //! the same scope where `designer_impl!` is used.
 //!
-//! **Object initialization literal: `ComponentName { prop foo = ...; ... }`**
+//! **Object initialization literal: `ComponentName::new! { prop foo = ...; ... }`**
 //! Instantiates the component named `ComponentName` *exactly once* when the
 //! current component is created. The component's fields are initialized with
 //! specified dynamic expressions and kept up-to-date by re-evaluating the
 //! expressions as needed in a way similar to `const` and `wire`.
 //!
 //! ```tcwdl,no_compile
-//! const button = Button {
+//! const button = Button::new! {
 //!     const style_manager = |style_manager| style_manager;
 //!     prop caption = |this.count|
 //!         format!("You pressed this button for {} time(s)!", count);
