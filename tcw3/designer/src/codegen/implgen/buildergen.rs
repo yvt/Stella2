@@ -269,7 +269,7 @@ pub fn gen_builder(
         ty = comp.ident.sym
     )
     .unwrap();
-    initgen::gen_construct(analysis, dep_analysis, ctx, item_meta2sem_map, diag, out);
+    initgen::gen_construct(analysis, dep_analysis, ctx, item_meta2sem_map, out);
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}").unwrap();
 }

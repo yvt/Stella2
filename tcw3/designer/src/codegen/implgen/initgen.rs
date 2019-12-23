@@ -473,8 +473,14 @@ fn analyze_dep(
             sem::CompItemDef::Field(item) => match item.field_ty {
                 sem::FieldType::Const => {
                     if let Some(sem::DynExpr::ObjInit(init)) = &item.value {
+                        let init_info = analysis.obj_inits[item_i].as_ref().unwrap();
+
                         for (field_i, field) in init.fields.iter().enumerate() {
-                            if field.field_ty == sem::FieldType::Prop {
+                            let field_ty = init_info
+                                .inited_field(ctx.repo, field_i)
+                                .map(|field| field.field_ty);
+
+                            if field_ty == Some(metadata::FieldType::Prop) {
                                 let node_i = commit_nodes.len();
                                 trigger_emitted.set(false);
                                 define_func_trigger(&mut trigger_info, diag, &field.value, node_i);
@@ -874,7 +880,6 @@ pub fn gen_construct(
     dep_analysis: &DepAnalysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
-    diag: &mut Diag,
     out: &mut String,
 ) {
     let comp = ctx.cur_comp;
@@ -1079,44 +1084,19 @@ pub fn gen_construct(
                         );
                     }
                     sem::DynExpr::ObjInit(init) => {
-                        // Find the component we are constructing. The field's
-                        // type is guaranteed to match the component's type
-                        // because we do not allow explicitly specifying the type
-                        // when `ObjInit` is in use.
-                        let meta_item_i =
-                            item_meta2sem_map.iter().position(|i| i == item_i).unwrap();
-                        let meta_field = ctx.cur_meta_comp().items[meta_item_i].field().unwrap();
+                        let obj_init_info = analysis.obj_inits[*item_i].as_ref().unwrap();
 
-                        if let Some(ty) = &meta_field.ty {
-                            let initer_map = check_obj_init(ctx.repo.comp_by_ref(ty), init, diag);
-
+                        if obj_init_info.comp_ref.is_some() {
                             gen_obj_init(
-                                ctx.repo.comp_by_ref(ty),
                                 init,
+                                obj_init_info,
                                 analysis,
                                 ctx,
                                 item_meta2sem_map,
                                 &mut func_input_gen,
-                                &initer_map,
                                 out,
                             );
                         } else {
-                            diag.emit(&[Diagnostic {
-                                level: Level::Error,
-                                message: format!("`{}` does not refer to a component", init.path),
-                                code: None,
-                                spans: init
-                                    .path
-                                    .span
-                                    .map(|span| SpanLabel {
-                                        span,
-                                        label: None,
-                                        style: SpanStyle::Primary,
-                                    })
-                                    .into_iter()
-                                    .collect(),
-                            }]);
-
                             write!(out, "panic!(\"codegen failed\")").unwrap();
                         }
                     }
@@ -1495,135 +1475,27 @@ fn gen_subscribe_event(
     writeln!(out, ");").unwrap();
 }
 
-/// Analyze `ObjInit` and report errors if any.
-///
-/// Returns a multi-map from indices into `comp.item` to indices into
-/// `obj_init.fields`.
-fn check_obj_init(
-    comp: &metadata::CompDef,
-    obj_init: &sem::ObjInit,
-    diag: &mut Diag,
-) -> Vec<Vec<usize>> {
-    let mut initers = vec![Vec::new(); comp.items.len()];
-
-    for (init_field_i, init_field) in obj_init.fields.iter().enumerate() {
-        let item_i = comp.items.iter().position(|item| {
-            item.field()
-                .filter(|f| f.ident == init_field.ident.sym)
-                .is_some()
-        });
-
-        let init_field_span = init_field.ident.span.map(|span| SpanLabel {
-            span,
-            label: None,
-            style: SpanStyle::Primary,
-        });
-
-        if let Some(item_i) = item_i {
-            if let Some(field) = comp.items[item_i].field() {
-                if init_field.field_ty != field.field_ty {
-                    diag.emit(&[Diagnostic {
-                        level: Level::Error,
-                        message: format!(
-                            "Field type mismatch; the field `{}` is of type `{}`",
-                            field.field_ty, init_field.field_ty
-                        ),
-                        code: None,
-                        spans: init_field_span.into_iter().collect(),
-                    }]);
-                }
-
-                initers[item_i].push(init_field_i);
-            } else {
-                diag.emit(&[Diagnostic {
-                    level: Level::Error,
-                    message: format!("`{}::{}` is not a field", comp.name(), init_field.ident.sym),
-                    code: None,
-                    spans: init_field_span.into_iter().collect(),
-                }]);
-            }
-        } else {
-            diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: format!(
-                    "Component `{}` does not have a field named `{}`",
-                    comp.name(),
-                    init_field.ident.sym
-                ),
-                code: None,
-                spans: init_field_span.into_iter().collect(),
-            }]);
-        }
-    }
-
-    // Report excessive or lack of initialization
-    for (item, initers) in comp.items.iter().zip(initers.iter()) {
-        let field = if let Some(x) = item.field() {
-            x
-        } else {
-            continue;
-        };
-
-        if initers.len() > 1 {
-            let codemap_spans: Vec<_> = initers
-                .iter()
-                .filter_map(|&i| obj_init.fields[i].ident.span)
-                .map(|span| SpanLabel {
-                    span,
-                    label: None,
-                    style: SpanStyle::Primary,
-                })
-                .collect();
-
-            diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: format!("Too many initializers for the field `{}`", item.ident()),
-                code: None,
-                spans: codemap_spans,
-            }]);
-        }
-
-        if !field.flags.contains(metadata::FieldFlags::OPTIONAL)
-            && initers.is_empty()
-            && field.field_ty != metadata::FieldType::Wire
-        {
-            diag.emit(&[Diagnostic {
-                level: Level::Error,
-                message: format!("Non-optional field `{}` is not initialized", field.ident),
-                code: None,
-                spans: obj_init
-                    .path
-                    .span
-                    .map(|span| SpanLabel {
-                        span,
-                        label: None,
-                        style: SpanStyle::Primary,
-                    })
-                    .into_iter()
-                    .collect(),
-            }]);
-        }
-    }
-
-    initers
-}
-
 /// Generate an expression that instantiates a componen and evaluates to the
 /// component's type.
-///
-/// `initer_map` is a multi-map from indices into `comp.item` to indices into
-/// `obj_init.fields`, returned by `check_obj_init`, and may include errors
-/// reported by `check_obj_init`.
 fn gen_obj_init(
-    comp: &metadata::CompDef,
     obj_init: &sem::ObjInit,
+    obj_init_info: &analysis::ObjInitInfo,
     analysis: &analysis::Analysis,
     ctx: &Ctx,
     item_meta2sem_map: &[usize],
     input_gen: &mut impl evalgen::FuncInputGen,
-    initer_map: &[Vec<usize>],
     out: &mut String,
 ) {
+    let comp = ctx
+        .repo
+        .comp_by_ref(obj_init_info.comp_ref.as_ref().unwrap());
+    let initer_map = &obj_init_info.initers;
+
+    let inited_fields = obj_init_info
+        .item_i_list
+        .iter()
+        .map(|e| e.map(|item_i| comp.items[item_i].field().unwrap()));
+
     if comp.flags.contains(metadata::CompFlags::SIMPLE_BUILDER) {
         // Simple builder API
         let tmp_var = TempVar("built_component");
@@ -1661,10 +1533,12 @@ fn gen_obj_init(
         }
         writeln!(out, "    );").unwrap();
 
-        for obj_field in obj_init
+        for (obj_field, _) in obj_init
             .fields
             .iter()
-            .filter(|f| f.field_ty == metadata::FieldType::Prop)
+            .zip(inited_fields)
+            .filter_map(|(obj_field, inited_field)| Some((obj_field, inited_field?)))
+            .filter(|(_, inited_field)| inited_field.field_ty == metadata::FieldType::Prop)
         {
             // `prop` is set through a setter method
             write!(

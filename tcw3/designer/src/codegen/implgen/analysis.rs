@@ -1,5 +1,6 @@
 //! Resolves what `Input` points to and provides the analysis result.
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use try_match::try_match;
 
 use super::super::{diag::Diag, sem};
 use super::Ctx;
@@ -18,6 +19,9 @@ pub struct Analysis {
     //              event.event1_foo as param, // used only with `event1`
     //              event.event2_bar as param, // used only with `event2`
     //          | { body }
+    /// Analysis for `ObjInit` of each field in `sem::CompDef::items`. `None`
+    /// for fields that do not have `ObjInit`.
+    pub obj_inits: Vec<Option<ObjInitInfo>>,
 }
 
 impl Analysis {
@@ -104,6 +108,36 @@ impl ItemIndirection {
     }
 }
 
+pub struct ObjInitInfo {
+    /// The component the obj-init literal refers to. `None` if the analysis
+    /// fails.
+    pub comp_ref: Option<metadata::CompRef>,
+
+    /// Indexed by indices into `sem::ObjInit::fields`. Each element refers to
+    /// a field in `metadata::CompDef::items` of the component referred by
+    /// `comp_ref`.
+    pub item_i_list: Vec<Option<usize>>,
+
+    /// A multi-map from indices into `comp.item` to indices into
+    /// `obj_init.fields`. Invalid if `comp_ref` is `None`.
+    pub initers: Vec<Vec<usize>>,
+}
+
+impl ObjInitInfo {
+    /// Find the `FieldDef` initialized by `obj_init.fields[i]`.
+    pub fn inited_field<'a>(
+        &self,
+        repo: &'a metadata::Repo,
+        i: usize,
+    ) -> Option<&'a metadata::FieldDef> {
+        Some(
+            repo.comp_by_ref(&self.comp_ref?).items[self.item_i_list[i]?]
+                .field()
+                .unwrap(),
+        )
+    }
+}
+
 struct AnalysisCtx<'a, 'b> {
     ctx: &'a Ctx<'a>,
     diag: &'a mut Diag<'b>,
@@ -111,14 +145,21 @@ struct AnalysisCtx<'a, 'b> {
 }
 
 impl Analysis {
-    pub fn new(ctx: &Ctx, diag: &mut Diag<'_>) -> Self {
-        let mut this = Self { inputs: Vec::new() };
+    pub fn new(ctx: &Ctx<'_>, item_meta2sem_map: &[usize], diag: &mut Diag<'_>) -> Self {
+        let mut this = Self {
+            inputs: Vec::new(),
+            obj_inits: (0..ctx.cur_comp.items.len()).map(|_| None).collect(),
+        };
 
         let mut actx = AnalysisCtx {
             ctx,
             diag,
             analysis: &mut this,
         };
+
+        for i in 0..ctx.cur_comp.items.len() {
+            analyze_obj_init(&mut actx, item_meta2sem_map, i);
+        }
 
         for item in ctx.cur_comp.items.iter() {
             match item {
@@ -132,11 +173,11 @@ impl Analysis {
                         );
                     }
                     Some(sem::DynExpr::ObjInit(init)) => {
-                        analyze_obj_init(&mut actx, init);
+                        analyze_inputs_obj_init(&mut actx, init);
                     }
                 },
                 sem::CompItemDef::On(item) => {
-                    analyze_on(&mut actx, item);
+                    analyze_inputs_on(&mut actx, item);
                 }
                 sem::CompItemDef::Event(_) => {}
             }
@@ -146,7 +187,186 @@ impl Analysis {
     }
 }
 
-fn analyze_on(actx: &mut AnalysisCtx<'_, '_>, item: &sem::OnDef) {
+/// Analyze an `ObjInit` in the current component and store the result in
+/// `Analysis::obj_inits`. Do nothing if `cur_comp.items[item_i]` does
+/// not contain an `ObjInit`.
+///
+/// The caller should ignore the return value. It's only used for early return
+/// by the `?` operator.
+fn analyze_obj_init(
+    actx: &mut AnalysisCtx<'_, '_>,
+    item_meta2sem_map: &[usize],
+    item_i: usize,
+) -> Option<()> {
+    let comp = actx.ctx.cur_comp;
+    let diag = &mut *actx.diag;
+
+    let field = comp.items[item_i].field()?;
+    let init = try_match!(Some(sem::DynExpr::ObjInit(init)) = &field.value).ok()?;
+
+    // Find the component we are constructing. The field's type is guaranteed to
+    // match the component's type because we do not allow explicitly specifying
+    // the type when `ObjInit` is in use.
+    let meta_item_i = item_meta2sem_map.iter().position(|&i| i == item_i).unwrap();
+    let meta_field = actx.ctx.cur_meta_comp().items[meta_item_i].field().unwrap();
+
+    let target_comp_ref = if let Some(target_comp_ref) = meta_field.ty {
+        target_comp_ref
+    } else {
+        diag.emit(&[Diagnostic {
+            level: Level::Error,
+            message: format!("`{}` does not refer to a component", init.path),
+            code: None,
+            spans: init
+                .path
+                .span
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .into_iter()
+                .collect(),
+        }]);
+
+        actx.analysis.obj_inits[item_i] = Some(ObjInitInfo {
+            comp_ref: None,
+            item_i_list: vec![None; init.fields.len()],
+            initers: vec![],
+        });
+        return None;
+    };
+
+    let target_comp = actx.ctx.repo.comp_by_ref(&target_comp_ref);
+
+    // A map from `ObjInitField`s to `CompItemDef`s
+    let item_i_list: Vec<Option<usize>> = init
+        .fields
+        .iter()
+        .map(|init_field| {
+            let item_i = target_comp.items.iter().position(|item| {
+                item.field()
+                    .filter(|f| f.ident == init_field.ident.sym)
+                    .is_some()
+            });
+
+            let init_field_span = init_field.ident.span.map(|span| SpanLabel {
+                span,
+                label: None,
+                style: SpanStyle::Primary,
+            });
+
+            if let Some(item_i) = item_i {
+                if let Some(field) = target_comp.items[item_i].field() {
+                    if init_field.field_ty != field.field_ty {
+                        diag.emit(&[Diagnostic {
+                            level: Level::Error,
+                            message: format!(
+                                "Field type mismatch; the field `{}` is of type `{}`",
+                                field.field_ty, init_field.field_ty
+                            ),
+                            code: None,
+                            spans: init_field_span.into_iter().collect(),
+                        }]);
+                    }
+
+                    Some(item_i)
+                } else {
+                    diag.emit(&[Diagnostic {
+                        level: Level::Error,
+                        message: format!(
+                            "`{}::{}` is not a field",
+                            target_comp.name(),
+                            init_field.ident.sym
+                        ),
+                        code: None,
+                        spans: init_field_span.into_iter().collect(),
+                    }]);
+                    None
+                }
+            } else {
+                diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: format!(
+                        "Component `{}` does not have a field named `{}`",
+                        target_comp.name(),
+                        init_field.ident.sym
+                    ),
+                    code: None,
+                    spans: init_field_span.into_iter().collect(),
+                }]);
+                None
+            }
+        })
+        .collect();
+
+    let mut initers = vec![Vec::new(); target_comp.items.len()];
+
+    for (init_field_i, &item_i) in item_i_list.iter().enumerate() {
+        if let Some(item_i) = item_i {
+            initers[item_i].push(init_field_i);
+        }
+    }
+
+    // Report excessive or lack of initialization
+    for (item, initers) in target_comp.items.iter().zip(initers.iter()) {
+        let field = if let Some(x) = item.field() {
+            x
+        } else {
+            continue;
+        };
+
+        if initers.len() > 1 {
+            let codemap_spans: Vec<_> = initers
+                .iter()
+                .filter_map(|&i| init.fields[i].ident.span)
+                .map(|span| SpanLabel {
+                    span,
+                    label: None,
+                    style: SpanStyle::Primary,
+                })
+                .collect();
+
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!("Too many initializers for the field `{}`", item.ident()),
+                code: None,
+                spans: codemap_spans,
+            }]);
+        }
+
+        if !field.flags.contains(metadata::FieldFlags::OPTIONAL)
+            && initers.is_empty()
+            && field.field_ty != metadata::FieldType::Wire
+        {
+            diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: format!("Non-optional field `{}` is not initialized", field.ident),
+                code: None,
+                spans: init
+                    .path
+                    .span
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        }
+    }
+
+    actx.analysis.obj_inits[item_i] = Some(ObjInitInfo {
+        comp_ref: Some(target_comp_ref),
+        item_i_list,
+        initers,
+    });
+
+    Some(())
+}
+
+fn analyze_inputs_on(actx: &mut AnalysisCtx<'_, '_>, item: &sem::OnDef) {
     analyze_inputs(
         actx,
         item.triggers.iter().filter_map(|trigger| match &trigger {
@@ -215,7 +435,7 @@ fn analyze_on(actx: &mut AnalysisCtx<'_, '_>, item: &sem::OnDef) {
     );
 }
 
-fn analyze_obj_init(actx: &mut AnalysisCtx<'_, '_>, init: &sem::ObjInit) {
+fn analyze_inputs_obj_init(actx: &mut AnalysisCtx<'_, '_>, init: &sem::ObjInit) {
     for field in init.fields.iter() {
         analyze_inputs(
             actx,

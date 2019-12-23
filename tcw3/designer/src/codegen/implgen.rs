@@ -174,7 +174,7 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
         .collect();
 
     // Analyze input references
-    let analysis = analysis::Analysis::new(ctx, diag);
+    let analysis = analysis::Analysis::new(ctx, &item_meta2sem_map, diag);
 
     // Analyze field dependency
     let dep_analysis =
