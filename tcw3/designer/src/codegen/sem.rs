@@ -973,8 +973,19 @@ impl AnalyzeCtx<'_, '_> {
                             new_tokens.extend(Some(TokenTree::Ident(ident)));
                             pending.clear();
                         }
+                        TokenTree::Group(ref g) => {
+                            new_tokens.extend(pending.drain(..));
+
+                            // Recurse into the group
+                            let mut inner_tokens = g.stream();
+                            self.visit_token_stream(&mut inner_tokens);
+                            let new_g = proc_macro2::Group::new(g.delimiter(), inner_tokens);
+
+                            new_tokens.extend(Some(TokenTree::Group(new_g)));
+                        }
                         _ => {
                             new_tokens.extend(pending.drain(..));
+                            new_tokens.extend(Some(tree));
                         }
                     }
                 }
