@@ -979,7 +979,8 @@ impl AnalyzeCtx<'_, '_> {
                             // Recurse into the group
                             let mut inner_tokens = g.stream();
                             self.visit_token_stream(&mut inner_tokens);
-                            let new_g = proc_macro2::Group::new(g.delimiter(), inner_tokens);
+                            let mut new_g = proc_macro2::Group::new(g.delimiter(), inner_tokens);
+                            new_g.set_span(g.span());
 
                             new_tokens.extend(Some(TokenTree::Group(new_g)));
                         }
