@@ -668,9 +668,26 @@ impl AnalyzeCtx<'_, '_> {
             accessors = default_accessors;
         }
 
-        // `const` and `prop` without a default value nor a setter are impossible
-        // to initialize
-        if item.field_ty != FieldType::Wire && accessors.set.is_none() && item.dyn_expr.is_none() {
+        if item.field_ty == FieldType::Prop && accessors.set.is_none() {
+            self.diag.emit(&[Diagnostic {
+                level: Level::Error,
+                message: "Props must have a setter".to_string(),
+                code: None,
+                spans: span_to_codemap(item.ident.span(), self.file)
+                    .map(|span| SpanLabel {
+                        span,
+                        label: None,
+                        style: SpanStyle::Primary,
+                    })
+                    .into_iter()
+                    .collect(),
+            }]);
+        } else if item.field_ty != FieldType::Wire
+            && accessors.set.is_none()
+            && item.dyn_expr.is_none()
+        {
+            // `const` and `prop` without a default value nor a setter are impossible
+            // to initialize
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
                 message: "Must have a default value or a setter \
