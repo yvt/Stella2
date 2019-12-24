@@ -6,8 +6,8 @@ comp crate::field::prop::Comp {
     prop prop1: u32 { set; get; watch event(prop1_changed); } = 1;
     event prop1_changed();
 
-    const prop1_history: RefCell<Vec<(u32, u32)>> = || Default::default();
-    on (prop1_changed) |&this, &prop1_history, prop1| {
-        prop1_history.borrow_mut().push((this.prop1(), prop1))
+    const prop1_history: RefCell<Vec<(u32, u32)>> = Default::default();
+    on (prop1_changed) {
+        get!(&prop1_history).borrow_mut().push((get!(&this).prop1(), get!(prop1)))
     }
 }

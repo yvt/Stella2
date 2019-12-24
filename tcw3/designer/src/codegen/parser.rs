@@ -528,61 +528,16 @@ impl Parse for DynExpr {
     }
 }
 
-/// `42`, `|&this| 42`
+/// `42`, `get!(val) + 1`
 pub struct Func {
-    pub inputs: Option<FuncInputs>,
     pub body: Expr,
 }
 
 impl Parse for Func {
     fn parse(input: ParseStream) -> Result<Self> {
-        let inputs = if input.peek(Token![|]) {
-            Some(input.parse()?)
-        } else {
-            None
-        };
-
         let body = input.parse()?;
 
-        Ok(Self { inputs, body })
-    }
-}
-
-/// `|&this, this.prop|`
-pub struct FuncInputs {
-    pub or1_token: Token![|],
-    pub inputs: Vec<FuncInput>,
-    pub or2_token: Token![|],
-}
-
-impl Parse for FuncInputs {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let or1_token = input.parse()?;
-        let mut first = true;
-        let inputs = std::iter::from_fn(|| {
-            // delimiter
-            let colon = input.parse::<Token![,]>();
-            while input.parse::<Token![,]>().is_ok() {}
-
-            if input.peek(Token![|]) {
-                None
-            } else {
-                if let (Err(e), false) = (colon, first) {
-                    return Some(Err(e));
-                }
-                first = false;
-
-                Some(input.parse())
-            }
-        })
-        .collect::<Result<_>>()?;
-        let or2_token = input.parse()?;
-
-        Ok(Self {
-            or1_token,
-            inputs,
-            or2_token,
-        })
+        Ok(Self { body })
     }
 }
 

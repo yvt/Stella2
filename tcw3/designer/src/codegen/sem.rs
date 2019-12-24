@@ -905,17 +905,8 @@ impl AnalyzeCtx<'_, '_> {
     }
 
     fn analyze_func(&mut self, func: &parser::Func) -> Func {
-        // TODO: Check `FuncInput::rename` collision
         let mut this = Func {
-            inputs: if let Some(inputs) = &func.inputs {
-                inputs
-                    .inputs
-                    .iter()
-                    .map(|i| self.analyze_func_input(i))
-                    .collect()
-            } else {
-                vec![]
-            },
+            inputs: Vec::new(),
             body: func.body.clone(),
         };
 

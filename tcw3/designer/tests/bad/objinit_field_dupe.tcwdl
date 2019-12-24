@@ -1,5 +1,5 @@
 pub comp crate::Comp1 {
-    const wm: tcw3_pal::Wm { pub set; } = || unreachable!();
+    const wm: tcw3_pal::Wm { pub set; } = unreachable!();
     prop field: u32;
 }
 pub comp crate::Comp2 {

@@ -4,6 +4,6 @@ pub comp crate::Comp2 {
     const const1: crate::Comp1 { pub set; }
 
     // `const1.bad_field` refers to a non-existent field
-    wire wire1: u32 = |const1.bad_field| bad_field;
+    wire wire1: u32 = get!(const1.bad_field);
     //~^ ERROR `crate::Comp1` does not have a field named `bad_field`
 }

@@ -8,10 +8,10 @@ pub comp crate::Comp2 {
     const wm: tcw3_pal::Wm { pub set; }
 
     const const1 = crate::Comp1::new! {
-        const2 = || 42,
+        const2 = 42,
 
         // `const1.const2` is accessible only after `const1` is fully
         // constructed
-        const3 = |const1.const2| const2,
+        const3 = get!(const1.const2),
     };
 }

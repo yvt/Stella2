@@ -21,8 +21,11 @@ pub comp crate::ui::views::SpacerWidget {
 
         layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
-            size_traits = |min, max, preferred|
-                crate::uicore::SizeTraits { min, max, preferred },
+            size_traits = crate::uicore::SizeTraits {
+                min: get!(min),
+                max: get!(max),
+                preferred: get!(preferred),
+            },
         },
     };
 }
@@ -42,8 +45,10 @@ pub comp crate::ui::views::FixedSpacer {
 
         layout = EmptyLayout::new! {
             // FIXME: `const` can't use values from `prop`
-            size_traits = |size|
-                crate::uicore::SizeTraits { min: size, max: size, preferred: size },
+            size_traits = {
+                let size = get!(size);
+                crate::uicore::SizeTraits { min: size, max: size, preferred: size }
+            },
         },
     };
 }

@@ -43,16 +43,8 @@ pub trait TcwdlVisitMut: VisitMut {
         visit_func_mut(self, i);
     }
 
-    fn visit_func_inputs_mut(&mut self, i: &mut FuncInputs) {
-        visit_func_inputs_mut(self, i);
-    }
-
     fn visit_trigger_mut(&mut self, i: &mut Trigger) {
         visit_trigger_mut(self, i);
-    }
-
-    fn visit_func_input_mut(&mut self, i: &mut FuncInput) {
-        visit_func_input_mut(self, i);
     }
 
     fn visit_input_mut(&mut self, i: &mut Input) {
@@ -161,14 +153,7 @@ pub fn visit_dyn_expr_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut DynExpr
 }
 
 pub fn visit_func_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut Func) {
-    if let Some(i) = &mut i.inputs {
-        v.visit_func_inputs_mut(i);
-    }
     v.visit_expr_mut(&mut i.body);
-}
-
-pub fn visit_func_inputs_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut FuncInputs) {
-    i.inputs.iter_mut().for_each(|i| v.visit_func_input_mut(i));
 }
 
 pub fn visit_trigger_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut Trigger) {
@@ -176,10 +161,6 @@ pub fn visit_trigger_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut Trigger)
         Trigger::Init(_) => {}
         Trigger::Input(i) => v.visit_input_mut(i),
     }
-}
-
-pub fn visit_func_input_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut FuncInput) {
-    v.visit_input_mut(&mut i.input);
 }
 
 pub fn visit_input_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut Input) {
