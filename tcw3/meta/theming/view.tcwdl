@@ -8,7 +8,7 @@ use crate::{
 #[builder(simple)]
 pub comp crate::ui::theming::StyledBox {
     const style_manager: &Manager { pub set; }
-    const view_flags: ViewFlags { pub set; }
+    const view_flags: ViewFlags { pub set; } = Default::default();
 
     prop class_set: ClassSet { pub set; pub get; } = unreachable!();
     prop r#override: Box<dyn StyledBoxOverride> { pub set; } = unreachable!();

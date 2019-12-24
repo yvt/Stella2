@@ -8,7 +8,7 @@ use crate::{pal, uicore::{HWnd, ViewFlags, CursorShape, Layout, ViewListener}};
 pub comp crate::uicore::HView {
     // TODO: `flags` is actually a `prop`. But some flags can be set only
     //       through `new`
-    const flags: ViewFlags { pub set; pub get clone; }
+    const flags: ViewFlags { pub set; pub get clone; } = Default::default();
 
     /// Sets a new `ViewListener` for the view.
     prop listener: Box<ViewListener> { pub set; } = unreachable!();
