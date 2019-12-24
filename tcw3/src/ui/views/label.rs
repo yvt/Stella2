@@ -108,6 +108,18 @@ impl Label {
             .set_layout(LabelListener::new(Rc::clone(&self.inner)));
     }
 
+    /// Set the styling class set.
+    ///
+    /// It defaults to `ClassSet::LABEL`.
+    pub fn set_class_set(&self, class_set: ClassSet) {
+        self.inner.style_elem.set_class_set(class_set);
+    }
+
+    /// Get the styling class set.
+    pub fn class_set(&self) -> ClassSet {
+        self.inner.style_elem.class_set()
+    }
+
     /// Call `set_text`, retuning `self`.
     ///
     /// This method is useful for constructing `Label` using the builder
