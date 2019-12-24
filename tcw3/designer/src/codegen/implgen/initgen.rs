@@ -1500,8 +1500,8 @@ fn gen_obj_init(
             (comp.items.iter())
                 .zip(initer_map.iter())
                 .filter_map(|(item, initers)| Some((item.field()?, initers)))
-                .filter(move |(field, initers)| {
-                    field.field_ty == field_ty && field.accessors.set.is_some() && initers.len() > 0
+                .filter(move |(field, _)| {
+                    field.field_ty == field_ty && field.accessors.set.is_some()
                 })
         };
 
@@ -1518,20 +1518,27 @@ fn gen_obj_init(
         .unwrap();
         for (_, initers) in inited_field_and_initers(metadata::FieldType::Const) {
             // `const` is passed to `new`
-            let obj_init_field = &obj_init.fields[initers[0]];
-            evalgen::gen_func_eval(
-                &obj_init_field.value,
-                analysis,
-                ctx,
-                item_meta2sem_map,
-                input_gen,
-                out,
-            );
+            if let Some(&obj_init_field_i) = initers.get(0) {
+                let obj_init_field = &obj_init.fields[obj_init_field_i];
+                evalgen::gen_func_eval(
+                    &obj_init_field.value,
+                    analysis,
+                    ctx,
+                    item_meta2sem_map,
+                    input_gen,
+                    out,
+                );
+            } else {
+                write!(out, "{}::default()", paths::DEFAULT).unwrap();
+            }
             writeln!(out, "    ,").unwrap();
         }
         writeln!(out, "    );").unwrap();
 
         for (field, initers) in inited_field_and_initers(metadata::FieldType::Prop) {
+            if initers.is_empty() {
+                continue;
+            }
             // `prop` is set through a setter method
             write!(out, "    {}.{}(", tmp_var, SetterMethod(&field.ident)).unwrap();
             let obj_init_field = &obj_init.fields[initers[0]];

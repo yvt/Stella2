@@ -287,7 +287,7 @@ fn gen_path(ctx: &mut Ctx<'_, '_>, path: &sem::Path) -> metadata::Path {
 fn gen_field(
     ctx: &mut Ctx<'_, '_>,
     field: &sem::FieldDef<'_>,
-    comp_flags: metadata::CompFlags,
+    _comp_flags: metadata::CompFlags,
     mut reloc: impl FnMut(CompReloc),
 ) -> metadata::FieldDef {
     let mut flags = field.flags;
@@ -324,31 +324,6 @@ fn gen_field(
             None
         }
     };
-
-    // `builder(simple)` puts some restriction.
-    if comp_flags.contains(metadata::CompFlags::SIMPLE_BUILDER)
-        && field.field_ty == metadata::FieldType::Const
-        && field.value.is_some()
-        && field.accessors.set.is_some()
-    {
-        ctx.diag.emit(&[Diagnostic {
-            level: Level::Error,
-            message: "`const` field may not have both of a default value and a \
-                      setter if the component has `#[builder(simple)]`"
-                .to_string(),
-            code: None,
-            spans: field
-                .ident
-                .span
-                .map(|span| SpanLabel {
-                    span,
-                    label: None,
-                    style: SpanStyle::Primary,
-                })
-                .into_iter()
-                .collect(),
-        }]);
-    }
 
     metadata::FieldDef {
         field_ty: field.field_ty,

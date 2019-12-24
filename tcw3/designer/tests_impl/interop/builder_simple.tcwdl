@@ -1,0 +1,18 @@
+#[prototype_only]
+#[builder(simple)]
+comp crate::interop::builder_simple::ExtComp {
+    const const1: u32 { get; set; } = Default::default();
+    const const2: u32 { get; set; }
+    prop prop1: u32 = Default::default();
+}
+
+comp crate::interop::builder_simple::Comp {
+    const c1 = crate::interop::builder_simple::ExtComp::new! {
+        const1 = 1,
+        const2 = 2,
+        prop1 = 3,
+    };
+    const c2 = crate::interop::builder_simple::ExtComp::new! {
+        const2 = 2,
+    };
+}

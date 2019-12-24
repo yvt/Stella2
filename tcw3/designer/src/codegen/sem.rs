@@ -500,6 +500,9 @@ impl AnalyzeCtx<'_, '_> {
             }]);
         }
 
+        // TODO: If `SIMPLE_BUILDER`, check that all optional `const`s have
+        //       `Default::default()` as the default value
+
         this
     }
 

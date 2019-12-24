@@ -404,16 +404,16 @@
 //! The simple builder API does not provide a builder type and instead the
 //! component is instantiated by its method `new` that accepts initial field
 //! values in the order defined in the component. Optional `const` fields
-//! are not allowed to have a setter method because there's no way to set
-//! them. This means that every `const` field either (1) has no default value
-//! and must be specified through `new` or (2) has a default value that can't
-//! be changed from outside.
+//! are assumed to have `Default::default()` as the default value.
+//! **Default values specified in the component definition are ignored.**
 //!
 //! ```rust,no_compile
 //! // Standard builder
+//! StyledBox::new().build()
 //! ScrollbarBuilder::new().vertical(true).build()
 //! // Simple builder
-//! Scrollbar::new(true).build()
+//! StyledBox::new(Default::default())
+//! Scrollbar::new(true)
 //! ```
 //!
 //! The reason to support this builder API is to facilitate the integration
