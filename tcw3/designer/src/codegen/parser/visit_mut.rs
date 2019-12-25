@@ -198,6 +198,9 @@ pub fn visit_obj_init_field_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut O
     }
 }
 
-pub fn visit_obj_init_field_value_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut ObjInitFieldValue) {
+pub fn visit_obj_init_field_value_mut(
+    v: &mut (impl TcwdlVisitMut + ?Sized),
+    i: &mut ObjInitFieldValue,
+) {
     v.visit_dyn_expr_mut(&mut i.dyn_expr);
 }
