@@ -1,0 +1,14 @@
+use tcw3::pal;
+
+use crate::objinit::shorthand::{Comp, CompOther};
+
+comp Comp {
+    const const1: u32 = 42;
+
+    // shorthand field initialization syntax
+    const other = CompOther::new! { const1 };
+}
+
+comp CompOther {
+    const const1: u32 { get; set; }
+}

@@ -1169,7 +1169,11 @@ impl AnalyzeCtx<'_, '_> {
                 .iter()
                 .map(|field| ObjInitField {
                     ident: Ident::from_syn(&field.ident, self.file),
-                    value: self.analyze_dyn_expr_as_func(&field.dyn_expr, out_lifted_fields),
+                    value: if let Some(value) = &field.value {
+                        self.analyze_dyn_expr_as_func(&value.dyn_expr, out_lifted_fields)
+                    } else {
+                        self.mk_func_with_named_input(field.ident.clone())
+                    },
                 })
                 .collect(),
         }
@@ -1236,6 +1240,28 @@ impl AnalyzeCtx<'_, '_> {
                 attrs: vec![],
                 qself: None,
                 path: syn::Ident::new(&lifted_field_name, proc_macro2::Span::call_site()).into(),
+            }),
+        }
+    }
+
+    /// Construct a `Func` that looks like it was created from `get!(ident)`.
+    fn mk_func_with_named_input(&mut self, ident: syn::Ident) -> Func {
+        // `|this.ident as ident| ident`
+        Func {
+            inputs: vec![FuncInput {
+                by_ref: false,
+                input: Input {
+                    origin: InputOrigin::This,
+                    selectors: vec![Ident::from_syn(&ident, self.file)],
+                    index: self.get_next_input_index(),
+                    span: None,
+                },
+                ident: Ident::from_syn(&ident, self.file),
+            }],
+            body: syn::Expr::Path(syn::ExprPath {
+                attrs: vec![],
+                qself: None,
+                path: ident.into(),
             }),
         }
     }

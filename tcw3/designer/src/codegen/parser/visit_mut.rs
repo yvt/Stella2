@@ -62,6 +62,10 @@ pub trait TcwdlVisitMut: VisitMut {
     fn visit_obj_init_field_mut(&mut self, i: &mut ObjInitField) {
         visit_obj_init_field_mut(self, i);
     }
+
+    fn visit_obj_init_field_value_mut(&mut self, i: &mut ObjInitFieldValue) {
+        visit_obj_init_field_value_mut(self, i);
+    }
 }
 
 pub fn visit_file_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut File) {
@@ -189,5 +193,11 @@ pub fn visit_obj_init_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut ObjInit
 
 pub fn visit_obj_init_field_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut ObjInitField) {
     v.visit_ident_mut(&mut i.ident);
+    if let Some(i) = &mut i.value {
+        v.visit_obj_init_field_value_mut(i);
+    }
+}
+
+pub fn visit_obj_init_field_value_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut ObjInitFieldValue) {
     v.visit_dyn_expr_mut(&mut i.dyn_expr);
 }

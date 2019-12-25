@@ -1,0 +1,10 @@
+pub comp crate::Comp1 {
+    const comp1_field: u32 { set; }
+}
+pub comp crate::Comp2 {
+    const comp1 = crate::Comp1::new! {
+        // `Comp1` has `comp1_field`, but `Comp2` doesn't
+        comp1_field,
+        //~^ ERROR does not have a field named `comp1_field`
+    };
+}

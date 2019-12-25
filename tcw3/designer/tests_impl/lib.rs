@@ -20,3 +20,7 @@ mod func {
 mod interop {
     mod builder_simple;
 }
+
+mod objinit {
+    mod shorthand;
+}

@@ -720,17 +720,33 @@ impl Parse for ObjInit {
     }
 }
 
-/// `prop x = value;`
+/// `x = value` `x`
 pub struct ObjInitField {
     pub ident: Ident,
-    pub eq_token: Token![=],
-    pub dyn_expr: DynExpr,
+    pub value: Option<ObjInitFieldValue>,
 }
 
 impl Parse for ObjInitField {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
             ident: input.parse()?,
+            value: if input.peek(Token![=]) {
+                Some(input.parse()?)
+            } else {
+                None
+            },
+        })
+    }
+}
+
+pub struct ObjInitFieldValue {
+    pub eq_token: Token![=],
+    pub dyn_expr: DynExpr,
+}
+
+impl Parse for ObjInitFieldValue {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
             eq_token: input.parse()?,
             dyn_expr: input.parse()?,
         })

@@ -197,7 +197,9 @@
 //!
 //! ```tcwdl,no_compile
 //! const button = Button::new! {
-//!     style_manager = get!(style_manager),
+//!     // equivalent to `style_manager = get!(this.style_manager)`
+//!     style_manager,
+//!
 //!     caption = format!("You pressed this button for {} time(s)!", get!(count)),
 //! };
 //! ```
