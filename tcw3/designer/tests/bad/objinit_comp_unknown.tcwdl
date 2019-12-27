@@ -1,0 +1,5 @@
+pub comp crate::Comp2 {
+    // `Comp1` is not a known component
+    const comp1 = crate::Comp1::new! {};
+    //~^ ERROR does not refer to a component
+}

@@ -1,0 +1,6 @@
+pub comp crate::Comp1 {
+    const wm: tcw3_pal::Wm { pub set; }
+
+    prop field: u32 {} = 42;
+    //~^ ERROR Props must have a setter
+}

@@ -3,7 +3,7 @@ use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 use tcw3::{
     stylesheet,
-    ui::theming::{Manager, Metrics, Stylesheet},
+    ui::theming::{Manager, Metrics, Role, Stylesheet},
 };
 
 /// Define styling ID values.
@@ -14,6 +14,7 @@ pub mod elem_id {
     pub const GO_FORWARD: ClassSet = ClassSet::id(2);
     pub const SIDEBAR_SHOW: ClassSet = ClassSet::id(3);
     pub const SIDEBAR_HIDE: ClassSet = ClassSet::id(4);
+    pub const TOOLBAR: ClassSet = ClassSet::id(5);
 }
 
 fn new_custom_stylesheet() -> impl Stylesheet {
@@ -30,6 +31,21 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     let himg_from_stvg = |data| StvgImg::new(data).into_himg();
 
     stylesheet! {
+        // Toolbar and titlebar background
+        ([#TOOLBAR]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.6, 0.6, 0.6, 1.0].into(),
+            layer_metrics[0]: Metrics {
+                margin: [-100.0, 0.0, 0.0, 0.0],
+                ..Default::default()
+            },
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [5.0; 4],
+                ..Default::default()
+            },
+        },
+
         // Toolbar buttons
         ([#GO_BACK.BUTTON]) (priority = 10000) {
             num_layers: 2,
@@ -58,7 +74,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     }
 }
 
-pub fn register_stylesheet(manager: &Manager) {
+pub fn register_stylesheet(manager: &'static Manager) {
     manager.subscribe_new_sheet_set(Box::new(move |_, _, ctx| {
         ctx.insert_stylesheet(new_custom_stylesheet());
     }));

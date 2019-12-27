@@ -7,7 +7,7 @@ use crate::{
     pal,
     pal::prelude::*,
     ui::mixins::CanvasMixin,
-    ui::theming::{ClassSet, Elem, ElemClassPath, Manager, Prop, PropKindFlags, PropValue},
+    ui::theming::{ClassSet, Elem, HElem, Manager, Prop, PropKindFlags, PropValue, Widget},
     uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
 };
 
@@ -84,6 +84,11 @@ impl Label {
         self.view
     }
 
+    /// Get the styling element representing a label widget.
+    pub fn style_elem(&self) -> HElem {
+        self.inner.style_elem.helem()
+    }
+
     /// Set the text displayed in a label widget.
     #[momo]
     pub fn set_text(&self, value: impl Into<String>) {
@@ -103,6 +108,18 @@ impl Label {
             .set_layout(LabelListener::new(Rc::clone(&self.inner)));
     }
 
+    /// Set the styling class set.
+    ///
+    /// It defaults to `ClassSet::LABEL`.
+    pub fn set_class_set(&self, class_set: ClassSet) {
+        self.inner.style_elem.set_class_set(class_set);
+    }
+
+    /// Get the styling class set.
+    pub fn class_set(&self) -> ClassSet {
+        self.inner.style_elem.class_set()
+    }
+
     /// Call `set_text`, retuning `self`.
     ///
     /// This method is useful for constructing `Label` using the builder
@@ -111,12 +128,15 @@ impl Label {
         self.set_text(value);
         self
     }
+}
 
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        self.inner
-            .style_elem
-            .set_parent_class_path(parent_class_path);
+impl Widget for Label {
+    fn view(&self) -> &HView {
+        self.view()
+    }
+
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 

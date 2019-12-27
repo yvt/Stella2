@@ -1,0 +1,50 @@
+use cgmath::Vector2;
+use crate::{uicore::{HView, SizeTraits}, ui::layouts::EmptyLayout, pal};
+
+/// Represents a spacer widget, which has size traits but no graphical contents.
+#[widget]
+pub comp crate::ui::views::SpacerWidget {
+    pub const wm: pal::Wm { pub set; }
+
+    /// Sets `SizeTraits::min`.
+    pub prop min: Vector2<f32> = [0.0; 2].into();
+
+    /// Sets `SizeTraits::max`.
+    pub prop max: Vector2<f32> = [std::f32::INFINITY; 2].into();
+
+    /// Sets `SizeTraits::preferred`.
+    pub prop preferred: Vector2<f32> = [0.0; 2].into();
+
+    /// Retrieves `HView` representing the widget.
+    pub const view = HView::new! {
+        layout = EmptyLayout::new! {
+            // FIXME: `const` can't use values from `prop`
+            size_traits = crate::uicore::SizeTraits {
+                min: get!(min),
+                max: get!(max),
+                preferred: get!(preferred),
+            },
+        },
+    };
+}
+
+/// Represents a fixed-size spacer widget, which has size traits but no
+/// graphical contents.
+#[widget]
+pub comp crate::ui::views::FixedSpacer {
+    pub const wm: pal::Wm { pub set; }
+
+    /// Sets the widget size
+    pub prop size: Vector2<f32> = [0.0; 2].into();
+
+    /// Retrieves `HView` representing the widget.
+    pub const view = HView::new! {
+        layout = EmptyLayout::new! {
+            // FIXME: `const` can't use values from `prop`
+            size_traits = {
+                let size = get!(size);
+                crate::uicore::SizeTraits { min: size, max: size, preferred: size }
+            },
+        },
+    };
+}

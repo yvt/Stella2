@@ -1,0 +1,8 @@
+// `super` is not allowed because TCWDL doesn't have a notion of
+// "a current module"
+use super::Hoge;
+//~^ ERROR `super` is not allowed to use
+
+pub comp crate::Comp1 {
+    prop field: Hoge;
+}

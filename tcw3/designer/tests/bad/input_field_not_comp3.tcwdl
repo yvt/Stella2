@@ -1,0 +1,11 @@
+pub comp crate::Comp1 {
+    pub event const2();
+}
+pub comp crate::Comp2 {
+    const wm: tcw3_pal::Wm { pub set; }
+    const const1: crate::Comp1 { pub set; }
+
+    // `const1.const2` is not a component
+    wire wire1: u32 = get!(const1.const2.field);
+    //~^ ERROR Events do not have a field
+}

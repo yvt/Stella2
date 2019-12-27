@@ -30,6 +30,8 @@ pub mod views {
         split::Split,
         table::{ScrollableTable, Table},
     };
+    tcw3_meta::designer_impl! { crate::ui::views::SpacerWidget }
+    tcw3_meta::designer_impl! { crate::ui::views::FixedSpacer }
 }
 
 /// Theming support
@@ -38,11 +40,13 @@ pub mod theming {
     mod style;
     mod stylesheet;
     mod view;
+    mod widget;
     pub use self::{
-        manager::{Elem, ElemChangeCb, Manager, PropKindFlags},
+        manager::{Elem, ElemChangeCb, HElem, Manager, PropKindFlags},
         style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
+        widget::Widget,
     };
 }
 

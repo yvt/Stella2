@@ -1,0 +1,21 @@
+use crate::{
+    ui::theming::{ClassSet, HElem, Manager, StyledBoxOverride},
+    uicore::{HView, ViewFlags},
+};
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::theming::StyledBox {
+    const style_manager: &Manager { pub set; }
+    const view_flags: ViewFlags { pub set; } = Default::default();
+
+    prop class_set: ClassSet { pub set; pub get; } = unreachable!();
+    prop r#override: Box<dyn StyledBoxOverride> { pub set; } = unreachable!();
+
+    /// Work-around for the lack of indexed prop support
+    prop subview_generic: Option<HView> { pub set; } = unreachable!();
+
+    const view: HView { pub get; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
+}

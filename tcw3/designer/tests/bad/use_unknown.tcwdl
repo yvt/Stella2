@@ -1,0 +1,7 @@
+// `self::Hoge2` resolves to `self::Hoge`, which is non-existent
+use self::Hoge as Hoge2;
+//~^ ERROR Could not resolve `Hoge`
+
+pub comp crate::Comp1 {
+    prop field: Hoge2;
+}

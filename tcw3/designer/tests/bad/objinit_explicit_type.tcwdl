@@ -1,0 +1,6 @@
+pub comp crate::Comp1 {}
+pub comp crate::Comp2 {
+    // A field having obj-init must not be explicitly typed
+    const comp1: crate::Comp1 = crate::Comp1::new! {};
+    //~^ ERROR Type mustn't be specified if the initializer is an object literal
+}

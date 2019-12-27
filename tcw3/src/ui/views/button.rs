@@ -1,5 +1,6 @@
 use cgmath::Point2;
 use std::{cell::RefCell, fmt, rc::Rc};
+use subscriber_list::SubscriberList;
 
 use crate::{
     pal,
@@ -7,10 +8,10 @@ use crate::{
     ui::{
         layouts::FillLayout,
         mixins::ButtonMixin,
-        theming::{ClassSet, ElemClassPath, Manager, Role, StyledBox},
+        theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Label,
     },
-    uicore::{HView, ViewFlags, ViewListener},
+    uicore::{HView, Sub, ViewFlags, ViewListener},
 };
 
 /// A push button widget.
@@ -24,7 +25,7 @@ struct Inner {
     button_mixin: ButtonMixin,
     styled_box: StyledBox,
     label: Label,
-    activate_handler: RefCell<Box<dyn Fn(pal::Wm)>>,
+    activate_handlers: RefCell<SubscriberList<Box<dyn Fn(pal::Wm)>>>,
 }
 
 impl fmt::Debug for Inner {
@@ -33,7 +34,7 @@ impl fmt::Debug for Inner {
             .field("button_mixin", &self.button_mixin)
             .field("styled_box", &self.styled_box)
             .field("label", &self.label)
-            .field("activate_handler", &())
+            .field("activate_handlers", &())
             .finish()
     }
 }
@@ -45,7 +46,7 @@ impl Button {
         let styled_box = StyledBox::new(style_manager, ViewFlags::default());
         {
             let _guard = styled_box.suspend_update();
-            styled_box.set_subview(Role::Generic, Some(label.view().clone()));
+            styled_box.set_child(Role::Generic, Some(&label));
             styled_box.set_class_set(ClassSet::BUTTON);
         }
 
@@ -59,7 +60,7 @@ impl Button {
             button_mixin: ButtonMixin::new(),
             styled_box,
             label,
-            activate_handler: RefCell::new(Box::new(|_| {})),
+            activate_handlers: RefCell::new(SubscriberList::new()),
         });
 
         view.set_listener(ButtonViewListener {
@@ -74,19 +75,14 @@ impl Button {
         &self.view
     }
 
+    /// Get the styling element representing the widget.
+    pub fn style_elem(&self) -> HElem {
+        self.inner.styled_box.style_elem()
+    }
+
     /// Set the text displayed in a push button widget.
     pub fn set_caption(&self, value: impl Into<String>) {
         self.inner.label.set_text(value);
-    }
-
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        let styled_box = &self.inner.styled_box;
-        styled_box.set_parent_class_path(parent_class_path);
-
-        self.inner
-            .label
-            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     /// Set the class set of the inner `StyledBox`.
@@ -101,10 +97,6 @@ impl Button {
         class_set -= protected;
         class_set |= styled_box.class_set() & protected;
         styled_box.set_class_set(class_set);
-
-        self.inner
-            .label
-            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     /// Get the class set of the inner `StyledBox`.
@@ -112,13 +104,27 @@ impl Button {
         self.inner.styled_box.class_set()
     }
 
-    /// Set the function called when a push button widget is activated.
+    /// Add a function called when a push button widget is activated.
     ///
     /// The function is called via `Wm::invoke`, thus allowed to modify
     /// view hierarchy and view attributes. However, it's not allowed to call
-    /// `set_on_activate` on the activated `Button`.
-    pub fn set_on_activate(&self, cb: impl Fn(pal::Wm) + 'static) {
-        *self.inner.activate_handler.borrow_mut() = Box::new(cb);
+    /// `subscribe_activate` when one of the handlers is being called.
+    pub fn subscribe_activated(&self, cb: Box<dyn Fn(pal::Wm)>) -> Sub {
+        self.inner
+            .activate_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
+    }
+}
+
+impl Widget for Button {
+    fn view(&self) -> &HView {
+        self.view()
+    }
+
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 
@@ -169,17 +175,15 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
         let mut class_set = styled_box.class_set();
         class_set.set(ClassSet::ACTIVE, self.inner.button_mixin.is_pressed());
         styled_box.set_class_set(class_set);
-
-        self.inner
-            .label
-            .set_parent_class_path(Some(styled_box.class_path()));
     }
 
     fn activate(&self, wm: pal::Wm, _: &HView) {
         let inner = Rc::clone(&self.inner);
         wm.invoke(move |wm| {
-            let handler = inner.activate_handler.borrow();
-            handler(wm);
+            let handlers = inner.activate_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(wm);
+            }
         });
     }
 }

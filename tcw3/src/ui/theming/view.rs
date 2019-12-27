@@ -11,8 +11,9 @@ use std::{
 };
 
 use super::{
-    manager::{Elem, Manager, PropKindFlags},
-    style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
+    manager::{Elem, HElem, Manager, PropKindFlags},
+    style::{ClassSet, Metrics, Prop, PropValue, Role, ROLE_COUNT},
+    widget::Widget,
 };
 use crate::{
     pal,
@@ -75,6 +76,7 @@ struct Shared {
     dirty: Cell<PropKindFlags>,
 
     subviews: RefCell<Vec<(Role, HView)>>,
+    subelems: [Cell<Option<HElem>>; ROLE_COUNT],
     /// `override` is a reserved keyword, so `overrider` is used here
     overrider: RefCell<Rc<dyn StyledBoxOverride>>,
 
@@ -90,6 +92,7 @@ impl fmt::Debug for Shared {
             .field("style_elem", &self.style_elem)
             .field("dirty", &self.dirty)
             .field("subviews", &self.subviews)
+            .field("subelems", &self.subelems)
             .field("overrider", &())
             .field("suspend_flag", &self.suspend_flag)
             .field("has_layer_group", &self.has_layer_group)
@@ -115,6 +118,7 @@ impl StyledBox {
         let shared = Rc::new(Shared {
             view: view.clone(),
             subviews: RefCell::new(subviews),
+            subelems: Default::default(),
             overrider: RefCell::new(overrider),
             style_elem,
             // Already have an up-to-date `Layout`, so exclude it from
@@ -144,6 +148,8 @@ impl StyledBox {
 
     /// Temporarily suspend updates until the returned RAII guard is dropped.
     pub fn suspend_update<'a>(&'a self) -> impl Suspend + 'a {
+        // TODO: Maybe this method isn't needed now that `Elem` uses
+        //       `invoke_on_update` automatically
         self.shared.suspend_flag.suspend(move || {
             self.shared.set_dirty(PropKindFlags::empty());
         })
@@ -163,13 +169,6 @@ impl StyledBox {
         );
 
         self.shared.style_elem.set_class_set(class_set);
-    }
-
-    /// Set the parent class path.
-    pub fn set_parent_class_path(&self, parent_class_path: Option<Rc<ElemClassPath>>) {
-        self.shared
-            .style_elem
-            .set_parent_class_path(parent_class_path);
     }
 
     /// Set a subview for the specified `Role`.
@@ -195,22 +194,41 @@ impl StyledBox {
         self.shared.set_dirty(PropKindFlags::LAYOUT);
     }
 
+    #[doc(hidden)]
+    /// Calls `set_subview` with `Role::Generic`. Work-arounds the lack of
+    /// indexed prop support in Designer.
+    pub fn set_subview_generic(&self, view: impl Into<Option<HView>>) {
+        self.set_subview(Role::Generic, view.into());
+    }
+
+    /// Set a subelement for the specified `Role`.
+    pub fn set_subelement(&self, role: Role, helem: Option<HElem>) {
+        let elem_cell = &self.shared.subelems[role as usize];
+
+        if let Some(e) = elem_cell.get() {
+            self.shared.style_elem.remove_child(e);
+        }
+        if let Some(e) = helem {
+            self.shared.style_elem.insert_child(e);
+        }
+
+        elem_cell.set(helem);
+    }
+
+    /// Set a child widget using `set_subview` and `set_subelement`.
+    pub fn set_child(&self, role: Role, widget: Option<&dyn Widget>) {
+        if let Some(widget) = widget {
+            self.set_subview(role, Some(widget.view().clone()));
+            self.set_subelement(role, widget.style_elem());
+        } else {
+            self.set_subview(role, None);
+            self.set_subelement(role, None);
+        }
+    }
+
     /// Get the class set of the styled element.
     pub fn class_set(&self) -> ClassSet {
         self.shared.style_elem.class_set()
-    }
-
-    /// Get `Rc<ElemClassPath>` representing the class path of the styled
-    /// element. The returned value can be set on subviews as a parent class
-    /// path.
-    ///
-    /// This is calculated based on the element's parent class path (set by
-    /// [`set_parent_class_path`]) and class set (set by [`set_class_set`]).
-    ///
-    /// [`set_parent_class_path`]: StyledBox::set_parent_class_path
-    /// [`set_class_set`]: StyledBox::set_class_set
-    pub fn class_path(&self) -> Rc<ElemClassPath> {
-        self.shared.style_elem.class_path()
     }
 
     /// Set a new [`StyledBoxOverride`]  object.
@@ -237,9 +255,24 @@ impl StyledBox {
         self.shared.set_dirty(dirty_flags);
     }
 
-    /// Get the view representing a styled box.
+    /// Get the view representing the styled box.
     pub fn view(&self) -> &HView {
         &self.view
+    }
+
+    /// Get the styling element representing the styled box.
+    pub fn style_elem(&self) -> HElem {
+        self.shared.style_elem.helem()
+    }
+}
+
+impl Widget for StyledBox {
+    fn view(&self) -> &HView {
+        self.view()
+    }
+
+    fn style_elem(&self) -> Option<HElem> {
+        Some(self.style_elem())
     }
 }
 

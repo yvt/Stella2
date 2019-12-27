@@ -1,0 +1,40 @@
+use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, pal,
+    ui::views::split::SplitDragListener};
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::views::Split {
+    const style_manager: &Manager { pub set; }
+
+    /// Specifies the split direction.
+    const vertical: bool { pub set; }
+
+    /// Specifies which panel should be resized when the overall size is
+    /// changed. It must be one of Some(0), Some(1), and None.
+    const fix: Option<usize> { pub set; } = Default::default();
+
+    const view: HView { pub get borrow; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
+
+    /// Sets or retrieves a raw (unclipped) value representing the split position.
+    ///
+    /// The interpretation of this value differs depending on the value of `fix`.
+    /// If `fix` is `Some(_)`, it represents the absolute size of the
+    /// corresponding panel. Otherwise, it represents the percentage of the
+    /// area occupied by the first panel.
+    ///
+    /// The returned value is raw and unclipped, meaning it does not take the
+    /// size contraints of the panels into consideration. Also, it does not
+    /// change when the overall size is changed.
+    prop value: f32 { pub set; pub get clone; } = unreachable!();
+
+    /// Set the views placed in the panels.
+    prop subviews: [HView; 2] { pub set; } = unreachable!();
+
+    /// Set the factory function for gesture event handlers used when the user
+    /// resizes the panels.
+    ///
+    /// The function is called when the user starts a mouse drag gesture.
+    prop on_drag: impl Fn(Wm) -> Box<dyn SplitDragListener> { pub set; } = unreachable!();
+}

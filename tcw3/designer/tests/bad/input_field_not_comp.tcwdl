@@ -1,0 +1,8 @@
+pub comp crate::Comp2 {
+    const wm: tcw3_pal::Wm { pub set; }
+    const const1: u32 { pub set; }
+
+    // `const1` is not a component
+    wire wire1: u32 = get!(const1.field);
+    //~^ ERROR Can't refer to a field of something that is not a component
+}

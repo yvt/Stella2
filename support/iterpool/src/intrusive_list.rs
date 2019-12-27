@@ -326,7 +326,241 @@ where
     }
 }
 
-/// An iterator over the elements of `ListAccessor` or `ListAccessorMut`.
+pub trait CellLike {
+    type Target;
+
+    fn get(&self) -> Self::Target;
+    fn set(&self, value: Self::Target);
+
+    fn modify(&self, f: impl FnOnce(&mut Self::Target))
+    where
+        Self: Sized,
+    {
+        let mut x = self.get();
+        f(&mut x);
+        self.set(x);
+    }
+}
+
+impl<T: Copy> CellLike for std::cell::Cell<T> {
+    type Target = T;
+
+    fn get(&self) -> Self::Target {
+        self.get()
+    }
+    fn set(&self, value: Self::Target) {
+        self.set(value);
+    }
+}
+
+impl<T: CellLike> CellLike for &T {
+    type Target = T::Target;
+
+    fn get(&self) -> Self::Target {
+        (*self).get()
+    }
+    fn set(&self, value: Self::Target) {
+        (*self).set(value);
+    }
+}
+
+/// `Cell`-based accessor to a linked list.
+#[derive(Debug)]
+pub struct ListAccessorCell<'a, H, P, F> {
+    head: H,
+    pool: &'a P,
+    field: F,
+}
+
+impl<'a, H, P, F, T, L> ListAccessorCell<'a, H, P, F>
+where
+    H: CellLike<Target = ListHead>,
+    P: ops::Index<PoolPtr, Output = T>,
+    F: Fn(&T) -> &L,
+    L: CellLike<Target = Option<Link>>,
+{
+    pub fn new(head: H, pool: &'a P, field: F) -> Self {
+        ListAccessorCell { head, pool, field }
+    }
+
+    pub fn head_cell(&self) -> &H {
+        &self.head
+    }
+
+    pub fn head(&self) -> ListHead {
+        self.head.get()
+    }
+
+    pub fn set_head(&self, head: ListHead) {
+        self.head.set(head);
+    }
+
+    pub fn pool(&self) -> &P {
+        self.pool
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.head().is_empty()
+    }
+
+    pub fn front(&self) -> Option<PoolPtr> {
+        self.head().first
+    }
+
+    pub fn back(&self) -> Option<PoolPtr> {
+        self.head()
+            .first
+            .map(|p| (self.field)(&self.pool[p]).get().unwrap().prev)
+    }
+
+    pub fn front_data(&self) -> Option<&T> {
+        if let Some(p) = self.front() {
+            Some(&self.pool[p])
+        } else {
+            None
+        }
+    }
+
+    pub fn back_data(&self) -> Option<&T> {
+        if let Some(p) = self.back() {
+            Some(&self.pool[p])
+        } else {
+            None
+        }
+    }
+
+    /// Insert `item` before the position `p` (if `at` is `Some(p)`) or to the
+    /// the list's back (if `at` is `None`).
+    pub fn insert(&self, item: PoolPtr, at: Option<PoolPtr>) {
+        debug_assert!(
+            (self.field)(&self.pool[item]).get().is_none(),
+            "item is already linked"
+        );
+
+        let mut head = self.head();
+
+        if let Some(first) = head.first {
+            let (next, update_first) = if let Some(at) = at {
+                (at, at == first)
+            } else {
+                (first, false)
+            };
+
+            let prev = (self.field)(&self.pool[next]).get().unwrap().prev;
+            (self.field)(&self.pool[prev]).modify(|l| l.as_mut().unwrap().next = item);
+            (self.field)(&self.pool[next]).modify(|l| l.as_mut().unwrap().prev = item);
+            (self.field)(&self.pool[item]).set(Some(Link { prev, next }));
+
+            if update_first {
+                head.first = Some(item);
+                self.set_head(head);
+            }
+        } else {
+            debug_assert!(at.is_none());
+
+            let link = (self.field)(&self.pool[item]);
+            link.set(Some(Link {
+                prev: item,
+                next: item,
+            }));
+
+            head.first = Some(item);
+            self.set_head(head);
+        }
+    }
+
+    pub fn push_back(&self, item: PoolPtr) {
+        self.insert(item, None);
+    }
+
+    pub fn push_front(&self, item: PoolPtr) {
+        let at = self.front();
+        self.insert(item, at);
+    }
+
+    /// Remove `item` from the list. Returns `item`.
+    pub fn remove(&self, item: PoolPtr) -> PoolPtr {
+        debug_assert!(
+            (self.field)(&self.pool[item]).get().is_some(),
+            "item is not linked"
+        );
+
+        let link: Link = {
+            let link_ref = (self.field)(&self.pool[item]);
+            let mut head = self.head();
+            if head.first == Some(item) {
+                let next = link_ref.get().unwrap().next;
+                if next == item {
+                    // The list just became empty
+                    head.first = None;
+                    self.set_head(head);
+
+                    link_ref.set(None);
+                    return item;
+                }
+
+                // Move the head pointer
+                head.first = Some(next);
+                self.set_head(head);
+            }
+
+            link_ref.get().unwrap()
+        };
+
+        (self.field)(&self.pool[link.prev]).modify(|l| l.as_mut().unwrap().next = link.next);
+        (self.field)(&self.pool[link.next]).modify(|l| l.as_mut().unwrap().prev = link.prev);
+        (self.field)(&self.pool[item]).set(None);
+
+        item
+    }
+
+    pub fn pop_back(&self) -> Option<PoolPtr> {
+        self.back().map(|item| self.remove(item))
+    }
+
+    pub fn pop_front(&self) -> Option<PoolPtr> {
+        self.front().map(|item| self.remove(item))
+    }
+
+    pub fn iter(&self) -> Iter<&Self> {
+        Iter {
+            next: self.head().first,
+            accessor: self,
+        }
+    }
+
+    pub fn clear(&self) {
+        for (_, el) in self.iter() {
+            (self.field)(el).set(None);
+        }
+        self.set_head(ListHead::new());
+    }
+}
+
+impl<'a, H, P, F> ops::Deref for ListAccessorCell<'a, H, P, F> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        self.pool
+    }
+}
+
+impl<'a, H, P, F, T, L> Extend<PoolPtr> for ListAccessorCell<'a, H, P, F>
+where
+    H: CellLike<Target = ListHead>,
+    P: ops::Index<PoolPtr, Output = T>,
+    F: Fn(&T) -> &L,
+    L: CellLike<Target = Option<Link>>,
+{
+    fn extend<I: IntoIterator<Item = PoolPtr>>(&mut self, iter: I) {
+        for item in iter {
+            self.push_back(item);
+        }
+    }
+}
+
+/// An iterator over the elements of `ListAccessor`, `ListAccessorMut`, or
+/// `ListAccessorCell`.
 #[derive(Debug)]
 pub struct Iter<T> {
     accessor: T,
@@ -377,6 +611,34 @@ where
                 self.next = Some(new_next);
             }
             Some((next, unsafe { transmute(&mut self.accessor.pool[next]) }))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, 'b, H, P, F, T, L> Iterator for Iter<&'b ListAccessorCell<'a, H, P, F>>
+where
+    H: CellLike<Target = ListHead>,
+    P: ops::Index<PoolPtr, Output = T>,
+    F: 'a + Fn(&T) -> &L,
+    T: 'a + 'b,
+    L: CellLike<Target = Option<Link>>,
+{
+    type Item = (PoolPtr, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next) = self.next {
+            let new_next = (self.accessor.field)(&self.accessor.pool[next])
+                .get()
+                .unwrap()
+                .next;
+            if Some(new_next) == self.accessor.head().first {
+                self.next = None;
+            } else {
+                self.next = Some(new_next);
+            }
+            Some((next, &self.accessor.pool[next]))
         } else {
             None
         }
@@ -456,6 +718,82 @@ fn basic_mut() {
     accessor.remove(ptr3);
 
     assert!(accessor.is_empty());
+}
+
+#[test]
+fn basic_cell() {
+    use crate::Pool;
+    use std::cell::Cell;
+    let mut pool = Pool::new();
+    let head = Cell::new(ListHead::new());
+
+    macro_rules! get_accessor {
+        () => {
+            ListAccessorCell::new(&head, &pool, |(_, link)| link)
+        };
+    }
+
+    let ptr1 = pool.allocate((1, Cell::new(None)));
+    get_accessor!().push_back(ptr1);
+
+    let ptr2 = pool.allocate((2, Cell::new(None)));
+    get_accessor!().push_back(ptr2);
+
+    let ptr3 = pool.allocate((3, Cell::new(None)));
+    get_accessor!().push_front(ptr3);
+
+    println!("{:?}", (&pool, &head));
+
+    let accessor = get_accessor!();
+    assert!(!accessor.is_empty());
+    assert_eq!(accessor.front(), Some(ptr3));
+    assert_eq!(accessor.back(), Some(ptr2));
+    assert_eq!(accessor.front_data().unwrap().0, 3);
+    assert_eq!(accessor.back_data().unwrap().0, 2);
+
+    let items: Vec<_> = accessor.iter().map(|(_, (x, _))| *x).collect();
+    assert_eq!(items, vec![3, 1, 2]);
+
+    accessor.remove(ptr1);
+    println!("{:?}", (&pool, &head));
+    accessor.remove(ptr2);
+    println!("{:?}", (&pool, &head));
+    accessor.remove(ptr3);
+    println!("{:?}", (&pool, &head));
+
+    assert!(accessor.is_empty());
+}
+
+#[test]
+fn clear_cell() {
+    use crate::Pool;
+    use std::cell::Cell;
+    let mut pool = Pool::new();
+    let head = Cell::new(ListHead::new());
+
+    macro_rules! get_accessor {
+        () => {
+            ListAccessorCell::new(&head, &pool, |(_, link)| link)
+        };
+    }
+
+    let ptrs = [
+        pool.allocate((1, Cell::new(None))),
+        pool.allocate((2, Cell::new(None))),
+        pool.allocate((3, Cell::new(None))),
+    ];
+
+    get_accessor!().push_back(ptrs[0]);
+    get_accessor!().push_back(ptrs[1]);
+    get_accessor!().push_front(ptrs[2]);
+
+    get_accessor!().clear();
+
+    assert_eq!(head.get().first, None);
+    for &ptr in &ptrs {
+        let e = &pool[ptr];
+        assert!(e.1.get().is_none());
+    }
 }
 
 #[test]

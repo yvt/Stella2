@@ -1,0 +1,7 @@
+// `self` is a virtual module tha cannot be imported by itself
+use self as Hoge;
+//~^ ERROR Importing `self` is not allowed
+
+pub comp crate::Comp1 {
+    prop field: Hoge;
+}

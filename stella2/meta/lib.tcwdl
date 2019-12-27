@@ -1,0 +1,155 @@
+use harmony::Elem;
+use tcw3::{
+    ui::{
+        AlignFlags,
+        views::{Label, Button, Split, FixedSpacer},
+        layouts::TableLayout,
+        theming::{self, Manager, StyledBox},
+    },
+    uicore::HView,
+    pal,
+};
+
+use crate::{model, stylesheet::elem_id};
+
+#[widget]
+comp crate::view::MainView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+
+    pub prop wnd_state: Elem<model::WndState>;
+    pub event dispatch(action: model::WndAction);
+
+    pub const view = HView::new! {
+        layout = TableLayout::new! {
+            cells = vec![
+                (get!(toolbar.view), [0, 0], AlignFlags::JUSTIFY),
+                (get!(split_side.view), [0, 1], AlignFlags::JUSTIFY),
+            ],
+        },
+    };
+
+    const toolbar = crate::view::toolbar::ToolbarView::new! { wm, style_manager, wnd_state };
+
+    on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
+
+    const split_side = Split::new! {
+        style_manager,
+        vertical = false,
+        fix = Some(0), // Fix the sidebar
+        subviews = [get!(sidebar_view.view), get!(split_editor.view)],
+        value = get!(&wnd_state).sidebar_width,
+    };
+
+    const sidebar_view = PlaceholderView::new! {
+        wm,
+        style_manager,
+        text = "sidebar: todo!".to_string(),
+    };
+
+    const split_editor = Split::new! {
+        style_manager,
+        vertical = true,
+        fix = Some(1), // Fix the editor
+        subviews = [get!(log_view.view), get!(editor_view.view)],
+        value = get!(&wnd_state).editor_height,
+    };
+
+    const log_view = PlaceholderView::new! {
+        wm,
+        style_manager,
+        text = "log: todo!".to_string(),
+    };
+
+    const editor_view = PlaceholderView::new! {
+        wm,
+        style_manager,
+        text = "editor: todo!".to_string(),
+    };
+
+    on (init) get!(&this).init();
+}
+
+use crate::view::toolbar::ToolbarView;
+#[widget]
+pub(crate) comp ToolbarView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+
+    pub prop wnd_state: Elem<model::WndState>;
+    pub event dispatch(action: model::WndAction);
+
+    on (init) get!(&this).init();
+
+    pub const wrapper = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::TOOLBAR,
+        subview_generic = HView::new! {
+            layout = TableLayout::new! {
+                cells = vec![
+                    (get!(toggle_sidebar_button.view), [0, 0], AlignFlags::JUSTIFY),
+                    (get!(spacer1.view), [1, 0], AlignFlags::HORZ_JUSTIFY),
+                    (get!(go_back_button.view), [2, 0], AlignFlags::JUSTIFY),
+                    (get!(spacer2.view), [3, 0], AlignFlags::HORZ_JUSTIFY),
+                    (get!(go_forward_button.view), [4, 0], AlignFlags::JUSTIFY),
+                    (get!(spacer3.view), [5, 0], AlignFlags::CENTER),
+                    (get!(search_bar.view), [6, 0], AlignFlags::RIGHT),
+                ],
+            },
+        },
+    };
+
+    pub const view: HView = get!(wrapper.view);
+
+    const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
+    const spacer2 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
+    const spacer3 = FixedSpacer::new! { wm };
+
+    const toggle_sidebar_button = Button::new! {
+        style_manager,
+
+        class_set = theming::ClassSet::BUTTON
+            | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
+                [get!(&wnd_state).sidebar_visible as usize],
+
+        // TODO: `on_activate` is set by `init` for now
+    };
+
+    on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
+
+    const go_back_button = Button::new! {
+        style_manager,
+        class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK,
+    };
+
+    const go_forward_button = Button::new! {
+        style_manager,
+        class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD,
+    };
+
+    on (go_back_button.activated) dbg!();
+    on (go_forward_button.activated) dbg!();
+
+    // TODO
+    const search_bar = PlaceholderView::new! {
+        wm,
+        style_manager,
+        text = "search: todo!".to_string(),
+    };
+}
+
+use crate::view::PlaceholderView;
+#[widget]
+pub(crate) comp PlaceholderView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+    pub prop text: String;
+
+    pub const view = HView::new! {
+        layout = TableLayout::new! {
+            cells = vec![(get!(label.view), [0, 0],  AlignFlags::TOP | AlignFlags::LEFT)],
+        },
+    };
+
+    const label = Label::new! { style_manager, text };
+}

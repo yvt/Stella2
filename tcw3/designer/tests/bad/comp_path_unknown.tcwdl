@@ -1,0 +1,2 @@
+pub comp unknown::Foo {}
+//~^ ERROR Can't find a crate named `unknown`

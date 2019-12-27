@@ -1,0 +1,11 @@
+[package]
+name = "tcw3_designer_runtime"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+owning_ref = "0.4.0"
+subscriber_list = { path = "../../support/subscriber_list" }
+harmony = { path = "../../harmony" }
+tcw3_pal = { path = "../pal" }

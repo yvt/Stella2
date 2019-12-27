@@ -1,0 +1,17 @@
+[package]
+name = "tcw3_designer_tests_impl"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[features]
+testing = ["tcw3/testing"]
+
+[build-dependencies]
+tcw3_designer = { path = ".." }
+
+[dependencies]
+tcw3 = { path = "../.." }
+
+[lib]
+path = "lib.rs"
