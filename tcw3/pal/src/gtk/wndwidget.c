@@ -15,6 +15,7 @@
 typedef struct _TcwWndWidget TcwWndWidget;
 typedef struct _TcwWndWidgetClass TcwWndWidgetClass;
 
+// These definitions must be synchronized with `window.rs`
 struct _TcwWndWidget {
     GtkDrawingArea parent_instance;
 };
@@ -35,4 +36,9 @@ static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
     GtkWidget *widget = GTK_WIDGET(self);
     (void)widget;
+}
+
+/// Called by `window.rs`.
+extern TcwWndWidget *tcw_wnd_widget_new(void) {
+    return g_object_new(TCW_TYPE_WND_WIDGET, NULL);
 }

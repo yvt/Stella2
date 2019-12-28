@@ -1,3 +1,7 @@
+use glib::{
+    glib_object_wrapper, glib_wrapper,
+    translate::{FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
+};
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
 use std::cell::RefCell;
@@ -17,11 +21,7 @@ static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
 
 struct Wnd {
     gtk_wnd: gtk::Window,
-    gtk_widget: gtk::DrawingArea,
-}
-
-extern "C" {
-    fn tcw_wnd_widget_get_type() -> usize;
+    gtk_widget: WndWidget,
 }
 
 impl HWnd {
@@ -29,12 +29,7 @@ impl HWnd {
     pub(super) fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> Self {
         let gtk_wnd = gtk::Window::new(gtk::WindowType::Toplevel);
 
-        // `TcwWndWidget` is defined in `wndwidget.c`
-        let wnd_widget_ty = glib::Type::Other(unsafe { tcw_wnd_widget_get_type() });
-        let gtk_widget = glib::Object::new(wnd_widget_ty, &[])
-            .unwrap()
-            .downcast::<gtk::DrawingArea>()
-            .unwrap();
+        let gtk_widget = WndWidget::new(wm);
 
         gtk_wnd.add(&gtk_widget);
         gtk_wnd.set_hexpand(true);
@@ -137,5 +132,40 @@ impl HWnd {
     /// Implements `Wm::request_update_ready_wnd`.
     pub(super) fn request_update_ready_wnd(&self, wm: Wm) {
         // TODO
+    }
+}
+
+// ============================================================================
+
+// These type are not actually `pub`, but `pub` is required by `glib_wrapper!`
+glib_wrapper! {
+    /// `TcwWndWidget` is defined in `wndwidget.c`.
+    pub struct WndWidget(Object<TcwWndWidget, TcwWndWidgetClass, WndWidgetClass>)
+        @extends gtk::Widget;
+
+    match fn {
+        get_type => || tcw_wnd_widget_get_type(),
+    }
+}
+
+extern "C" {
+    fn tcw_wnd_widget_new() -> *mut gtk_sys::GtkWidget;
+    fn tcw_wnd_widget_get_type() -> glib_sys::GType;
+}
+
+// These types are defined in `wndwidget.c`
+#[repr(C)]
+pub struct TcwWndWidget {
+    parent_instance: gtk_sys::GtkDrawingArea,
+}
+
+#[repr(C)]
+pub struct TcwWndWidgetClass {
+    parent_class: gtk_sys::GtkDrawingAreaClass,
+}
+
+impl WndWidget {
+    fn new(wm: Wm) -> Self {
+        unsafe { gtk::Widget::from_glib_none(tcw_wnd_widget_new()).unsafe_cast() }
     }
 }
