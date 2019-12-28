@@ -19,7 +19,8 @@ pub use self::{
 };
 
 mod timer;
-pub use self::timer::HInvoke;
+mod window;
+pub use self::{timer::HInvoke, window::HWnd};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
@@ -141,46 +142,44 @@ impl iface::Wm for Wm {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        unimplemented!()
+        HWnd::new_wnd(self, attrs)
     }
 
     fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        unimplemented!()
+        window.set_wnd_attr(self, attrs)
     }
 
     fn remove_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window.remove_wnd(self)
     }
 
     fn update_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window.update_wnd(self)
     }
 
     fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2] {
-        unimplemented!()
+        window.get_wnd_size(self)
     }
 
     fn get_wnd_dpi_scale(self, window: &Self::HWnd) -> f32 {
-        unimplemented!()
+        window.get_wnd_dpi_scale(self)
     }
 
     fn request_update_ready_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window.request_update_ready_wnd(self)
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        unimplemented!()
+        // TODO
+        HLayer
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        unimplemented!()
+        // TODO
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        unimplemented!()
+        // TODO
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HWnd;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer;
