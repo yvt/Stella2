@@ -10,7 +10,7 @@ pub struct HWnd {
     ptr: PoolPtr,
 }
 
-static WNDS: MtSticky<RefCell<Pool<Wnd>>> = {
+static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
     // `Wnd` is `!Send`, but there is no instance at this point, so this is safe
     unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
 };
