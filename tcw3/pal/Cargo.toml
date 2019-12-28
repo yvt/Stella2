@@ -75,6 +75,7 @@ rayon = "1.2.0"
 
 [build-dependencies]
 cc = "1.0.35"
+pkg-config = "0.3.7"
 
 [dev-dependencies]
 demotools = { path = "../../support/demotools" }

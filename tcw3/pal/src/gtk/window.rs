@@ -1,4 +1,3 @@
-use array::Array2;
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
 use std::cell::RefCell;
@@ -21,15 +20,25 @@ struct Wnd {
     gtk_widget: gtk::DrawingArea,
 }
 
+extern "C" {
+    fn tcw_wnd_widget_get_type() -> usize;
+}
+
 impl HWnd {
     /// Implements `Wm::new_wnd`.
     pub(super) fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> Self {
         let gtk_wnd = gtk::Window::new(gtk::WindowType::Toplevel);
 
-        let gtk_widget = gtk::DrawingArea::new();
+        // `TcwWndWidget` is defined in `wndwidget.c`
+        let wnd_widget_ty = glib::Type::Other(unsafe { tcw_wnd_widget_get_type() });
+        let gtk_widget = glib::Object::new(wnd_widget_ty, &[])
+            .unwrap()
+            .downcast::<gtk::DrawingArea>()
+            .unwrap();
 
         gtk_wnd.add(&gtk_widget);
-
+        gtk_wnd.set_hexpand(true);
+        gtk_wnd.set_vexpand(true);
 
         let wnd = Wnd {
             gtk_wnd,
@@ -91,7 +100,7 @@ impl HWnd {
         let gtk_wnd = &wnds[self.ptr].gtk_wnd;
         [
             gtk_wnd.get_allocated_width() as u32,
-            gtk_wnd.get_allocated_height() as u32 ,
+            gtk_wnd.get_allocated_height() as u32,
         ]
     }
 

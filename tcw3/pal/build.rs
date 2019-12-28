@@ -11,7 +11,7 @@ fn main() {
                 .file("src/macos/Timers.m")
                 .flag("-fobjc-arc")
                 .flag("-fobjc-weak")
-                .compile("tcwsupport");
+                .compile("tcwsupport_macos");
         }
 
         #[cfg(feature = "macos_winit")]
@@ -22,5 +22,19 @@ fn main() {
                 .flag("-fobjc-weak")
                 .compile("tcwsupport_winit");
         }
+    } else {
+        // Try to match the settings to that of `gtk-sys`
+        let gtk_lib = pkg_config::Config::new()
+            .atleast_version("3.14")
+            .cargo_metadata(false)
+            .probe("gtk+-3.0")
+            .unwrap();
+
+        let mut build = cc::Build::new();
+        for path in gtk_lib.include_paths.iter() {
+            build.include(path);
+        }
+
+        build.file("src/gtk/wndwidget.c").compile("tcwsupport_gtk");
     }
 }
