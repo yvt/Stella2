@@ -55,9 +55,32 @@ impl HWnd {
         let wnds = WNDS.get_with_wm(wm).borrow();
         let wnd = &wnds[self.ptr];
 
-        // TOOD: size
-        // TODO: min_size
-        // TODO: max_size
+        let default_geom = gdk::Geometry {
+            min_width: attrs.min_size.unwrap_or_default()[0] as i32,
+            min_height: attrs.min_size.unwrap_or_default()[0] as i32,
+            max_width: attrs.max_size.unwrap_or_default()[0] as i32,
+            max_height: attrs.max_size.unwrap_or_default()[0] as i32,
+            base_width: 0,
+            base_height: 0,
+            width_inc: 0,
+            height_inc: 0,
+            min_aspect: 0.0,
+            max_aspect: 0.0,
+            win_gravity: gdk::Gravity::NorthWest,
+        };
+        let mut hint_flags = gdk::WindowHints::empty();
+        hint_flags.set(gdk::WindowHints::MIN_SIZE, attrs.min_size.is_some());
+        hint_flags.set(gdk::WindowHints::MAX_SIZE, attrs.max_size.is_some());
+
+        if !hint_flags.is_empty() {
+            wnd.gtk_wnd
+                .set_geometry_hints(None::<&gtk::Widget>, Some(&default_geom), hint_flags);
+        }
+
+        if let Some(size) = attrs.size {
+            wnd.gtk_wnd.resize(size[0] as i32, size[1] as i32);
+            wnd.gtk_wnd.set_default_size(size[0] as i32, size[1] as i32);
+        }
 
         if let Some(flags) = attrs.flags {
             // TODO: BORDERLESS
