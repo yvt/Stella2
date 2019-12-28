@@ -2,7 +2,7 @@
 use super::iface;
 use std::{cell::RefCell, marker::PhantomData, mem::MaybeUninit, ops::Range, time::Duration};
 
-use crate::MtLock;
+use crate::{cells::MtLazyStatic, MtLock};
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -18,9 +18,10 @@ pub use self::{
     text::{CharStyle, TextLayout},
 };
 
+mod comp;
 mod timer;
 mod window;
-pub use self::{timer::HInvoke, window::HWnd};
+pub use self::{comp::HLayer, timer::HInvoke, window::HWnd};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
@@ -170,19 +171,24 @@ impl iface::Wm for Wm {
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        // TODO
-        HLayer
+        window::COMPOSITOR
+            .get_with_wm(self)
+            .borrow_mut()
+            .new_layer(attrs)
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        // TODO
+        window::COMPOSITOR
+            .get_with_wm(self)
+            .borrow_mut()
+            .set_layer_attr(layer, attrs)
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        // TODO
+        window::COMPOSITOR
+            .get_with_wm(self)
+            .borrow_mut()
+            .remove_layer(layer)
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HLayer;
 
 struct AssertSend<T>(T);
 unsafe impl<T> Send for AssertSend<T> {}

@@ -1,4 +1,7 @@
 #include <gtk/gtk.h>
+#include <stdint.h>
+
+#include "window.h"
 
 #define TCW_TYPE_WND_WIDGET (tcw_wnd_widget_get_type())
 #define TCW_WND_WIDGET(obj)                                                    \
@@ -18,6 +21,7 @@ typedef struct _TcwWndWidgetClass TcwWndWidgetClass;
 // These definitions must be synchronized with `window.rs`
 struct _TcwWndWidget {
     GtkDrawingArea parent_instance;
+    size_t wnd_ptr;
 };
 
 struct _TcwWndWidgetClass {
@@ -28,14 +32,22 @@ GType tcw_wnd_widget_get_type(void);
 
 G_DEFINE_TYPE(TcwWndWidget, tcw_wnd_widget, GTK_TYPE_DRAWING_AREA)
 
+static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr);
+
 static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
-    (void)widget_class;
+    widget_class->draw = tcw_wnd_widget_draw;
 }
 
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
     GtkWidget *widget = GTK_WIDGET(self);
     (void)widget;
+}
+
+static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    tcw_wnd_widget_draw_handler(wnd_widget->wnd_ptr, cr);
+    return TRUE;
 }
 
 /// Called by `window.rs`.

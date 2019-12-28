@@ -1,13 +1,13 @@
 use glib::{
     glib_object_wrapper, glib_wrapper,
-    translate::{FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
+    translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
 };
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
-use super::{Wm, WndAttrs};
-use crate::{iface, MtSticky};
+use super::{comp, Wm, WndAttrs};
+use crate::{cells::MtLazyStatic, iface, iface::Wm as WmTrait, mt_lazy_static, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
@@ -19,14 +19,20 @@ static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
     unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
 };
 
+mt_lazy_static! {
+    pub(super) static <Wm> ref COMPOSITOR: RefCell<comp::Compositor> =>
+        |_| RefCell::new(comp::Compositor::new());
+}
+
 struct Wnd {
     gtk_wnd: gtk::Window,
     gtk_widget: WndWidget,
+    comp_wnd: comp::Wnd,
 }
 
 impl HWnd {
     /// Implements `Wm::new_wnd`.
-    pub(super) fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> Self {
+    pub(super) fn new_wnd(wm: Wm, mut attrs: WndAttrs<'_>) -> Self {
         let gtk_wnd = gtk::Window::new(gtk::WindowType::Toplevel);
 
         let gtk_widget = WndWidget::new(wm);
@@ -35,11 +41,24 @@ impl HWnd {
         gtk_wnd.set_hexpand(true);
         gtk_wnd.set_vexpand(true);
 
+        let comp_wnd = COMPOSITOR
+            .get_with_wm(wm)
+            .borrow_mut()
+            .new_wnd(attrs.layer.take().unwrap_or(None));
+
         let wnd = Wnd {
             gtk_wnd,
             gtk_widget,
+            comp_wnd,
         };
-        let ptr = WNDS.get_with_wm(wm).borrow_mut().allocate(wnd);
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let ptr = wnds.allocate(wnd);
+        wnds[ptr].gtk_widget.wnd_ptr().set(ptr.0.get());
+
+        // `set_wnd_attr` borrows `WNDS`, so unborrow it before calling that
+        drop(wnds);
+
         let this = Self { ptr };
         this.set_wnd_attr(wm, attrs);
         this
@@ -83,8 +102,14 @@ impl HWnd {
                 .set_resizable(flags.contains(iface::WndFlags::RESIZABLE));
         }
 
+        if let Some(layer) = attrs.layer {
+            COMPOSITOR
+                .get_with_wm(wm)
+                .borrow_mut()
+                .set_wnd_layer(&wnd.comp_wnd, layer);
+        }
+
         // TODO: listener
-        // TODO: layer
         // TODO: cursor_shape
 
         if let Some(caption) = attrs.caption {
@@ -93,23 +118,53 @@ impl HWnd {
 
         if let Some(visible) = attrs.visible {
             if visible {
-                wnd.gtk_wnd.show();
+                wnd.gtk_wnd.show_all();
             } else {
                 wnd.gtk_wnd.hide();
             }
         }
-
-        // TODO
     }
 
     /// Implements `Wm::remove_wnd`.
     pub(super) fn remove_wnd(&self, wm: Wm) {
-        WNDS.get_with_wm(wm).borrow_mut().deallocate(self.ptr);
+        let wnd = WNDS
+            .get_with_wm(wm)
+            .borrow_mut()
+            .deallocate(self.ptr)
+            .unwrap();
+
+        COMPOSITOR
+            .get_with_wm(wm)
+            .borrow_mut()
+            .remove_wnd(&wnd.comp_wnd);
     }
 
     /// Implements `Wm::update_wnd`.
     pub(super) fn update_wnd(&self, wm: Wm) {
-        // TODO
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let wnd = &mut wnds[self.ptr];
+
+        if !wnd.gtk_wnd.is_visible() {
+            return;
+        }
+
+        let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
+
+        let added_dirty_rect = COMPOSITOR.get_with_wm(wm).borrow_mut().update_wnd(
+            &mut wnd.comp_wnd,
+            surf_size,
+            dpi_scale,
+            true,
+        );
+
+        if let Some(r) = added_dirty_rect {
+            let fac = wnd.gtk_wnd.get_scale_factor();
+            let x = r.min.x as i32 / fac;
+            let y = r.min.y as i32 / fac;
+            let width = (r.max.x as i32 + fac - 1) / fac - x;
+            let height = (r.max.y as i32 + fac - 1) / fac - y;
+            wnd.gtk_wnd.queue_draw_area(x, y, width, height);
+        }
     }
 
     /// Implements `Wm::get_wnd_size`.
@@ -130,8 +185,45 @@ impl HWnd {
     }
 
     /// Implements `Wm::request_update_ready_wnd`.
-    pub(super) fn request_update_ready_wnd(&self, wm: Wm) {
+    pub(super) fn request_update_ready_wnd(&self, _wm: Wm) {
         // TODO
+    }
+}
+
+fn comp_surf_props_for_gtk_wnd(gtk_wnd: &gtk::Window) -> ([usize; 2], f32) {
+    let factor = gtk_wnd.get_scale_factor() as usize;
+
+    (
+        [
+            gtk_wnd.get_allocated_width() as usize * factor,
+            gtk_wnd.get_allocated_height() as usize * factor,
+        ],
+        factor as f32,
+    )
+}
+
+/// Handles `GtkWidgetClass::draw`. `wnd_ptr` is retrieved from
+/// `TcwWndWidget::wnd_ptr`.
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_sys::cairo_t) {
+    use std::num::NonZeroUsize;
+    let wm = unsafe { Wm::global_unchecked() };
+
+    let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+    let wnd = &mut wnds[PoolPtr(NonZeroUsize::new(wnd_ptr).unwrap())];
+
+    let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
+
+    let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
+    compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale, false);
+
+    compositor.paint_wnd(&mut wnd.comp_wnd);
+
+    let cr = unsafe { cairo::Context::from_glib_borrow(cairo_ctx) };
+    if let Some(surface) = wnd.comp_wnd.cairo_surface() {
+        cr.set_source_surface(surface, 0.0, 0.0);
+        cr.set_operator(cairo::Operator::Over);
+        cr.paint();
     }
 }
 
@@ -157,6 +249,9 @@ extern "C" {
 #[repr(C)]
 pub struct TcwWndWidget {
     parent_instance: gtk_sys::GtkDrawingArea,
+    /// Stores `HWnd`. This field is only touched by a main thread, so it's safe
+    /// to access through `Cell`.
+    wnd_ptr: Cell<usize>,
 }
 
 #[repr(C)]
@@ -165,7 +260,12 @@ pub struct TcwWndWidgetClass {
 }
 
 impl WndWidget {
-    fn new(wm: Wm) -> Self {
+    fn new(_: Wm) -> Self {
+        // We have `Wm`, so we know we are on the main thread, hence this is safe
         unsafe { gtk::Widget::from_glib_none(tcw_wnd_widget_new()).unsafe_cast() }
+    }
+
+    fn wnd_ptr(&self) -> &Cell<usize> {
+        unsafe { &(&*self.as_ptr()).wnd_ptr }
     }
 }
