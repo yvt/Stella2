@@ -34,13 +34,15 @@ struct Wnd {
     comp_wnd: comp::Wnd,
     // TODO: Handle the following events:
     //       - update_ready
-    //       - resize
     //       - mouse_motion
     //       - mouse_leave
     //       - mouse_drag
     //       - scroll_motion
     //       - scroll_gesture
     listener: Rc<dyn iface::WndListener<Wm>>,
+
+    /// The last known size of the window.
+    size: [i32; 2],
 }
 
 impl HWnd {
@@ -64,6 +66,7 @@ impl HWnd {
             gtk_widget,
             comp_wnd,
             listener: Rc::new(()),
+            size: [0, 0],
         };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -256,6 +259,27 @@ fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) ->
 /// `TcwWndWidget::wnd_ptr`.
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_sys::cairo_t) {
+    // Emit `resize` event if needed. `resize`'s event handler may call
+    // `Wm::update_wnd`.
+    if let Some(Some((wm, hwnd, listener))) = with_wnd_mut(
+        unsafe { Wm::global_unchecked() },
+        wnd_ptr,
+        |wnd, hwnd, wm| {
+            let size = [
+                wnd.gtk_wnd.get_allocated_width(),
+                wnd.gtk_wnd.get_allocated_height(),
+            ];
+            if size != wnd.size {
+                wnd.size = size;
+                Some((wm, hwnd, Rc::clone(&wnd.listener)))
+            } else {
+                None
+            }
+        },
+    ) {
+        listener.resize(wm, &hwnd);
+    }
+
     with_wnd_mut(unsafe { Wm::global_unchecked() }, wnd_ptr, |wnd, _, wm| {
         let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
 
