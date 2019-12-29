@@ -35,7 +35,6 @@ struct Wnd {
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
     // TODO: Handle the following events:
-    //       - update_ready
     //       - mouse_motion
     //       - mouse_leave
     //       - mouse_drag
@@ -45,6 +44,9 @@ struct Wnd {
 
     /// The last known size of the window.
     size: [i32; 2],
+
+    tick_callback_active: bool,
+    tick_callback_continue: bool,
 }
 
 impl HWnd {
@@ -69,6 +71,8 @@ impl HWnd {
             comp_wnd,
             listener: Rc::new(()),
             size: [0, 0],
+            tick_callback_active: false,
+            tick_callback_continue: false,
         };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -215,8 +219,73 @@ impl HWnd {
     }
 
     /// Implements `Wm::request_update_ready_wnd`.
-    pub(super) fn request_update_ready_wnd(&self, _wm: Wm) {
-        // TODO
+    pub(super) fn request_update_ready_wnd(&self, wm: Wm) {
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let wnd = &mut wnds[self.ptr];
+
+        // If we are currently inside a tick handler, tell the handler
+        // not to stop the tick callback
+        wnd.tick_callback_continue = true;
+
+        if !wnd.tick_callback_active {
+            wnd.tick_callback_active = true;
+            unsafe {
+                gtk_sys::gtk_widget_add_tick_callback(
+                    wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
+                    Some(Self::handle_tick_callback),
+                    self.ptr.0.get() as _,
+                    None,
+                );
+            }
+        }
+    }
+
+    extern "C" fn handle_tick_callback(
+        _: *mut gtk_sys::GtkWidget,
+        _: *mut gdk_sys::GdkFrameClock,
+        userdata: glib_sys::gpointer,
+    ) -> glib_sys::gboolean {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(std::num::NonZeroUsize::new(userdata as _).unwrap());
+        let hwnd = HWnd { ptr };
+
+        let listener = {
+            let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+            let wnd = if let Some(wnd) = wnds.get_mut(ptr) {
+                wnd
+            } else {
+                // The window is gone
+                return glib_sys::G_SOURCE_REMOVE;
+            };
+            debug_assert!(wnd.tick_callback_active);
+            wnd.tick_callback_continue = false;
+            Rc::clone(&wnd.listener)
+        };
+
+        listener.update_ready(wm, &hwnd);
+
+        // Decide whether we should stop the tick callback or not
+        let cont = {
+            let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+            let wnd = if let Some(wnd) = wnds.get_mut(ptr) {
+                wnd
+            } else {
+                // The window was removed by `listener.update_ready`
+                return glib_sys::G_SOURCE_REMOVE;
+            };
+            if wnd.tick_callback_continue {
+                true
+            } else {
+                wnd.tick_callback_active = false;
+                false
+            }
+        };
+
+        if cont {
+            glib_sys::G_SOURCE_CONTINUE
+        } else {
+            glib_sys::G_SOURCE_REMOVE
+        }
     }
 }
 
