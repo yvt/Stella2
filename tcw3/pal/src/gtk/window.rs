@@ -28,6 +28,8 @@ mt_lazy_static! {
         |_| RefCell::new(comp::Compositor::new());
 }
 
+static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>> = MtSticky::new(Cell::new(None));
+
 struct Wnd {
     gtk_wnd: gtk::Window,
     gtk_widget: WndWidget,
@@ -165,6 +167,10 @@ impl HWnd {
 
     /// Implements `Wm::update_wnd`.
     pub(super) fn update_wnd(&self, wm: Wm) {
+        if DRAWING_WND.get_with_wm(wm).get() == Some(self.ptr) {
+            return;
+        }
+
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
         let wnd = &mut wnds[self.ptr];
 
@@ -263,7 +269,12 @@ extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_
             }
         },
     ) {
+        // Suppress `Wm::update_wnd`
+        DRAWING_WND.get_with_wm(wm).set(Some(hwnd.ptr));
+
         listener.resize(wm, &hwnd);
+
+        DRAWING_WND.get_with_wm(wm).set(None);
     }
 
     with_wnd_mut(unsafe { Wm::global_unchecked() }, wnd_ptr, |wnd, _, wm| {
