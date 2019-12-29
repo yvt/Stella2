@@ -4,6 +4,7 @@ use glib::{
 };
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
+use log::warn;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -34,7 +35,6 @@ struct Wnd {
     // TODO: Handle the following events:
     //       - update_ready
     //       - resize
-    //       - dpi_scale_changed
     //       - mouse_motion
     //       - mouse_leave
     //       - mouse_drag
@@ -237,28 +237,52 @@ fn comp_surf_props_for_gtk_wnd(gtk_wnd: &gtk::Window) -> ([usize; 2], f32) {
     )
 }
 
+/// Used by `TcwWndWidget`'s callback functions. Mutably borrow `WNDS` and
+/// call the given closure with `Wnd`, `HWnd`, and `Wm`.
+fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) -> R) -> Option<R> {
+    use std::num::NonZeroUsize;
+    let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr).unwrap());
+
+    let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+    if let Some(wnd) = wnds.get_mut(ptr) {
+        Some(f(wnd, HWnd { ptr }, wm))
+    } else {
+        warn!("Ignoring invalid window ptr: {:?}", ptr);
+        None
+    }
+}
+
 /// Handles `GtkWidgetClass::draw`. `wnd_ptr` is retrieved from
 /// `TcwWndWidget::wnd_ptr`.
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_sys::cairo_t) {
-    use std::num::NonZeroUsize;
-    let wm = unsafe { Wm::global_unchecked() };
+    with_wnd_mut(unsafe { Wm::global_unchecked() }, wnd_ptr, |wnd, _, wm| {
+        let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
 
-    let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
-    let wnd = &mut wnds[PoolPtr(NonZeroUsize::new(wnd_ptr).unwrap())];
+        let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
+        compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale, false);
 
-    let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
+        compositor.paint_wnd(&mut wnd.comp_wnd);
 
-    let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
-    compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale, false);
+        let cr = unsafe { cairo::Context::from_glib_borrow(cairo_ctx) };
+        if let Some(surface) = wnd.comp_wnd.cairo_surface() {
+            cr.set_source_surface(surface, 0.0, 0.0);
+            cr.set_operator(cairo::Operator::Over);
+            cr.paint();
+        }
+    });
+}
 
-    compositor.paint_wnd(&mut wnd.comp_wnd);
-
-    let cr = unsafe { cairo::Context::from_glib_borrow(cairo_ctx) };
-    if let Some(surface) = wnd.comp_wnd.cairo_surface() {
-        cr.set_source_surface(surface, 0.0, 0.0);
-        cr.set_operator(cairo::Operator::Over);
-        cr.paint();
+/// Handles `notify::scale-factor`.
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: usize) {
+    if let Some((wm, hwnd, listener)) = with_wnd_mut(
+        unsafe { Wm::global_unchecked() },
+        wnd_ptr,
+        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
+    ) {
+        dbg!();
+        listener.dpi_scale_changed(wm, &hwnd);
     }
 }
 

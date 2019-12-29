@@ -33,6 +33,8 @@ GType tcw_wnd_widget_get_type(void);
 G_DEFINE_TYPE(TcwWndWidget, tcw_wnd_widget, GTK_TYPE_DRAWING_AREA)
 
 static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr);
+static void tcw_wnd_notify_scale_factor(TcwWndWidget *wnd_widget,
+                                        GParamSpec *pspec, gpointer user_data);
 
 static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
@@ -40,14 +42,21 @@ static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
 }
 
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
-    GtkWidget *widget = GTK_WIDGET(self);
-    (void)widget;
+    g_signal_connect_object(self, "notify::scale-factor",
+                            G_CALLBACK(tcw_wnd_notify_scale_factor), self, 0);
 }
 
 static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr) {
     TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
     tcw_wnd_widget_draw_handler(wnd_widget->wnd_ptr, cr);
     return TRUE;
+}
+
+static void tcw_wnd_notify_scale_factor(TcwWndWidget *wnd_widget,
+                                        GParamSpec *pspec, gpointer user_data) {
+    (void)pspec;
+    (void)user_data;
+    tcw_wnd_widget_dpi_scale_changed_handler(wnd_widget->wnd_ptr);
 }
 
 /// Called by `window.rs`.
