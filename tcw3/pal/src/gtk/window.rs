@@ -53,8 +53,8 @@ impl HWnd {
         let gtk_widget = WndWidget::new(wm);
 
         gtk_wnd.add(&gtk_widget);
-        gtk_wnd.set_hexpand(true);
-        gtk_wnd.set_vexpand(true);
+        gtk_widget.set_hexpand(true);
+        gtk_widget.set_vexpand(true);
 
         let comp_wnd = COMPOSITOR
             .get_with_wm(wm)
@@ -100,32 +100,18 @@ impl HWnd {
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
         let wnd = &mut wnds[self.ptr];
 
-        let default_geom = gdk::Geometry {
-            min_width: attrs.min_size.unwrap_or_default()[0] as i32,
-            min_height: attrs.min_size.unwrap_or_default()[0] as i32,
-            max_width: attrs.max_size.unwrap_or_default()[0] as i32,
-            max_height: attrs.max_size.unwrap_or_default()[0] as i32,
-            base_width: 0,
-            base_height: 0,
-            width_inc: 0,
-            height_inc: 0,
-            min_aspect: 0.0,
-            max_aspect: 0.0,
-            win_gravity: gdk::Gravity::NorthWest,
-        };
-        let mut hint_flags = gdk::WindowHints::empty();
-        hint_flags.set(gdk::WindowHints::MIN_SIZE, attrs.min_size.is_some());
-        hint_flags.set(gdk::WindowHints::MAX_SIZE, attrs.max_size.is_some());
-
-        if !hint_flags.is_empty() {
-            wnd.gtk_wnd
-                .set_geometry_hints(None::<&gtk::Widget>, Some(&default_geom), hint_flags);
-        }
-
         if let Some(size) = attrs.size {
             wnd.gtk_wnd.resize(size[0] as i32, size[1] as i32);
             wnd.gtk_wnd.set_default_size(size[0] as i32, size[1] as i32);
         }
+
+        if let Some(size) = attrs.min_size {
+            wnd.gtk_widget
+                .set_size_request(size[0] as i32, size[1] as i32);
+        }
+
+        // TODO: `max_size`. Dimensions passed to `set_geometry_hints` must
+        //       include the window title bar and the border
 
         if let Some(flags) = attrs.flags {
             // TODO: BORDERLESS
@@ -186,7 +172,7 @@ impl HWnd {
             return;
         }
 
-        let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
+        let (surf_size, dpi_scale) = comp_surf_props_for_widget(&wnd.gtk_widget);
 
         let added_dirty_rect = COMPOSITOR.get_with_wm(wm).borrow_mut().update_wnd(
             &mut wnd.comp_wnd,
@@ -208,10 +194,10 @@ impl HWnd {
     /// Implements `Wm::get_wnd_size`.
     pub(super) fn get_wnd_size(&self, wm: Wm) -> [u32; 2] {
         let wnds = WNDS.get_with_wm(wm).borrow();
-        let gtk_wnd = &wnds[self.ptr].gtk_wnd;
+        let gtk_widget = &wnds[self.ptr].gtk_widget;
         [
-            gtk_wnd.get_allocated_width() as u32,
-            gtk_wnd.get_allocated_height() as u32,
+            gtk_widget.get_allocated_width() as u32,
+            gtk_widget.get_allocated_height() as u32,
         ]
     }
 
@@ -228,13 +214,13 @@ impl HWnd {
     }
 }
 
-fn comp_surf_props_for_gtk_wnd(gtk_wnd: &gtk::Window) -> ([usize; 2], f32) {
-    let factor = gtk_wnd.get_scale_factor() as usize;
+fn comp_surf_props_for_widget(w: &WndWidget) -> ([usize; 2], f32) {
+    let factor = w.get_scale_factor() as usize;
 
     (
         [
-            gtk_wnd.get_allocated_width() as usize * factor,
-            gtk_wnd.get_allocated_height() as usize * factor,
+            w.get_allocated_width() as usize * factor,
+            w.get_allocated_height() as usize * factor,
         ],
         factor as f32,
     )
@@ -283,7 +269,7 @@ extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_
     with_wnd_mut(unsafe { Wm::global_unchecked() }, wnd_ptr, |wnd, _, wm| {
         let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
 
-        let (surf_size, dpi_scale) = comp_surf_props_for_gtk_wnd(&wnd.gtk_wnd);
+        let (surf_size, dpi_scale) = comp_surf_props_for_widget(&wnd.gtk_widget);
         compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale, false);
 
         compositor.paint_wnd(&mut wnd.comp_wnd);
