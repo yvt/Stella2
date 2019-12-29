@@ -59,6 +59,16 @@ impl HWnd {
         gtk_widget.set_hexpand(true);
         gtk_widget.set_vexpand(true);
 
+        // Do not automatically fill the background
+        // TODO: Use `gdk_window_set_opaque_region` to optimize
+        //       system-level compositing
+        gtk_wnd.set_app_paintable(true);
+
+        // On X11, we also have to request an RGBA visual
+        if let Some(vis) = gtk_wnd.get_screen().unwrap().get_rgba_visual() {
+            gtk_wnd.set_visual(Some(&vis));
+        }
+
         let comp_wnd = COMPOSITOR
             .get_with_wm(wm)
             .borrow_mut()
@@ -355,7 +365,7 @@ extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_
         let cr = unsafe { cairo::Context::from_glib_borrow(cairo_ctx) };
         if let Some(surface) = wnd.comp_wnd.cairo_surface() {
             cr.set_source_surface(surface, 0.0, 0.0);
-            cr.set_operator(cairo::Operator::Over);
+            cr.set_operator(cairo::Operator::Source);
             cr.paint();
         }
     });
