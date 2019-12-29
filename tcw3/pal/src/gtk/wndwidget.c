@@ -88,6 +88,13 @@ static void tcw_wnd_widget_notify_scale_factor(TcwWndWidget *wnd_widget,
 static gboolean tcw_wnd_widget_button_press_event(GtkWidget *widget,
                                                   GdkEventButton *event) {
     TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    if (event->type != GDK_BUTTON_PRESS) {
+        // When the user performs a double click, the system generates
+        // `GDK_2BUTTON_PRESS` along with the normal mouse down event
+        // (`GDK_BUTTON_PRESS`) for the second click. Just ignore
+        // `GDK_2BUTTON_PRESS`.
+        return TRUE;
+    }
     tcw_wnd_widget_button_handler(wnd_widget->wnd_ptr, (float)event->x,
                                   (float)event->y, 1, (int)event->button - 1);
     return TRUE;

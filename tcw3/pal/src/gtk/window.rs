@@ -434,6 +434,9 @@ extern "C" fn tcw_wnd_widget_button_handler(
                 wnd.drag_state.as_mut().unwrap()
             };
 
+            if (drag_state.pressed_buttons & button_mask) != 0 {
+                return None;
+            }
             drag_state.pressed_buttons |= button_mask;
 
             // Call `MouseDragListener::mouse_down`
