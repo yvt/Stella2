@@ -281,7 +281,6 @@ extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: usize) {
         wnd_ptr,
         |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
     ) {
-        dbg!();
         listener.dpi_scale_changed(wm, &hwnd);
     }
 }
