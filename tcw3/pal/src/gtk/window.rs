@@ -398,6 +398,7 @@ extern "C" fn tcw_wnd_widget_button_handler(
     is_pressed: c_int,
     button: c_int,
 ) {
+    log::debug!("button{:?}", (wnd_ptr, x, y, is_pressed != 0, button));
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
         let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
@@ -497,6 +498,7 @@ extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: usize, x: f32, y: f32) {
 
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
+    log::debug!("leave{:?}", (wnd_ptr,));
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
         let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
