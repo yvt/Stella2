@@ -27,7 +27,7 @@ mt_lazy_static! {
         |_| RefCell::new(comp::Compositor::new());
 }
 
-static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>> = MtSticky::new(Cell::new(None));
+static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>, Wm> = MtSticky::new(Cell::new(None));
 
 struct Wnd {
     gtk_wnd: gtk::Window,
