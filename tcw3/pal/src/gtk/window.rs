@@ -37,7 +37,6 @@ struct Wnd {
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
     // TODO: Handle the following events:
-    //       - scroll_motion
     //       - scroll_gesture
     listener: Rc<dyn iface::WndListener<Wm>>,
 
