@@ -44,6 +44,8 @@ static gboolean tcw_wnd_widget_motion_notify_event(GtkWidget *widget,
                                                    GdkEventMotion *event);
 static gboolean tcw_wnd_widget_leave_notify_event(GtkWidget *widget,
                                                   GdkEventCrossing *event);
+static gboolean tcw_wnd_widget_scroll_event(GtkWidget *widget,
+                                            GdkEventScroll *event);
 
 static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
@@ -52,6 +54,7 @@ static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     widget_class->button_release_event = tcw_wnd_widget_button_release_event;
     widget_class->motion_notify_event = tcw_wnd_widget_motion_notify_event;
     widget_class->leave_notify_event = tcw_wnd_widget_leave_notify_event;
+    widget_class->scroll_event = tcw_wnd_widget_scroll_event;
 }
 
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
@@ -65,7 +68,7 @@ static void tcw_wnd_widget_init(TcwWndWidget *self) {
     gtk_widget_set_events(
         widget, gtk_widget_get_events(widget) | GDK_LEAVE_NOTIFY_MASK |
                     GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-                    GDK_POINTER_MOTION_MASK);
+                    GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK);
 }
 
 static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr) {
@@ -111,6 +114,37 @@ static gboolean tcw_wnd_widget_leave_notify_event(GtkWidget *widget,
     TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
     (void)event;
     tcw_wnd_widget_leave_handler(wnd_widget->wnd_ptr);
+    return TRUE;
+}
+
+static gboolean tcw_wnd_widget_scroll_event(GtkWidget *widget,
+                                            GdkEventScroll *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    (void)event;
+
+    gdouble delta_x, delta_y;
+    GdkScrollDirection direction;
+
+    if (gdk_event_get_scroll_deltas((GdkEvent *)event, &delta_x, &delta_y)) {
+        if (gdk_event_is_scroll_stop_event((GdkEvent *)event)) {
+            tcw_wnd_widget_smooth_scroll_stop_handler(wnd_widget->wnd_ptr);
+        } else {
+            tcw_wnd_widget_smooth_scroll_handler(
+                wnd_widget->wnd_ptr, (float)event->x, (float)event->y,
+                (float)delta_x, (float)delta_y);
+        }
+    } else if (gdk_event_get_scroll_direction((GdkEvent *)event, &direction)) {
+        static float steps[4][2] = {
+            [GDK_SCROLL_LEFT][0] = 1.0,   [GDK_SCROLL_LEFT][1] = 0.0,
+            [GDK_SCROLL_RIGHT][0] = -1.0, [GDK_SCROLL_RIGHT][1] = 0.0,
+            [GDK_SCROLL_UP][0] = 0.0,     [GDK_SCROLL_UP][1] = 1.0,
+            [GDK_SCROLL_DOWN][0] = 0.0,   [GDK_SCROLL_DOWN][1] = -1.0,
+        };
+        tcw_wnd_widget_discrete_scroll_handler(
+            wnd_widget->wnd_ptr, (float)event->x, (float)event->y,
+            steps[direction][0], steps[direction][1]);
+    }
+
     return TRUE;
 }
 

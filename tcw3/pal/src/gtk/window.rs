@@ -526,6 +526,50 @@ extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
     })();
 }
 
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_discrete_scroll_handler(
+    wnd_ptr: usize,
+    x: f32,
+    y: f32,
+    delta_x: f32,
+    delta_y: f32,
+) {
+    if let Some((wm, hwnd, listener)) = with_wnd_mut(
+        unsafe { Wm::global_unchecked() },
+        wnd_ptr,
+        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
+    ) {
+        listener.scroll_motion(
+            wm,
+            &hwnd,
+            [x, y].into(),
+            &iface::ScrollDelta {
+                delta: [delta_x, delta_y].into(),
+                precise: false,
+            },
+        );
+    }
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_smooth_scroll_handler(
+    wnd_ptr: usize,
+    x: f32,
+    y: f32,
+    delta_x: f32,
+    delta_y: f32,
+) {
+    log::warn!(
+        "TODO: tcw_wnd_widget_smooth_scroll_handler{:?}",
+        (wnd_ptr, x, y, delta_x, delta_y)
+    );
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: usize) {
+    log::warn!("TODO: tcw_wnd_widget_smooth_scroll_stop_handler");
+}
+
 // ============================================================================
 
 // These type are not actually `pub`, but `pub` is required by `glib_wrapper!`
