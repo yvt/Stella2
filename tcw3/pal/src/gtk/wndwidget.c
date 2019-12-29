@@ -36,16 +36,36 @@ static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr);
 static void tcw_wnd_widget_notify_scale_factor(TcwWndWidget *wnd_widget,
                                                GParamSpec *pspec,
                                                gpointer user_data);
+static gboolean tcw_wnd_widget_button_press_event(GtkWidget *widget,
+                                                  GdkEventButton *event);
+static gboolean tcw_wnd_widget_button_release_event(GtkWidget *widget,
+                                                    GdkEventButton *event);
+static gboolean tcw_wnd_widget_motion_notify_event(GtkWidget *widget,
+                                                   GdkEventMotion *event);
+static gboolean tcw_wnd_widget_leave_notify_event(GtkWidget *widget,
+                                                  GdkEventCrossing *event);
 
 static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
     widget_class->draw = tcw_wnd_widget_draw;
+    widget_class->button_press_event = tcw_wnd_widget_button_press_event;
+    widget_class->button_release_event = tcw_wnd_widget_button_release_event;
+    widget_class->motion_notify_event = tcw_wnd_widget_motion_notify_event;
+    widget_class->leave_notify_event = tcw_wnd_widget_leave_notify_event;
 }
 
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
+    GtkWidget *widget = GTK_WIDGET(self);
+
     g_signal_connect_object(self, "notify::scale-factor",
                             G_CALLBACK(tcw_wnd_widget_notify_scale_factor),
                             self, 0);
+
+    // Enable events
+    gtk_widget_set_events(
+        widget, gtk_widget_get_events(widget) | GDK_LEAVE_NOTIFY_MASK |
+                    GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+                    GDK_POINTER_MOTION_MASK);
 }
 
 static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr) {
@@ -60,6 +80,38 @@ static void tcw_wnd_widget_notify_scale_factor(TcwWndWidget *wnd_widget,
     (void)pspec;
     (void)user_data;
     tcw_wnd_widget_dpi_scale_changed_handler(wnd_widget->wnd_ptr);
+}
+
+static gboolean tcw_wnd_widget_button_press_event(GtkWidget *widget,
+                                                  GdkEventButton *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    tcw_wnd_widget_button_handler(wnd_widget->wnd_ptr, (float)event->x,
+                                  (float)event->y, 1, (int)event->button - 1);
+    return TRUE;
+}
+
+static gboolean tcw_wnd_widget_button_release_event(GtkWidget *widget,
+                                                    GdkEventButton *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    tcw_wnd_widget_button_handler(wnd_widget->wnd_ptr, (float)event->x,
+                                  (float)event->y, 0, (int)event->button - 1);
+    return TRUE;
+}
+
+static gboolean tcw_wnd_widget_motion_notify_event(GtkWidget *widget,
+                                                   GdkEventMotion *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    tcw_wnd_widget_motion_handler(wnd_widget->wnd_ptr, (float)event->x,
+                                  (float)event->y);
+    return TRUE;
+}
+
+static gboolean tcw_wnd_widget_leave_notify_event(GtkWidget *widget,
+                                                  GdkEventCrossing *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+    (void)event;
+    tcw_wnd_widget_leave_handler(wnd_widget->wnd_ptr);
+    return TRUE;
 }
 
 /// Called by `window.rs`.

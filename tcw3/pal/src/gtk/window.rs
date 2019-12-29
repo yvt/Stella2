@@ -1,3 +1,4 @@
+use cgmath::Point2;
 use glib::{
     glib_object_wrapper, glib_wrapper,
     translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
@@ -7,6 +8,7 @@ use iterpool::{Pool, PoolPtr};
 use std::{
     cell::{Cell, RefCell},
     num::NonZeroUsize,
+    os::raw::c_int,
     rc::Rc,
 };
 
@@ -35,9 +37,6 @@ struct Wnd {
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
     // TODO: Handle the following events:
-    //       - mouse_motion
-    //       - mouse_leave
-    //       - mouse_drag
     //       - scroll_motion
     //       - scroll_gesture
     listener: Rc<dyn iface::WndListener<Wm>>,
@@ -47,6 +46,13 @@ struct Wnd {
 
     tick_callback_active: bool,
     tick_callback_continue: bool,
+
+    drag_state: Option<MouseDragState>,
+}
+
+struct MouseDragState {
+    listener: Rc<dyn iface::MouseDragListener<Wm>>,
+    pressed_buttons: u32,
 }
 
 impl HWnd {
@@ -83,6 +89,7 @@ impl HWnd {
             size: [0, 0],
             tick_callback_active: false,
             tick_callback_continue: false,
+            drag_state: None,
         };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -381,6 +388,142 @@ extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: usize) {
     ) {
         listener.dpi_scale_changed(wm, &hwnd);
     }
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_button_handler(
+    wnd_ptr: usize,
+    x: f32,
+    y: f32,
+    is_pressed: c_int,
+    button: c_int,
+) {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let loc = Point2::new(x, y);
+        let button_mask = 1 << button;
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let mut wnd = wnds.get_mut(ptr)?;
+
+        if is_pressed != 0 {
+            // Mouse button pressed
+            let drag_state = if let Some(drag_state) = &mut wnd.drag_state {
+                drag_state
+            } else {
+                // Unborrow `WNDS` before calling into user code
+                let listener = Rc::clone(&wnd.listener);
+                drop(wnd);
+                drop(wnds);
+
+                // Create `MouseDragState`
+                let drag_state = MouseDragState {
+                    listener: listener.mouse_drag(wm, &hwnd, loc, button as u8).into(),
+                    pressed_buttons: 0,
+                };
+
+                // Re-borrow `WNDS` and set `drag_state`
+                wnds = WNDS.get_with_wm(wm).borrow_mut();
+                wnd = wnds.get_mut(ptr)?;
+                debug_assert!(wnd.drag_state.is_none());
+                wnd.drag_state = Some(drag_state);
+                wnd.drag_state.as_mut().unwrap()
+            };
+
+            drag_state.pressed_buttons |= button_mask;
+
+            // Call `MouseDragListener::mouse_down`
+            let drag_listener = Rc::clone(&drag_state.listener);
+
+            drop(wnds);
+            drag_listener.mouse_down(wm, &hwnd, loc, button as u8);
+        } else {
+            // Mouse button released
+            let drag_state = wnd.drag_state.as_mut()?;
+
+            if (drag_state.pressed_buttons & button_mask) == 0 {
+                return None;
+            }
+            drag_state.pressed_buttons &= !button_mask;
+
+            let drag_listener = if drag_state.pressed_buttons == 0 {
+                // Remove `MouseDragState` from `Wnd`
+                wnd.drag_state.take().unwrap().listener
+            } else {
+                Rc::clone(&drag_state.listener)
+            };
+
+            // Call `MouseDragListener::mouse_up`
+            drop(wnds);
+            drag_listener.mouse_up(wm, &hwnd, loc, button as u8);
+        }
+
+        Some(())
+    })();
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: usize, x: f32, y: f32) {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let loc = Point2::new(x, y);
+
+        let wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let wnd = wnds.get(ptr)?;
+
+        if let Some(drag_state) = wnd.drag_state.as_ref() {
+            // `MouseDragListener::mouse_motion`
+            let listener = Rc::clone(&drag_state.listener);
+
+            drop(wnds);
+            listener.mouse_motion(wm, &hwnd, loc);
+        } else {
+            // `WndListener::mouse_motion`
+            let listener = Rc::clone(&wnd.listener);
+
+            drop(wnds);
+            listener.mouse_motion(wm, &hwnd, loc);
+        }
+
+        Some(())
+    })();
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let mut wnd = wnds.get_mut(ptr)?;
+
+        if let Some(drag_state) = wnd.drag_state.take() {
+            // Cancel the mouse drag gesture first
+            let listener = Rc::clone(&drag_state.listener);
+
+            drop(wnds);
+            listener.cancel(wm, &hwnd);
+
+            // Re-borrow `WNDS`
+            wnds = WNDS.get_with_wm(wm).borrow_mut();
+            wnd = wnds.get_mut(ptr)?;
+        }
+
+        let listener = Rc::clone(&wnd.listener);
+
+        drop(wnds);
+        listener.mouse_leave(wm, &hwnd);
+
+        Some(())
+    })();
 }
 
 // ============================================================================
