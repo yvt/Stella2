@@ -6,6 +6,7 @@ use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
 use std::{
     cell::{Cell, RefCell},
+    num::NonZeroUsize,
     rc::Rc,
 };
 
@@ -258,7 +259,7 @@ impl HWnd {
         userdata: glib_sys::gpointer,
     ) -> glib_sys::gboolean {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(std::num::NonZeroUsize::new(userdata as _).unwrap());
+        let ptr = PoolPtr(NonZeroUsize::new(userdata as _).unwrap());
         let hwnd = HWnd { ptr };
 
         let listener = {
@@ -316,7 +317,6 @@ fn comp_surf_props_for_widget(w: &WndWidget) -> ([usize; 2], f32) {
 /// Used by `TcwWndWidget`'s callback functions. Mutably borrow `WNDS` and
 /// call the given closure with `Wnd`, `HWnd`, and `Wm`.
 fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) -> R) -> Option<R> {
-    use std::num::NonZeroUsize;
     let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
 
     let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
