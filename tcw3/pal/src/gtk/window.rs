@@ -4,7 +4,10 @@ use glib::{
 };
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use super::{comp, Wm, WndAttrs};
 use crate::{cells::MtLazyStatic, iface, iface::Wm as WmTrait, mt_lazy_static, MtSticky};
@@ -28,6 +31,16 @@ struct Wnd {
     gtk_wnd: gtk::Window,
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
+    // TODO: Handle the following events:
+    //       - update_ready
+    //       - resize
+    //       - dpi_scale_changed
+    //       - mouse_motion
+    //       - mouse_leave
+    //       - mouse_drag
+    //       - scroll_motion
+    //       - scroll_gesture
+    listener: Rc<dyn iface::WndListener<Wm>>,
 }
 
 impl HWnd {
@@ -50,11 +63,26 @@ impl HWnd {
             gtk_wnd,
             gtk_widget,
             comp_wnd,
+            listener: Rc::new(()),
         };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
         let ptr = wnds.allocate(wnd);
-        wnds[ptr].gtk_widget.wnd_ptr().set(ptr.0.get());
+
+        // Connect window events
+        let wnd = &wnds[ptr];
+        wnd.gtk_widget.wnd_ptr().set(ptr.0.get());
+
+        wnd.gtk_wnd.connect_delete_event(move |_, _| {
+            let listener = {
+                let wnds = WNDS.get_with_wm(wm).borrow();
+                Rc::clone(&wnds[ptr].listener)
+            };
+
+            listener.close_requested(wm, &Self { ptr });
+
+            Inhibit(true)
+        });
 
         // `set_wnd_attr` borrows `WNDS`, so unborrow it before calling that
         drop(wnds);
@@ -66,8 +94,8 @@ impl HWnd {
 
     /// Implements `Wm::set_wnd_attr`.
     pub(super) fn set_wnd_attr(&self, wm: Wm, attrs: WndAttrs<'_>) {
-        let wnds = WNDS.get_with_wm(wm).borrow();
-        let wnd = &wnds[self.ptr];
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let wnd = &mut wnds[self.ptr];
 
         let default_geom = gdk::Geometry {
             min_width: attrs.min_size.unwrap_or_default()[0] as i32,
@@ -109,7 +137,10 @@ impl HWnd {
                 .set_wnd_layer(&wnd.comp_wnd, layer);
         }
 
-        // TODO: listener
+        let _old_listener;
+        if let Some(listener) = attrs.listener {
+            _old_listener = std::mem::replace(&mut wnd.listener, Rc::from(listener));
+        }
         // TODO: cursor_shape
 
         if let Some(caption) = attrs.caption {
@@ -123,6 +154,10 @@ impl HWnd {
                 wnd.gtk_wnd.hide();
             }
         }
+
+        // Unborrow `WNDS` before dropping `old_listener` (which might execute
+        // user code)
+        drop(wnds);
     }
 
     /// Implements `Wm::remove_wnd`.
