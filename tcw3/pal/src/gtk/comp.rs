@@ -120,18 +120,15 @@ impl Compositor {
 
             wnd.surf_size = surf_size_sz;
             wnd.surf_dpi_scale = surf_dpi_scale;
+            wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size_sz });
         }
 
         // Compute the dirty region
-        let mut new_dirty = if update_layers {
+        let new_dirty = if update_layers {
             self.sr_scrn.update_wnd(&wnd.sr_wnd)
         } else {
             None
         };
-
-        if should_renew_surface {
-            new_dirty = Some(box2! { min: [0, 0], max: surf_size_sz });
-        }
 
         if let Some(new_dirty) = new_dirty {
             if let Some(x) = &mut wnd.dirty_rect {
