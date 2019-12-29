@@ -4,7 +4,6 @@ use glib::{
 };
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
-use log::warn;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -163,6 +162,9 @@ impl HWnd {
             .deallocate(self.ptr)
             .unwrap();
 
+        // Suppress further callbacks
+        wnd.gtk_widget.wnd_ptr().set(0);
+
         COMPOSITOR
             .get_with_wm(wm)
             .borrow_mut()
@@ -305,15 +307,11 @@ fn comp_surf_props_for_widget(w: &WndWidget) -> ([usize; 2], f32) {
 /// call the given closure with `Wnd`, `HWnd`, and `Wm`.
 fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) -> R) -> Option<R> {
     use std::num::NonZeroUsize;
-    let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr).unwrap());
+    let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
 
     let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
-    if let Some(wnd) = wnds.get_mut(ptr) {
-        Some(f(wnd, HWnd { ptr }, wm))
-    } else {
-        warn!("Ignoring invalid window ptr: {:?}", ptr);
-        None
-    }
+    let wnd = wnds.get_mut(ptr)?;
+    Some(f(wnd, HWnd { ptr }, wm))
 }
 
 /// Handles `GtkWidgetClass::draw`. `wnd_ptr` is retrieved from
