@@ -197,7 +197,7 @@ impl HWnd {
             let y = r.min.y as i32 / fac;
             let width = (r.max.x as i32 + fac - 1) / fac - x;
             let height = (r.max.y as i32 + fac - 1) / fac - y;
-            wnd.gtk_wnd.queue_draw_area(x, y, width, height);
+            wnd.gtk_widget.queue_draw_area(x, y, width, height);
         }
     }
 
