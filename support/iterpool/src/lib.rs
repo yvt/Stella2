@@ -230,11 +230,11 @@ impl<T> Pool<T> {
     }
 
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
-        self.storage[fp.get()].as_ref()
+        self.storage.get(fp.get()).and_then(Entry::as_ref)
     }
 
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
-        self.storage[fp.get()].as_mut()
+        self.storage.get_mut(fp.get()).and_then(Entry::as_mut)
     }
 
     /// Iterate over objects. Unlike `IterablePool`, `Pool` can't skip free
@@ -376,11 +376,11 @@ impl<T> IterablePool<T> {
     }
 
     pub fn get(&self, fp: PoolPtr) -> Option<&T> {
-        self.storage[fp.get()].as_ref()
+        self.storage.get(fp.get()).and_then(ItEntry::as_ref)
     }
 
     pub fn get_mut(&mut self, fp: PoolPtr) -> Option<&mut T> {
-        self.storage[fp.get()].as_mut()
+        self.storage.get_mut(fp.get()).and_then(ItEntry::as_mut)
     }
 
     pub fn iter(&self) -> Iter<'_, T> {
@@ -556,6 +556,20 @@ mod tests {
         let ptr = pool.allocate(1);
         pool.deallocate(ptr);
         pool[ptr];
+    }
+
+    #[test]
+    fn get_fail() {
+        let pool = Pool::<u32>::new();
+        let ptr = PoolPtr::uninitialized();
+        assert!(pool.get(ptr).is_none());
+    }
+
+    #[test]
+    fn it_get_fail() {
+        let pool = IterablePool::<u32>::new();
+        let ptr = PoolPtr::uninitialized();
+        assert!(pool.get(ptr).is_none());
     }
 
     #[test]
