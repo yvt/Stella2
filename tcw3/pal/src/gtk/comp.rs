@@ -106,14 +106,14 @@ impl Compositor {
 
         if should_renew_surface {
             // Update the surface size
-            wnd.cairo_img = Some(
-                ImageSurface::create(
-                    cairo::Format::ARgb32,
-                    surf_size_sz[0] as i32,
-                    surf_size_sz[1] as i32,
-                )
-                .unwrap(),
-            );
+            let cairo_img = ImageSurface::create(
+                cairo::Format::ARgb32,
+                surf_size_sz[0] as i32,
+                surf_size_sz[1] as i32,
+            )
+            .unwrap();
+            cairo_img.set_device_scale(surf_dpi_scale as f64, surf_dpi_scale as f64);
+            wnd.cairo_img = Some(cairo_img);
 
             self.sr_scrn.set_wnd_size(&wnd.sr_wnd, surf_size_sz);
             self.sr_scrn.set_wnd_dpi_scale(&wnd.sr_wnd, surf_dpi_scale);
