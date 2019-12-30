@@ -83,20 +83,23 @@ When testing the whole workspace, specifying features on individual crates won't
 
 The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work.
 
-When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system. You also need **GTK3** when building for a Linux system.
+When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system. You also need **GTK3**, **GDK3**, and **ATK** development files when building for a Linux system.
 
 Fedora:
 
 ```shell
-sudo yum install glib2-devel cairo-devel cairo-gobject-devel pango-devel
+sudo yum install glib2-devel cairo-devel cairo-gobject-devel pango-devel \
+     gtk3-devel atk-devel
 ```
 
 Nix:
 
 ```shell
 # Assumes `cargo` and the nightly toolchain are already available.
-nix-shell -p glib gtk3 pkgconfig pango harfbuzz \
-  --run 'cargo build --release -p stella2'
+nix-shell -p gtk3 pkgconfig --run 'cargo build --release -p stella2'
+
+# Without GTK3 (e.g., when building on macOS):
+nix-shell -p glib pango harfbuzz pkgconfig --run 'cargo build --release -p stella2'
 ```
 
 ## Third-party software
