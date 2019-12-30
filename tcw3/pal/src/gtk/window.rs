@@ -416,7 +416,6 @@ extern "C" fn tcw_wnd_widget_button_handler(
             } else {
                 // Unborrow `WNDS` before calling into user code
                 let listener = Rc::clone(&wnd.listener);
-                drop(wnd);
                 drop(wnds);
 
                 // Create `MouseDragState`
@@ -613,6 +612,6 @@ impl WndWidget {
     }
 
     fn wnd_ptr(&self) -> &Cell<usize> {
-        unsafe { &(&*self.as_ptr()).wnd_ptr }
+        unsafe { &(*self.as_ptr()).wnd_ptr }
     }
 }
