@@ -136,7 +136,7 @@ unsafe impl<T: Send, TWM: WMTrait> Sync for MtLock<T, TWM> {}
 
 impl<T: fmt::Debug, TWM: WMTrait> fmt::Debug for MtLock<T, TWM> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Ok(wm) = Wm::try_global() {
+        if let Ok(wm) = TWM::try_global() {
             f.debug_tuple("MtLock").field(self.get_with_wm(wm)).finish()
         } else {
             write!(f, "MtLock(<not main thread>)")
@@ -184,7 +184,7 @@ impl<T, TWM: WMTrait> MtLock<T, TWM> {
 
     /// Get a reference to the inner value with compile-time thread checking.
     #[inline]
-    pub fn get_with_wm(&self, _: Wm) -> &T {
+    pub fn get_with_wm(&self, _: TWM) -> &T {
         unsafe { &*self.get_ptr() }
     }
 }

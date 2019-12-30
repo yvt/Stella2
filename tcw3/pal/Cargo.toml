@@ -59,17 +59,25 @@ core-text = "15.0.0"
 dispatch = "0.1.4"
 objc = "0.2.3"
 
-# `unix` backend
+# `gtk` backend
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-winit = "0.20.0-alpha3"
-swsurface = "0.1.2"
-cairo-rs = "0.8.0"
+gio = "0.7.0"
+gdk = "0.12.0"
+gdk-sys = "0.9.1"
+glib = "0.9.0"
+glib-sys = "0.9.1"
+gtk = "0.8.0"
+gtk-sys = "0.9.1"
+# `cairo_surface_set_device_scale` requires v1.14
+cairo-rs = { version = "0.8.0", features = ["v1_14"] }
+cairo-sys-rs = "0.9.2"
 pangocairo = "0.9.0"
 pango = "0.8.0"
 rayon = "1.2.0"
 
 [build-dependencies]
 cc = "1.0.35"
+pkg-config = "0.3.7"
 
 [dev-dependencies]
 demotools = { path = "../../support/demotools" }

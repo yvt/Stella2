@@ -52,22 +52,24 @@ pub mod macos;
 #[cfg(target_os = "macos")]
 pub use macos as native;
 
+// TODO: remove `unix`?
+
 #[cfg(not(target_os = "macos"))]
-pub mod unix;
+pub mod gtk;
 #[cfg(not(target_os = "macos"))]
-pub use unix as native;
+pub use self::gtk as native;
 
 // TODO: Windows
 
 // And here are supporting modules, which are shared between the
 // platform-specific modules.
-#[cfg(any(not(target_os = "macos"), feature = "winit"))]
+#[cfg(feature = "winit")]
 mod winit;
 
 #[cfg(any(not(target_os = "macos"), feature = "testing"))]
 mod swrast;
 
-#[cfg(any(not(target_os = "macos"), feature = "winit", feature = "testing"))]
+#[cfg(any(feature = "winit", feature = "testing"))]
 mod timerqueue;
 
 // ============================================================================
