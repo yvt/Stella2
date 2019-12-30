@@ -1,4 +1,5 @@
 use cgmath::{Point2, Vector2};
+use gdk::prelude::*;
 use glib::{
     glib_object_wrapper, glib_wrapper,
     translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
@@ -176,7 +177,54 @@ impl HWnd {
         if let Some(listener) = attrs.listener {
             _old_listener = std::mem::replace(&mut wnd.listener, Rc::from(listener));
         }
-        // TODO: cursor_shape
+
+        if let Some(shape) = attrs.cursor_shape {
+            use self::iface::CursorShape;
+            let name = match shape {
+                CursorShape::Default => "default",
+                CursorShape::Crosshair => "crosshair",
+                CursorShape::Hand => "pointer",
+                CursorShape::Arrow => "default",
+                CursorShape::Move => "move",
+                CursorShape::Text => "text",
+                CursorShape::Wait => "wait",
+                CursorShape::Help => "help",
+                CursorShape::Progress => "progress",
+                CursorShape::NotAllowed => "not-allowed",
+                CursorShape::ContextMenu => "context-menu",
+                CursorShape::Cell => "cell",
+                CursorShape::VerticalText => "vertical-text",
+                CursorShape::Alias => "alias",
+                CursorShape::Copy => "copy",
+                CursorShape::NoDrop => "no-drop",
+                CursorShape::Grab => "grab",
+                CursorShape::Grabbing => "grabbing",
+                CursorShape::AllScroll => "all-scroll",
+                CursorShape::ZoomIn => "zoom-in",
+                CursorShape::ZoomOut => "zoom-out",
+                CursorShape::EResize => "e-resize",
+                CursorShape::NResize => "n-resize",
+                CursorShape::NeResize => "ne-resize",
+                CursorShape::NwResize => "ne-resize",
+                CursorShape::SResize => "s-resize",
+                CursorShape::SeResize => "se-resize",
+                CursorShape::SwResize => "sw-resize",
+                CursorShape::WResize => "w-resize",
+                CursorShape::EwResize => "ew-resize",
+                CursorShape::NsResize => "ns-resize",
+                CursorShape::NeswResize => "nesw-resize",
+                CursorShape::NwseResize => "nwse-resize",
+                CursorShape::ColResize => "col-resize",
+                CursorShape::RowResize => "row-resize",
+            };
+
+            let cursor = gdk::Cursor::new_from_name(&wnd.gtk_widget.get_display().unwrap(), name);
+
+            wnd.gtk_wnd
+                .get_window()
+                .unwrap()
+                .set_cursor(cursor.as_ref());
+        }
 
         if let Some(caption) = attrs.caption {
             wnd.gtk_wnd.set_title(&caption);
