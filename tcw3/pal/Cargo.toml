@@ -8,12 +8,6 @@ license = "MIT"
 [features]
 default = []
 
-# This flag enables the use of `winit` in the macOS backend for creating
-# windows and handling input events. Whether this should be default or not is
-# yet to be determined. After it's decided, this feature flag probably should be
-# remove.
-macos_winit = ["winit"]
-
 # Enables the testing backend. Note that the testing backend needs to be
 # activated at runtime before use.
 testing = ["atom2", "cairo-rs", "pangocairo", "pango", "rayon"]
