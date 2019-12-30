@@ -36,7 +36,6 @@ owning_ref = "0.4.0"
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
-winit = { version = "0.20.0-alpha3", optional = true }
 zerocopy = "0.2.8"
 
 # testing backend (borrows some implementation from `unix`)
