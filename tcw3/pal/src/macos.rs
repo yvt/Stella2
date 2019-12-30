@@ -17,29 +17,18 @@ pub use self::bitmap::{Bitmap, BitmapBuilder};
 pub use self::layer::HLayer;
 pub use self::text::{CharStyle, TextLayout};
 
-cfg_if! {
-    if #[cfg(feature = "macos_winit")] {
-        mod winitwindow;
-        pub use self::winitwindow::HWnd;
-        pub use super::winit::HInvokeCore as HInvoke;
+use cocoa::{
+    appkit,
+    appkit::{NSApplication, NSApplicationActivationPolicy},
+    base::nil,
+};
+use objc::{msg_send, sel, sel_impl};
 
-        use super::winit::{WinitEnv, WinitWmCore};
-        static WINIT_ENV: WinitEnv<Wm, winitwindow::WndContent> = WinitEnv::new();
-    } else {
-        use cocoa::{
-            appkit,
-            appkit::{NSApplication, NSApplicationActivationPolicy},
-            base::nil,
-        };
-        use objc::{msg_send, sel, sel_impl};
+mod timer;
+mod window;
+pub use self::{timer::HInvoke, window::HWnd};
 
-        mod window;
-        mod timer;
-        pub use self::{window::HWnd, timer::HInvoke};
-
-        use self::utils::{is_main_thread, IdRef};
-    }
-}
+use self::utils::{is_main_thread, IdRef};
 
 /// Provides an access to the window system.
 ///
@@ -49,16 +38,6 @@ cfg_if! {
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
-}
-
-impl Wm {
-    /// Get the global `WinitWmCore` instance.
-    ///
-    /// Use `WinitWmCore::wm` for the conversion in the other way around.
-    #[cfg(feature = "macos_winit")]
-    fn winit_wm(self) -> &'static WinitWmCore<Wm, winitwindow::WndContent> {
-        WINIT_ENV.wm_with_wm(self)
-    }
 }
 
 impl iface::Wm for Wm {
@@ -73,17 +52,14 @@ impl iface::Wm for Wm {
         }
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn is_main_thread() -> bool {
         is_main_thread()
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
         dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
         // Give `Send` uncondionally because we don't `Send` actually
         // (we are already on the main thread)
@@ -97,17 +73,14 @@ impl iface::Wm for Wm {
         });
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
         timer::invoke_after(self, delay, f)
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn cancel_invoke(self, hinv: &Self::HInvoke) {
         timer::cancel_invoke(self, hinv)
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn enter_main_loop(self) -> ! {
         unsafe {
             let app = appkit::NSApp();
@@ -121,48 +94,11 @@ impl iface::Wm for Wm {
         std::process::exit(0);
     }
 
-    #[cfg(not(feature = "macos_winit"))]
     fn terminate(self) {
         unsafe {
             let app = appkit::NSApp();
             let () = msg_send![app, terminate: nil];
         }
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn is_main_thread() -> bool {
-        WINIT_ENV.is_main_thread()
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
-        WINIT_ENV.invoke_on_main_thread(move |winit_wm| f(winit_wm.wm()));
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn invoke(self, f: impl FnOnce(Self) + 'static) {
-        self.winit_wm().invoke(move |winit_wm| f(winit_wm.wm()));
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
-        self.winit_wm()
-            .invoke_after(delay, move |winit_wm| f(winit_wm.wm()))
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn cancel_invoke(self, hinv: &Self::HInvoke) {
-        self.winit_wm().cancel_invoke(hinv);
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn enter_main_loop(self) -> ! {
-        WINIT_ENV.wm_with_wm(self).enter_main_loop();
-    }
-
-    #[cfg(feature = "macos_winit")]
-    fn terminate(self) {
-        WINIT_ENV.wm_with_wm(self).terminate();
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {

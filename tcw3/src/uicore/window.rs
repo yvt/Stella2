@@ -258,13 +258,13 @@ impl HWnd {
 
             // A sensitive limit we set for window sizes.
             //
-            // Some backends can handle a very large maximum window size, while
-            // others fail when we set it to a very large value. For instance,
-            // when dimensions close to `u32::max_value()` are specified via
-            // `with_max_inner_size`, winit + Wayland (SCTK) causes an error
-            // like "xdg_toplevel@31: error 4: invalid negative max size
-            // requested -256 x -226". As a work-around, we limit the maximum
-            // size so that it won't cause a problem.
+            // There used to be a backend that cannot handle a very value.
+            // For instance, when dimensions close to `u32::max_value()` are
+            // specified via `with_max_inner_size`, winit + Wayland (SCTK)
+            // caused an error like "xdg_toplevel@31: error 4: invalid negative
+            // max size requested -256 x -226". To be safe, we clamp the
+            // maximum size by a much smaller value so that it won't cause a
+            // problem.
             const SIZE_MAX: f32 = 16_777_216.0;
 
             let min_s = [

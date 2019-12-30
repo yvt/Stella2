@@ -14,9 +14,9 @@ use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash, ops::Range, time::Duration};
 
 pub type RGBAF32 = RGBA<f32>;
 
-// FIXME: winit will be the primary (but not only) target, but our API isn't a
-//        perfect fit. This is because the API was originally built around
-//        Cocoa (macOS's system API). It's perfectly okay to modify it.
+// FIXME: Our API might not be a perfect fit for some platforms. This is because
+//        the API was originally built around Cocoa (macOS's system API). It's
+//        perfectly okay to modify it.
 
 /// A trait for window managers.
 ///
@@ -519,6 +519,9 @@ impl<T: Wm> ScrollListener<T> for () {}
 ///
 /// This type contains the same set of variants as `winit::window::CursorIcon`
 /// to allow cost-free conversion between these two types.
+///
+/// TODO: There is no point in copying `winit::window::CursorIcon` anymore.
+///       Remove unused variants to reduce the code size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CursorShape {
     Default,
