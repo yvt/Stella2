@@ -211,14 +211,14 @@ const NONE: u32 = 0xffffffff;
 
 impl<TBmp: Bmp> Binner<TBmp> {
     /// Construct a `Binner`.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             bins: Vec::new(),
             elems: Vec::new(),
             frags: Vec::new(),
             target_size: [0, 0],
             bin_count: [0, 0],
-            group_bins: Default::default(),
+            group_bins: arr_macro::arr![Vec::new(); 32],
         }
     }
 

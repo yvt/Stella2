@@ -185,7 +185,7 @@ struct Wnd {
 }
 
 impl<TBmp: Bmp> Screen<TBmp> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             layers: Pool::new(),
             wnds: Pool::new(),

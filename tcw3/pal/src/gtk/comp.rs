@@ -33,7 +33,7 @@ pub struct HLayer {
 }
 
 impl Compositor {
-    pub(super) fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             binner: swrast::Binner::new(),
             sr_scrn: swrast::Screen::new(),

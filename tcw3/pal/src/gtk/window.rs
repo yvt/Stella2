@@ -14,7 +14,7 @@ use std::{
 };
 
 use super::{comp, Wm, WndAttrs};
-use crate::{cells::MtLazyStatic, iface, iface::Wm as WmTrait, mt_lazy_static, MtSticky};
+use crate::{iface, iface::Wm as WmTrait, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
@@ -26,10 +26,8 @@ static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
     unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
 };
 
-mt_lazy_static! {
-    pub(super) static <Wm> ref COMPOSITOR: RefCell<comp::Compositor> =>
-        |_| RefCell::new(comp::Compositor::new());
-}
+pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>> =
+    MtSticky::new(RefCell::new(comp::Compositor::new()));
 
 static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>, Wm> = MtSticky::new(Cell::new(None));
 

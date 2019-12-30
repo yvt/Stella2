@@ -2,7 +2,7 @@
 use super::iface;
 use std::{cell::RefCell, marker::PhantomData, mem::MaybeUninit, ops::Range, time::Duration};
 
-use crate::{cells::MtLazyStatic, MtLock};
+use crate::MtLock;
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
