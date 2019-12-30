@@ -24,9 +24,9 @@ use cocoa::{
 };
 use objc::{msg_send, sel, sel_impl};
 
-mod window;
 mod timer;
-pub use self::{window::HWnd, timer::HInvoke};
+mod window;
+pub use self::{timer::HInvoke, window::HWnd};
 
 use self::utils::{is_main_thread, IdRef};
 
