@@ -15,5 +15,6 @@ extern void tcw_wnd_widget_discrete_scroll_handler(size_t wnd_ptr, float x,
                                                    float delta_y);
 extern void tcw_wnd_widget_smooth_scroll_handler(size_t wnd_ptr, float x,
                                                  float y, float delta_x,
-                                                 float delta_y);
-extern void tcw_wnd_widget_smooth_scroll_stop_handler(size_t wnd_ptr);
+                                                 float delta_y, uint32_t time);
+extern void tcw_wnd_widget_smooth_scroll_stop_handler(size_t wnd_ptr,
+                                                      uint32_t time);

@@ -1,4 +1,4 @@
-use cgmath::Point2;
+use cgmath::{Point2, Vector2};
 use glib::{
     glib_object_wrapper, glib_wrapper,
     translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
@@ -6,9 +6,9 @@ use glib::{
 use gtk::prelude::*;
 use iterpool::{Pool, PoolPtr};
 use std::{
-    cell::{Cell, RefCell},
-    num::NonZeroUsize,
-    os::raw::c_int,
+    cell::{Cell, RefCell, RefMut},
+    num::{NonZeroUsize, Wrapping},
+    os::raw::{c_int, c_uint},
     rc::Rc,
 };
 
@@ -36,8 +36,6 @@ struct Wnd {
     gtk_wnd: gtk::Window,
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
-    // TODO: Handle the following events:
-    //       - scroll_gesture
     listener: Rc<dyn iface::WndListener<Wm>>,
 
     /// The last known size of the window.
@@ -47,11 +45,36 @@ struct Wnd {
     tick_callback_continue: bool,
 
     drag_state: Option<MouseDragState>,
+    scroll_state: Option<ScrollState>,
 }
 
 struct MouseDragState {
     listener: Rc<dyn iface::MouseDragListener<Wm>>,
     pressed_buttons: u32,
+}
+
+struct ScrollState {
+    listener: Rc<dyn iface::ScrollListener<Wm>>,
+    history: [ScrollEvent; SCROLL_HISTORY_LEN],
+    history_index: Wrapping<u8>,
+    momentum: Option<MomentumScrollState>,
+}
+
+struct MomentumScrollState {
+    tick_callback_id: c_uint,
+    velocity: Vector2<f32>,
+    last_frame_time: i64,
+    elapsed_time: u32,
+}
+
+const SCROLL_HISTORY_LEN: usize = 4;
+const MOMENTUM_DURATION: u32 = 1500; // 1500 << 10 microseconds
+
+#[derive(Clone, Copy)]
+#[repr(align(16))]
+struct ScrollEvent {
+    time: Wrapping<u32>,
+    delta: Vector2<f32>,
 }
 
 impl HWnd {
@@ -89,6 +112,7 @@ impl HWnd {
             tick_callback_active: false,
             tick_callback_continue: false,
             drag_state: None,
+            scroll_state: None,
         };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -178,6 +202,18 @@ impl HWnd {
             .borrow_mut()
             .deallocate(self.ptr)
             .unwrap();
+
+        // Delete scroll tick callback
+        if let Some(scroll_state) = &wnd.scroll_state {
+            if let Some(momentum_state) = &scroll_state.momentum {
+                unsafe {
+                    gtk_sys::gtk_widget_remove_tick_callback(
+                        wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
+                        momentum_state.tick_callback_id,
+                    );
+                }
+            }
+        }
 
         // Suppress further callbacks
         wnd.gtk_widget.wnd_ptr().set(0);
@@ -407,6 +443,10 @@ extern "C" fn tcw_wnd_widget_button_handler(
         let button_mask = 1 << button;
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Stop any ongoing scroll gesture (just in case)
+        wnds = stop_scroll(wm, wnds, hwnd.clone());
+
         let mut wnd = wnds.get_mut(ptr)?;
 
         if is_pressed != 0 {
@@ -476,7 +516,11 @@ extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: usize, x: f32, y: f32) {
 
         let loc = Point2::new(x, y);
 
-        let wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Stop any ongoing scroll gesture (just in case)
+        wnds = stop_scroll(wm, wnds, hwnd.clone());
+
         let wnd = wnds.get(ptr)?;
 
         if let Some(drag_state) = wnd.drag_state.as_ref() {
@@ -537,11 +581,20 @@ extern "C" fn tcw_wnd_widget_discrete_scroll_handler(
     delta_x: f32,
     delta_y: f32,
 ) {
-    if let Some((wm, hwnd, listener)) = with_wnd_mut(
-        unsafe { Wm::global_unchecked() },
-        wnd_ptr,
-        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
-    ) {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Stop any ongoing scroll gesture (just in case)
+        wnds = stop_scroll(wm, wnds, hwnd.clone());
+
+        let wnd = wnds.get(ptr)?;
+
+        let listener = Rc::clone(&wnd.listener);
+        drop(wnds);
         listener.scroll_motion(
             wm,
             &hwnd,
@@ -551,6 +604,55 @@ extern "C" fn tcw_wnd_widget_discrete_scroll_handler(
                 precise: false,
             },
         );
+
+        Some(())
+    });
+}
+
+impl ScrollState {
+    /// Return an event in `self.history`. `i = 1` represents the last event.
+    fn past_event(&self, i: usize) -> &ScrollEvent {
+        debug_assert!(i > 0);
+        &self.history[(self.history_index.0 as usize).wrapping_sub(i) % SCROLL_HISTORY_LEN]
+    }
+
+    /// Estimate the scroll velocity based on recent event recrods.
+    fn velocity(&self, time: Wrapping<u32>) -> Vector2<f32> {
+        let mut earliest_time = time;
+        let mut num_events = 0;
+
+        while num_events < SCROLL_HISTORY_LEN {
+            let e = self.past_event(num_events + 1);
+            let delta = earliest_time - e.time;
+            if delta.0 > 50 {
+                // Too distant, probably a separate series of events
+                break;
+            }
+            earliest_time = e.time;
+            num_events += 1;
+        }
+
+        // Needs at least two events to estimate the velocity
+        if num_events >= 2 {
+            let latest_time = self.past_event(1).time;
+            //
+            //      ───────────────→ time
+            //   delta:   3   2   1     (each number represents the event
+            //                           wherein the delta value is recorded)
+            //       k:     3   2   1   (numEvents = 3)
+            //              ↑       ↑
+            //              │       └─ event.timestamp
+            //              └───────── timestamp
+            //
+            // In this example, the delta values from the two events 1 and 2
+            // should be summed and divided by the timing difference between the
+            // events 1 and 3.
+
+            let sum: Vector2<f32> = (1..num_events).map(|i| self.past_event(i).delta).sum();
+            sum * (1000.0 / (latest_time - earliest_time).0 as f32)
+        } else {
+            [0.0, 0.0].into()
+        }
     }
 }
 
@@ -561,16 +663,252 @@ extern "C" fn tcw_wnd_widget_smooth_scroll_handler(
     y: f32,
     delta_x: f32,
     delta_y: f32,
+    time: Wrapping<u32>,
 ) {
-    log::warn!(
-        "TODO: tcw_wnd_widget_smooth_scroll_handler{:?}",
-        (wnd_ptr, x, y, delta_x, delta_y)
-    );
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let loc = Point2::new(x, y);
+        let delta = iface::ScrollDelta {
+            delta: -Vector2::new(delta_x, delta_y),
+            precise: false,
+        };
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Preempt momentum scrollng
+        wnds = stop_momentum_scroll(wm, wnds, hwnd.clone());
+
+        let mut wnd = wnds.get_mut(ptr)?;
+
+        let scroll_state = if let Some(scroll_state) = &mut wnd.scroll_state {
+            scroll_state
+        } else {
+            // Unborrow `WNDS` before calling into user code
+            let listener = Rc::clone(&wnd.listener);
+            drop(wnds);
+
+            // Create `ScrollState`
+            let scroll_state = ScrollState {
+                listener: listener.scroll_gesture(wm, &hwnd, loc).into(),
+                history: [ScrollEvent {
+                    delta: [0.0, 0.0].into(),
+                    time: time - Wrapping(0x80000000), // 20 days earlier
+                }; SCROLL_HISTORY_LEN],
+                history_index: Wrapping(0),
+                momentum: None,
+            };
+
+            // Re-borrow `WNDS` and set `scroll_state`
+            wnds = WNDS.get_with_wm(wm).borrow_mut();
+            wnd = wnds.get_mut(ptr)?;
+            debug_assert!(wnd.scroll_state.is_none());
+            wnd.scroll_state = Some(scroll_state);
+            wnd.scroll_state.as_mut().unwrap()
+        };
+
+        scroll_state.history[scroll_state.history_index.0 as usize % SCROLL_HISTORY_LEN] =
+            ScrollEvent {
+                delta: delta.delta,
+                time,
+            };
+        scroll_state.history_index += Wrapping(1u8);
+
+        let velocity = scroll_state.velocity(time);
+
+        // Call `ScrollListener::motion`
+        let scroll_listener = Rc::clone(&scroll_state.listener);
+
+        drop(wnds);
+        scroll_listener.motion(wm, &hwnd, &delta, velocity);
+
+        Some(())
+    })();
 }
 
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: usize) {
-    log::warn!("TODO: tcw_wnd_widget_smooth_scroll_stop_handler");
+extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: usize, time: Wrapping<u32>) {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let hwnd = HWnd { ptr };
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Preempt (existing) momentum scrollng
+        wnds = stop_momentum_scroll(wm, wnds, hwnd.clone());
+
+        let wnd = wnds.get_mut(ptr)?;
+
+        let scroll_state = wnd.scroll_state.as_mut()?;
+        let velocity = scroll_state.velocity(time);
+
+        if velocity != Vector2::new(0.0, 0.0) {
+            // Start a momentum phase
+            let tick_callback_id = unsafe {
+                gtk_sys::gtk_widget_add_tick_callback(
+                    wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
+                    Some(handle_momentum_scroll_tick_callback),
+                    ptr.0.get() as _,
+                    None,
+                )
+            };
+
+            scroll_state.momentum = Some(MomentumScrollState {
+                tick_callback_id,
+                velocity,
+                last_frame_time: -1,
+                elapsed_time: 0,
+            });
+
+            // Call `ScrollListener::start_momentum_phase`. But, before calling into user code,
+            // we should unborrow `WNDS`.
+            let listener = Rc::clone(&scroll_state.listener);
+            drop(wnds);
+            listener.start_momentum_phase(wm, &hwnd);
+        } else {
+            let scroll_state = wnd.scroll_state.take().unwrap();
+
+            // Call `ScrollListener::end`. But, before calling into user code,
+            // we should unborrow `WNDS`.
+            drop(wnds);
+            scroll_state.listener.end(wm, &hwnd);
+        }
+
+        Some(())
+    })();
+}
+
+extern "C" fn handle_momentum_scroll_tick_callback(
+    _: *mut gtk_sys::GtkWidget,
+    frame_clock: *mut gdk_sys::GdkFrameClock,
+    userdata: glib_sys::gpointer,
+) -> glib_sys::gboolean {
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = PoolPtr(NonZeroUsize::new(userdata as _).unwrap());
+        let hwnd = HWnd { ptr };
+
+        let frame_clock = unsafe { gdk::FrameClock::from_glib_borrow(frame_clock) };
+        let frame_time = frame_clock.get_frame_time();
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+        let wnd = wnds.get_mut(ptr)?;
+
+        let scroll_state = wnd.scroll_state.as_mut()?;
+        let momentum_state = scroll_state.momentum.as_mut()?;
+
+        // Evaluate the animation
+        let (decel_curve1, _) = eval_deceleration(momentum_state.elapsed_time);
+
+        if momentum_state.last_frame_time != -1 {
+            // Update the elapsed time. Convert microseconds to milliseconds
+            // by shifting by 10 bits.
+            momentum_state.elapsed_time +=
+                ((frame_time >> 10) - (momentum_state.last_frame_time >> 10)) as u32;
+        }
+        momentum_state.last_frame_time = frame_time;
+
+        let (decel_curve2, decel_curve_vel) = eval_deceleration(momentum_state.elapsed_time);
+
+        let end = momentum_state.elapsed_time >= MOMENTUM_DURATION;
+
+        // Calculate the delta
+        let delta = momentum_state.velocity * (decel_curve2 - decel_curve1);
+        let velocity = momentum_state.velocity * decel_curve_vel;
+
+        // Grab the listener, and remove the `ScrollState`
+        // if the animation is done
+        let scroll_listener = Rc::clone(&scroll_state.listener);
+
+        if end {
+            wnd.scroll_state = None;
+        }
+
+        // Call handlers
+        drop(wnds);
+
+        scroll_listener.motion(
+            wm,
+            &hwnd,
+            &iface::ScrollDelta {
+                delta,
+                precise: false,
+            },
+            velocity,
+        );
+
+        if end {
+            scroll_listener.end(wm, &hwnd);
+            Some(glib_sys::G_SOURCE_REMOVE)
+        } else {
+            Some(glib_sys::G_SOURCE_CONTINUE)
+        }
+    })()
+    .unwrap_or(glib_sys::G_SOURCE_REMOVE)
+}
+
+/// Evaluate the deceleration animation at time `t` (measured in milliseconds).
+///
+/// Returns two values: `f(t)` and `f'(t)`.
+fn eval_deceleration(t: u32) -> (f32, f32) {
+    // Let T = MOMENTUM_DURATION / 1000.
+    // We need a smooth function f such that f(0) = 0, f'(0) = 1,
+    // and f'(T) = 0. We define f as:
+    //     f(t) = (1 - (1 - t / T)²) * T/2
+    // The derivative is:
+    //     f'(t) = 1 - t / T
+    if t < MOMENTUM_DURATION {
+        let p = (t as f32) * (1.0 / MOMENTUM_DURATION as f32);
+        (
+            (MOMENTUM_DURATION as f32 / 2000.0) * (1.0 - (1.0 - p) * (1.0 - p)),
+            1.0 - p,
+        )
+    } else {
+        (MOMENTUM_DURATION as f32 / 2000.0, 0.0)
+    }
+}
+
+/// Abort an ongoing scroll gesture if it's currently in the momentum phase.
+fn stop_momentum_scroll(wm: Wm, wnds: RefMut<'_, Pool<Wnd>>, hwnd: HWnd) -> RefMut<'_, Pool<Wnd>> {
+    if let Some(wnd) = wnds.get(hwnd.ptr) {
+        if let Some(scroll_state) = &wnd.scroll_state {
+            if scroll_state.momentum.is_some() {
+                return stop_scroll(wm, wnds, hwnd);
+            }
+        }
+    }
+
+    wnds
+}
+
+/// Abort an ongoing scroll gesture.
+fn stop_scroll(wm: Wm, mut wnds: RefMut<'_, Pool<Wnd>>, hwnd: HWnd) -> RefMut<'_, Pool<Wnd>> {
+    if let Some(wnd) = wnds.get_mut(hwnd.ptr) {
+        if let Some(scroll_state) = wnd.scroll_state.take() {
+            if let Some(momentum_state) = &scroll_state.momentum {
+                unsafe {
+                    gtk_sys::gtk_widget_remove_tick_callback(
+                        wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
+                        momentum_state.tick_callback_id,
+                    );
+                }
+            }
+
+            // Unborrow `WNDS` before calling `end` and dropping the listener
+            drop(wnds);
+
+            scroll_state.listener.end(wm, &hwnd);
+            drop(scroll_state);
+
+            // Reborrow `WNDS`
+            return WNDS.get_with_wm(wm).borrow_mut();
+        }
+    }
+
+    wnds
 }
 
 // ============================================================================
