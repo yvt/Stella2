@@ -550,19 +550,7 @@ extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
         let hwnd = HWnd { ptr };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
-        let mut wnd = wnds.get_mut(ptr)?;
-
-        if let Some(drag_state) = wnd.drag_state.take() {
-            // Cancel the mouse drag gesture first
-            let listener = Rc::clone(&drag_state.listener);
-
-            drop(wnds);
-            listener.cancel(wm, &hwnd);
-
-            // Re-borrow `WNDS`
-            wnds = WNDS.get_with_wm(wm).borrow_mut();
-            wnd = wnds.get_mut(ptr)?;
-        }
+        let wnd = wnds.get_mut(ptr)?;
 
         let listener = Rc::clone(&wnd.listener);
 
