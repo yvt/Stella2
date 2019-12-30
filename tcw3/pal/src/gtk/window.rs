@@ -26,7 +26,7 @@ static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
     unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
 };
 
-pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>> =
+pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>, Wm> =
     MtSticky::new(RefCell::new(comp::Compositor::new()));
 
 static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>, Wm> = MtSticky::new(Cell::new(None));
