@@ -161,9 +161,22 @@ impl Split {
         &self.container
     }
 
-    /// Get the styling element representing the widget.
+    /// Get the styling element of the splitter.
     pub fn style_elem(&self) -> HElem {
         self.shared.splitter_sb.style_elem()
+    }
+
+    /// Set the styling class set of the splitter.
+    ///
+    /// It defaults to `ClassSet::SPLITTER` or
+    /// `ClassSet::SPLITTER | ClassSet::VERTICAL`.
+    pub fn set_class_set(&self, class_set: ClassSet) {
+        self.shared.splitter_sb.set_class_set(class_set);
+    }
+
+    /// Get the styling class set of the splitter.
+    pub fn class_set(&self) -> ClassSet {
+        self.shared.splitter_sb.class_set()
     }
 
     /// Get a raw (unclipped) value representing the split position.

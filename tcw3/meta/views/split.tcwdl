@@ -17,6 +17,8 @@ pub comp crate::ui::views::Split {
     const view: HView { pub get borrow; } = unreachable!();
     const style_elem: HElem { pub get clone; } = unreachable!();
 
+    prop class_set: ClassSet { pub set; get clone; } = unreachable!();
+
     /// Sets or retrieves a raw (unclipped) value representing the split position.
     ///
     /// The interpretation of this value differs depending on the value of `fix`.
