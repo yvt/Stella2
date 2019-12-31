@@ -7,7 +7,7 @@ use std::{
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::layouts::FillLayout,
+    ui::layouts::{FillLayout, TableLayout},
     ui::theming,
     ui::views::split::SplitDragListener,
     ui::AlignFlags,

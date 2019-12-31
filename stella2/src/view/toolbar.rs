@@ -1,5 +1,5 @@
 use crate::{model, stylesheet::elem_id};
-use tcw3::ui::{theming, AlignFlags};
+use tcw3::ui::{layouts::TableLayout, theming, AlignFlags};
 
 stella2_meta::designer_impl! {
     crate::view::toolbar::ToolbarView
