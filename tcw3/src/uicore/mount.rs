@@ -49,6 +49,8 @@ impl HView {
 
         self.view.listener.borrow().unmount(wm, self);
 
+        self.view.layers.borrow_mut().clear();
+
         for subview in self.view.layout.borrow().subviews().iter() {
             subview.call_unmount(wm);
         }
