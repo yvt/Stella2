@@ -143,9 +143,7 @@ impl Split {
         });
 
         splitter.set_listener(SplitterListener {
-            vertical,
             shared: Rc::downgrade(&shared),
-            layer: RefCell::new(None),
         });
 
         let mut margin = [0.0; 4];
@@ -434,56 +432,10 @@ impl Layout for SplitLayout {
 }
 
 struct SplitterListener {
-    vertical: bool,
     shared: Weak<Shared>,
-    layer: RefCell<Option<pal::HLayer>>,
 }
 
 impl ViewListener for SplitterListener {
-    fn mount(&self, wm: pal::Wm, view: &HView, _: &HWnd) {
-        // Create a layer for the splitter line
-        let layer = wm.new_layer(pal::LayerAttrs {
-            bg_color: Some(pal::RGBAF32::new(0.1, 0.1, 0.1, 1.0)),
-            ..Default::default()
-        });
-
-        *self.layer.borrow_mut() = Some(layer);
-
-        view.pend_update();
-    }
-
-    fn unmount(&self, wm: pal::Wm, _: &HView) {
-        let layer = self.layer.borrow_mut().take().unwrap();
-        wm.remove_layer(&layer);
-    }
-
-    fn position(&self, _: pal::Wm, view: &HView) {
-        view.pend_update();
-    }
-
-    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
-        let layer = self.layer.borrow();
-        let layer = layer.as_ref().unwrap();
-
-        let mut frame = view.global_frame();
-
-        let axis_pri = self.vertical as usize;
-        frame.min[axis_pri] += SPLITTER_TOLERANCE;
-        frame.max[axis_pri] -= SPLITTER_TOLERANCE;
-
-        wm.set_layer_attr(
-            layer,
-            pal::LayerAttrs {
-                bounds: Some(frame),
-                ..Default::default()
-            },
-        );
-
-        if ctx.layers().len() != 1 {
-            ctx.set_layers(vec![layer.clone()]);
-        }
-    }
-
     fn mouse_drag(
         &self,
         wm: pal::Wm,
