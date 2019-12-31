@@ -16,8 +16,8 @@ use crate::{
         theming::{ClassSet, HElem, Manager, StyledBox, Widget},
     },
     uicore::{
-        CursorShape, HView, HWnd, Layout, LayoutCtx, MouseDragListener, SizeTraits, UpdateCtx,
-        ViewFlags, ViewListener,
+        CursorShape, HView, Layout, LayoutCtx, MouseDragListener, SizeTraits, ViewFlags,
+        ViewListener,
     },
 };
 
