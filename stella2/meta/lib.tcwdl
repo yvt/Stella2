@@ -38,6 +38,7 @@ comp crate::view::MainView {
         fix = Some(0), // Fix the sidebar
         subviews = [get!(sidebar_view.view), get!(split_editor.view)],
         value = get!(&wnd_state).sidebar_width,
+        zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
     };
 
     const sidebar_view = PlaceholderView::new! {
