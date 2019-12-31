@@ -1,5 +1,4 @@
 //! The backend for macOS, Cocoa, and Core Graphics.
-use cfg_if::cfg_if;
 use std::{marker::PhantomData, ops::Range, time::Duration};
 
 use super::iface;
