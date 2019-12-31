@@ -150,11 +150,6 @@ impl Split {
         margin[!vertical as usize + 2] = SPLITTER_TOLERANCE;
         splitter.set_layout(FillLayout::new(shared.splitter_sb.view().clone()).with_margin(margin));
 
-        splitter.set_cursor_shape(
-            [Some(CursorShape::EwResize), Some(CursorShape::NsResize)][vertical as usize],
-        );
-        // TODO: Use `CursorShape::EResize`, etc.
-
         container.set_layout(shared.layout());
 
         Self { container, shared }
@@ -294,7 +289,7 @@ fn get_split_position(
     st_min: [f32; 2],
     st_max: [f32; 2],
     splitter_width: f32,
-) -> f32 {
+) -> (f32, bool, bool) {
     let mut min = [st_min[0], size - splitter_width - st_max[0]].fmax();
     let mut max = [st_max[0], size - splitter_width - st_min[0]].fmin();
 
@@ -309,7 +304,9 @@ fn get_split_position(
         _ => unreachable!(),
     };
 
-    position.fmin(max).fmax(min)
+    let position = position.fmin(max).fmax(min);
+
+    (position, position == min, position == max)
 }
 
 #[derive(Debug)]
@@ -359,7 +356,7 @@ impl Layout for SplitLayout {
 
         let splitter_width = st_spl.min[axis_pri] - SPLITTER_TOLERANCE * 2.0;
 
-        let pos = get_split_position(
+        let (pos, at_min, at_max) = get_split_position(
             size[axis_pri],
             self.fix,
             self.value,
@@ -384,6 +381,24 @@ impl Layout for SplitLayout {
         spl_frame.max[axis_pri] = pos + splitter_width + SPLITTER_TOLERANCE;
 
         ctx.set_subview_frame(&self.subviews[2], spl_frame);
+
+        // Set the cursor shape. It's dependent on whether the splitter position
+        // is at a limit or not.
+        let shape_map = &[
+            [
+                // horizontal
+                [CursorShape::EwResize, CursorShape::WResize],
+                [CursorShape::EResize, CursorShape::Default],
+            ],
+            [
+                // vertical
+                [CursorShape::NsResize, CursorShape::NResize],
+                [CursorShape::SResize, CursorShape::Default],
+            ],
+        ];
+        self.subviews[2].set_cursor_shape(Some(
+            shape_map[self.vertical as usize][at_min as usize][at_max as usize],
+        ));
     }
 
     fn has_same_subviews(&self, other: &dyn Layout) -> bool {
