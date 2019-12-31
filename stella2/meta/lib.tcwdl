@@ -36,11 +36,16 @@ comp crate::view::MainView {
         style_manager,
         vertical = false,
         fix = Some(0), // Fix the sidebar
-        subviews = [get!(sidebar_view.view), get!(split_editor.view)],
+        subviews = [get!(sidebar_view_wrap.view), get!(split_editor.view)],
         value = get!(&wnd_state).sidebar_width,
         zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
     };
 
+    const sidebar_view_wrap = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::SIDEBAR,
+        subview_generic = get!(sidebar_view.view),
+    };
     const sidebar_view = PlaceholderView::new! {
         wm,
         style_manager,
@@ -51,16 +56,27 @@ comp crate::view::MainView {
         style_manager,
         vertical = true,
         fix = Some(1), // Fix the editor
-        subviews = [get!(log_view.view), get!(editor_view.view)],
+        subviews = [get!(log_view_wrap.view), get!(editor_view_wrap.view)],
         value = get!(&wnd_state).editor_height,
+        class_set = ClassSet::SPLITTER | ClassSet::VERTICAL | elem_id::EDITOR_SPLIT,
     };
 
+    const log_view_wrap = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::LOG_VIEW,
+        subview_generic = get!(log_view.view),
+    };
     const log_view = PlaceholderView::new! {
         wm,
         style_manager,
         text = "log: todo!".to_string(),
     };
 
+    const editor_view_wrap = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::EDITOR,
+        subview_generic = get!(editor_view.view),
+    };
     const editor_view = PlaceholderView::new! {
         wm,
         style_manager,

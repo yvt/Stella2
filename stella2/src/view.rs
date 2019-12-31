@@ -8,13 +8,13 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::layouts::{FillLayout, TableLayout},
-    ui::theming,
+    ui::theming::{self, ClassSet},
     ui::views::split::SplitDragListener,
     ui::AlignFlags,
     uicore::{HWnd, WndListener},
 };
 
-use crate::model;
+use crate::{model, stylesheet::elem_id};
 
 mod toolbar;
 

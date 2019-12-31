@@ -14,7 +14,12 @@ pub mod elem_id {
     pub const GO_FORWARD: ClassSet = ClassSet::id(2);
     pub const SIDEBAR_SHOW: ClassSet = ClassSet::id(3);
     pub const SIDEBAR_HIDE: ClassSet = ClassSet::id(4);
+
     pub const TOOLBAR: ClassSet = ClassSet::id(5);
+    pub const SIDEBAR: ClassSet = ClassSet::id(6);
+    pub const LOG_VIEW: ClassSet = ClassSet::id(7);
+    pub const EDITOR: ClassSet = ClassSet::id(8);
+    pub const EDITOR_SPLIT: ClassSet = ClassSet::id(9);
 }
 
 fn new_custom_stylesheet() -> impl Stylesheet {
@@ -31,6 +36,15 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     let himg_from_stvg = |data| StvgImg::new(data).into_himg();
 
     stylesheet! {
+        ([.SPLITTER]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.85, 0.85, 0.85, 0.8].into(),
+            min_size: [1.0, 1.0].into(),
+        },
+        ([#EDITOR_SPLIT.SPLITTER]) (priority = 10000) {
+            min_size: [0.0, 0.0].into(),
+        },
+
         // Toolbar and titlebar background
         ([#TOOLBAR]) (priority = 10000) {
             num_layers: 1,
@@ -39,6 +53,35 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 margin: [-100.0, 0.0, 0.0, 0.0],
                 ..Default::default()
             },
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [5.0; 4],
+                ..Default::default()
+            },
+        },
+
+        // Pane background
+        ([#SIDEBAR]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [5.0; 4],
+                ..Default::default()
+            },
+        },
+        ([#LOG_VIEW]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [1.0, 1.0, 1.0, 1.0].into(),
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [5.0; 4],
+                ..Default::default()
+            },
+        },
+        ([#EDITOR]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [5.0; 4],
