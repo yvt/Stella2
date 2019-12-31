@@ -51,7 +51,7 @@ pub mod theming {
 }
 
 mod types;
-pub use self::types::{AlignFlags, Suspend, SuspendFlag, SuspendGuard};
+pub use self::types::AlignFlags;
 
 mod scrolling {
     pub mod lineset;
