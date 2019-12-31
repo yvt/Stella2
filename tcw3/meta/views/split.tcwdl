@@ -32,6 +32,10 @@ pub comp crate::ui::views::Split {
     /// Set the views placed in the panels.
     prop subviews: [HView; 2] { pub set; } = unreachable!();
 
+    /// Set the panel to zoom into. Defaults to `None` (both panels are
+    /// displayed). The value must be one of `Some(0)`, `Some(1)`, and `None`.
+    prop zoom: Option<u8> { pub set; pub get clone; } = unreachable!();
+
     /// Set the factory function for gesture event handlers used when the user
     /// resizes the panels.
     ///

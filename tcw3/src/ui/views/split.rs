@@ -76,6 +76,7 @@ struct Shared {
     vertical: bool,
     fix: Option<u8>,
     value: Cell<f32>,
+    zoom: Cell<Option<u8>>,
     container: HView,
     splitter: HView,
     splitter_sb: StyledBox,
@@ -91,6 +92,7 @@ impl fmt::Debug for Shared {
             .field("vertical", &self.vertical)
             .field("fix", &self.fix)
             .field("value", &self.value)
+            .field("zoom", &self.zoom)
             .field("container", &self.container)
             .field("splitter", &self.splitter)
             .field("subviews", &self.subviews)
@@ -128,6 +130,7 @@ impl Split {
                 _ => panic!("fix: index out of range"),
             },
             value: Cell::new(0.5),
+            zoom: Cell::new(None),
             container: container.clone(),
             splitter: splitter.clone(),
             splitter_sb,
@@ -186,6 +189,12 @@ impl Split {
     /// [`value`]: self::Split::value
     pub fn set_value(&self, new_value: f32) {
         self.shared.set_value(new_value);
+    }
+
+    /// Set the panel to zoom into. Defaults to `None` (both panels are
+    /// displayed). The value must be one of `Some(0)`, `Some(1)`, and `None`.
+    pub fn set_zoom(&self, new_zoom: Option<u8>) {
+        self.shared.set_zoom(new_zoom);
     }
 
     /// Set the views placed in the panels.
@@ -247,6 +256,15 @@ impl Shared {
         self.container.set_layout(self.layout());
     }
 
+    fn set_zoom(&self, new_zoom: Option<u8>) {
+        if new_zoom == self.zoom.get() {
+            return;
+        }
+        self.zoom.set(new_zoom);
+
+        self.container.set_layout(self.layout());
+    }
+
     /// Calcuate the increase in `value` corresponding to a unit increase in
     /// X or Y coordinates.
     fn dvalue_dposition(&self) -> f32 {
@@ -266,17 +284,22 @@ impl Shared {
     }
 
     /// Construct a `Layout` based on the current state.
-    fn layout(&self) -> SplitLayout {
+    fn layout(&self) -> Box<dyn Layout> {
         let subviews = self.subviews.borrow();
-        SplitLayout {
-            vertical: self.vertical,
-            fix: self.fix,
-            value: self.value.get(),
-            subviews: [
-                subviews[0].clone(),
-                subviews[1].clone(),
-                self.splitter.clone(),
-            ],
+
+        if let Some(zoom) = self.zoom.get() {
+            Box::new(FillLayout::new(subviews[zoom as usize].clone()))
+        } else {
+            Box::new(SplitLayout {
+                vertical: self.vertical,
+                fix: self.fix,
+                value: self.value.get(),
+                subviews: [
+                    subviews[0].clone(),
+                    subviews[1].clone(),
+                    self.splitter.clone(),
+                ],
+            })
         }
     }
 }
