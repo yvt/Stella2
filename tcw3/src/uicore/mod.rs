@@ -317,11 +317,13 @@ impl ViewFlags {
 pub trait ViewListener {
     /// A view was added to a window.
     ///
-    /// If the view has an associated layer, it's advised to insert a call to
-    /// [`HView::pend_update`] here.
+    /// If the view has one or more associated layers, they should be created
+    /// here. Also, it's advised to insert a call to [`HView::pend_update`] here.
     fn mount(&self, _: Wm, _: &HView, _: &HWnd) {}
 
     /// A view was removed from a window.
+    ///
+    /// The implementation should remove any associated layers.
     fn unmount(&self, _: Wm, _: &HView) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
@@ -334,7 +336,8 @@ pub trait ViewListener {
     /// A view should be updated.
     ///
     /// This method is called after [`HView::pend_update`] is called or a view
-    /// is added to a window for the first time.
+    /// is added to a window for the first time (it is unspecified whether it
+    /// should be called for the second time).
     /// The system automatically flushes changes to the layers by calling
     /// [`Wm::update_wnd`] after calling this method for all
     /// pending views, so this is the optimal place to update the properties of

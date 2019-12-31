@@ -460,6 +460,8 @@ impl ViewListener for SbListener {
                 styled: Vec::new(),
                 sub: Some(sub),
             });
+
+            shared.view.pend_update();
         } else {
             *layers = Some(Layers::default());
         }
