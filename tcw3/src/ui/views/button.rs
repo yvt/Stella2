@@ -44,11 +44,8 @@ impl Button {
         let label = Label::new(style_manager);
 
         let styled_box = StyledBox::new(style_manager, ViewFlags::default());
-        {
-            let _guard = styled_box.suspend_update();
-            styled_box.set_child(Role::Generic, Some(&label));
-            styled_box.set_class_set(ClassSet::BUTTON);
-        }
+        styled_box.set_child(Role::Generic, Some(&label));
+        styled_box.set_class_set(ClassSet::BUTTON);
 
         let view = HView::new(
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,

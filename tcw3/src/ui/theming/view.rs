@@ -18,7 +18,6 @@ use super::{
 use crate::{
     pal,
     pal::prelude::*,
-    ui::{Suspend, SuspendFlag},
     uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener},
 };
 
@@ -80,8 +79,6 @@ struct Shared {
     /// `override` is a reserved keyword, so `overrider` is used here
     overrider: RefCell<Rc<dyn StyledBoxOverride>>,
 
-    suspend_flag: SuspendFlag,
-
     has_layer_group: bool,
 }
 
@@ -94,7 +91,6 @@ impl fmt::Debug for Shared {
             .field("subviews", &self.subviews)
             .field("subelems", &self.subelems)
             .field("overrider", &())
-            .field("suspend_flag", &self.suspend_flag)
             .field("has_layer_group", &self.has_layer_group)
             .finish()
     }
@@ -125,7 +121,6 @@ impl StyledBox {
             // the dirty flags
             dirty: Cell::new(PropKindFlags::all() - PropKindFlags::LAYOUT),
             has_layer_group: view_flags.contains(ViewFlags::LAYER_GROUP),
-            suspend_flag: SuspendFlag::new(),
         });
 
         view.set_listener(SbListener::new(Rc::downgrade(&shared)));
@@ -144,15 +139,6 @@ impl StyledBox {
         }
 
         Self { view, shared }
-    }
-
-    /// Temporarily suspend updates until the returned RAII guard is dropped.
-    pub fn suspend_update<'a>(&'a self) -> impl Suspend + 'a {
-        // TODO: Maybe this method isn't needed now that `Elem` uses
-        //       `invoke_on_update` automatically
-        self.shared.suspend_flag.suspend(move || {
-            self.shared.set_dirty(PropKindFlags::empty());
-        })
     }
 
     /// Set the class set of the styled element.
@@ -281,11 +267,6 @@ impl Shared {
     fn set_dirty(&self, mut diff: PropKindFlags) {
         let dirty = &self.dirty;
         diff |= dirty.get();
-
-        if self.suspend_flag.is_suspended() {
-            dirty.set(diff);
-            return;
-        }
 
         if diff.intersects(PropKindFlags::LAYOUT) {
             self.view.set_layout(SbLayout::new(
