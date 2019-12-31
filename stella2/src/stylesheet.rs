@@ -10,16 +10,18 @@ use tcw3::{
 pub mod elem_id {
     use tcw3::ui::theming::ClassSet;
 
-    pub const GO_BACK: ClassSet = ClassSet::id(1);
-    pub const GO_FORWARD: ClassSet = ClassSet::id(2);
-    pub const SIDEBAR_SHOW: ClassSet = ClassSet::id(3);
-    pub const SIDEBAR_HIDE: ClassSet = ClassSet::id(4);
+    iota::iota! {
+        pub const GO_BACK: ClassSet = ClassSet::id(iota + 1);
+                , GO_FORWARD
+                , SIDEBAR_SHOW
+                , SIDEBAR_HIDE
 
-    pub const TOOLBAR: ClassSet = ClassSet::id(5);
-    pub const SIDEBAR: ClassSet = ClassSet::id(6);
-    pub const LOG_VIEW: ClassSet = ClassSet::id(7);
-    pub const EDITOR: ClassSet = ClassSet::id(8);
-    pub const EDITOR_SPLIT: ClassSet = ClassSet::id(9);
+                , TOOLBAR
+                , SIDEBAR
+                , LOG_VIEW
+                , EDITOR
+                , EDITOR_SPLIT
+    }
 }
 
 fn new_custom_stylesheet() -> impl Stylesheet {
