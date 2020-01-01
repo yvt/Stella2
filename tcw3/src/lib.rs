@@ -5,7 +5,6 @@
 //!  - **Color management**: Color values are specified in the sRGB color space,
 //!    unless otherwise specified.
 //!
-#![feature(weak_counts)]
 #![feature(doc_cfg)] // `cfg(rustdoc)`
 #![feature(unsized_locals)] // Call `dyn FnOnce`
 #![feature(const_if_match)] // `if` and `match` in `const fn`
