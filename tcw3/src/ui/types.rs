@@ -5,7 +5,7 @@ use cggeom::{prelude::*, Box2};
 use crate::uicore::SizeTraits;
 
 bitflags! {
-    #[cfg_attr(rustdoc, svgbobdoc::transform)]
+    #[cfg_attr(doc, svgbobdoc::transform)]
     /// Describes how to align a layout element within the containing box.
     ///
     /// ```svgbob

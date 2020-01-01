@@ -235,7 +235,7 @@ impl<T: Wm, TLayer: Debug> Debug for WndAttrs<'_, T, TLayer> {
     }
 }
 
-#[cfg_attr(rustdoc, svgbobdoc::transform)]
+#[cfg_attr(doc, svgbobdoc::transform)]
 /// Specifies layer attributes.
 #[allow(clippy::option_option)] // for consistency between fields
 #[derive(Debug, Clone)]
