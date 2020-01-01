@@ -19,7 +19,7 @@ use crate::{
     prelude::*,
     ui::{
         layouts::FillLayout,
-        mixins::scrollwheel::{ScrollModel, ScrollWheelMixin},
+        mixins::scrollwheel::{ScrollAxisFlags, ScrollModel, ScrollWheelMixin},
         theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Scrollbar,
     },
@@ -157,6 +157,13 @@ impl ScrollableTable {
     /// Get a reference to the inner `Table`.
     pub fn table(&self) -> &Table {
         &self.inner.table
+    }
+
+    /// Set the axes for which scrolling is allowed.
+    ///
+    /// This might not take effect for an ongoing scroll gesture (if any).
+    pub fn set_scrollable_axes(&self, axes: ScrollAxisFlags) {
+        self.inner.scroll_mixin.set_axes(axes);
     }
 
     /// Set the class set of the inner `StyledBox`.
