@@ -21,6 +21,15 @@ pub struct ScrollWheelMixin {
     inner: Rc<Inner>,
 }
 
+bitflags::bitflags! {
+    /// Specifies the axes [`ScrollWheelMixin`] can scroll along.
+    pub struct ScrollAxisFlags: u32 {
+        const HORIZONTAL = 1;
+        const VERTICAL = 1 << 1;
+        const BOTH = Self::HORIZONTAL.bits | Self::VERTICAL.bits;
+    }
+}
+
 /// Provides methods to query and manipulate the scrolling state of
 /// scrollable contents.
 ///
@@ -83,8 +92,16 @@ impl ScrollWheelMixin {
                 token: Cell::new(0),
                 delta: Cell::new(ScrollDelta::default()),
                 flush_enqueued: Cell::new(false),
+                axes: Cell::new(ScrollAxisFlags::BOTH),
             }),
         }
+    }
+
+    /// Set the axes for which scrolling is allowed.
+    ///
+    /// This might not take effect for an ongoing scroll gesture (if any).
+    pub fn set_axes(&self, axes: ScrollAxisFlags) {
+        self.inner.axes.set(axes);
     }
 
     /// Stop the current scroll action and animation.
@@ -103,11 +120,16 @@ impl ScrollWheelMixin {
     ) {
         self.inner.stop_except_stateless_scroll();
 
+        let delta = ScrollDelta {
+            delta: filter_vec_by_axis_flags(delta.delta, self.inner.axes.get()),
+            ..*delta
+        };
+
         if delta.delta == Vector2::new(0.0, 0.0) {
             return;
         }
 
-        self.inner.accumulate(delta);
+        self.inner.accumulate(&delta);
 
         if (self.inner.token.get() & STATELESS_SCROLL_TOKEN_FLAG) != 0 {
             // There already is a pending `invoke_on_update`
@@ -168,6 +190,8 @@ struct Inner {
     delta: Cell<ScrollDelta>,
     /// `ScrollListenerImpl::motion` called `invoke_on_update`.
     flush_enqueued: Cell<bool>,
+    /// The axes for which scrolling is allowed.
+    axes: Cell<ScrollAxisFlags>,
 }
 
 /// This flag indicates `Inner::token` corresponds to a scroll action registered
@@ -432,6 +456,14 @@ impl Inner {
     }
 }
 
+#[rustfmt::skip]
+fn filter_vec_by_axis_flags(x: Vector2<f32>, flags: ScrollAxisFlags) -> Vector2<f32> {
+    [
+        if flags.contains(ScrollAxisFlags::HORIZONTAL) { x.x } else { 0.0 },
+        if flags.contains(ScrollAxisFlags::VERTICAL) { x.y } else { 0.0 },
+    ].into()
+}
+
 fn clamp_model_pos(model: &mut dyn ScrollModel) {
     let pos = model.bounds().limit_point(&model.pos());
     model.set_pos(pos);
@@ -486,6 +518,11 @@ impl ScrollListenerImpl {
 
 impl ScrollListener for ScrollListenerImpl {
     fn motion(&self, wm: pal::Wm, hview: &HView, delta: &ScrollDelta, velocity: Vector2<f32>) {
+        let delta = ScrollDelta {
+            delta: filter_vec_by_axis_flags(delta.delta, self.inner.axes.get()),
+            ..*delta
+        };
+
         if delta.delta == Vector2::new(0.0, 0.0) || !self.is_valid() {
             return;
         }
@@ -498,7 +535,7 @@ impl ScrollListener for ScrollListenerImpl {
         let axis = self.vertical.get() as usize;
         self.velocity.set(velocity[axis]);
 
-        self.inner.accumulate(delta);
+        self.inner.accumulate(&delta);
 
         if !self.inner.flush_enqueued.get() {
             self.inner.flush_enqueued.set(true);
