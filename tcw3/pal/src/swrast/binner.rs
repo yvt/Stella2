@@ -536,6 +536,12 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
         let bb = parallelogram_aabb(par);
         let clip_planes = xform_to_clip_planes(par);
 
+        // Bail out if the parallelogram is empty. `clip_planes` returns
+        // weird values for such cases.
+        if (par.x.x, par.x.y) == (0.0, 0.0) || (par.y.x, par.y.y) == (0.0, 0.0) {
+            return;
+        }
+
         // The AABB of the rendered region
         let bb = if let Some(bb) = saturating_aabb_f32_to_u16(round_aabb_conservative(bb))
             .and_then(|bb| bb.intersection(&self.scissor.unwrap()))
@@ -1605,6 +1611,48 @@ mod tests {
         for (bin_x, bin_y) in iproduct!(bin_xs, bin_ys) {
             let elems: Vec<_> = binner.bin_elems([bin_x, bin_y]).collect();
             assert!(!elems.is_empty(), "{:?}", (bin_x, bin_y, &binner));
+        }
+    }
+
+    #[test]
+    fn draw_empty_rect() {
+        let mut binner = Binner::new();
+
+        let mut builder = binner.build([300, 300]);
+        builder.push_elem(ElemInfo {
+            xform: Matrix3::identity(),
+            bounds: box2! { min: [96.0, 56.96875], max: [190.0, 56.96875] },
+            contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
+            contents_scale: 1.0,
+            bitmap: Some(TestBmp),
+            bg_color: [40, 60, 80, 255].into(),
+            opacity: 0.8,
+        });
+        builder.push_elem(ElemInfo {
+            xform: Matrix3::identity(),
+            bounds: box2! { min: [200.3, 100.0], max: [200.3, 170.0] },
+            contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
+            contents_scale: 1.0,
+            bitmap: Some(TestBmp),
+            bg_color: [40, 60, 80, 255].into(),
+            opacity: 0.8,
+        });
+        builder.push_elem(ElemInfo {
+            xform: Matrix3::identity(),
+            bounds: box2! { min: [250.0, 200.0], max: [250.0, 200.0] },
+            contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
+            contents_scale: 1.0,
+            bitmap: Some(TestBmp),
+            bg_color: [40, 60, 80, 255].into(),
+            opacity: 0.8,
+        });
+        builder.finish();
+
+        let bin_xs = 0..(300 + TILE - 1) / TILE;
+        let bin_ys = 0..(300 + TILE - 1) / TILE;
+        for (bin_x, bin_y) in iproduct!(bin_xs, bin_ys) {
+            let elems: Vec<_> = binner.bin_elems([bin_x, bin_y]).collect();
+            assert!(elems.is_empty(), "{:?}", (bin_x, bin_y, &binner));
         }
     }
 }
