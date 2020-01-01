@@ -538,13 +538,29 @@ lazy_static! {
                 .. Metrics::default()
             },
             subview_metrics[Role::HorizontalScrollbar]: Metrics {
-                // Dock to the bottom side
+                // Dock to the bottom side. Avoid the vertical scrollbar
                 margin: [NAN, 16.0, 0.0, 0.0],
                 .. Metrics::default()
             },
             subview_metrics[Role::VerticalScrollbar]: Metrics {
-                // Dock to the right side
+                // Dock to the right side. Avoid the horizontal scrollbar
                 margin: [0.0, 0.0, 16.0, NAN],
+                .. Metrics::default()
+            },
+        },
+        ([.SCROLL_CONTAINER:not(.HAS_HORIZONTAL_SCROLLBAR)]) (priority = 200) {
+            subview_visibility[Role::HorizontalScrollbar]: false,
+            subview_metrics[Role::VerticalScrollbar]: Metrics {
+                // Dock to the right side
+                margin: [0.0, 0.0, 0.0, NAN],
+                .. Metrics::default()
+            },
+        },
+        ([.SCROLL_CONTAINER:not(.HAS_VERTICAL_SCROLLBAR)]) (priority = 200) {
+            subview_visibility[Role::VerticalScrollbar]: false,
+            subview_metrics[Role::HorizontalScrollbar]: Metrics {
+                // Dock to the bottom side
+                margin: [NAN, 0.0, 0.0, 0.0],
                 .. Metrics::default()
             },
         },
