@@ -239,15 +239,12 @@ macro_rules! sel {
 
 /// This macro is used for two purposes:
 ///  - To create `PropKindFlags`.
-///    (`Prop` and `Prop::kind_flags` would be better for normalization, but
-///     `match` does not work inside a `const fn` yet...
-///     <https://github.com/rust-lang/rfcs/pull/2342>)
 ///  - To create `(Prop, PropValue)`.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop {
     (@kind num_layers) => {
-        $crate::ui::theming::PropKindFlags::LAYER_ALL
+        $crate::ui::theming::Prop::NumLayers.kind_flags()
     };
     (num_layers: $val:expr) => {
         (
@@ -257,7 +254,7 @@ macro_rules! prop {
     };
 
     (@kind layer_img[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYER_IMG
+        $crate::ui::theming::Prop::LayerImg($i).kind_flags()
     };
     (layer_img[$i:expr]: $val:expr) => {
         (
@@ -267,7 +264,7 @@ macro_rules! prop {
     };
 
     (@kind layer_center[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYER_CENTER
+        $crate::ui::theming::Prop::LayerCenter($i).kind_flags()
     };
     (layer_center[$i:expr]: $val:expr) => {
         (
@@ -277,7 +274,7 @@ macro_rules! prop {
     };
 
     (@kind layer_opacity[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYER_OPACITY
+        $crate::ui::theming::Prop::LayerOpacity($i).kind_flags()
     };
     (layer_opacity[$i:expr]: $val:expr) => {
         (
@@ -287,7 +284,7 @@ macro_rules! prop {
     };
 
     (@kind layer_bg_color[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYER_BG_COLOR
+        $crate::ui::theming::Prop::LayerBgColor($i).kind_flags()
     };
     (layer_bg_color[$i:expr]: $val:expr) => {
         (
@@ -297,7 +294,7 @@ macro_rules! prop {
     };
 
     (@kind layer_metrics[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYER_BOUNDS
+        $crate::ui::theming::Prop::LayerMetrics($i).kind_flags()
     };
     (layer_metrics[$i:expr]: $val:expr) => {
         (
@@ -307,7 +304,7 @@ macro_rules! prop {
     };
 
     (@kind subview_metrics[$i:expr]) => {
-        $crate::ui::theming::PropKindFlags::LAYOUT
+        $crate::ui::theming::Prop::SubviewMetrics($i).kind_flags()
     };
     (subview_metrics[$i:expr]: $val:expr) => {
         (
@@ -317,7 +314,7 @@ macro_rules! prop {
     };
 
     (@kind min_size) => {
-        $crate::ui::theming::PropKindFlags::LAYOUT
+        $crate::ui::theming::Prop::MinSize.kind_flags()
     };
     (min_size: $val:expr) => {
         (
@@ -327,7 +324,7 @@ macro_rules! prop {
     };
 
     (@kind fg_color) => {
-        $crate::ui::theming::PropKindFlags::FG_COLOR
+        $crate::ui::theming::Prop::FgColor.kind_flags()
     };
     (fg_color: $val:expr) => {
         (
