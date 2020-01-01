@@ -28,7 +28,9 @@ pub fn gen_builder(
 
     let settable_fields = comp.items.iter().filter_map(|item| match item {
         sem::CompItemDef::Field(
-            field @ sem::FieldDef {
+            field
+            @
+            sem::FieldDef {
                 accessors: sem::FieldAccessors { set: Some(_), .. },
                 ..
             },
