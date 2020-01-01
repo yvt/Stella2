@@ -1,0 +1,17 @@
+use tcw3::{
+    ui::theming::{self, Manager},
+    uicore::HView,
+    pal,
+};
+
+use crate::{model, stylesheet::elem_id};
+
+#[widget]
+#[prototype_only]
+#[builder(simple)]
+pub(crate) comp crate::view::channellist::ChannelListView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+
+    const view: HView { pub get borrow; } = unreachable!();
+}

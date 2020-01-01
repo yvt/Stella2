@@ -10,8 +10,16 @@ use tcw3::{
     pal,
 };
 
-use crate::{model, stylesheet::elem_id, view::toolbar::ToolbarView};
+use crate::{
+    model,
+    stylesheet::elem_id,
+    view::{
+        channellist::ChannelListView,
+        toolbar::ToolbarView,
+    },
+};
 
+import!("view/channellist.tcwdl");
 import!("view/toolbar.tcwdl");
 
 #[widget]
@@ -50,11 +58,7 @@ comp crate::view::MainView {
         class_set = elem_id::SIDEBAR,
         subview_generic = get!(sidebar_view.view),
     };
-    const sidebar_view = PlaceholderView::new! {
-        wm,
-        style_manager,
-        text = "sidebar: todo!".to_string(),
-    };
+    const sidebar_view = ChannelListView::new! { wm, style_manager };
 
     // The main area
     // -----------------------------------------------------------------------

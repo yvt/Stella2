@@ -73,11 +73,6 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
-
-            subview_metrics[Role::Generic]: Metrics {
-                margin: [5.0; 4],
-                ..Default::default()
-            },
         },
         ([#LOG_VIEW]) (priority = 10000) {
             num_layers: 1,
