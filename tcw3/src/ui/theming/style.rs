@@ -120,6 +120,9 @@ pub enum Prop {
     /// The [`Metrics`] of a subview.
     SubviewMetrics(Role),
 
+    /// Toggles the visibility of a subview.
+    SubviewVisibility(Role),
+
     /// The [`Metrics`] of the layer used to clip subviews.
     ClipMetrics,
 
@@ -135,6 +138,7 @@ pub enum Prop {
 
 #[derive(Debug, Clone)]
 pub enum PropValue {
+    Bool(bool),
     Float(f32),
     Usize(usize),
     Himg(Option<crate::images::HImg>),
@@ -160,6 +164,7 @@ impl PropValue {
             }),
             Prop::LayerXform(_) => PropValue::LayerXform(LayerXform::default()),
             Prop::SubviewMetrics(_) => PropValue::Metrics(Metrics::default()),
+            Prop::SubviewVisibility(_) => PropValue::Bool(true),
             Prop::ClipMetrics => PropValue::Metrics(Metrics::default()),
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
             Prop::FgColor => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)),

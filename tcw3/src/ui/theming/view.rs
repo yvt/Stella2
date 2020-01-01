@@ -25,7 +25,7 @@ use crate::{
 ///
 /// The following [`Prop`]s are handled: `NumLayers`, `LayerImg`,
 /// `LayerBgColor`, `LayerMetrics`, `LayerOpacity`, `LayerCenter`, `LayerXform`,
-/// `SubviewMetrics`, `ClipMetrics`, and `MinSize`.
+/// `SubviewMetrics`, `SubviewVisibility`, `ClipMetrics`, and `MinSize`.
 ///
 /// [`Prop`]: crate::ui::theming::Prop
 #[derive(Debug)]
@@ -294,9 +294,16 @@ struct SbLayout {
 impl SbLayout {
     fn new(subviews: &[(Role, HView)], elem: &Elem, overrider: Rc<dyn StyledBoxOverride>) -> Self {
         // Evaluate the layout properties now
+        let subviews_filtered = subviews.iter().filter(|&&(role, _)| {
+            match elem.compute_prop(Prop::SubviewVisibility(role)) {
+                PropValue::Bool(b) => b,
+                _ => unreachable!(),
+            }
+        });
+
         Self {
-            subview_layout: subviews
-                .iter()
+            subview_layout: subviews_filtered
+                .clone()
                 .map(
                     |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
                         PropValue::Metrics(m) => (role, m),
@@ -304,7 +311,7 @@ impl SbLayout {
                     },
                 )
                 .collect(),
-            subviews: subviews.iter().map(|x| x.1.clone()).collect(),
+            subviews: subviews_filtered.map(|x| x.1.clone()).collect(),
             min_size: match elem.compute_prop(Prop::MinSize) {
                 PropValue::Vector2(v) => v,
                 _ => unreachable!(),

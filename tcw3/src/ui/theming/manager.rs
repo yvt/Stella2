@@ -416,6 +416,7 @@ impl Prop {
             Prop::LayerCenter(_) => PropKindFlags::LAYER_CENTER,
             Prop::LayerXform(_) => PropKindFlags::LAYER_XFORM,
             Prop::SubviewMetrics(_) => PropKindFlags::LAYOUT,
+            Prop::SubviewVisibility(_) => PropKindFlags::LAYOUT,
             Prop::MinSize => PropKindFlags::LAYOUT,
             Prop::ClipMetrics => PropKindFlags::CLIP_LAYER,
             Prop::FgColor => PropKindFlags::FG_COLOR,

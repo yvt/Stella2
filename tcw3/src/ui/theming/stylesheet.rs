@@ -313,6 +313,16 @@ macro_rules! prop {
         )
     };
 
+    (@kind subview_visibility[$i:expr]) => {
+        $crate::ui::theming::Prop::SubviewVisibility($i).kind_flags()
+    };
+    (subview_visibility[$i:expr]: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::SubviewVisibility($i),
+            $crate::ui::theming::PropValue::Bool($val),
+        )
+    };
+
     (@kind min_size) => {
         $crate::ui::theming::Prop::MinSize.kind_flags()
     };
