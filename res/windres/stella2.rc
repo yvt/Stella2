@@ -42,7 +42,7 @@ BEGIN
             VALUE "FileDescription", "Stella2 application"
             VALUE "FileVersion", "1.0.0.1"
             VALUE "InternalName", "Stella2"
-            VALUE "LegalCopyright", "Copyright (C) 2019"
+            VALUE "LegalCopyright", "Copyright (C) 2020"
             VALUE "OriginalFilename", "Stella2"
             VALUE "ProductName", "Stella2"
             VALUE "ProductVersion", "1.0.0.1"
