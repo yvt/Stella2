@@ -2,6 +2,7 @@ use std::ops::Range;
 use tcw3::{
     pal,
     ui::{
+        mixins::scrollwheel::ScrollAxisFlags,
         prelude::*,
         theming,
         views::{table, table::LineTy, Label, ScrollableTable},
@@ -23,6 +24,8 @@ impl ChannelListView {
             min: [40.0, 40.0].into(),
             ..Default::default()
         });
+
+        table.set_scrollable_axes(ScrollAxisFlags::VERTICAL);
 
         // Set up the table model
         {
