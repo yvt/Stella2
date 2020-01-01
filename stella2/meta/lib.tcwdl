@@ -10,7 +10,9 @@ use tcw3::{
     pal,
 };
 
-use crate::{model, stylesheet::elem_id};
+use crate::{model, stylesheet::elem_id, view::toolbar::ToolbarView};
+
+import!("view/toolbar.tcwdl");
 
 #[widget]
 comp crate::view::MainView {
@@ -133,94 +135,6 @@ comp crate::view::MainView {
     };
 
     on (init) get!(&this).init();
-}
-
-use crate::view::toolbar::ToolbarView;
-#[widget]
-pub(crate) comp ToolbarView {
-    const wm: pal::Wm { pub set; }
-    const style_manager: &Manager { pub set; }
-
-    pub prop wnd_state: Elem<model::WndState>;
-    pub event dispatch(action: model::WndAction);
-
-    on (init) get!(&this).init();
-
-    pub const wrapper = StyledBox::new! {
-        style_manager,
-        class_set = elem_id::TOOLBAR,
-        subview_generic = HView::new! {
-            layout = TableLayout::stack_horz(
-                [
-                    (get!(&toggle_sidebar_button.view), AlignFlags::JUSTIFY),
-                    (get!(&spacer1.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(&go_back_button.view), AlignFlags::JUSTIFY),
-                    (get!(&spacer2.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(&go_forward_button.view), AlignFlags::JUSTIFY),
-                    (get!(&spacer3.view), AlignFlags::CENTER),
-                    (get!(&search_bar.view), AlignFlags::RIGHT),
-                ]
-                    .iter()
-                    .map(|&(view, align)| (view.clone(), align))
-            ),
-        },
-    };
-
-    pub const view: HView = get!(wrapper.view);
-
-    const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
-    const spacer2 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
-    const spacer3 = FixedSpacer::new! { wm };
-
-    const toggle_sidebar_button = Button::new! {
-        style_manager,
-
-        class_set = theming::ClassSet::BUTTON
-            | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
-                [get!(&wnd_state).sidebar_visible as usize],
-
-        // TODO: `on_activate` is set by `init` for now
-    };
-
-    on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
-
-    const go_back_button = Button::new! {
-        style_manager,
-        class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK,
-    };
-
-    const go_forward_button = Button::new! {
-        style_manager,
-        class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD,
-    };
-
-    on (go_back_button.activated) dbg!();
-    on (go_forward_button.activated) dbg!();
-
-    // TODO
-    const search_bar = StyledBox::new! {
-        style_manager,
-        view_flags = {
-            // Make `set_cursor_shape` work
-            use tcw3::uicore::ViewFlags;
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
-        },
-        class_set = elem_id::SEARCH_FIELD,
-        subview_generic = get!(search_bar_placeholder.view),
-    };
-    on (init) {
-        // TODO: find a prettier way
-        get!(&search_bar).set_subelement(
-            tcw3::ui::theming::Role::Generic,
-            Some(get!(search_bar_placeholder.style_elem))
-        );
-        get!(&search_bar.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
-    }
-
-    const search_bar_placeholder = Label::new! {
-        style_manager,
-        text = "Search",
-    };
 }
 
 use crate::view::PlaceholderView;
