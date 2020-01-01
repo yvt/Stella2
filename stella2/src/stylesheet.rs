@@ -1,7 +1,9 @@
+use cggeom::box2;
 use cgmath::Vector2;
 use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 use tcw3::{
+    images::himg_from_rounded_rect,
     stylesheet,
     ui::theming::{Manager, Metrics, Role, Stylesheet},
 };
@@ -16,24 +18,29 @@ pub mod elem_id {
                 , SIDEBAR_SHOW
                 , SIDEBAR_HIDE
 
+                , SEARCH_FIELD
+
                 , TOOLBAR
                 , SIDEBAR
                 , LOG_VIEW
                 , EDITOR
                 , EDITOR_SPLIT
+                , EDITOR_FIELD
     }
 }
 
 fn new_custom_stylesheet() -> impl Stylesheet {
+    use std::f32::NAN;
+
     // Import IDs (e.g., `#GO_BACK`) into the scope
     use self::elem_id::*;
 
     const TOOLBAR_IMG_SIZE: Vector2<f32> = Vector2::new(24.0, 16.0);
     const TOOLBAR_IMG_METRICS: Metrics = Metrics {
-        margin: [std::f32::NAN; 4],
+        margin: [NAN; 4],
         size: TOOLBAR_IMG_SIZE,
     };
-    const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(30.0, 20.0);
+    const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(30.0, 22.0);
 
     let himg_from_stvg = |data| StvgImg::new(data).into_himg();
 
@@ -115,6 +122,50 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_HIDE)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
+        },
+
+        // Toolbar elements
+        ([#SEARCH_FIELD]) (priority = 10000) {
+            num_layers: 2,
+
+            layer_img[0]: Some(
+                himg_from_rounded_rect([0.0, 0.0, 0.0, 0.2].into(), [[3.0; 2]; 4])
+            ),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+
+            layer_img[1]: Some(himg_from_stvg(assets::SEARCH)),
+            layer_metrics[1]: Metrics {
+                margin: [NAN, NAN, NAN, 4.0],
+                size: [16.0, 16.0].into(),
+            },
+
+            min_size: [150.0, TOOLBAR_BTN_MIN_SIZE.y].into(),
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [2.0, 2.0, 2.0, 22.0],
+                ..Default::default()
+            },
+        },
+        ([.LABEL] < [#SEARCH_FIELD]) (priority = 10000) {
+            fg_color: [1.0, 1.0, 1.0, 0.6].into(),
+        },
+
+        // Composing area
+        ([#EDITOR_FIELD]) (priority = 10000) {
+            num_layers: 1,
+
+            layer_img[0]: Some(
+                himg_from_rounded_rect([1.0; 4].into(), [[3.0; 2]; 4])
+            ),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [3.0; 4],
+                ..Default::default()
+            },
+        },
+        ([.LABEL] < [#EDITOR_FIELD]) (priority = 10000) {
+            fg_color: [0.0, 0.0, 0.0, 0.4].into(),
         },
     }
 }

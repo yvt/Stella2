@@ -41,6 +41,8 @@ comp crate::view::MainView {
         zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
     };
 
+    // Sidebar
+    // -----------------------------------------------------------------------
     const sidebar_view_wrap = StyledBox::new! {
         style_manager,
         class_set = elem_id::SIDEBAR,
@@ -52,6 +54,8 @@ comp crate::view::MainView {
         text = "sidebar: todo!".to_string(),
     };
 
+    // The main area
+    // -----------------------------------------------------------------------
     const split_editor = Split::new! {
         style_manager,
         vertical = true,
@@ -61,6 +65,8 @@ comp crate::view::MainView {
         class_set = ClassSet::SPLITTER | ClassSet::VERTICAL | elem_id::EDITOR_SPLIT,
     };
 
+    // Chat log
+    // -----------------------------------------------------------------------
     const log_view_wrap = StyledBox::new! {
         style_manager,
         class_set = elem_id::LOG_VIEW,
@@ -72,15 +78,58 @@ comp crate::view::MainView {
         text = "log: todo!".to_string(),
     };
 
+    // Composing area
+    // -----------------------------------------------------------------------
     const editor_view_wrap = StyledBox::new! {
         style_manager,
         class_set = elem_id::EDITOR,
-        subview_generic = get!(editor_view.view),
+        subview_generic = get!(editor_view),
     };
-    const editor_view = PlaceholderView::new! {
-        wm,
+    const editor_view = HView::new! {
+        layout = TableLayout::stack_horz(
+            [
+                (get!(&editor_field.view), AlignFlags::JUSTIFY),
+                (get!(&spacer1.view), AlignFlags::HORZ_JUSTIFY),
+                (get!(&send_button.view), AlignFlags::HORZ_JUSTIFY | AlignFlags::TOP),
+            ]
+                .iter()
+                .map(|&(view, align)| (view.clone(), align))
+        ),
+    };
+
+    const editor_field = StyledBox::new! {
         style_manager,
-        text = "editor: todo!".to_string(),
+        view_flags = {
+            // Make `set_cursor_shape` work
+            use tcw3::uicore::ViewFlags;
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
+        },
+        class_set = elem_id::EDITOR_FIELD,
+        subview_generic = HView::new! {
+            // Align the text to the upper-left corner
+            layout = TableLayout::stack_horz(
+                Some((get!(editor_placeholder.view), AlignFlags::TOP | AlignFlags::LEFT))
+            ),
+        },
+    };
+    const editor_placeholder = Label::new! {
+        style_manager,
+        text = "Message #random",
+    };
+    on (init) {
+        // TODO: find a prettier way
+        get!(&editor_field).set_subelement(
+            tcw3::ui::theming::Role::Generic,
+            Some(get!(editor_placeholder.style_elem))
+        );
+        get!(&editor_field.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
+    }
+
+    const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
+
+    const send_button = Button::new! {
+        style_manager,
+        caption = "Send",
     };
 
     on (init) get!(&this).init();
@@ -149,10 +198,28 @@ pub(crate) comp ToolbarView {
     on (go_forward_button.activated) dbg!();
 
     // TODO
-    const search_bar = PlaceholderView::new! {
-        wm,
+    const search_bar = StyledBox::new! {
         style_manager,
-        text = "search: todo!".to_string(),
+        view_flags = {
+            // Make `set_cursor_shape` work
+            use tcw3::uicore::ViewFlags;
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
+        },
+        class_set = elem_id::SEARCH_FIELD,
+        subview_generic = get!(search_bar_placeholder.view),
+    };
+    on (init) {
+        // TODO: find a prettier way
+        get!(&search_bar).set_subelement(
+            tcw3::ui::theming::Role::Generic,
+            Some(get!(search_bar_placeholder.style_elem))
+        );
+        get!(&search_bar.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
+    }
+
+    const search_bar_placeholder = Label::new! {
+        style_manager,
+        text = "Search",
     };
 }
 

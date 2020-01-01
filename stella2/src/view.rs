@@ -107,6 +107,7 @@ impl WndView {
         hwnd.content_view()
             .set_layout(FillLayout::new(main_view.view().clone()));
 
+        hwnd.set_caption("Stella 2");
         hwnd.set_listener(WndViewWndListener);
         hwnd.set_visibility(true);
 

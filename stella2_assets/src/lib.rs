@@ -9,6 +9,8 @@ macro_rules! stvg {
     };
 }
 
+pub static SEARCH: Stvg = stvg!("src/search.svg");
+
 pub mod toolbar {
     use super::*;
 
