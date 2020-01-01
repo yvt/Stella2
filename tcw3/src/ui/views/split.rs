@@ -324,8 +324,8 @@ fn get_split_position(
     st_max: [f32; 2],
     splitter_width: f32,
 ) -> (f32, bool, bool) {
-    let mut min = [st_min[0], size - splitter_width - st_max[0]].fmax();
-    let mut max = [st_max[0], size - splitter_width - st_min[0]].fmin();
+    let mut min = [st_min[0], size - splitter_width - st_max[1]].fmax();
+    let mut max = [st_max[0], size - splitter_width - st_min[1]].fmin();
 
     // Make sure the first panel's size is rounded
     min = min.ceil();
