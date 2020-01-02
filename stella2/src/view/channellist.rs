@@ -1,46 +1,30 @@
 use std::ops::Range;
 use tcw3::{
-    pal,
     ui::{
         mixins::scrollwheel::ScrollAxisFlags,
         prelude::*,
         theming,
-        views::{table, table::LineTy, Label, ScrollableTable},
+        views::{table, table::LineTy, Label},
     },
     uicore::{HView, SizeTraits},
 };
 
-pub struct ChannelListView {
-    table: ScrollableTable,
+stella2_meta::designer_impl! {
+    crate::view::channellist::ChannelListView
 }
 
 impl ChannelListView {
-    pub fn new(_: pal::Wm, style_manager: &'static theming::Manager) -> Self {
-        let table = ScrollableTable::new(style_manager);
-
-        // This minimum size is kind of arbitrary
-        table.table().set_size_traits(SizeTraits {
-            preferred: [150.0, 200.0].into(),
-            min: [40.0, 40.0].into(),
-            ..Default::default()
-        });
-
-        table.set_scrollable_axes(ScrollAxisFlags::VERTICAL);
-
+    fn init(&self) {
         // Set up the table model
         {
-            let mut edit = table.table().edit().unwrap();
-            edit.set_model(TableModelQuery { style_manager });
+            let mut edit = self.table().table().edit().unwrap();
+            edit.set_model(TableModelQuery {
+                style_manager: self.style_manager(),
+            });
             edit.insert(LineTy::Row, 0..30);
             edit.insert(LineTy::Col, 0..1);
             edit.set_scroll_pos([0.0, edit.scroll_pos()[1]]);
         }
-
-        Self { table }
-    }
-
-    pub fn view(&self) -> &HView {
-        self.table.view()
     }
 }
 

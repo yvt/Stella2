@@ -1,5 +1,8 @@
 use tcw3::{
-    ui::theming::{self, Manager},
+    ui::{
+        theming::{self, Manager},
+        views::ScrollableTable,
+    },
     uicore::HView,
     pal,
 };
@@ -7,11 +10,22 @@ use tcw3::{
 use crate::{model, stylesheet::elem_id};
 
 #[widget]
-#[prototype_only]
-#[builder(simple)]
 pub(crate) comp crate::view::channellist::ChannelListView {
     const wm: pal::Wm { pub set; }
-    const style_manager: &Manager { pub set; }
+    const style_manager: &Manager { pub set; get clone; }
 
-    const view: HView { pub get borrow; } = unreachable!();
+    const view: HView { pub get; } = get!(table.view);
+
+    const table = ScrollableTable::new! {
+        style_manager,
+        scrollable_axes = ScrollAxisFlags::VERTICAL,
+        size_traits = SizeTraits {
+            preferred: [150.0, 200.0].into(),
+            // This minimum size is kind of arbitrary
+            min: [40.0, 40.0].into(),
+            ..Default::default()
+        },
+    };
+
+    on (init) get!(&this).init();
 }
