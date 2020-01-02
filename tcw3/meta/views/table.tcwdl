@@ -39,6 +39,12 @@ pub comp crate::ui::views::ScrollableTable {
     /// Get a reference to the inner `Table`.
     const table: crate::ui::views::Table { pub get borrow; } = unreachable!();
 
+    /// Set new size traits (delegated to the inner `Table`).
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
+    prop size_traits: SizeTraits { pub set; } = unreachable!();
+
     /// Set the axes for which scrolling is allowed.
     ///
     /// This might not take effect for an ongoing scroll gesture (if any).

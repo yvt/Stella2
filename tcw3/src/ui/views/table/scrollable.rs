@@ -23,7 +23,7 @@ use crate::{
         theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Scrollbar,
     },
-    uicore::{HView, ScrollDelta, ScrollListener, ViewFlags, ViewListener},
+    uicore::{HView, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
 };
 
 /// Wraps [`Table`] to support scrolling.
@@ -157,6 +157,14 @@ impl ScrollableTable {
     /// Get a reference to the inner `Table`.
     pub fn table(&self) -> &Table {
         &self.inner.table
+    }
+
+    /// Set new size traits (delegated to the inner `Table``).
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
+    pub fn set_size_traits(&self, value: SizeTraits) {
+        self.inner.table.set_size_traits(value);
     }
 
     /// Set the axes for which scrolling is allowed.
