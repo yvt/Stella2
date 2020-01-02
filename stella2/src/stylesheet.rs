@@ -61,11 +61,17 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         // Toolbar and titlebar background
         ([#TOOLBAR]) (priority = 10000) {
-            num_layers: 1,
+            num_layers: 2,
             layer_bg_color[0]: [0.6, 0.6, 0.6, 1.0].into(),
             layer_metrics[0]: Metrics {
                 margin: [-100.0, 0.0, 0.0, 0.0],
                 ..Default::default()
+            },
+
+            layer_bg_color[1]: [0.3, 0.3, 0.3, 0.35].into(),
+            layer_metrics[1]: Metrics {
+                margin: [NAN, 0.0, 0.0, 0.0],
+                size: [NAN, 0.65].into(),
             },
 
             subview_metrics[Role::Generic]: Metrics {
