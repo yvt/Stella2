@@ -595,7 +595,7 @@ mod tests {
         let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
 
         assert!(fr2.size().x < fr1.size().x * 0.2);
-        assert!(fr2.size().y > fr1.size().y * 0.4);
+        assert!(fr2.size().y > fr1.size().y * 0.1);
         assert!(fr1.contains_box(&fr2));
     }
 
