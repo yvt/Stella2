@@ -19,6 +19,7 @@ pub(crate) comp crate::view::channellist::ChannelListView {
     const table = ScrollableTable::new! {
         style_manager,
         scrollable_axes = ScrollAxisFlags::VERTICAL,
+        flags = table::TableFlags::GROW_LAST_COL,
         size_traits = SizeTraits {
             preferred: [150.0, 200.0].into(),
             // This minimum size is kind of arbitrary

@@ -74,8 +74,9 @@ impl table::TableModelQuery for TableModelQuery {
                 .map(|i| if i % 4 == 0 { 25.0 } else { 20.0 })
                 .sum(),
 
-            // TODO: find a better way to fill the width
-            LineTy::Col => (range.end - range.start) as f64 * 50.0,
+            // `TableFlags::GROW_LAST_COL` expands the column to cover the region.
+            // The column needs some width for this flag to work.
+            LineTy::Col => (range.end - range.start) as f64,
         }
     }
 }
