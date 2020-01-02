@@ -273,6 +273,16 @@ macro_rules! prop {
         )
     };
 
+    (@kind layer_xform[$i:expr]) => {
+        $crate::ui::theming::Prop::LayerXform($i).kind_flags()
+    };
+    (layer_xform[$i:expr]: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::LayerXform($i),
+            $crate::ui::theming::PropValue::LayerXform($val),
+        )
+    };
+
     (@kind layer_opacity[$i:expr]) => {
         $crate::ui::theming::Prop::LayerOpacity($i).kind_flags()
     };
