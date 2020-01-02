@@ -1,0 +1,55 @@
+use crate::{
+    ui::{
+        theming::{ClassSet, HElem, Manager},
+        mixins::scrollwheel::ScrollAxisFlags,
+    },
+    uicore::{HView, SizeTraits},
+    pal,
+};
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::views::Table {
+    /// Get a handle to the view representing the widget.
+    const view: HView { pub get borrow; } = unreachable!();
+
+    /// Set new size traits.
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
+    prop size_traits: SizeTraits { pub set; } = unreachable!();
+
+    /// The event that is raised whenever the table model is updated.
+    event model_update();
+}
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::views::ScrollableTable {
+    const style_manager: &Manager { pub set; }
+
+    /// Get a handle to the view representing the widget.
+    const view: HView { pub get borrow; } = unreachable!();
+
+    /// Get the styling element representing the widget.
+    const style_elem: HElem { pub get clone; } = unreachable!();
+
+    /// Get a reference to the inner `Table`.
+    const table: crate::ui::views::Table { pub get borrow; } = unreachable!();
+
+    /// Set the axes for which scrolling is allowed.
+    ///
+    /// This might not take effect for an ongoing scroll gesture (if any).
+    prop scrollable_axes: ScrollAxisFlags { pub set; } = unreachable!();
+
+    /// Set the class set of the inner `StyledBox`.
+    ///
+    /// It defaults to `ClassSet::SCROLL_CONTAINER`. Some bits (e.g.,
+    /// `HAS_HORIZONTAL_SCROLLBAR`) are internally enforced and cannot be
+    /// modified.
+    prop class_set: ClassSet { pub set; get clone; } = unreachable!();
+
+
+}
