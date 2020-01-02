@@ -342,6 +342,16 @@ macro_rules! prop {
             $crate::ui::theming::PropValue::Rgbaf32($val),
         )
     };
+
+    (@kind font) => {
+        $crate::ui::theming::Prop::Font.kind_flags()
+    };
+    (font: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::Font,
+            $crate::ui::theming::PropValue::SysFontType($val),
+        )
+    };
 }
 
 /// Construct a `Vec<(Prop, PropValue)>`.
