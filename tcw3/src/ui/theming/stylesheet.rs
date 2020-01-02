@@ -471,6 +471,11 @@ use crate::{images::himg_from_rounded_rect, pal::RGBAF32};
 use cggeom::box2;
 use std::f32::NAN;
 
+const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
+const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
+const SCROLLBAR_MARGIN: f32 = 6.0;
+const SCROLLBAR_LEN_MIN: f32 = 20.0;
+
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
@@ -504,10 +509,10 @@ lazy_static! {
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.12), [[4.0; 2]; 4]
+                RGBAF32::new(0.5, 0.5, 0.5, 0.12), [[SCROLLBAR_VISUAL_RADIUS; 2]; 4]
             )),
             layer_metrics[0]: Metrics {
-                margin: [4.0; 4],
+                margin: [SCROLLBAR_MARGIN; 4],
                 .. Metrics::default()
             },
             layer_center[0]: box2! { point: [0.5, 0.5] },
@@ -518,30 +523,30 @@ lazy_static! {
         },
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
-                margin: [4.0; 4],
-                size: [NAN, 8.0].into(),
+                margin: [SCROLLBAR_MARGIN; 4],
+                size: [NAN, SCROLLBAR_VISUAL_WIDTH].into(),
             },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
-                margin: [4.0; 4],
-                size: [8.0, NAN].into(),
+                margin: [SCROLLBAR_MARGIN; 4],
+                size: [SCROLLBAR_VISUAL_WIDTH, NAN].into(),
             },
         },
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
             layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.7), [[4.0; 2]; 4]
+                RGBAF32::new(0.5, 0.5, 0.5, 0.7), [[SCROLLBAR_VISUAL_RADIUS; 2]; 4]
             )),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
-            min_size: [20.0, 0.0].into(),
+            min_size: [SCROLLBAR_LEN_MIN, 0.0].into(),
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
-            min_size: [0.0, 20.0].into(),
+            min_size: [0.0, SCROLLBAR_LEN_MIN].into(),
         },
 
         ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
