@@ -576,7 +576,7 @@ impl ViewListener for SbListener {
                     layer_attrs.contents_center = Some(value);
                 }
 
-                if dirty.intersects(PropKindFlags::LAYER_XFORM) {
+                if dirty.intersects(PropKindFlags::LAYER_XFORM | PropKindFlags::LAYER_BOUNDS) {
                     let xform = compute_prop!(Prop::LayerXform(layer_id), PropValue::LayerXform);
 
                     let met = compute_prop!(Prop::LayerMetrics(layer_id), PropValue::Metrics);
