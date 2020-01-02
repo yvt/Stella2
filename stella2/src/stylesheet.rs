@@ -1,11 +1,12 @@
 use cggeom::box2;
-use cgmath::Vector2;
+use cgmath::{Deg, Vector2};
 use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 use tcw3::{
     images::himg_from_rounded_rect,
+    pal::SysFontType,
     stylesheet,
-    ui::theming::{Manager, Metrics, Role, Stylesheet},
+    ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
 };
 
 /// Define styling ID values.
@@ -26,6 +27,10 @@ pub mod elem_id {
                 , EDITOR
                 , EDITOR_SPLIT
                 , EDITOR_FIELD
+
+                , SIDEBAR_GROUP_HEADER
+                , SIDEBAR_GROUP_BULLET
+                , SIDEBAR_ITEM
     }
 }
 
@@ -161,6 +166,60 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([.LABEL] < [#EDITOR_FIELD]) (priority = 10000) {
             fg_color: [0.0, 0.0, 0.0, 0.4].into(),
+        },
+
+        // Sidebar
+        ([#SIDEBAR_GROUP_HEADER]) (priority = 10000) {
+            // label
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [NAN, NAN, NAN, 25.0],
+                ..Default::default()
+            },
+            // bullet (open/close)
+            subview_metrics[Role::Bullet]: Metrics {
+                margin: [NAN, NAN, NAN, 5.0],
+                size: [16.0, 16.0].into(),
+            },
+        },
+        ([.LABEL] < [#SIDEBAR_GROUP_HEADER]) (priority = 10000) {
+            fg_color: [0.0, 0.0, 0.0, 0.4].into(),
+            font: SysFontType::Emph,
+        },
+
+        ([#SIDEBAR_GROUP_BULLET]) (priority = 10000) {
+            num_layers: 1,
+            layer_img[0]: Some(himg_from_stvg(assets::LIST_GROUP_OPEN)),
+            layer_metrics[0]: Metrics {
+                margin: [NAN, NAN, NAN, 4.0],
+                size: [12.0, 12.0].into(),
+            },
+            layer_opacity[0]: 0.5,
+        },
+        ([#SIDEBAR_GROUP_BULLET.HOVER]) (priority = 11000) {
+            layer_opacity[0]: 0.7,
+        },
+        ([#SIDEBAR_GROUP_BULLET.ACTIVE]) (priority = 12000) {
+            layer_opacity[0]: 1.0,
+        },
+        ([#SIDEBAR_GROUP_BULLET] < [#SIDEBAR_GROUP_HEADER:not(.ACTIVE)]) (priority = 10000) {
+            layer_xform[0]: LayerXform {
+                rotate: Deg(-90.0).into(),
+                ..Default::default()
+            },
+        },
+
+        ([#SIDEBAR_ITEM]) (priority = 10000) {
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [NAN, NAN, NAN, 25.0],
+                ..Default::default()
+            },
+        },
+        ([#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: [0.1, 0.3, 0.6, 0.9].into(),
+        },
+        ([.LABEL] < [#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
+            fg_color: [1.0, 1.0, 1.0, 1.0].into(),
         },
     }
 }

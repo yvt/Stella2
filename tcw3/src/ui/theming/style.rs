@@ -82,6 +82,7 @@ pub enum Role {
     Generic = 0,
     HorizontalScrollbar,
     VerticalScrollbar,
+    Bullet,
 
     #[doc(hidden)]
     __Count,
