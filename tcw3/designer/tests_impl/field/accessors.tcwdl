@@ -1,0 +1,11 @@
+use std::cell::RefCell;
+use tcw3::pal;
+
+comp crate::field::accessors::Comp {
+    const wm: pal::Wm { set; }
+
+    prop prop1: u32 { set; get clone; } = 1;
+    prop prop2: u32 { set; get borrow; } = 2;
+    const const1: u32 { set; get clone; } = 3;
+    const const2: u32 { set; get borrow; } = 4;
+}

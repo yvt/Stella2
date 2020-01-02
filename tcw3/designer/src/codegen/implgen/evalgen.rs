@@ -115,7 +115,7 @@ pub fn gen_func_eval(
                 if func_input.by_ref {
                     input_gen.gen_this(out);
                 } else {
-                    write!(out, "{}::Clone(", paths::CLONE).unwrap();
+                    write!(out, "{}::clone(", paths::CLONE).unwrap();
                     input_gen.gen_this(out);
                     write!(out, ")").unwrap();
                 }

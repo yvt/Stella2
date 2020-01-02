@@ -9,6 +9,7 @@ mod commit {
 }
 
 mod field {
+    mod accessors;
     mod lifetime_elision;
     mod prop;
 }

@@ -104,7 +104,7 @@ pub fn gen_accessors(dep_analysis: &initgen::DepAnalysis, ctx: &Ctx<'_>, out: &m
                             .unwrap();
                             writeln!(
                                 out,
-                                "        {clone}::Clone(&self.{shared}.{field})",
+                                "        {clone}::clone(&self.{shared}.{field})",
                                 clone = paths::CLONE,
                                 shared = fields::SHARED,
                                 field = InnerValueField(&field.ident.sym),
