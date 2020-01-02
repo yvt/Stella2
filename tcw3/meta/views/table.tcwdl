@@ -1,5 +1,6 @@
 use crate::{
     ui::{
+        table::TableFlags,
         theming::{ClassSet, HElem, Manager},
         mixins::scrollwheel::ScrollAxisFlags,
     },
@@ -19,6 +20,9 @@ pub comp crate::ui::views::Table {
     /// Must not have an active edit (the table model must be in the unlocked
     /// state).
     prop size_traits: SizeTraits { pub set; } = unreachable!();
+
+    /// Set new table flags.
+    prop flags: TableFlags { pub set; } = unreachable!();
 
     /// The event that is raised whenever the table model is updated.
     event model_update();
@@ -44,6 +48,9 @@ pub comp crate::ui::views::ScrollableTable {
     /// Must not have an active edit (the table model must be in the unlocked
     /// state).
     prop size_traits: SizeTraits { pub set; } = unreachable!();
+
+    /// Set new table flags.
+    prop flags: TableFlags { pub set; } = unreachable!();
 
     /// Set the axes for which scrolling is allowed.
     ///

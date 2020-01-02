@@ -12,7 +12,7 @@ use super::{
         TableScrollbarDragListener,
     },
     scrollwheel::TableScrollModel,
-    LineTy, Table,
+    LineTy, Table, TableFlags,
 };
 use crate::{
     pal,
@@ -165,6 +165,14 @@ impl ScrollableTable {
     /// state).
     pub fn set_size_traits(&self, value: SizeTraits) {
         self.inner.table.set_size_traits(value);
+    }
+
+    /// Set new table flags (delegated to the inner `Table``).
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
+    pub fn set_flags(&self, value: TableFlags) {
+        self.inner.table.set_flags(value);
     }
 
     /// Set the axes for which scrolling is allowed.

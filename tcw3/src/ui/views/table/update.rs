@@ -1,3 +1,4 @@
+use alt_fp::FloatOrd;
 use arrayvec::ArrayVec;
 use cggeom::{prelude::*, Box2};
 use cgmath::{Point2, Vector2};
@@ -13,7 +14,7 @@ use std::{
 
 use super::{
     fixedpoint::{fix_to_f32, fp_to_fix},
-    DirtyFlags, Inner, LineTy, State, TableCell, TableModelQuery, VpSet,
+    DirtyFlags, Inner, LineTy, State, TableCell, TableFlags, TableModelQuery, VpSet,
 };
 use crate::{
     ui::scrolling::{
@@ -379,6 +380,7 @@ impl TableLayout {
     /// in its size. That's why it needs a `Rc<Inner>`.
     pub(super) fn from_current_state(inner: Rc<Inner>, state: &State) -> Self {
         // TODO: Assert `line_idx_maps` is an identity transform
+        let flags = inner.flags.get();
 
         // Get coordinates of the lines
         let pos_lists: ArrayVec<[_; 2]> = [LineTy::Col, LineTy::Row]
@@ -425,6 +427,16 @@ impl TableLayout {
                 }
 
                 assert_eq!(pos_list.len(), pos_list.capacity());
+
+                // Grow the last line if `GROW_LAST_*` is specified
+                if flags
+                    .contains([TableFlags::GROW_LAST_COL, TableFlags::GROW_LAST_ROW][ty as usize])
+                    && i == lineset.num_lines()
+                    && pos_list.len() > 1
+                {
+                    let pos = pos_list.last_mut().unwrap();
+                    *pos = pos.fmax(fix_to_f32(vp_size));
+                }
 
                 // Add the display offset
                 for x in pos_list.iter_mut() {

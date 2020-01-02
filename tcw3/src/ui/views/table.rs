@@ -136,6 +136,16 @@ pub type CellIdx = [u64; 2];
 /// The boxed function type for [`Table`]'s callback functions.
 pub type Cb = Box<dyn Fn()>;
 
+bitflags! {
+    /// Flags controlling the behavior of [`Table`].
+    pub struct TableFlags: u32 {
+        /// Expand the last column to fill the remaining space.
+        const GROW_LAST_COL = 1;
+        /// Expand the last row to fill the remaining space.
+        const GROW_LAST_ROW = 1 << 1;
+    }
+}
+
 /// The underlying data of a table view.
 struct Inner {
     state: RefCell<State>,
@@ -157,6 +167,8 @@ struct Inner {
     /// The size traits of the table view.
     size_traits: Cell<SizeTraits>,
 
+    flags: Cell<TableFlags>,
+
     dirty: Cell<DirtyFlags>,
 
     /// Callback functions to be called on model update. Use
@@ -170,6 +182,7 @@ impl fmt::Debug for Inner {
             .field("state", &self.state)
             .field("size", &self.size)
             .field("size_traits", &self.size_traits)
+            .field("flags", &self.flags)
             .field("dirty", &self.dirty)
             .field(
                 "model_update_handlers",
@@ -483,6 +496,7 @@ impl Table {
             }),
             size: Cell::new(Vector2::new(0, 0)),
             size_traits: Cell::new(SizeTraits::default()),
+            flags: Cell::new(TableFlags::empty()),
             dirty: Cell::new(DirtyFlags::empty()),
             model_update_handlers: RefCell::new(SubscriberList::new()),
         };
@@ -533,6 +547,19 @@ impl Table {
         self.inner.size_traits.set(value);
         self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
         Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
+    }
+
+    /// Set new table flags.
+    ///
+    /// Must not have an active edit (the table model must be in the unlocked
+    /// state).
+    pub fn set_flags(&self, value: TableFlags) {
+        let diff = value ^ self.inner.flags.get();
+        self.inner.flags.set(value);
+        if diff.intersects(TableFlags::GROW_LAST_COL | TableFlags::GROW_LAST_ROW) {
+            self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
+            Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
+        }
     }
 
     /// Register a function that gets called whenever the table model is updated.
