@@ -25,7 +25,7 @@ impl ChannelListView {
             });
             edit.insert(LineTy::Row, 0..29);
             edit.insert(LineTy::Col, 0..1);
-            edit.set_scroll_pos([0.0, edit.scroll_pos()[1]]);
+            edit.set_scroll_pos([0.0, 0.0]);
         }
     }
 }
