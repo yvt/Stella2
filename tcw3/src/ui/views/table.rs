@@ -174,6 +174,8 @@ struct Inner {
     /// Callback functions to be called on model update. Use
     /// `Inner::call_model_update_handlers` to call them.
     model_update_handlers: RefCell<SubscriberList<Cb>>,
+
+    prearrange_handlers: RefCell<SubscriberList<Cb>>,
 }
 
 impl fmt::Debug for Inner {
@@ -187,6 +189,10 @@ impl fmt::Debug for Inner {
             .field(
                 "model_update_handlers",
                 &((&self.model_update_handlers) as *const _),
+            )
+            .field(
+                "prearrange_handlers",
+                &((&self.prearrange_handlers) as *const _),
             )
             .finish()
     }
@@ -247,6 +253,11 @@ bitflags! {
         /// Indicates that the layout of the view is out-dated and must be
         /// replaced with a new layout.
         const LAYOUT = 1 << 1;
+
+        /// *This is technically not a dirty flag*. This flag is set for the
+        /// duration of a method of `TableLayout` being called. Use grep to find
+        /// out the purpose of this flag.
+        const LAYOUTING = 1 << 2;
     }
 }
 
@@ -499,6 +510,7 @@ impl Table {
             flags: Cell::new(TableFlags::empty()),
             dirty: Cell::new(DirtyFlags::empty()),
             model_update_handlers: RefCell::new(SubscriberList::new()),
+            prearrange_handlers: RefCell::new(SubscriberList::new()),
         };
 
         let inner = Rc::new(inner);
@@ -579,6 +591,22 @@ impl Table {
     pub fn subscribe_model_update(&self, cb: Cb) -> Sub {
         self.inner
             .model_update_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
+    }
+
+    /// Register a function that gets called in `Layout::arrange` and may
+    /// make modifications to the table model.
+    ///
+    /// This may be useful to resize lines based on the current size of the
+    /// table view.
+    ///
+    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
+    /// unregister the function.
+    pub fn subscribe_prearrange(&self, cb: Cb) -> Sub {
+        self.inner
+            .prearrange_handlers
             .borrow_mut()
             .insert(cb)
             .untype()

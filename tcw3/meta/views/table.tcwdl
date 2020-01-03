@@ -26,6 +26,13 @@ pub comp crate::ui::views::Table {
 
     /// The event that is raised whenever the table model is updated.
     event model_update();
+
+    /// The event that is raised in `Layout::arrange` to make modifications to
+    /// the table model.
+    ///
+    /// This may be useful to resize lines based on the current size of the
+    /// table view.
+    event prearrange();
 }
 
 #[prototype_only]

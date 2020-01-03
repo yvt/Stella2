@@ -37,6 +37,18 @@ impl Inner {
         }
     }
 
+    /// Call callback functions registered to `prearrange_handlers`.
+    ///
+    /// `state` must be in an unborrowed state (this is a precondition for the
+    /// callback functions).
+    pub(super) fn call_prearrange_handlers(&self) {
+        debug_assert!(self.state.try_borrow_mut().is_ok());
+
+        for cb in self.prearrange_handlers.borrow().iter() {
+            cb();
+        }
+    }
+
     /// An utility function for updating `self.dirty`.
     pub(super) fn set_dirty_flags(&self, new_flags: DirtyFlags) {
         self.dirty.set(self.dirty.get() | new_flags);
@@ -170,7 +182,12 @@ impl Inner {
     }
 
     pub(super) fn update_layout_if_needed(this: &Rc<Inner>, state: &State, view: &HView) {
-        if !this.dirty.get().contains(DirtyFlags::LAYOUT) {
+        // Return if `LAYOUT` is not set.
+        // `LAYOUTING` menas we are currently in `TableLayout::arrange`, so we
+        // can't call `HView::set_layout`.
+        if !this.dirty.get().contains(DirtyFlags::LAYOUT)
+            || this.dirty.get().contains(DirtyFlags::LAYOUTING)
+        {
             return;
         }
         this.dirty.set(this.dirty.get() - DirtyFlags::LAYOUT);
@@ -326,10 +343,23 @@ impl Layout for TableLayout {
         let fix_size = size.cast::<f64>().unwrap().map(fp_to_fix);
         if fix_size != self.inner.size.get() {
             self.inner.size.set(fix_size);
-
             self.inner.set_dirty_flags(DirtyFlags::CELLS);
-            self.inner.update_cells(&mut self.inner.state.borrow_mut());
+        }
 
+        // Call prearrange handlers
+        self.inner
+            .dirty
+            .set(self.inner.dirty.get() | DirtyFlags::LAYOUTING);
+        self.inner.call_prearrange_handlers();
+        self.inner
+            .dirty
+            .set(self.inner.dirty.get() - DirtyFlags::LAYOUTING);
+
+        if self.inner.dirty.get().contains(DirtyFlags::CELLS) {
+            self.inner.update_cells(&mut self.inner.state.borrow_mut());
+        }
+
+        if self.inner.dirty.get().contains(DirtyFlags::LAYOUT) {
             self.inner.call_model_update_handlers();
 
             // The `LAYOUT` dirty flag can be cleared here because
