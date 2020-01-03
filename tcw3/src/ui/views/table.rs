@@ -442,10 +442,9 @@ pub trait TableModelEditExt: TableModelEdit {
     /// Downcast the result of `self.model_mut()`.
     ///
     ///     # use tcw3::ui::views::table::*;
-    ///     # fn test(
+    ///     # fn test<MyModelQuery: TableModelQuery>(
     ///     #    edit: &mut dyn TableModelEdit,
     ///     # ) {
-    ///     # type MyModelQuery = Vec<f32>;
     ///     let my_model: &mut MyModelQuery = edit.model_downcast_mut()
     ///         .expect("wrong concrete type");
     ///     # }
