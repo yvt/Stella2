@@ -22,8 +22,8 @@ pub(crate) comp crate::view::logview::LogView {
         flags = table::TableFlags::GROW_LAST_COL,
         size_traits = SizeTraits {
             preferred: [300.0, 300.0].into(),
-            // This minimum size is kind of arbitrary
-            min: [40.0, 40.0].into(),
+            // The vertical minimum size is kind of arbitrary
+            min: [GUTTER_WIDTH * 2.0, 40.0].into(),
             ..Default::default()
         },
     };

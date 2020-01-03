@@ -16,6 +16,8 @@ stella2_meta::designer_impl! {
     crate::view::logview::LogView
 }
 
+const GUTTER_WIDTH: f32 = 100.0;
+
 impl LogView {
     fn init(&self) {
         // Set up the table model
@@ -37,17 +39,17 @@ impl LogView {
         let mk_lipsum = |num_words| lipsum.clone().take(num_words).collect::<Vec<_>>().join(" ");
         let rows = vec![
             Row::Date(chrono::NaiveDate::from_ymd(2018, 3, 1)),
-            Row::LogItem("bob", mk_lipsum(20)),
-            Row::LogItem("alice", mk_lipsum(25)),
-            Row::LogItem("bob", mk_lipsum(35)),
-            Row::LogItem("alice", mk_lipsum(5)),
-            Row::LogItem("bob", mk_lipsum(12)),
+            Row::LogItem("bob", "13:00", mk_lipsum(20)),
+            Row::LogItem("alice", "13:32", mk_lipsum(25)),
+            Row::LogItem("bob", "14:04", mk_lipsum(35)),
+            Row::LogItem("alice", "14:36", mk_lipsum(5)),
+            Row::LogItem("bob", "15:08", mk_lipsum(12)),
             Row::Date(chrono::NaiveDate::from_ymd(2018, 3, 2)),
-            Row::LogItem("bob", mk_lipsum(12)),
-            Row::LogItem("alice", mk_lipsum(15)),
-            Row::LogItem("bob", mk_lipsum(17)),
-            Row::LogItem("alice", mk_lipsum(40)),
-            Row::LogItem("bob", mk_lipsum(20)),
+            Row::LogItem("bob", "10:40", mk_lipsum(12)),
+            Row::LogItem("alice", "11:12", mk_lipsum(15)),
+            Row::LogItem("bob", "11:44", mk_lipsum(17)),
+            Row::LogItem("alice", "14:16", mk_lipsum(40)),
+            Row::LogItem("bob", "14:48", mk_lipsum(20)),
         ];
 
         {
@@ -182,7 +184,7 @@ impl ViewListener for RowViewListener {
 // Mock-up log model
 enum Row {
     Date(chrono::NaiveDate),
-    LogItem(&'static str, String),
+    LogItem(&'static str, &'static str, String),
 }
 
 #[derive(Clone)]
@@ -195,17 +197,21 @@ struct RowVisual {
 impl RowVisual {
     fn from_row(row: &Row, row_width: f32, dpi_scale: f32) -> Self {
         let v_margin = 3.0;
-        let h_margin = 8.0;
+        let h_margin = 10.0;
+        let scrollbar_margin = 12.0;
 
         let text = match row {
             Row::Date(d) => d.to_string(),
-            Row::LogItem(name, body) => format!("{} @{} {}", name, name, body),
+            Row::LogItem(name, _, body) => format!("{} @{} {}", name, name, body),
         };
         let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
             ..Default::default()
         });
-        let text_layout =
-            pal::TextLayout::from_text(&text, &char_style, Some(row_width - h_margin * 2.0));
+        let text_layout = pal::TextLayout::from_text(
+            &text,
+            &char_style,
+            Some(row_width - h_margin * 2.0 - GUTTER_WIDTH - scrollbar_margin),
+        );
         let layout_bounds = text_layout.layout_bounds();
 
         let row_height = layout_bounds.size().y.ceil() + v_margin * 2.0;
@@ -224,16 +230,23 @@ impl RowVisual {
             // Apply DPI scaling
             builder.mult_transform(Matrix3::from_scale_2d(dpi_scale));
 
+            builder.set_fill_rgb([0.5, 0.5, 0.5, 0.05].into());
+            builder.fill_rect(box2! {
+                min: [0.0, 0.0],
+                max: [GUTTER_WIDTH, row_height],
+            });
+
             match row {
                 Row::Date(_) => {
                     let y = row_height / 2.0;
-                    let text_x_min = (row_width - layout_bounds.size().x) / 2.0;
+                    let text_x_min =
+                        (row_width - GUTTER_WIDTH - layout_bounds.size().x) / 2.0 + GUTTER_WIDTH;
                     let text_x_max = text_x_min + layout_bounds.size().x;
 
                     builder.begin_path();
-                    builder.move_to([h_margin + 8.0, y].into());
+                    builder.move_to([GUTTER_WIDTH, y].into());
                     builder.line_to([text_x_min - 8.0, y].into());
-                    builder.move_to([row_width - h_margin - 8.0, y].into());
+                    builder.move_to([row_width, y].into());
                     builder.line_to([text_x_max + 8.0, y].into());
                     builder.set_stroke_rgb([0.0, 0.0, 0.0, 0.2].into());
                     builder.stroke();
@@ -244,11 +257,44 @@ impl RowVisual {
                         pal::RGBAF32::new(0.0, 0.0, 0.0, 1.0),
                     );
                 }
-                _ => {
+                Row::LogItem(author, time, _) => {
+                    let y = v_margin - text_layout.layout_bounds().min.y;
                     builder.draw_text(
                         &text_layout,
-                        [h_margin, v_margin - text_layout.layout_bounds().min.y].into(),
+                        [h_margin + GUTTER_WIDTH, y].into(),
                         pal::RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+                    );
+
+                    // Avatar
+                    let avatar_size = 16.0;
+                    if *author == "bob" {
+                        builder.set_fill_rgb([0.8, 0.4, 0.3, 1.0].into());
+                    } else {
+                        builder.set_fill_rgb([0.1, 0.6, 0.6, 1.0].into());
+                    }
+                    builder.begin_path();
+                    builder.rounded_rect(
+                        box2! {
+                            top_right: [GUTTER_WIDTH - 6.0, y],
+                            size: [avatar_size; 2],
+                        },
+                        [[2.0; 2]; 4],
+                    );
+                    builder.fill();
+
+                    // Time
+                    let time_text_layout = pal::TextLayout::from_text(time, &char_style, None);
+                    builder.draw_text(
+                        &time_text_layout,
+                        [
+                            GUTTER_WIDTH
+                                - time_text_layout.layout_bounds().max.x
+                                - 12.0
+                                - avatar_size,
+                            y,
+                        ]
+                        .into(),
+                        pal::RGBAF32::new(0.0, 0.0, 0.0, 0.6),
                     );
                 }
             }
