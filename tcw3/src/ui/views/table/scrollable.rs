@@ -159,7 +159,7 @@ impl ScrollableTable {
         &self.inner.table
     }
 
-    /// Set new size traits (delegated to the inner `Table``).
+    /// Set new size traits (delegated to the inner `Table`).
     ///
     /// Must not have an active edit (the table model must be in the unlocked
     /// state).
@@ -167,7 +167,7 @@ impl ScrollableTable {
         self.inner.table.set_size_traits(value);
     }
 
-    /// Set new table flags (delegated to the inner `Table``).
+    /// Set new table flags (delegated to the inner `Table`).
     ///
     /// Must not have an active edit (the table model must be in the unlocked
     /// state).
