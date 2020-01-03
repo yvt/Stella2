@@ -1,0 +1,32 @@
+use tcw3::{
+    ui::{
+        theming::{self, Manager},
+        views::ScrollableTable,
+    },
+    uicore::HView,
+    pal,
+};
+
+use crate::{model, stylesheet::elem_id};
+
+#[widget]
+pub(crate) comp crate::view::logview::LogView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; get clone; }
+
+    const view: HView { pub get; } = get!(table.view);
+
+    const table = ScrollableTable::new! {
+        style_manager,
+        scrollable_axes = ScrollAxisFlags::VERTICAL,
+        flags = table::TableFlags::GROW_LAST_COL,
+        size_traits = SizeTraits {
+            preferred: [300.0, 300.0].into(),
+            // This minimum size is kind of arbitrary
+            min: [40.0, 40.0].into(),
+            ..Default::default()
+        },
+    };
+
+    on (init) get!(&this).init();
+}

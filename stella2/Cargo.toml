@@ -10,6 +10,7 @@ license = "GPL-3.0-or-later"
 default-run = "stella2"
 
 [dependencies]
+chrono = "0.4"
 tcw3 = { path = "../tcw3" }
 harmony = { path = "../harmony" }
 stella2_assets = { path = "../stella2_assets" }

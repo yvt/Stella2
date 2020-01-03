@@ -88,11 +88,6 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#LOG_VIEW]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: [1.0, 1.0, 1.0, 1.0].into(),
-
-            subview_metrics[Role::Generic]: Metrics {
-                margin: [5.0; 4],
-                ..Default::default()
-            },
         },
         ([#EDITOR]) (priority = 10000) {
             num_layers: 1,

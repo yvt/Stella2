@@ -17,6 +17,7 @@ use tcw3::{
 use crate::{model, stylesheet::elem_id};
 
 mod channellist;
+mod logview;
 mod toolbar;
 
 pub struct AppView {

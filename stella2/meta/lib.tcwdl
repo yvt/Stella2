@@ -15,11 +15,13 @@ use crate::{
     stylesheet::elem_id,
     view::{
         channellist::ChannelListView,
+        logview::LogView,
         toolbar::ToolbarView,
     },
 };
 
 import!("view/channellist.tcwdl");
+import!("view/logview.tcwdl");
 import!("view/toolbar.tcwdl");
 
 #[widget]
@@ -78,11 +80,7 @@ comp crate::view::MainView {
         class_set = elem_id::LOG_VIEW,
         subview_generic = get!(log_view.view),
     };
-    const log_view = PlaceholderView::new! {
-        wm,
-        style_manager,
-        text = "log: todo!".to_string(),
-    };
+    const log_view = LogView::new! { wm, style_manager };
 
     // Composing area
     // -----------------------------------------------------------------------
