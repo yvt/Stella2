@@ -29,4 +29,6 @@ pub(crate) comp crate::view::logview::LogView {
     };
 
     on (init) get!(&this).init();
+
+    on (table.table.prearrange) get!(&this).update_row_visuals();
 }

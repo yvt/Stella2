@@ -50,24 +50,51 @@ impl LogView {
             Row::LogItem("bob", mk_lipsum(20)),
         ];
 
-        // TODO: adapt to width and DPI factor changes
-        let row_visuals = rows
-            .iter()
-            .map(|row| RowVisual::from_row(row, 450.0, 2.0))
-            .collect();
-
         {
             let mut edit = self.table().table().edit().unwrap();
             let num_rows = rows.len() as u64;
-            edit.set_model(TableModelQuery { row_visuals });
+            edit.set_model(TableModelQuery {
+                width: 100.0,
+                row_visuals: rows
+                    .iter()
+                    .map(|row| RowVisual::from_row(row, 100.0, 2.0))
+                    .collect(),
+                rows,
+            });
             edit.insert(LineTy::Row, 0..num_rows);
             edit.insert(LineTy::Col, 0..1);
         }
+    }
+
+    fn update_row_visuals(&self) {
+        // TODO: adapt t DPI factor changes
+        let mut edit = self.table().table().edit().unwrap();
+        let width = self.table().view().frame().size().x;
+
+        let model: &mut TableModelQuery = edit.model_downcast_mut().unwrap();
+
+        if (width - model.width).abs() < 0.1 {
+            return;
+        }
+
+        model.width = width;
+
+        model.row_visuals = model
+            .rows
+            .iter()
+            .map(|row| RowVisual::from_row(row, width, 2.0))
+            .collect();
+
+        let num_rows = model.rows.len() as u64;
+        edit.resize(LineTy::Row, 0..num_rows);
+        edit.renew_subviews(LineTy::Row, 0..num_rows);
     }
 }
 
 struct TableModelQuery {
     row_visuals: Vec<RowVisual>,
+    width: f32,
+    rows: Vec<Row>,
 }
 
 impl table::TableModelQuery for TableModelQuery {
