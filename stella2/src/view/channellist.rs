@@ -37,7 +37,16 @@ struct TableModelQuery {
 impl table::TableModelQuery for TableModelQuery {
     fn new_view(&mut self, cell: table::CellIdx) -> (HView, Box<dyn table::CellCtrler>) {
         let label = Label::new(self.style_manager);
-        label.set_text(format!("Item {}", cell[1]));
+        label.set_text(match (cell[1] % 4, (cell[1] / 4) % 4) {
+            (0, 0) => "randomserver — Slack",
+            (0, 1) => "workplace — Slack",
+            (0, 2) => "thawedpeach — GNU Social",
+            (0, 3) => "FreeNode",
+            (1, _) => "#general",
+            (2, _) => "#prolang",
+            (3, _) => "#random",
+            _ => unreachable!(),
+        });
 
         let wrap = theming::StyledBox::new(self.style_manager, Default::default());
         wrap.set_child(theming::Role::Generic, Some(&label));
