@@ -439,7 +439,7 @@ pub trait TableModelEditExt: TableModelEdit {
     ///         .expect("wrong concrete type");
     ///     # }
     ///
-    fn model_downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
+    fn model_downcast_mut<T: TableModelQuery>(&mut self) -> Option<&mut T> {
         (*self.model_mut()).as_any_mut().downcast_mut()
     }
 }
