@@ -195,6 +195,7 @@ struct RowVisual {
 }
 
 impl RowVisual {
+    #[allow(clippy::possible_missing_comma)]
     fn from_row(row: &Row, row_width: f32, dpi_scale: f32) -> Self {
         let v_margin = 3.0;
         let h_margin = 10.0;
