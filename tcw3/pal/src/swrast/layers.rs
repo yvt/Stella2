@@ -280,17 +280,17 @@ impl<TBmp: Bmp> Screen<TBmp> {
             let old_new_sublayers = self.layers[layer.ptr].new_sublayers.take();
             let sublayers = std::mem::replace(&mut self.layers[layer.ptr].sublayers, Vec::new());
 
-            if let Some(layers) = &old_new_sublayers {
-                for hlayer in layers.iter() {
-                    self.release_layer(hlayer);
-                }
-            }
-
             // detach sublayers first
             for hlayer in old_new_sublayers.as_ref().unwrap_or(&sublayers) {
                 let sublayer = &mut self.layers[hlayer.ptr];
                 debug_assert!(sublayer.superlayer == Some(Superlayer::Layer(layer.clone())));
                 sublayer.superlayer = None;
+            }
+
+            if let Some(layers) = &old_new_sublayers {
+                for hlayer in layers.iter() {
+                    self.release_layer(hlayer);
+                }
             }
 
             self.layers[layer.ptr].sublayers = sublayers;
