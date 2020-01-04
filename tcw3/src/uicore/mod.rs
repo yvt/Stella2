@@ -765,10 +765,24 @@ impl HView {
 
     /// Set a new [`ViewListener`].
     ///
-    /// It's not allowed to call this method from `ViewListener`'s methods.
+    /// It's not allowed to call this method from `ViewListener`'s methods or
+    /// when the `ViewListener` is currently borrowed.
     #[momo]
     pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>) {
         *self.view.listener.borrow_mut() = listener.into();
+    }
+
+    /// Borrow the current [`ViewListener`].
+    pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_ {
+        owning_ref::OwningRef::new(self.view.listener.borrow()).map(|r| &**r)
+    }
+
+    /// Take the current [`ViewListener`].
+    ///
+    /// It's not allowed to call this method from `ViewListener`'s methods or
+    /// when the `ViewListener` is currently borrowed
+    pub fn take_listener(&self) -> Box<dyn ViewListener> {
+        std::mem::replace(&mut *self.view.listener.borrow_mut(), Box::new(()))
     }
 
     /// Set a new [`Layout`].
