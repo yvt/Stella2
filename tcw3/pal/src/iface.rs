@@ -68,6 +68,9 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
 
     /// Enqueue a call to the specified function on the main thread. The calling
     /// thread can be any thread.
+    ///
+    /// This method may panic if it is called before a main thread is
+    /// determined.
     fn invoke_on_main_thread(f: impl FnOnce(Self) + Send + 'static);
 
     /// Enqueue a call to the specified function on the main thread.

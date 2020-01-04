@@ -81,8 +81,9 @@ fn is_main_thread_slow() -> bool {
 }
 
 fn get_msg_hwnd() -> HWND {
-    // Make sure the main thread is initialized
-    is_main_thread();
+    if MAIN_HTHREAD.load(Ordering::Acquire) == 0 {
+        panic!("No main thread");
+    }
 
     let msg_hwnd = MSG_HWND.load(Ordering::Relaxed) as HWND;
     debug_assert_ne!(msg_hwnd, null_mut());
@@ -100,16 +101,19 @@ fn get_msg_hwnd_with_wm(_: Wm) -> HWND {
 }
 
 pub fn invoke_on_main_thread(f: Box<dyn FnOnce(Wm) + Send>) {
+    invoke_inner(get_msg_hwnd(), f);
+}
+
+pub fn invoke(wm: Wm, f: Box<dyn FnOnce(Wm) + Send>) {
+    invoke_inner(get_msg_hwnd_with_wm(wm), f);
+}
+
+fn invoke_inner(hwnd: HWND, f: Box<dyn FnOnce(Wm) + Send>) {
     // TODO: find a way to avoid double boxing
     let boxed: InvokePayload = Box::new(f);
 
     unsafe {
-        PostMessageW(
-            get_msg_hwnd(),
-            MSG_WND_WM_INVOKE,
-            Box::into_raw(boxed) as WPARAM,
-            0,
-        );
+        PostMessageW(hwnd, MSG_WND_WM_INVOKE, Box::into_raw(boxed) as WPARAM, 0);
     }
 }
 
@@ -317,17 +321,21 @@ fn init_main_thread() {
 }
 
 extern "system" fn msg_wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    let wm = unsafe { Wm::global_unchecked() };
-
-    log::debug!("{:?}", (hwnd, msg, wparam, lparam));
+    // note: This function may be called before `MSG_HWND` and `MAIN_THREAD`
+    // are initialized, to handle `WM_CREATE`, etc. In such cases, calling
+    // `global_unchecked` is illegal.
 
     match msg {
         MSG_WND_WM_INVOKE => {
+            let wm = unsafe { Wm::global_unchecked() };
+
             let payload = unsafe { InvokePayload::from_raw(wparam as _) };
             payload(wm);
             0
         }
         WM_TIMER => {
+            let wm = unsafe { Wm::global_unchecked() };
+
             let timer_id = wparam as UINT_PTR;
 
             let mut timers = TIMERS.get_with_wm(wm).borrow_mut();

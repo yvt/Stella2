@@ -38,17 +38,13 @@ impl iface::Wm for Wm {
     }
 
     fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
-        eventloop::invoke_on_main_thread(Box::new(move |wm| {
-            debug_assert!(Self::is_main_thread());
-
-            f(wm);
-        }));
+        eventloop::invoke_on_main_thread(Box::new(move |wm| f(wm)));
     }
 
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
         // This is safe because we know we are already in the main thread
         let f = AssertSend(f);
-        Self::invoke_on_main_thread(move |wm| (f.0)(wm));
+        eventloop::invoke(self, Box::new(move |wm| (f.0)(wm)));
     }
 
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
