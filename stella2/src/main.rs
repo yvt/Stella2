@@ -5,6 +5,7 @@
 // When never type (`!`) is stabilized, `msg_send![ ... ];` will be no longer
 // deduced to `()`. Thus a call to `msg_send!` needs a unit value binding
 #![allow(clippy::let_unit_value)]
+#![allow(clippy::float_cmp)]
 
 use log::debug;
 use tcw3::pal::{self, prelude::*};
