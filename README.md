@@ -2,6 +2,10 @@
 
 [![Build Status](https://yvt.visualstudio.com/Stella2/_apis/build/status/yvt.Stella2?branchName=master)](https://yvt.visualstudio.com/Stella2/_build/latest?definitionId=1&branchName=master)
 
+**Work in progress**
+
+This project aims to create a lightweight instant messaging client.
+
 TODO
 
 ## Goals
@@ -102,14 +106,15 @@ nix-shell -p gtk3 pkgconfig --run 'cargo build --release -p stella2'
 nix-shell -p glib pango harfbuzz pkgconfig --run 'cargo build --release -p stella2'
 ```
 
+Windows isn't supported yet, but you can build and run it anyway if you have GTK+ SDK installed on your system. [gtk-rs's Requirements page](https://gtk-rs.org/docs-src/requirements.html) provides an excellent guide on how to configure a development environment for GTK.
+
 ## Third-party software
 
 This source tree includes the following third-party projects:
 
  - (Git subtree) <https://github.com/yvt/alt_fp-rs> at `support/alt_fp`
- - `stvg_macro` is partly based on [Pathfinder 3](https://github.com/servo/pathfinder), licensed by the Pathfinder Project developers under the Apache License, Version 2.0 or the MIT license.
+ - `stvg_macro` is partly based on [Pathfinder 3](https://github.com/servo/pathfinder), licensed by the Pathfinder Project developers under the Apache License, Version 2.0 or the MIT license. Being a procedural macro, it's not included in the final binary.
 
 ## License
 
-TBD
-
+Yet to be determined. Probably it will be GPLv3 or a more tolerant one.
