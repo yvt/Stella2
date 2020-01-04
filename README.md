@@ -1,4 +1,4 @@
-# Stella 2
+# ![Stella 2](docs/images/banner.svg)
 
 [![Build Status](https://yvt.visualstudio.com/Stella2/_apis/build/status/yvt.Stella2?branchName=master)](https://yvt.visualstudio.com/Stella2/_build/latest?definitionId=1&branchName=master)
 
