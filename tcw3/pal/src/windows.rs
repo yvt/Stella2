@@ -2,7 +2,9 @@
 use super::iface;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
-use std::{marker::PhantomData, ops::Range, time::Duration};
+use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
+
+mod eventloop;
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
@@ -11,6 +13,10 @@ pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
+}
+
+thread_local! {
+    static IS_MAIN_THREAD: Cell<bool> = Cell::new(false);
 }
 
 impl iface::Wm for Wm {
@@ -26,15 +32,21 @@ impl iface::Wm for Wm {
     }
 
     fn is_main_thread() -> bool {
-        unimplemented!()
+        eventloop::is_main_thread()
     }
 
     fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
-        unimplemented!()
+        eventloop::invoke_on_main_thread(Box::new(move |wm| {
+            debug_assert!(Self::is_main_thread());
+
+            f(wm);
+        }));
     }
 
     fn invoke(self, f: impl FnOnce(Self) + 'static) {
-        unimplemented!()
+        // This is safe because we know we are already in the main thread
+        let f = AssertSend(f);
+        Self::invoke_on_main_thread(move |wm| (f.0)(wm));
     }
 
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
@@ -46,11 +58,12 @@ impl iface::Wm for Wm {
     }
 
     fn enter_main_loop(self) -> ! {
-        unimplemented!()
+        eventloop::enter_main_loop();
+        std::process::exit(0);
     }
 
     fn terminate(self) {
-        unimplemented!()
+        eventloop::terminate();
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
@@ -91,6 +104,9 @@ impl iface::Wm for Wm {
         unimplemented!()
     }
 }
+
+struct AssertSend<T>(T);
+unsafe impl<T> Send for AssertSend<T> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd;

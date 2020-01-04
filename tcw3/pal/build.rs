@@ -11,7 +11,9 @@ fn main() {
             .flag("-fobjc-weak")
             .compile("tcwsupport_macos");
     } else if env::var("CARGO_CFG_TARGET_OS").unwrap() == "windows" {
-        // Nothing for now
+        // `CompareObjectHandles` is in `WindowsApp.lib`.
+        // <https://github.com/retep998/winapi-rs/issues/781>
+        println!("cargo:rustc-link-lib=dylib=WindowsApp");
     } else {
         // Try to match the settings to that of `gtk-sys`
         let gtk_lib = pkg_config::Config::new()
