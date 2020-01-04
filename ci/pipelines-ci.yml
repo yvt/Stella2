@@ -66,8 +66,7 @@ stages:
           MacOS:
             vmImage: macOS-10.13
             prepareScript: ""
-          # TODO: Windows does not have its own backend at the moment
-          # Windows:
-          #   vmImage: vs2017-win2016
-          #   prepareScript: ""
+          Windows:
+            vmImage: vs2017-win2016
+            prepareScript: ""
 
