@@ -765,7 +765,7 @@ impl HView {
 
     /// Set a new [`ViewListener`].
     ///
-    /// It's now allowed to call this method from `ViewListener`'s methods.
+    /// It's not allowed to call this method from `ViewListener`'s methods.
     #[momo]
     pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>) {
         *self.view.listener.borrow_mut() = listener.into();
@@ -774,6 +774,9 @@ impl HView {
     /// Set a new [`Layout`].
     ///
     /// It's not allowed to call this method from [`ViewListener::update`].
+    ///
+    /// It's not allowed to call this method from `Layout`'s method. You should
+    /// use [`LayoutCtx::set_layout`] instead.
     #[momo]
     pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>) {
         let layout = layout.into();
