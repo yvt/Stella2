@@ -10,6 +10,8 @@ fn main() {
             .flag("-fobjc-arc")
             .flag("-fobjc-weak")
             .compile("tcwsupport_macos");
+    } else if env::var("CARGO_CFG_TARGET_OS").unwrap() == "windows" {
+        // Nothing for now
     } else {
         // Try to match the settings to that of `gtk-sys`
         let gtk_lib = pkg_config::Config::new()

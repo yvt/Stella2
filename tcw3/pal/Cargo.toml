@@ -44,6 +44,7 @@ pangocairo = { version = "0.9.0", optional = true }
 pango = { version = "0.8.0", optional = true }
 rayon = { version = "1.2.0", optional = true }
 
+# `macos` backend
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.20.0"
 core-foundation = "0.7"
@@ -52,8 +53,20 @@ core-text = "15.0.0"
 dispatch = "0.1.4"
 objc = "0.2.3"
 
+# `windows` backend
+[target.'cfg(target_os = "windows")'.dependencies]
+directwrite = "0.1.4"
+direct2d = "0.2.0"
+
+[target.'cfg(target_os = "windows")'.dependencies.winapi]
+version = "0.3.8"
+features = [
+	"d2d1_1", "dwrite", "winbase", "winuser", "shellscalingapi", "combaseapi",
+	"synchapi", "dxgi1_3", "dcomp", "d3d11", "dwmapi",
+]
+
 # `gtk` backend
-[target.'cfg(not(target_os = "macos"))'.dependencies]
+[target.'cfg(not(any(target_os = "macos", target_os = "windows")))'.dependencies]
 gio = "0.7.0"
 gdk = "0.12.0"
 gdk-sys = "0.9.1"

@@ -51,14 +51,20 @@ pub mod macos;
 #[cfg(target_os = "macos")]
 pub use macos as native;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+pub mod windows;
+#[cfg(target_os = "windows")]
+pub use windows as native;
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod gtk;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub use self::gtk as native;
 
-// TODO: Windows
-
-#[cfg(any(not(target_os = "macos"), feature = "testing"))]
+#[cfg(any(
+    not(any(target_os = "macos", target_os = "windows")),
+    feature = "testing"
+))]
 mod swrast;
 
 #[cfg(feature = "testing")]
