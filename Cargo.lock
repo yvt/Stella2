@@ -2010,6 +2010,7 @@ dependencies = [
  "stella2_meta 0.1.0",
  "stella2_windres 0.1.0",
  "stvg_tcw3 0.1.0",
+ "subscriber_list 0.1.0",
  "tcw3 0.1.0",
 ]
 

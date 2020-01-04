@@ -17,6 +17,7 @@ use tcw3::{
 use crate::{model, stylesheet::elem_id};
 
 mod channellist;
+mod dpiscalewatcher;
 mod logview;
 mod toolbar;
 

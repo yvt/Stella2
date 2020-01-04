@@ -7,14 +7,18 @@ use tcw3::{
     pal,
 };
 
-use crate::{model, stylesheet::elem_id};
+use crate::{
+    model,
+    stylesheet::elem_id,
+    view::dpiscalewatcher::DpiScaleWatcher,
+};
 
 #[widget]
 pub(crate) comp crate::view::logview::LogView {
     const wm: pal::Wm { pub set; }
     const style_manager: &Manager { pub set; get clone; }
 
-    const view: HView { pub get; } = get!(table.view);
+    const view: HView { pub get; } = get!(dpi_scale_watcher.view);
 
     const table = ScrollableTable::new! {
         style_manager,
@@ -28,7 +32,11 @@ pub(crate) comp crate::view::logview::LogView {
         },
     };
 
+    const dpi_scale_watcher = DpiScaleWatcher::new! { subview = get!(table.view) };
+
     on (init) get!(&this).init();
 
-    on (table.table.prearrange) get!(&this).update_row_visuals();
+    on (table.table.prearrange, dpi_scale_watcher.dpi_scale_changed) {
+        get!(&this).update_row_visuals();
+    }
 }

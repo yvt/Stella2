@@ -57,9 +57,10 @@ impl LogView {
             let num_rows = rows.len() as u64;
             edit.set_model(TableModelQuery {
                 width: 100.0,
+                dpi_scale: 1.0,
                 row_visuals: rows
                     .iter()
-                    .map(|row| RowVisual::from_row(row, 100.0, 2.0))
+                    .map(|row| RowVisual::from_row(row, 100.0, 1.0))
                     .collect(),
                 rows,
             });
@@ -69,22 +70,24 @@ impl LogView {
     }
 
     fn update_row_visuals(&self) {
-        // TODO: adapt t DPI factor changes
+        let dpi_scale = self.table().view().containing_wnd().unwrap().dpi_scale();
+
         let mut edit = self.table().table().edit().unwrap();
         let width = self.table().view().frame().size().x;
 
         let model: &mut TableModelQuery = edit.model_downcast_mut().unwrap();
 
-        if (width - model.width).abs() < 0.1 {
+        if (width - model.width).abs() < 0.1 && dpi_scale == model.dpi_scale {
             return;
         }
 
         model.width = width;
+        model.dpi_scale = dpi_scale;
 
         model.row_visuals = model
             .rows
             .iter()
-            .map(|row| RowVisual::from_row(row, width, 2.0))
+            .map(|row| RowVisual::from_row(row, width, dpi_scale))
             .collect();
 
         let num_rows = model.rows.len() as u64;
@@ -96,6 +99,7 @@ impl LogView {
 struct TableModelQuery {
     row_visuals: Vec<RowVisual>,
     width: f32,
+    dpi_scale: f32,
     rows: Vec<Row>,
 }
 

@@ -21,6 +21,7 @@ use crate::{
 };
 
 import!("view/channellist.tcwdl");
+import!("view/dpiscalewatcher.tcwdl");
 import!("view/logview.tcwdl");
 import!("view/toolbar.tcwdl");
 
