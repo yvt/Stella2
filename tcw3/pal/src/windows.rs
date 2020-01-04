@@ -6,6 +6,8 @@ use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
 mod eventloop;
 
+pub use self::eventloop::HInvoke;
+
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
@@ -50,11 +52,11 @@ impl iface::Wm for Wm {
     }
 
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke {
-        unimplemented!()
+        eventloop::invoke_after(self, delay, Box::new(f))
     }
 
     fn cancel_invoke(self, hinv: &Self::HInvoke) {
-        unimplemented!()
+        eventloop::cancel_invoke(self, hinv);
     }
 
     fn enter_main_loop(self) -> ! {
@@ -113,9 +115,6 @@ pub struct HWnd;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HInvoke;
 
 #[derive(Debug, Clone)]
 pub struct Bitmap;
