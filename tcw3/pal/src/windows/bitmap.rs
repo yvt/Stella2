@@ -5,12 +5,7 @@ use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
 use winapi::um::{
     gdiplusenums,
     gdiplusenums::GraphicsState,
-    gdiplusflat::{
-        GdipAddPathBezier, GdipAddPathLine, GdipClosePathFigure, GdipCreateBitmapFromScan0,
-        GdipCreatePath, GdipDeleteGraphics, GdipDeletePath, GdipDisposeImage,
-        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth, GdipResetPath,
-        GdipRestoreGraphics, GdipSaveGraphics, GdipSetPathFillMode, GdipStartPathFigure,
-    },
+    gdiplusflat as gp,
     gdiplusgpstubs::{GpBitmap, GpGraphics, GpPath, GpStatus},
     gdiplusinit, gdipluspixelformats, gdiplustypes,
     gdiplustypes::REAL,
@@ -105,8 +100,8 @@ impl iface::Bitmap for Bitmap {
         let mut out = [0, 0];
         let gp_bmp = self.inner.gp_bmp;
         unsafe {
-            assert_gp_ok(GdipGetImageWidth(gp_bmp as _, &mut out[0]));
-            assert_gp_ok(GdipGetImageHeight(gp_bmp as _, &mut out[1]));
+            assert_gp_ok(gp::GdipGetImageWidth(gp_bmp as _, &mut out[0]));
+            assert_gp_ok(gp::GdipGetImageHeight(gp_bmp as _, &mut out[1]));
         }
         [out[0] as u32, out[1] as u32]
     }
@@ -127,7 +122,7 @@ impl BitmapInner {
     fn new(size: [u32; 2]) -> Self {
         let gp_bmp = unsafe {
             create_gp_obj_with(|out| {
-                GdipCreateBitmapFromScan0(
+                gp::GdipCreateBitmapFromScan0(
                     size[0].try_into().expect("bitmap too large"),
                     size[1].try_into().expect("bitmap too large"),
                     0,
@@ -145,7 +140,7 @@ impl BitmapInner {
 impl Drop for BitmapInner {
     fn drop(&mut self) {
         unsafe {
-            assert_gp_ok(GdipDisposeImage(self.gp_bmp as _));
+            assert_gp_ok(gp::GdipDisposeImage(self.gp_bmp as _));
         }
     }
 }
@@ -159,7 +154,7 @@ struct UniqueGpGraphics {
 impl Drop for UniqueGpGraphics {
     fn drop(&mut self) {
         unsafe {
-            assert_gp_ok(GdipDeleteGraphics(self.gp_gr));
+            assert_gp_ok(gp::GdipDeleteGraphics(self.gp_gr));
         }
     }
 }
@@ -173,7 +168,7 @@ struct UniqueGpPath {
 impl Drop for UniqueGpPath {
     fn drop(&mut self) {
         unsafe {
-            assert_gp_ok(GdipDeletePath(self.gp_path));
+            assert_gp_ok(gp::GdipDeletePath(self.gp_path));
         }
     }
 }
@@ -196,13 +191,13 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
 
         let gr = UniqueGpGraphics {
             gp_gr: unsafe {
-                create_gp_obj_with(|out| GdipGetImageGraphicsContext(bmp.gp_bmp as _, out))
+                create_gp_obj_with(|out| gp::GdipGetImageGraphicsContext(bmp.gp_bmp as _, out))
             },
         };
 
         let path = UniqueGpPath {
             gp_path: unsafe {
-                create_gp_obj_with(|out| GdipCreatePath(gdiplusenums::FillModeWinding, out))
+                create_gp_obj_with(|out| gp::GdipCreatePath(gdiplusenums::FillModeWinding, out))
             },
         };
 
@@ -228,19 +223,19 @@ impl iface::BitmapBuilder for BitmapBuilder {
 
 impl iface::Canvas for BitmapBuilder {
     fn save(&mut self) {
-        let st = unsafe { create_gp_obj_with(|out| GdipSaveGraphics(self.gr.gp_gr, out)) };
+        let st = unsafe { create_gp_obj_with(|out| gp::GdipSaveGraphics(self.gr.gp_gr, out)) };
         self.state_stack.push(st);
     }
     fn restore(&mut self) {
         let st = self.state_stack.pop().unwrap();
         unsafe {
-            assert_gp_ok(GdipRestoreGraphics(self.gr.gp_gr, st));
+            assert_gp_ok(gp::GdipRestoreGraphics(self.gr.gp_gr, st));
         }
     }
     fn begin_path(&mut self) {
         unsafe {
-            assert_gp_ok(GdipResetPath(self.path.gp_path));
-            assert_gp_ok(GdipSetPathFillMode(
+            assert_gp_ok(gp::GdipResetPath(self.path.gp_path));
+            assert_gp_ok(gp::GdipSetPathFillMode(
                 self.path.gp_path,
                 gdiplusenums::FillModeWinding,
             ));
@@ -248,18 +243,18 @@ impl iface::Canvas for BitmapBuilder {
     }
     fn close_path(&mut self) {
         unsafe {
-            assert_gp_ok(GdipClosePathFigure(self.path.gp_path));
+            assert_gp_ok(gp::GdipClosePathFigure(self.path.gp_path));
         }
     }
     fn move_to(&mut self, p: Point2<f32>) {
         unsafe {
-            assert_gp_ok(GdipStartPathFigure(self.path.gp_path));
+            assert_gp_ok(gp::GdipStartPathFigure(self.path.gp_path));
         }
         self.cur_pt = p.into();
     }
     fn line_to(&mut self, p: Point2<f32>) {
         unsafe {
-            assert_gp_ok(GdipAddPathLine(
+            assert_gp_ok(gp::GdipAddPathLine(
                 self.path.gp_path,
                 self.cur_pt[0],
                 self.cur_pt[1],
@@ -271,7 +266,7 @@ impl iface::Canvas for BitmapBuilder {
     }
     fn cubic_bezier_to(&mut self, cp1: Point2<f32>, cp2: Point2<f32>, p: Point2<f32>) {
         unsafe {
-            assert_gp_ok(GdipAddPathBezier(
+            assert_gp_ok(gp::GdipAddPathBezier(
                 self.path.gp_path,
                 self.cur_pt[0],
                 self.cur_pt[1],
