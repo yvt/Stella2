@@ -1,10 +1,29 @@
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
-use std::ptr::null_mut;
-use winapi::um::{gdiplusinit, winnt::CHAR};
+use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
+use winapi::um::{
+    gdiplusflat::{
+        GdipCreateBitmapFromScan0, GdipDisposeImage, GdipGetImageHeight, GdipGetImageWidth,
+    },
+    gdiplusgpstubs::{GpBitmap, GpStatus},
+    gdiplusinit, gdipluspixelformats, gdiplustypes,
+    winnt::CHAR,
+};
 
 use super::CharStyleAttrs;
 use crate::iface;
+
+#[cold]
+fn panic_by_gp_status(st: GpStatus) -> ! {
+    panic!("GDI+ error {:?}", st);
+}
+
+/// Panic if `st` is not `Ok`.
+fn assert_gp_ok(st: GpStatus) {
+    if st != gdiplustypes::Ok {
+        panic_by_gp_status(st);
+    }
+}
 
 /// Call `GdiplusStartup` if it hasn't been called yet.
 fn ensure_gdip_inited() {
@@ -21,14 +40,14 @@ fn ensure_gdip_inited() {
             );
 
             unsafe {
-                gdiplusinit::GdiplusStartup(
+                assert_gp_ok(gdiplusinit::GdiplusStartup(
                     // don't need a token, we won't call `GdiplusShutdown`
-                    null_mut(),
+                    &mut 0,
                     &input,
                     // output is not necessary because we don't suppress the
                     // GDI+ background thread
                     null_mut(),
-                );
+                ));
             }
         };
     }
@@ -51,23 +70,86 @@ fn ensure_gdip_inited() {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Bitmap;
+/// Implements `crate::iface::Bitmap`.
+#[derive(Clone)]
+pub struct Bitmap {
+    inner: Arc<BitmapInner>,
+}
 
-impl iface::Bitmap for Bitmap {
-    fn size(&self) -> [u32; 2] {
-        unimplemented!()
+impl fmt::Debug for Bitmap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Bitmap")
+            .field("gp_bmp", &self.inner.gp_bmp)
+            .field("size", &iface::Bitmap::size(self))
+            .finish()
     }
 }
 
+impl iface::Bitmap for Bitmap {
+    fn size(&self) -> [u32; 2] {
+        let mut out = [0, 0];
+        let gp_bmp = self.inner.gp_bmp;
+        unsafe {
+            assert_gp_ok(GdipGetImageWidth(gp_bmp as _, &mut out[0]));
+            assert_gp_ok(GdipGetImageHeight(gp_bmp as _, &mut out[1]));
+        }
+        [out[0] as u32, out[1] as u32]
+    }
+}
+
+/// An owned pointer of `GpBitmap`.
 #[derive(Debug)]
-pub struct BitmapBuilder;
+struct BitmapInner {
+    gp_bmp: *mut GpBitmap,
+}
+
+// I just assume that GDI+ objects only require object-granular external
+// synchronization
+unsafe impl Send for BitmapInner {}
+unsafe impl Sync for BitmapInner {}
+
+impl BitmapInner {
+    fn new(size: [u32; 2]) -> Self {
+        let mut gp_bmp = MaybeUninit::uninit();
+
+        unsafe {
+            assert_gp_ok(GdipCreateBitmapFromScan0(
+                size[0].try_into().expect("bitmap too large"),
+                size[1].try_into().expect("bitmap too large"),
+                0,
+                gdipluspixelformats::PixelFormat32bppPARGB, // pre-multiplied alpha
+                null_mut(),                                 // let GDI+ manage the memory
+                gp_bmp.as_mut_ptr(),
+            ));
+        }
+
+        Self {
+            gp_bmp: unsafe { gp_bmp.assume_init() },
+        }
+    }
+}
+
+impl Drop for BitmapInner {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(GdipDisposeImage(self.gp_bmp as _));
+        }
+    }
+}
+
+/// Implements `crate::iface::BitmapBuilder`.
+#[derive(Debug)]
+pub struct BitmapBuilder {
+    bmp: BitmapInner,
+}
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
         ensure_gdip_inited();
 
-        unimplemented!()
+        Self {
+            bmp: BitmapInner::new(size),
+        }
     }
 }
 
@@ -75,7 +157,9 @@ impl iface::BitmapBuilder for BitmapBuilder {
     type Bitmap = Bitmap;
 
     fn into_bitmap(self) -> Self::Bitmap {
-        unimplemented!()
+        Bitmap {
+            inner: Arc::new(self.bmp),
+        }
     }
 }
 
