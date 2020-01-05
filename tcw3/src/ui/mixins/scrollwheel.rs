@@ -177,7 +177,7 @@ impl ScrollWheelMixin {
             momentum: Cell::new(false),
             vertical: Cell::new(false),
             token: self.inner.token.get(),
-            velocity: Cell::new(0.0),
+            velocity: Cell::new((0.0, true)),
         })
     }
 }
@@ -295,7 +295,7 @@ impl Inner {
         this: Rc<Self>,
         hview: &HView,
         vertical: bool,
-        velocity: f32,
+        (velocity, velocity_precise): (f32, bool),
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
     ) {
         let mut model = model_getter();
@@ -306,6 +306,7 @@ impl Inner {
 
         let mut pos = model.pos();
         let bounds = model.bounds();
+        let line_size = model.line_size();
 
         debug_assert!(bounds.contains_point_incl(&pos));
         pos[axis] -= dt;
@@ -320,6 +321,12 @@ impl Inner {
 
         if overflow_upper || overflow_lower {
             debug_assert!(!overflow_upper || !overflow_lower);
+
+            let velocity = if velocity_precise {
+                velocity
+            } else {
+                velocity * line_size[axis] as f32
+            };
 
             trace!(
                 "pos ({:?}) hit the bounds ({:?}), start bouncing \
@@ -506,7 +513,9 @@ struct ScrollListenerImpl {
     /// the same time.
     vertical: Cell<bool>,
     token: u64,
-    velocity: Cell<f32>,
+    /// The last known velocity. The second field contains the value of
+    /// `precise`.
+    velocity: Cell<(f32, bool)>,
 }
 
 impl ScrollListenerImpl {
@@ -533,7 +542,7 @@ impl ScrollListener for ScrollListenerImpl {
             self.vertical.set(velocity.y.abs() > velocity.x.abs());
         }
         let axis = self.vertical.get() as usize;
-        self.velocity.set(velocity[axis]);
+        self.velocity.set((velocity[axis], delta.precise));
 
         self.inner.accumulate(&delta);
 
