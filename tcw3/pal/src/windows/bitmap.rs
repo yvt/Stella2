@@ -3,14 +3,17 @@ use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
 use winapi::um::{
+    gdiplusenums,
     gdiplusenums::GraphicsState,
     gdiplusflat::{
-        GdipCreateBitmapFromScan0, GdipDeleteGraphics, GdipDisposeImage,
-        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth, GdipRestoreGraphics,
-        GdipSaveGraphics,
+        GdipAddPathBezier, GdipAddPathLine, GdipClosePathFigure, GdipCreateBitmapFromScan0,
+        GdipCreatePath, GdipDeleteGraphics, GdipDeletePath, GdipDisposeImage,
+        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth, GdipResetPath,
+        GdipRestoreGraphics, GdipSaveGraphics, GdipSetPathFillMode, GdipStartPathFigure,
     },
-    gdiplusgpstubs::{GpBitmap, GpGraphics, GpStatus},
+    gdiplusgpstubs::{GpBitmap, GpGraphics, GpPath, GpStatus},
     gdiplusinit, gdipluspixelformats, gdiplustypes,
+    gdiplustypes::REAL,
     winnt::CHAR,
 };
 
@@ -161,12 +164,28 @@ impl Drop for UniqueGpGraphics {
     }
 }
 
+/// An owned pointer of `GpPath`.
+#[derive(Debug)]
+struct UniqueGpPath {
+    gp_path: *mut GpPath,
+}
+
+impl Drop for UniqueGpPath {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(GdipDeletePath(self.gp_path));
+        }
+    }
+}
+
 /// Implements `crate::iface::BitmapBuilder`.
 #[derive(Debug)]
 pub struct BitmapBuilder {
     bmp: BitmapInner,
     gr: UniqueGpGraphics,
+    path: UniqueGpPath,
     state_stack: ArrayVec<[GraphicsState; 16]>,
+    cur_pt: [REAL; 2],
 }
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
@@ -181,10 +200,18 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             },
         };
 
+        let path = UniqueGpPath {
+            gp_path: unsafe {
+                create_gp_obj_with(|out| GdipCreatePath(gdiplusenums::FillModeWinding, out))
+            },
+        };
+
         Self {
             bmp,
             gr,
+            path,
             state_stack: ArrayVec::new(),
+            cur_pt: [0.0; 2],
         }
     }
 }
@@ -211,22 +238,60 @@ impl iface::Canvas for BitmapBuilder {
         }
     }
     fn begin_path(&mut self) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(GdipResetPath(self.path.gp_path));
+            assert_gp_ok(GdipSetPathFillMode(
+                self.path.gp_path,
+                gdiplusenums::FillModeWinding,
+            ));
+        }
     }
     fn close_path(&mut self) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(GdipClosePathFigure(self.path.gp_path));
+        }
     }
     fn move_to(&mut self, p: Point2<f32>) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(GdipStartPathFigure(self.path.gp_path));
+        }
+        self.cur_pt = p.into();
     }
     fn line_to(&mut self, p: Point2<f32>) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(GdipAddPathLine(
+                self.path.gp_path,
+                self.cur_pt[0],
+                self.cur_pt[1],
+                p.x,
+                p.y,
+            ));
+        }
+        self.cur_pt = p.into();
     }
     fn cubic_bezier_to(&mut self, cp1: Point2<f32>, cp2: Point2<f32>, p: Point2<f32>) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(GdipAddPathBezier(
+                self.path.gp_path,
+                self.cur_pt[0],
+                self.cur_pt[1],
+                cp1.x,
+                cp1.y,
+                cp2.x,
+                cp2.y,
+                p.x,
+                p.y,
+            ));
+        }
+        self.cur_pt = p.into();
     }
     fn quad_bezier_to(&mut self, cp: Point2<f32>, p: Point2<f32>) {
-        unimplemented!()
+        let p1: Point2<f32> = self.cur_pt.into();
+
+        let cp1 = cp + (p1 - cp) * (1.0 / 3.0);
+        let cp2 = cp + (p - cp) * (1.0 / 3.0);
+
+        self.cubic_bezier_to(cp1, cp2, p);
     }
     fn fill(&mut self) {
         unimplemented!()
