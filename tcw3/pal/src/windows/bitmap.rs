@@ -2,14 +2,19 @@ use arrayvec::ArrayVec;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
-use winapi::um::{
-    gdiplusenums,
-    gdiplusenums::GraphicsState,
-    gdiplusflat as gp,
-    gdiplusgpstubs::{GpBitmap, GpGraphics, GpPath, GpStatus},
-    gdiplusinit, gdipluspixelformats, gdiplustypes,
-    gdiplustypes::REAL,
-    winnt::CHAR,
+use winapi::{
+    shared::minwindef::INT,
+    um::{
+        gdipluscolor, gdiplusenums,
+        gdiplusenums::GraphicsState,
+        gdiplusflat as gp,
+        gdiplusgpstubs::{GpBitmap, GpGraphics, GpPath, GpPen, GpSolidFill, GpStatus},
+        gdiplusinit, gdipluspixelformats,
+        gdipluspixelformats::ARGB,
+        gdiplustypes,
+        gdiplustypes::REAL,
+        winnt::CHAR,
+    },
 };
 
 use super::CharStyleAttrs;
@@ -173,12 +178,50 @@ impl Drop for UniqueGpPath {
     }
 }
 
+/// An owned pointer of `GpSolidFill`.
+#[derive(Debug)]
+struct UniqueGpSolidFill {
+    gp_solid_fill: *mut GpSolidFill,
+}
+
+impl Drop for UniqueGpSolidFill {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipDeleteBrush(self.gp_solid_fill as _));
+        }
+    }
+}
+
+/// An owned pointer of `GpPen`.
+#[derive(Debug)]
+struct UniqueGpPen {
+    gp_pen: *mut GpPen,
+}
+
+impl Drop for UniqueGpPen {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipDeletePen(self.gp_pen));
+        }
+    }
+}
+
+fn rgbaf32_to_argb(c: iface::RGBAF32) -> ARGB {
+    use alt_fp::FloatOrd;
+    let cvt = |x: f32| (x.fmin(1.0).fmax(0.0) * 255.0) as u8;
+
+    let c = c.map_rgb(cvt).map_alpha(cvt);
+    gdipluscolor::Color::MakeARGB(c.a, c.r, c.g, c.b)
+}
+
 /// Implements `crate::iface::BitmapBuilder`.
 #[derive(Debug)]
 pub struct BitmapBuilder {
     bmp: BitmapInner,
     gr: UniqueGpGraphics,
     path: UniqueGpPath,
+    brush: UniqueGpSolidFill,
+    pen: UniqueGpPen,
     state_stack: ArrayVec<[GraphicsState; 16]>,
     cur_pt: [REAL; 2],
 }
@@ -201,10 +244,26 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             },
         };
 
+        let brush = UniqueGpSolidFill {
+            gp_solid_fill: unsafe {
+                create_gp_obj_with(|out| gp::GdipCreateSolidFill(0xffffffff, out))
+            },
+        };
+
+        let pen = UniqueGpPen {
+            gp_pen: unsafe {
+                create_gp_obj_with(|out| {
+                    gp::GdipCreatePen1(0xff000000, 1.0, gdiplusenums::UnitPixel, out)
+                })
+            },
+        };
+
         Self {
             bmp,
             gr,
             path,
+            brush,
+            pen,
             state_stack: ArrayVec::new(),
             cur_pt: [0.0; 2],
         }
@@ -298,25 +357,66 @@ impl iface::Canvas for BitmapBuilder {
         unimplemented!()
     }
     fn set_fill_rgb(&mut self, rgb: iface::RGBAF32) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipSetSolidFillColor(
+                self.brush.gp_solid_fill,
+                rgbaf32_to_argb(rgb),
+            ));
+        }
     }
     fn set_stroke_rgb(&mut self, rgb: iface::RGBAF32) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipSetPenColor(self.pen.gp_pen, rgbaf32_to_argb(rgb)));
+        }
     }
     fn set_line_cap(&mut self, cap: iface::LineCap) {
-        unimplemented!()
+        let cap = match cap {
+            iface::LineCap::Butt => gdiplusenums::LineCapFlat,
+            iface::LineCap::Round => gdiplusenums::LineCapRound,
+            iface::LineCap::Square => gdiplusenums::LineCapSquare,
+        };
+
+        unsafe {
+            assert_gp_ok(gp::GdipSetPenEndCap(self.pen.gp_pen, cap));
+        }
     }
     fn set_line_join(&mut self, join: iface::LineJoin) {
-        unimplemented!()
+        let join = match join {
+            iface::LineJoin::Miter => gdiplusenums::LineJoinMiter,
+            iface::LineJoin::Bevel => gdiplusenums::LineJoinBevel,
+            iface::LineJoin::Round => gdiplusenums::LineJoinRound,
+        };
+
+        unsafe {
+            assert_gp_ok(gp::GdipSetPenLineJoin(self.pen.gp_pen, join));
+        }
     }
     fn set_line_dash(&mut self, phase: f32, lengths: &[f32]) {
-        unimplemented!()
+        unsafe {
+            if lengths.len() == 0 {
+                assert_gp_ok(gp::GdipSetPenDashStyle(
+                    self.pen.gp_pen,
+                    gdiplusenums::DashStyleSolid,
+                ));
+            } else {
+                assert_gp_ok(gp::GdipSetPenDashArray(
+                    self.pen.gp_pen,
+                    lengths.as_ptr(),
+                    lengths.len() as INT,
+                ));
+            }
+            assert_gp_ok(gp::GdipSetPenDashOffset(self.pen.gp_pen, phase));
+        }
     }
     fn set_line_width(&mut self, width: f32) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipSetPenWidth(self.pen.gp_pen, width));
+        }
     }
     fn set_line_miter_limit(&mut self, miter_limit: f32) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipSetPenMiterLimit(self.pen.gp_pen, miter_limit));
+        }
     }
     fn mult_transform(&mut self, m: Matrix3<f32>) {
         unimplemented!()
