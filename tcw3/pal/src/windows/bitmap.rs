@@ -348,13 +348,31 @@ impl iface::Canvas for BitmapBuilder {
         self.cubic_bezier_to(cp1, cp2, p);
     }
     fn fill(&mut self) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipFillPath(
+                self.gr.gp_gr,
+                self.brush.gp_solid_fill as _,
+                self.path.gp_path,
+            ));
+        }
     }
     fn stroke(&mut self) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipDrawPath(
+                self.gr.gp_gr,
+                self.pen.gp_pen,
+                self.path.gp_path,
+            ));
+        }
     }
     fn clip(&mut self) {
-        unimplemented!()
+        unsafe {
+            assert_gp_ok(gp::GdipSetClipPath(
+                self.gr.gp_gr,
+                self.path.gp_path,
+                gdiplusenums::CombineModeIntersect,
+            ));
+        }
     }
     fn set_fill_rgb(&mut self, rgb: iface::RGBAF32) {
         unsafe {
