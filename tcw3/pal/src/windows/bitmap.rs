@@ -3,9 +3,10 @@ use cgmath::{Matrix3, Point2};
 use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
 use winapi::um::{
     gdiplusflat::{
-        GdipCreateBitmapFromScan0, GdipDisposeImage, GdipGetImageHeight, GdipGetImageWidth,
+        GdipCreateBitmapFromScan0, GdipDeleteGraphics, GdipDisposeImage,
+        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth,
     },
-    gdiplusgpstubs::{GpBitmap, GpStatus},
+    gdiplusgpstubs::{GpBitmap, GpGraphics, GpStatus},
     gdiplusinit, gdipluspixelformats, gdiplustypes,
     winnt::CHAR,
 };
@@ -143,19 +144,40 @@ impl Drop for BitmapInner {
     }
 }
 
+/// An owned pointer of `GpGraphics`.
+#[derive(Debug)]
+struct UniqueGpGraphics {
+    gp_gr: *mut GpGraphics,
+}
+
+impl Drop for UniqueGpGraphics {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(GdipDeleteGraphics(self.gp_gr));
+        }
+    }
+}
+
 /// Implements `crate::iface::BitmapBuilder`.
 #[derive(Debug)]
 pub struct BitmapBuilder {
     bmp: BitmapInner,
+    gr: UniqueGpGraphics,
 }
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
         ensure_gdip_inited();
 
-        Self {
-            bmp: BitmapInner::new(size),
-        }
+        let bmp = BitmapInner::new(size);
+
+        let gr = UniqueGpGraphics {
+            gp_gr: unsafe {
+                create_gp_obj_with(|out| GdipGetImageGraphicsContext(bmp.gp_bmp as _, out))
+            },
+        };
+
+        Self { bmp, gr }
     }
 }
 
