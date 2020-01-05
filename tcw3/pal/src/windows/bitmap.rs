@@ -8,7 +8,7 @@ use winapi::{
         gdipluscolor, gdiplusenums,
         gdiplusenums::GraphicsState,
         gdiplusflat as gp,
-        gdiplusgpstubs::{GpBitmap, GpGraphics, GpPath, GpPen, GpSolidFill, GpStatus},
+        gdiplusgpstubs::{GpBitmap, GpGraphics, GpMatrix, GpPath, GpPen, GpSolidFill, GpStatus},
         gdiplusinit, gdipluspixelformats,
         gdipluspixelformats::ARGB,
         gdiplustypes,
@@ -206,6 +206,20 @@ impl Drop for UniqueGpPen {
     }
 }
 
+/// An owned pointer of `GpMatrix`.
+#[derive(Debug)]
+struct UniqueGpMatrix {
+    gp_mat: *mut GpMatrix,
+}
+
+impl Drop for UniqueGpMatrix {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipDeleteMatrix(self.gp_mat));
+        }
+    }
+}
+
 fn rgbaf32_to_argb(c: iface::RGBAF32) -> ARGB {
     use alt_fp::FloatOrd;
     let cvt = |x: f32| (x.fmin(1.0).fmax(0.0) * 255.0) as u8;
@@ -222,6 +236,7 @@ pub struct BitmapBuilder {
     path: UniqueGpPath,
     brush: UniqueGpSolidFill,
     pen: UniqueGpPen,
+    mat: UniqueGpMatrix,
     state_stack: ArrayVec<[GraphicsState; 16]>,
     cur_pt: [REAL; 2],
 }
@@ -258,12 +273,17 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             },
         };
 
+        let mat = UniqueGpMatrix {
+            gp_mat: unsafe { create_gp_obj_with(|out| gp::GdipCreateMatrix(out)) },
+        };
+
         Self {
             bmp,
             gr,
             path,
             brush,
             pen,
+            mat,
             state_stack: ArrayVec::new(),
             cur_pt: [0.0; 2],
         }
@@ -437,7 +457,24 @@ impl iface::Canvas for BitmapBuilder {
         }
     }
     fn mult_transform(&mut self, m: Matrix3<f32>) {
-        unimplemented!()
+        let m = m / m.z.z;
+
+        unsafe {
+            assert_gp_ok(gp::GdipSetMatrixElements(
+                self.mat.gp_mat,
+                m.x.x,
+                m.x.y,
+                m.y.x,
+                m.y.y,
+                m.z.x,
+                m.z.y,
+            ));
+            assert_gp_ok(gp::GdipMultiplyWorldTransform(
+                self.gr.gp_gr,
+                self.mat.gp_mat,
+                gdiplusenums::MatrixOrderPrepend,
+            ));
+        }
     }
 }
 
