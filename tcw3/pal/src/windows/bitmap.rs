@@ -1,8 +1,55 @@
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
+use std::ptr::null_mut;
+use winapi::um::{gdiplusinit, winnt::CHAR};
 
 use super::CharStyleAttrs;
 use crate::iface;
+
+/// Call `GdiplusStartup` if it hasn't been called yet.
+fn ensure_gdip_inited() {
+    lazy_static::lazy_static! {
+        static ref GDIP_INIT: () = {
+            let input = gdiplusinit::GdiplusStartupInput::new(
+                if log::STATIC_MAX_LEVEL == log::LevelFilter::Off {
+                    None
+                } else {
+                    Some(gdip_debug_event_handler)
+                },
+                0, // do not suppress the GDI+ background thread
+                1, // suppress external codecs
+            );
+
+            unsafe {
+                gdiplusinit::GdiplusStartup(
+                    // don't need a token, we won't call `GdiplusShutdown`
+                    null_mut(),
+                    &input,
+                    // output is not necessary because we don't suppress the
+                    // GDI+ background thread
+                    null_mut(),
+                );
+            }
+        };
+    }
+
+    let () = &*GDIP_INIT;
+
+    extern "system" fn gdip_debug_event_handler(
+        level: gdiplusinit::DebugEventLevel,
+        message: *mut CHAR,
+    ) {
+        let level = match level {
+            gdiplusinit::DebugEventLevelFatal => log::Level::Error,
+            gdiplusinit::DebugEventLevelWarning => log::Level::Warn,
+            _ => log::Level::Error,
+        };
+
+        log::log!(level, "GDI+ debug event: {:?}", unsafe {
+            std::ffi::CStr::from_ptr(message)
+        });
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Bitmap;
@@ -18,6 +65,8 @@ pub struct BitmapBuilder;
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
     fn new(size: [u32; 2]) -> Self {
+        ensure_gdip_inited();
+
         unimplemented!()
     }
 }
