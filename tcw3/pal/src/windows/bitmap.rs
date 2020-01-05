@@ -25,6 +25,14 @@ fn assert_gp_ok(st: GpStatus) {
     }
 }
 
+unsafe fn create_gp_obj_with<T>(f: impl FnOnce(*mut T) -> GpStatus) -> T {
+    let mut out = MaybeUninit::uninit();
+
+    assert_gp_ok(f(out.as_mut_ptr()));
+
+    out.assume_init()
+}
+
 /// Call `GdiplusStartup` if it hasn't been called yet.
 fn ensure_gdip_inited() {
     lazy_static::lazy_static! {
@@ -110,22 +118,20 @@ unsafe impl Sync for BitmapInner {}
 
 impl BitmapInner {
     fn new(size: [u32; 2]) -> Self {
-        let mut gp_bmp = MaybeUninit::uninit();
+        let gp_bmp = unsafe {
+            create_gp_obj_with(|out| {
+                GdipCreateBitmapFromScan0(
+                    size[0].try_into().expect("bitmap too large"),
+                    size[1].try_into().expect("bitmap too large"),
+                    0,
+                    gdipluspixelformats::PixelFormat32bppPARGB, // pre-multiplied alpha
+                    null_mut(),                                 // let GDI+ manage the memory
+                    out,
+                )
+            })
+        };
 
-        unsafe {
-            assert_gp_ok(GdipCreateBitmapFromScan0(
-                size[0].try_into().expect("bitmap too large"),
-                size[1].try_into().expect("bitmap too large"),
-                0,
-                gdipluspixelformats::PixelFormat32bppPARGB, // pre-multiplied alpha
-                null_mut(),                                 // let GDI+ manage the memory
-                gp_bmp.as_mut_ptr(),
-            ));
-        }
-
-        Self {
-            gp_bmp: unsafe { gp_bmp.assume_init() },
-        }
+        Self { gp_bmp }
     }
 }
 
