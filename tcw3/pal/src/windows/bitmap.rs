@@ -1,10 +1,13 @@
+use arrayvec::ArrayVec;
 use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
 use winapi::um::{
+    gdiplusenums::GraphicsState,
     gdiplusflat::{
         GdipCreateBitmapFromScan0, GdipDeleteGraphics, GdipDisposeImage,
-        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth,
+        GdipGetImageGraphicsContext, GdipGetImageHeight, GdipGetImageWidth, GdipRestoreGraphics,
+        GdipSaveGraphics,
     },
     gdiplusgpstubs::{GpBitmap, GpGraphics, GpStatus},
     gdiplusinit, gdipluspixelformats, gdiplustypes,
@@ -163,6 +166,7 @@ impl Drop for UniqueGpGraphics {
 pub struct BitmapBuilder {
     bmp: BitmapInner,
     gr: UniqueGpGraphics,
+    state_stack: ArrayVec<[GraphicsState; 16]>,
 }
 
 impl iface::BitmapBuilderNew for BitmapBuilder {
@@ -177,7 +181,11 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             },
         };
 
-        Self { bmp, gr }
+        Self {
+            bmp,
+            gr,
+            state_stack: ArrayVec::new(),
+        }
     }
 }
 
@@ -193,10 +201,14 @@ impl iface::BitmapBuilder for BitmapBuilder {
 
 impl iface::Canvas for BitmapBuilder {
     fn save(&mut self) {
-        unimplemented!()
+        let st = unsafe { create_gp_obj_with(|out| GdipSaveGraphics(self.gr.gp_gr, out)) };
+        self.state_stack.push(st);
     }
     fn restore(&mut self) {
-        unimplemented!()
+        let st = self.state_stack.pop().unwrap();
+        unsafe {
+            assert_gp_ok(GdipRestoreGraphics(self.gr.gp_gr, st));
+        }
     }
     fn begin_path(&mut self) {
         unimplemented!()
