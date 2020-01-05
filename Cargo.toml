@@ -48,3 +48,7 @@ debug = true
 # `tcw3_pal`. This isn't as fast as the release build due to lack of LTO, but
 # at least it's usable.
 tcw3_pal = { opt-level = 3 }
+
+[patch.crates-io.winapi]
+git = "https://github.com/yvt/winapi-rs.git"
+rev = "a6df41df91d6b8c156cff69bede2da2196c663cb"
