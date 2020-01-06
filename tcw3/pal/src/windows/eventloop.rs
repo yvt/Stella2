@@ -28,7 +28,7 @@ use winapi::{
     },
 };
 
-use super::Wm;
+use super::{Wm, window};
 use crate::{iface::Wm as WmTrait, MtSticky};
 
 /// `HWND`
@@ -318,6 +318,12 @@ fn init_main_thread() {
     if MAIN_HTHREAD.compare_and_swap(0, cur_hthread as usize, Ordering::Release) != 0 {
         panic!("MAIN_HTHREAD is already set - possible race condition");
     }
+
+    // Now that `MAIN_HTHREAD` is initialized, we are officially in a main thread.
+    debug_assert!(Wm::is_main_thread());
+    let wm = unsafe { Wm::global_unchecked() };
+
+    window::init(wm);
 }
 
 extern "system" fn msg_wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

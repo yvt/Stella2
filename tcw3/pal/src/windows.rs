@@ -4,10 +4,12 @@ use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
 mod bitmap;
 mod eventloop;
+mod window;
 
 pub use self::{
     bitmap::{Bitmap, BitmapBuilder, CharStyle, TextLayout},
     eventloop::HInvoke,
+    window::HWnd,
 };
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
@@ -67,49 +69,47 @@ impl iface::Wm for Wm {
     }
 
     fn new_wnd(self, attrs: WndAttrs<'_>) -> Self::HWnd {
-        unimplemented!()
+        window::new_wnd(self, attrs)
     }
 
     fn set_wnd_attr(self, window: &Self::HWnd, attrs: WndAttrs<'_>) {
-        unimplemented!()
+        window::set_wnd_attr(self, window, attrs)
     }
 
     fn remove_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window::remove_wnd(self, window)
     }
 
     fn update_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window::update_wnd(self, window)
     }
 
     fn get_wnd_size(self, window: &Self::HWnd) -> [u32; 2] {
-        unimplemented!()
+        window::get_wnd_size(self, window)
     }
 
     fn get_wnd_dpi_scale(self, window: &Self::HWnd) -> f32 {
-        unimplemented!()
+        window::get_wnd_dpi_scale(self, window)
     }
 
     fn request_update_ready_wnd(self, window: &Self::HWnd) {
-        unimplemented!()
+        window::request_update_ready_wnd(self, window)
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        unimplemented!()
+        log::warn!("new_layer: stub!");
+        HLayer
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        unimplemented!()
+        log::warn!("set_layer_attr: stub!");
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        unimplemented!()
+        log::warn!("remove_layer: stub!");
     }
 }
 
 struct AssertSend<T>(T);
 unsafe impl<T> Send for AssertSend<T> {}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HWnd;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer;
