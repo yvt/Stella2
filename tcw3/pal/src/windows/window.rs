@@ -44,7 +44,6 @@ struct Wnd {
     hwnd: Cell<HWND>,
     // TODO: Raise the following events:
     // - update_ready
-    // - resize
     // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
@@ -553,6 +552,11 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.mouse_leave(wm, &pal_hwnd);
         } // WM_MOUSELEAVE
+
+        winuser::WM_SIZE => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.resize(wm, &pal_hwnd);
+        } // WM_SIZE
 
         _ => {}
     }
