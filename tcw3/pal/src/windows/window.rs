@@ -10,7 +10,7 @@ use wchar::wch_c;
 use winapi::{
     shared::{
         minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
-        windef::HWND,
+        windef::{HCURSOR, HWND},
     },
     um::{libloaderapi, winuser},
 };
@@ -52,6 +52,7 @@ struct Wnd {
     // - scroll_motion
     // - scroll_gesture
     listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
+    cursor: Cell<HCURSOR>,
 }
 
 impl fmt::Debug for Wnd {
@@ -59,6 +60,7 @@ impl fmt::Debug for Wnd {
         f.debug_struct("Wnd")
             .field("hwnd", &self.hwnd)
             .field("listener", &self.listener.as_ptr())
+            .field("cursor", &self.cursor)
             .finish()
     }
 }
@@ -121,6 +123,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
         wnd: Rc::new(Wnd {
             hwnd: Cell::new(hwnd),
             listener: RefCell::new(Rc::new(())),
+            cursor: Cell::new(unsafe { winuser::LoadCursorW(null_mut(), winuser::IDC_ARROW) }),
         }),
     };
 
@@ -146,7 +149,45 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     // TODO: min_size: Option<[u32; 2]>,
     // TODO: max_size: Option<[u32; 2]>,
     // TODO: layer: Option<Option<TLayer>>,
-    // TODO: cursor_shape: Option<CursorShape>,
+
+    if let Some(shape) = attrs.cursor_shape {
+        use self::iface::CursorShape;
+        let id = match shape {
+            CursorShape::Arrow | CursorShape::Default => winuser::IDC_ARROW,
+            CursorShape::Hand => winuser::IDC_HAND,
+            CursorShape::Crosshair => winuser::IDC_CROSS,
+            CursorShape::Text | CursorShape::VerticalText => winuser::IDC_IBEAM,
+            CursorShape::NotAllowed | CursorShape::NoDrop => winuser::IDC_NO,
+            CursorShape::Grab
+            | CursorShape::Grabbing
+            | CursorShape::Move
+            | CursorShape::AllScroll => winuser::IDC_SIZEALL,
+            CursorShape::EResize
+            | CursorShape::WResize
+            | CursorShape::EwResize
+            | CursorShape::ColResize => winuser::IDC_SIZEWE,
+            CursorShape::NResize
+            | CursorShape::SResize
+            | CursorShape::NsResize
+            | CursorShape::RowResize => winuser::IDC_SIZENS,
+            CursorShape::NeResize | CursorShape::SwResize | CursorShape::NeswResize => {
+                winuser::IDC_SIZENESW
+            }
+            CursorShape::NwResize | CursorShape::SeResize | CursorShape::NwseResize => {
+                winuser::IDC_SIZENWSE
+            }
+            CursorShape::Wait => winuser::IDC_WAIT,
+            CursorShape::Progress => winuser::IDC_APPSTARTING,
+            CursorShape::Help => winuser::IDC_HELP,
+            _ => winuser::IDC_ARROW,
+        };
+
+        // TODO: Call `SetCursor` if the pointer is inside the window
+        pal_hwnd
+            .wnd
+            .cursor
+            .set(unsafe { winuser::LoadCursorW(null_mut(), id) });
+    }
 
     if let Some(flags) = attrs.flags {
         let style = unsafe { winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) } as DWORD;
@@ -346,7 +387,17 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     let wnd = unsafe { Rc::from_raw(wnd_ptr) };
     std::mem::forget(Rc::clone(&wnd));
 
-    // TODO
+    match msg {
+        winuser::WM_SETCURSOR => {
+            if lparam & 0xffff == winuser::HTCLIENT {
+                unsafe {
+                    winuser::SetCursor(wnd.cursor.get());
+                }
+                return 1;
+            }
+        }
+        _ => {}
+    }
 
     drop(wnd);
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
