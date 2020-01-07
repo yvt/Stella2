@@ -3,7 +3,7 @@ use std::{cell::Cell, mem::MaybeUninit, ptr::null_mut, rc::Rc};
 use wchar::wch_c;
 use winapi::{
     shared::{
-        minwindef::{LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
         windef::HWND,
     },
     um::{
@@ -11,14 +11,16 @@ use winapi::{
         winuser::{
             AdjustWindowRectExForDpi, CreateWindowExW, DefWindowProcW, DestroyWindow,
             GetClientRect, GetDpiForWindow, GetWindowLongPtrW, GetWindowLongW, RegisterClassW,
-            SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, CW_USEDEFAULT,
-            GWLP_USERDATA, GWL_EXSTYLE, GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-            SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
+            SetWindowLongPtrW, SetWindowLongW, SetWindowPos, SetWindowTextW, ShowWindow,
+            CW_USEDEFAULT, GWLP_USERDATA, GWL_EXSTYLE, GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE,
+            SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
+            WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
         },
     },
 };
 
 use super::{codecvt::str_to_c_wstr, Wm, WndAttrs};
+use crate::iface;
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
 
@@ -85,8 +87,8 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
         CreateWindowExW(
             0,
             WND_CLASS.as_ptr(),
-            null_mut(),    // title
-            WS_OVERLAPPED, // window style
+            null_mut(), // title
+            style_for_flags(Default::default()),
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -127,11 +129,27 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     // TODO: min_size: Option<[u32; 2]>,
     // TODO: max_size: Option<[u32; 2]>,
-    // TODO: flags: Option<WndFlags>,
-    // TODO: visible: Option<bool>,
     // TODO: listener: Option<Box<dyn WndListener<T>>>,
     // TODO: layer: Option<Option<TLayer>>,
     // TODO: cursor_shape: Option<CursorShape>,
+
+    if let Some(flags) = attrs.flags {
+        let style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as DWORD;
+
+        let new_style = style
+            & !(WS_CHILD
+                | WS_OVERLAPPED
+                | WS_CAPTION
+                | WS_SYSMENU
+                | WS_THICKFRAME
+                | WS_MINIMIZEBOX
+                | WS_MAXIMIZEBOX)
+            | style_for_flags(flags);
+
+        unsafe {
+            SetWindowLongW(hwnd, GWL_STYLE, new_style as _);
+        }
+    }
 
     if let Some(new_size) = attrs.size {
         let dpi = unsafe { GetDpiForWindow(hwnd) } as u32;
@@ -206,6 +224,21 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
             ShowWindow(hwnd, cmd);
         }
     }
+}
+
+fn style_for_flags(flags: iface::WndFlags) -> DWORD {
+    use iface::WndFlags;
+    let mut out = if flags.contains(WndFlags::BORDERLESS) {
+        WS_CHILD
+    } else {
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU
+    };
+
+    if flags.contains(WndFlags::RESIZABLE) {
+        out |= WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+    }
+
+    out
 }
 
 pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
