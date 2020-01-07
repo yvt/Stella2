@@ -422,7 +422,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             // Prevent the default action (destroying the window) by not
             // calling `DefWindowProc`
             return 0;
-        }
+        } // WM_CLOSE
+
         winuser::WM_DPICHANGED => {
             // <https://docs.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged>:
             // > In order to handle this message correctly, you will need to
@@ -460,7 +461,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.dpi_scale_changed(wm, &pal_hwnd);
-        }
+        } // WM_DPICHANGED
+
         winuser::WM_GETDPISCALEDSIZE => {
             let new_dpi = wparam as u32;
             let size_result = unsafe { &mut *(lparam as *mut SIZE) };
@@ -513,7 +515,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             size_result.cx = req_size[0];
             size_result.cy = req_size[1];
             return 1;
-        }
+        } // WM_GETDPISCALEDSIZE
+
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
                 unsafe {
@@ -521,7 +524,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 }
                 return 1;
             }
-        }
+        } // WM_SETCURSOR
+
         winuser::WM_MOUSEMOVE => {
             let mut te = winuser::TRACKMOUSEEVENT {
                 cbSize: size_of::<winuser::TRACKMOUSEEVENT>() as u32,
@@ -543,11 +547,13 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.mouse_motion(wm, &pal_hwnd, loc.into());
-        }
+        } // WM_MOUSEMOVE
+
         winuser::WM_MOUSELEAVE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.mouse_leave(wm, &pal_hwnd);
-        }
+        } // WM_MOUSELEAVE
+
         _ => {}
     }
 
