@@ -259,7 +259,10 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
                         0, // ignored
                         rect.right - rect.left,
                         rect.bottom - rect.top,
-                        winuser::SWP_NOZORDER | winuser::SWP_NOMOVE | winuser::SWP_NOACTIVATE,
+                        winuser::SWP_NOZORDER
+                            | winuser::SWP_NOMOVE
+                            | winuser::SWP_NOACTIVATE
+                            | winuser::SWP_NOOWNERZORDER,
                     ),
                     0
                 );
