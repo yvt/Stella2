@@ -1,5 +1,11 @@
 use array::Array2;
-use std::{cell::Cell, mem::MaybeUninit, ptr::null_mut, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    fmt,
+    mem::MaybeUninit,
+    ptr::null_mut,
+    rc::Rc,
+};
 use wchar::wch_c;
 use winapi::{
     shared::{
@@ -43,9 +49,28 @@ impl std::hash::Hash for HWnd {
     }
 }
 
-#[derive(Debug)]
 struct Wnd {
     hwnd: Cell<HWND>,
+    // TODO: Raise the following events:
+    // - close_requested
+    // - update_ready
+    // - resize
+    // - dpi_scale_changed
+    // - mouse_motion
+    // - mouse_leave
+    // - mouse_drag
+    // - scroll_motion
+    // - scroll_gesture
+    listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
+}
+
+impl fmt::Debug for Wnd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Wnd")
+            .field("hwnd", &self.hwnd)
+            .field("listener", &self.listener.as_ptr())
+            .finish()
+    }
 }
 
 impl HWnd {
@@ -105,6 +130,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
     let pal_hwnd = HWnd {
         wnd: Rc::new(Wnd {
             hwnd: Cell::new(hwnd),
+            listener: RefCell::new(Rc::new(())),
         }),
     };
 
@@ -129,7 +155,6 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     // TODO: min_size: Option<[u32; 2]>,
     // TODO: max_size: Option<[u32; 2]>,
-    // TODO: listener: Option<Box<dyn WndListener<T>>>,
     // TODO: layer: Option<Option<TLayer>>,
     // TODO: cursor_shape: Option<CursorShape>,
 
@@ -212,6 +237,10 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
         unsafe {
             SetWindowTextW(hwnd, caption_w.as_ptr());
         }
+    }
+
+    if let Some(listener) = attrs.listener {
+        pal_hwnd.wnd.listener.replace(Rc::from(listener));
     }
 
     if let Some(visible) = attrs.visible {
