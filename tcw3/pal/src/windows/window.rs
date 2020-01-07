@@ -2,7 +2,7 @@ use array::Array2;
 use std::{
     cell::{Cell, RefCell},
     fmt,
-    mem::MaybeUninit,
+    mem::{size_of, MaybeUninit},
     ptr::null_mut,
     rc::Rc,
 };
@@ -16,7 +16,7 @@ use winapi::{
 };
 
 use super::{codecvt::str_to_c_wstr, Wm, WndAttrs};
-use crate::iface;
+use crate::{iface, iface::Wm as WmTrait};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
 
@@ -47,7 +47,6 @@ struct Wnd {
     // - resize
     // - dpi_scale_changed
     // - mouse_motion
-    // - mouse_leave
     // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
@@ -182,11 +181,14 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
             _ => winuser::IDC_ARROW,
         };
 
-        // TODO: Call `SetCursor` if the pointer is inside the window
-        pal_hwnd
-            .wnd
-            .cursor
-            .set(unsafe { winuser::LoadCursorW(null_mut(), id) });
+        let cursor = unsafe { winuser::LoadCursorW(null_mut(), id) };
+        pal_hwnd.wnd.cursor.set(cursor);
+
+        if is_mouse_in_wnd(hwnd) {
+            unsafe {
+                winuser::SetCursor(cursor);
+            }
+        }
     }
 
     if let Some(flags) = attrs.flags {
@@ -308,6 +310,27 @@ fn style_for_flags(flags: iface::WndFlags) -> DWORD {
     out
 }
 
+fn is_mouse_in_wnd(hwnd: HWND) -> bool {
+    // Our window enables mouse tracking with the `TME_LEAVE` flag whenever
+    // the mouse pointer enters. The flag is automatically cleared by the
+    // system when the mouse pointer leaves the window.
+    //
+    // `TrackMouseEvent` also lets us query the current state, so we can use
+    // it to check if the mouse pointer is inside the window.
+    let mut te = winuser::TRACKMOUSEEVENT {
+        cbSize: size_of::<winuser::TRACKMOUSEEVENT>() as u32,
+        dwFlags: winuser::TME_QUERY,
+        hwndTrack: hwnd,
+        dwHoverTime: 0,
+    };
+
+    unsafe {
+        assert_ne!(winuser::TrackMouseEvent(&mut te), 0);
+    }
+
+    te.dwFlags & winuser::TME_LEAVE != 0
+}
+
 pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
     let hwnd = pal_hwnd.expect_hwnd();
     unsafe {
@@ -387,19 +410,38 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     let wnd = unsafe { Rc::from_raw(wnd_ptr) };
     std::mem::forget(Rc::clone(&wnd));
 
+    let wm = unsafe { Wm::global_unchecked() };
+    let pal_hwnd = HWnd { wnd };
+
     match msg {
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
                 unsafe {
-                    winuser::SetCursor(wnd.cursor.get());
+                    winuser::SetCursor(pal_hwnd.wnd.cursor.get());
                 }
                 return 1;
             }
         }
+        winuser::WM_MOUSEMOVE => {
+            let mut te = winuser::TRACKMOUSEEVENT {
+                cbSize: size_of::<winuser::TRACKMOUSEEVENT>() as u32,
+                dwFlags: winuser::TME_LEAVE,
+                hwndTrack: hwnd,
+                dwHoverTime: 0,
+            };
+
+            unsafe {
+                assert_ne!(winuser::TrackMouseEvent(&mut te), 0);
+            }
+        }
+        winuser::WM_MOUSELEAVE => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.mouse_leave(wm, &pal_hwnd);
+        }
         _ => {}
     }
 
-    drop(wnd);
+    drop(pal_hwnd);
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
