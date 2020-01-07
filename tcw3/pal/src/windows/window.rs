@@ -1,4 +1,5 @@
 use array::Array2;
+use log::trace;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -10,7 +11,7 @@ use wchar::wch_c;
 use winapi::{
     shared::{
         minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
-        windef::{HCURSOR, HWND},
+        windef::{HCURSOR, HWND, RECT, SIZE},
     },
     um::{libloaderapi, winuser},
 };
@@ -45,7 +46,6 @@ struct Wnd {
     // - close_requested
     // - update_ready
     // - resize
-    // - dpi_scale_changed
     // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
@@ -416,6 +416,97 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     let pal_hwnd = HWnd { wnd };
 
     match msg {
+        winuser::WM_DPICHANGED => {
+            // <https://docs.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged>:
+            // > In order to handle this message correctly, you will need to
+            // > resize and reposition your window based on the suggestions
+            // > provided by lParam and using SetWindowPos.
+            let rect = unsafe { &*(lparam as *mut RECT) };
+
+            trace!(
+                "Received WM_DPICHANGED (new_dpi = {:?}, suggested_rect = {:?})",
+                (LOWORD(wparam as _), HIWORD(wparam as _)),
+                cggeom::box2! {
+                    min: [rect.left, rect.top],
+                    max: [rect.right, rect.bottom]
+                }
+                .display_im(),
+            );
+
+            unsafe {
+                assert_ne!(
+                    winuser::SetWindowPos(
+                        hwnd,
+                        null_mut(),
+                        rect.left,
+                        rect.top,
+                        rect.right - rect.left,
+                        rect.bottom - rect.top,
+                        winuser::SWP_NOZORDER
+                            | winuser::SWP_NOMOVE
+                            | winuser::SWP_NOACTIVATE
+                            | winuser::SWP_NOOWNERZORDER,
+                    ),
+                    0
+                );
+            }
+
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.dpi_scale_changed(wm, &pal_hwnd);
+        }
+        winuser::WM_GETDPISCALEDSIZE => {
+            let new_dpi = wparam as u32;
+            let size_result = unsafe { &mut *(lparam as *mut SIZE) };
+
+            // The rumor [^1] says that the system rounds off the window size
+            // every time the user moves the window to a monitor with
+            // a different DPI, so if the user keeps moving the window back
+            // and forth, the window size will gradually deviate from the
+            // original size.
+            //
+            // [^1]: https://8thway.blogspot.com/2014/06/wpf-per-monitor-dpi.html
+            //
+            // We try to mitigate this issue by remembering the logical size and
+            // preserving it on DPI change.
+
+            // Get the current logical size
+            let orig_size = get_wnd_size(wm, &pal_hwnd);
+
+            // Calculate the outer size using the new DPI
+            let req_size = unsafe {
+                let orig_outer_size = orig_size.map(|i| log_to_phy(i, new_dpi));
+                let mut rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: orig_outer_size[0] as i32,
+                    bottom: orig_outer_size[1] as i32,
+                };
+                let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
+                let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
+
+                assert_ne!(
+                    winuser::AdjustWindowRectExForDpi(
+                        &mut rect, style, 0, // the window doesn't have a menu
+                        exstyle, new_dpi,
+                    ),
+                    0
+                );
+
+                [rect.right - rect.left, rect.bottom - rect.top]
+            };
+
+            trace!(
+                "Received WM_GETDPISCALEDSIZE (new_dpi = {:?}, suggested_size = {:?}). Returning {:?}",
+                new_dpi,
+                [size_result.cx, size_result.cy],
+                req_size,
+            );
+
+            // Override the system-calculated size
+            size_result.cx = req_size[0];
+            size_result.cy = req_size[1];
+            return 1;
+        }
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
                 unsafe {
