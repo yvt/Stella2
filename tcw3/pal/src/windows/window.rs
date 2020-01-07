@@ -342,9 +342,13 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     if wnd_ptr.is_null() {
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    let _wnd = unsafe { &*wnd_ptr };
+    // Clone `Rc<Wnd>` from `GWLP_USERDATA`
+    let wnd = unsafe { Rc::from_raw(wnd_ptr) };
+    std::mem::forget(Rc::clone(&wnd));
 
     // TODO
+
+    drop(wnd);
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
