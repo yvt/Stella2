@@ -9,9 +9,11 @@ use winapi::{
     um::{
         libloaderapi::GetModuleHandleW,
         winuser::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, GetDpiForWindow,
-            GetWindowLongPtrW, RegisterClassW, SetWindowLongPtrW, ShowWindow, CW_USEDEFAULT,
-            GWLP_USERDATA, SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
+            AdjustWindowRectExForDpi, CreateWindowExW, DefWindowProcW, DestroyWindow,
+            GetClientRect, GetDpiForWindow, GetWindowLongPtrW, GetWindowLongW, RegisterClassW,
+            SetWindowLongPtrW, SetWindowPos, ShowWindow, CW_USEDEFAULT, GWLP_USERDATA, GWL_EXSTYLE,
+            GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CREATE,
+            WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
         },
     },
 };
@@ -123,6 +125,71 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     log::warn!("update_wnd({:?}, {:?}): stub!", pal_hwnd, attrs);
 
+    // TODO: min_size: Option<[u32; 2]>,
+    // TODO: max_size: Option<[u32; 2]>,
+    // TODO: flags: Option<WndFlags>,
+    // TODO: caption: Option<Cow<'a, str>>,
+    // TODO: visible: Option<bool>,
+    // TODO: listener: Option<Box<dyn WndListener<T>>>,
+    // TODO: layer: Option<Option<TLayer>>,
+    // TODO: cursor_shape: Option<CursorShape>,
+
+    if let Some(new_size) = attrs.size {
+        let dpi = unsafe { GetDpiForWindow(hwnd) } as u32;
+        assert_ne!(dpi, 0);
+
+        // Get the current client region
+        let mut rect = MaybeUninit::uninit();
+        assert_ne!(unsafe { GetClientRect(hwnd, rect.as_mut_ptr()) }, 0);
+        let mut rect = unsafe { rect.assume_init() };
+
+        let size = [
+            (rect.right - rect.left) as u32,
+            (rect.bottom - rect.top) as u32,
+        ];
+        let size = size.map(|i| phys_to_log(i, dpi));
+
+        // Resize the window only if the logical size differs
+        if size != new_size {
+            if size[0] != new_size[0] {
+                rect.right = rect.left + log_to_phys(new_size[0], dpi) as i32;
+            }
+            if size[1] != new_size[1] {
+                rect.bottom = rect.top + log_to_phys(new_size[1], dpi) as i32;
+            }
+
+            // Calculate the outer size
+            unsafe {
+                let style = GetWindowLongW(hwnd, GWL_STYLE) as _;
+                let exstyle = GetWindowLongW(hwnd, GWL_EXSTYLE) as _;
+
+                assert_ne!(
+                    AdjustWindowRectExForDpi(
+                        &mut rect, style, 0, // the window doesn't have a menu
+                        exstyle, dpi,
+                    ),
+                    0
+                );
+            }
+
+            // Resize the window
+            unsafe {
+                assert_ne!(
+                    SetWindowPos(
+                        hwnd,
+                        null_mut(),
+                        0, // ignored
+                        0, // ignored
+                        rect.right - rect.left,
+                        rect.bottom - rect.top,
+                        SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE,
+                    ),
+                    0
+                );
+            }
+        }
+    }
+
     if let Some(visible) = attrs.visible {
         // Note: `ShowWindow` ignores the command and uses the value specified
         // by the program that launched the current application when it's
@@ -165,7 +232,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
     assert_ne!(dpi, 0);
 
     // Apply DPI scaling
-    size.map(|i| (i * 96 + dpi / 2) / dpi)
+    size.map(|i| phys_to_log(i, dpi))
 }
 
 pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
@@ -211,4 +278,12 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
     // TODO
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+fn phys_to_log(x: u32, dpi: u32) -> u32 {
+    (x * 96 + dpi / 2) / dpi
+}
+
+fn log_to_phys(x: u32, dpi: u32) -> u32 {
+    (x * dpi + 48) / 96
 }
