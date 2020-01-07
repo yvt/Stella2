@@ -64,7 +64,7 @@ version = "0.3.8"
 features = [
 	"d2d1_1", "dwrite", "winbase", "winuser", "shellscalingapi", "combaseapi",
 	"synchapi", "dxgi1_3", "dcomp", "d3d11", "dwmapi", "libloaderapi",
-	"processthreadsapi", "gdiplusflat", "gdiplusinit",
+	"processthreadsapi", "gdiplusflat", "gdiplusinit", "stringapiset",
 ]
 
 # `gtk` backend

@@ -3,6 +3,7 @@ use super::iface;
 use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
 mod bitmap;
+mod codecvt;
 mod eventloop;
 mod window;
 
