@@ -47,7 +47,7 @@ struct Timer {
     handler: Box<dyn FnOnce(Wm)>,
 }
 
-static NEXT_TIMER_TOKEN: MtSticky<Cell<u64>> = MtSticky::new(Cell::new(0));
+static NEXT_TIMER_TOKEN: MtSticky<Cell<u64>, Wm> = MtSticky::new(Cell::new(0));
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {
