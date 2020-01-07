@@ -126,7 +126,11 @@ where
     ///
     /// use stvg_tcw3::StvgImg;
     ///
+    /// # #[tcw3::testing::use_testing_wm]
+    /// # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
     /// let himg = StvgImg::new(STVG_IMAGE).into_himg();
+    /// # }
+    /// # inner();
     /// ```
     pub fn into_himg(self) -> HImg {
         himg_from_paint_fn(
@@ -161,9 +165,13 @@ where
 ///
 /// use stvg_tcw3::{StvgImg, replace_color};
 ///
+/// # #[tcw3::testing::use_testing_wm]
+/// # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
 /// let himg = StvgImg::new(STVG_IMAGE)
 ///     .with_color_xform(replace_color([0.4, 0.5, 0.6, 1.0]))
 ///     .into_himg();
+/// # }
+/// # inner();
 /// ```
 pub fn replace_color(new_color: impl Into<RGBAF32>) -> impl Fn(RGBAF32) -> RGBAF32 {
     let orig = new_color.into();

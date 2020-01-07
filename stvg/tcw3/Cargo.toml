@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
+[features]
+testing = ["tcw3/testing"]
+
 [dependencies]
 tcw3 = { path = "../../tcw3" }
 stvg_io = { path = "../io" }
