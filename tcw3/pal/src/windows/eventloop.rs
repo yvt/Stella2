@@ -28,7 +28,7 @@ use winapi::{
     },
 };
 
-use super::{Wm, window};
+use super::{window, Wm};
 use crate::{iface::Wm as WmTrait, MtSticky};
 
 /// `HWND`
