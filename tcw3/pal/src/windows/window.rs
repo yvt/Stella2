@@ -12,17 +12,7 @@ use winapi::{
         minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
         windef::HWND,
     },
-    um::{
-        libloaderapi::GetModuleHandleW,
-        winuser::{
-            AdjustWindowRectExForDpi, CreateWindowExW, DefWindowProcW, DestroyWindow,
-            GetClientRect, GetDpiForWindow, GetWindowLongPtrW, GetWindowLongW, RegisterClassW,
-            SetWindowLongPtrW, SetWindowLongW, SetWindowPos, SetWindowTextW, ShowWindow,
-            CW_USEDEFAULT, GWLP_USERDATA, GWL_EXSTYLE, GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE,
-            SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-            WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
-        },
-    },
+    um::{libloaderapi, winuser},
 };
 
 use super::{codecvt::str_to_c_wstr, Wm, WndAttrs};
@@ -86,10 +76,10 @@ impl HWnd {
 /// (`mt_lazy_static!` would be a better choice for module decoupling, but
 /// I think that in this case, code size and runtime performance outweigh that.)
 pub(super) fn init(_: Wm) {
-    let hinstance = unsafe { GetModuleHandleW(null_mut()) };
+    let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
 
     // Create a window class for the message-only window
-    let wnd_class = WNDCLASSW {
+    let wnd_class = winuser::WNDCLASSW {
         style: 0,
         lpfnWndProc: Some(wnd_proc),
         hInstance: hinstance,
@@ -102,22 +92,22 @@ pub(super) fn init(_: Wm) {
         lpszMenuName: null_mut(),
     };
 
-    unsafe { RegisterClassW(&wnd_class) };
+    unsafe { winuser::RegisterClassW(&wnd_class) };
 }
 
 pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
-    let hinstance = unsafe { GetModuleHandleW(null_mut()) };
+    let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
 
     let hwnd = unsafe {
-        CreateWindowExW(
+        winuser::CreateWindowExW(
             0,
             WND_CLASS.as_ptr(),
             null_mut(), // title
             style_for_flags(Default::default()),
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
+            winuser::CW_USEDEFAULT,
+            winuser::CW_USEDEFAULT,
+            winuser::CW_USEDEFAULT,
+            winuser::CW_USEDEFAULT,
             null_mut(),
             null_mut(),
             hinstance,
@@ -134,11 +124,11 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
         }),
     };
 
-    // Store `Rc<Wnd>` to `hwnd[GWLP_USERDATA]`
+    // Store `Rc<Wnd>` to `hwnd[winuser::GWLP_USERDATA]`
     unsafe {
-        SetWindowLongPtrW(
+        winuser::SetWindowLongPtrW(
             hwnd,
-            GWLP_USERDATA,
+            winuser::GWLP_USERDATA,
             Rc::into_raw(Rc::clone(&pal_hwnd.wnd)) as isize,
         );
     }
@@ -159,30 +149,33 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     // TODO: cursor_shape: Option<CursorShape>,
 
     if let Some(flags) = attrs.flags {
-        let style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as DWORD;
+        let style = unsafe { winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) } as DWORD;
 
         let new_style = style
-            & !(WS_CHILD
-                | WS_OVERLAPPED
-                | WS_CAPTION
-                | WS_SYSMENU
-                | WS_THICKFRAME
-                | WS_MINIMIZEBOX
-                | WS_MAXIMIZEBOX)
+            & !(winuser::WS_CHILD
+                | winuser::WS_OVERLAPPED
+                | winuser::WS_CAPTION
+                | winuser::WS_SYSMENU
+                | winuser::WS_THICKFRAME
+                | winuser::WS_MINIMIZEBOX
+                | winuser::WS_MAXIMIZEBOX)
             | style_for_flags(flags);
 
         unsafe {
-            SetWindowLongW(hwnd, GWL_STYLE, new_style as _);
+            winuser::SetWindowLongW(hwnd, winuser::GWL_STYLE, new_style as _);
         }
     }
 
     if let Some(new_size) = attrs.size {
-        let dpi = unsafe { GetDpiForWindow(hwnd) } as u32;
+        let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
         assert_ne!(dpi, 0);
 
         // Get the current client region
         let mut rect = MaybeUninit::uninit();
-        assert_ne!(unsafe { GetClientRect(hwnd, rect.as_mut_ptr()) }, 0);
+        assert_ne!(
+            unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) },
+            0
+        );
         let mut rect = unsafe { rect.assume_init() };
 
         let size = [
@@ -202,11 +195,11 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
             // Calculate the outer size
             unsafe {
-                let style = GetWindowLongW(hwnd, GWL_STYLE) as _;
-                let exstyle = GetWindowLongW(hwnd, GWL_EXSTYLE) as _;
+                let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
+                let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
 
                 assert_ne!(
-                    AdjustWindowRectExForDpi(
+                    winuser::AdjustWindowRectExForDpi(
                         &mut rect, style, 0, // the window doesn't have a menu
                         exstyle, dpi,
                     ),
@@ -217,14 +210,14 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
             // Resize the window
             unsafe {
                 assert_ne!(
-                    SetWindowPos(
+                    winuser::SetWindowPos(
                         hwnd,
                         null_mut(),
                         0, // ignored
                         0, // ignored
                         rect.right - rect.left,
                         rect.bottom - rect.top,
-                        SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE,
+                        winuser::SWP_NOZORDER | winuser::SWP_NOMOVE | winuser::SWP_NOACTIVATE,
                     ),
                     0
                 );
@@ -235,7 +228,7 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     if let Some(caption) = attrs.caption {
         let caption_w = str_to_c_wstr(&caption);
         unsafe {
-            SetWindowTextW(hwnd, caption_w.as_ptr());
+            winuser::SetWindowTextW(hwnd, caption_w.as_ptr());
         }
     }
 
@@ -248,9 +241,13 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
         // by the program that launched the current application when it's
         // called for the first time. It's usually (but not always) a desired
         // behavior.
-        let cmd = if visible { SW_SHOW } else { SW_HIDE };
+        let cmd = if visible {
+            winuser::SW_SHOW
+        } else {
+            winuser::SW_HIDE
+        };
         unsafe {
-            ShowWindow(hwnd, cmd);
+            winuser::ShowWindow(hwnd, cmd);
         }
     }
 }
@@ -258,13 +255,13 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 fn style_for_flags(flags: iface::WndFlags) -> DWORD {
     use iface::WndFlags;
     let mut out = if flags.contains(WndFlags::BORDERLESS) {
-        WS_CHILD
+        winuser::WS_CHILD
     } else {
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU
+        winuser::WS_OVERLAPPED | winuser::WS_CAPTION | winuser::WS_SYSMENU
     };
 
     if flags.contains(WndFlags::RESIZABLE) {
-        out |= WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+        out |= winuser::WS_THICKFRAME | winuser::WS_MINIMIZEBOX | winuser::WS_MAXIMIZEBOX;
     }
 
     out
@@ -273,7 +270,7 @@ fn style_for_flags(flags: iface::WndFlags) -> DWORD {
 pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
     let hwnd = pal_hwnd.expect_hwnd();
     unsafe {
-        DestroyWindow(hwnd);
+        winuser::DestroyWindow(hwnd);
     }
 }
 
@@ -286,7 +283,10 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
 
     // Get the size of the client region
     let mut rect = MaybeUninit::uninit();
-    assert_ne!(unsafe { GetClientRect(hwnd, rect.as_mut_ptr()) }, 0);
+    assert_ne!(
+        unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) },
+        0
+    );
     let rect = unsafe { rect.assume_init() };
 
     let size = [
@@ -296,7 +296,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
 
     // Get the per-window DPI
     // (`GetDpiForWindow` requires Win 10, v1607)
-    let dpi = unsafe { GetDpiForWindow(hwnd) } as u32;
+    let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
     assert_ne!(dpi, 0);
 
     // Apply DPI scaling
@@ -306,7 +306,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
 pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
     let hwnd = pal_hwnd.expect_hwnd();
 
-    let dpi = unsafe { GetDpiForWindow(hwnd) };
+    let dpi = unsafe { winuser::GetDpiForWindow(hwnd) };
     assert_ne!(dpi, 0);
 
     (dpi as f32) / 96.0
@@ -317,39 +317,39 @@ pub fn request_update_ready_wnd(_: Wm, pal_hwnd: &HWnd) {
 }
 
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    let wnd_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const Wnd;
+    let wnd_ptr = unsafe { winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA) } as *const Wnd;
 
     // `wnd_ptr` is handled specially for the following lifecycle events
     match msg {
-        WM_CREATE => {
+        winuser::WM_CREATE => {
             debug_assert!(wnd_ptr.is_null());
-            return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+            return unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) };
         }
-        WM_DESTROY => {
+        winuser::WM_DESTROY => {
             debug_assert!(!wnd_ptr.is_null());
             // Take and drop the strong reference to `Wnd`
             let wnd = unsafe { Rc::from_raw(wnd_ptr) };
             wnd.hwnd.set(null_mut());
             unsafe {
-                SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+                winuser::SetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA, 0);
             }
             drop(wnd);
-            return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+            return unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) };
         }
         _ => {}
     }
 
     if wnd_ptr.is_null() {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    // Clone `Rc<Wnd>` from `GWLP_USERDATA`
+    // Clone `Rc<Wnd>` from `winuser::GWLP_USERDATA`
     let wnd = unsafe { Rc::from_raw(wnd_ptr) };
     std::mem::forget(Rc::clone(&wnd));
 
     // TODO
 
     drop(wnd);
-    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+    unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
 fn phys_to_log(x: u32, dpi: u32) -> u32 {
