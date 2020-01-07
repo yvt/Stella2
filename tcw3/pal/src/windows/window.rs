@@ -9,7 +9,7 @@ use std::{
 use wchar::wch_c;
 use winapi::{
     shared::{
-        minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
         windef::{HCURSOR, HWND},
     },
     um::{libloaderapi, winuser},
@@ -46,7 +46,6 @@ struct Wnd {
     // - update_ready
     // - resize
     // - dpi_scale_changed
-    // - mouse_motion
     // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
@@ -433,6 +432,16 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             unsafe {
                 assert_ne!(winuser::TrackMouseEvent(&mut te), 0);
             }
+
+            let lparam = lparam as DWORD;
+            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
+
+            // Convert to logical pixels
+            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi));
+
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.mouse_motion(wm, &pal_hwnd, loc.into());
         }
         winuser::WM_MOUSELEAVE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
@@ -456,6 +465,10 @@ fn log_to_phy(x: u32, dpi: u32) -> u32 {
     // Must be rounded down so that `phy_to_log . log_to_phy` is an identity
     // operation when `dpi >= 96`.
     x * dpi / 96
+}
+
+fn phy_to_log_f32(x: f32, dpi: u32) -> f32 {
+    x * (96.0 / dpi as f32)
 }
 
 #[cfg(test)]
