@@ -1,4 +1,5 @@
-use std::{cell::Cell, ptr::null_mut, rc::Rc};
+use array::Array2;
+use std::{cell::Cell, mem::MaybeUninit, ptr::null_mut, rc::Rc};
 use wchar::wch_c;
 use winapi::{
     shared::{
@@ -8,9 +9,9 @@ use winapi::{
     um::{
         libloaderapi::GetModuleHandleW,
         winuser::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, RegisterClassW,
-            SetWindowLongPtrW, ShowWindow, CW_USEDEFAULT, GWLP_USERDATA, SW_HIDE, SW_SHOW,
-            WM_CREATE, WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
+            CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, GetDpiForWindow,
+            GetWindowLongPtrW, RegisterClassW, SetWindowLongPtrW, ShowWindow, CW_USEDEFAULT,
+            GWLP_USERDATA, SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
         },
     },
 };
@@ -146,13 +147,34 @@ pub fn update_wnd(_: Wm, pal_hwnd: &HWnd) {
 }
 
 pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
-    log::warn!("get_wnd_size({:?}): stub!", pal_hwnd);
-    [100, 100]
+    let hwnd = pal_hwnd.expect_hwnd();
+
+    // Get the size of the client region
+    let mut rect = MaybeUninit::uninit();
+    assert_ne!(unsafe { GetClientRect(hwnd, rect.as_mut_ptr()) }, 0);
+    let rect = unsafe { rect.assume_init() };
+
+    let size = [
+        (rect.right - rect.left) as u32,
+        (rect.bottom - rect.top) as u32,
+    ];
+
+    // Get the per-window DPI
+    // (`GetDpiForWindow` requires Win 10, v1607)
+    let dpi = unsafe { GetDpiForWindow(hwnd) } as u32;
+    assert_ne!(dpi, 0);
+
+    // Apply DPI scaling
+    size.map(|i| (i * 96 + dpi / 2) / dpi)
 }
 
 pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
-    log::warn!("get_wnd_dpi_scale({:?}): stub!", pal_hwnd);
-    1.0
+    let hwnd = pal_hwnd.expect_hwnd();
+
+    let dpi = unsafe { GetDpiForWindow(hwnd) };
+    assert_ne!(dpi, 0);
+
+    (dpi as f32) / 96.0
 }
 
 pub fn request_update_ready_wnd(_: Wm, pal_hwnd: &HWnd) {
