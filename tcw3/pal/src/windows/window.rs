@@ -11,14 +11,14 @@ use winapi::{
         winuser::{
             AdjustWindowRectExForDpi, CreateWindowExW, DefWindowProcW, DestroyWindow,
             GetClientRect, GetDpiForWindow, GetWindowLongPtrW, GetWindowLongW, RegisterClassW,
-            SetWindowLongPtrW, SetWindowPos, ShowWindow, CW_USEDEFAULT, GWLP_USERDATA, GWL_EXSTYLE,
-            GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CREATE,
-            WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
+            SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, CW_USEDEFAULT,
+            GWLP_USERDATA, GWL_EXSTYLE, GWL_STYLE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+            SW_HIDE, SW_SHOW, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_OVERLAPPED,
         },
     },
 };
 
-use super::{Wm, WndAttrs};
+use super::{codecvt::str_to_c_wstr, Wm, WndAttrs};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
 
@@ -128,7 +128,6 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     // TODO: min_size: Option<[u32; 2]>,
     // TODO: max_size: Option<[u32; 2]>,
     // TODO: flags: Option<WndFlags>,
-    // TODO: caption: Option<Cow<'a, str>>,
     // TODO: visible: Option<bool>,
     // TODO: listener: Option<Box<dyn WndListener<T>>>,
     // TODO: layer: Option<Option<TLayer>>,
@@ -187,6 +186,13 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
                     0
                 );
             }
+        }
+    }
+
+    if let Some(caption) = attrs.caption {
+        let caption_w = str_to_c_wstr(&caption);
+        unsafe {
+            SetWindowTextW(hwnd, caption_w.as_ptr());
         }
     }
 
