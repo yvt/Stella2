@@ -225,15 +225,15 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
             (rect.right - rect.left) as u32,
             (rect.bottom - rect.top) as u32,
         ];
-        let size = size.map(|i| phys_to_log(i, dpi));
+        let size = size.map(|i| phy_to_log(i, dpi));
 
         // Resize the window only if the logical size differs
         if size != new_size {
             if size[0] != new_size[0] {
-                rect.right = rect.left + log_to_phys(new_size[0], dpi) as i32;
+                rect.right = rect.left + log_to_phy(new_size[0], dpi) as i32;
             }
             if size[1] != new_size[1] {
-                rect.bottom = rect.top + log_to_phys(new_size[1], dpi) as i32;
+                rect.bottom = rect.top + log_to_phy(new_size[1], dpi) as i32;
             }
 
             // Calculate the outer size
@@ -364,7 +364,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
     assert_ne!(dpi, 0);
 
     // Apply DPI scaling
-    size.map(|i| phys_to_log(i, dpi))
+    size.map(|i| phy_to_log(i, dpi))
 }
 
 pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
@@ -445,15 +445,15 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
-fn phys_to_log(x: u32, dpi: u32) -> u32 {
+fn phy_to_log(x: u32, dpi: u32) -> u32 {
     // Must be rounded up so that the drawn region (which is sized according to
     // the logical size because the user only knows the logical size) completely
     // covers a window's client region.
     (x * 96 + dpi - 1) / dpi
 }
 
-fn log_to_phys(x: u32, dpi: u32) -> u32 {
-    // Must be rounded down so that `phys_to_log . log_to_phys` is an identity
+fn log_to_phy(x: u32, dpi: u32) -> u32 {
+    // Must be rounded down so that `phy_to_log . log_to_phy` is an identity
     // operation when `dpi >= 96`.
     x * dpi / 96
 }
@@ -464,9 +464,9 @@ mod tests {
     use quickcheck_macros::quickcheck;
 
     #[quickcheck]
-    fn phys_log_roundtrip(x: u16, dpi: u8) -> bool {
+    fn phy_log_roundtrip(x: u16, dpi: u8) -> bool {
         let x = x as u32;
         let dpi = dpi as u32 + 96; // assume `dpi >= 96`
-        phys_to_log(log_to_phys(x, dpi), dpi) == x
+        phy_to_log(log_to_phy(x, dpi), dpi) == x
     }
 }
