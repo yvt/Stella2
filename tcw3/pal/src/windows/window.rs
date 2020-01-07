@@ -43,7 +43,6 @@ impl std::hash::Hash for HWnd {
 struct Wnd {
     hwnd: Cell<HWND>,
     // TODO: Raise the following events:
-    // - close_requested
     // - update_ready
     // - resize
     // - mouse_drag
@@ -416,6 +415,14 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     let pal_hwnd = HWnd { wnd };
 
     match msg {
+        winuser::WM_CLOSE => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.close_requested(wm, &pal_hwnd);
+
+            // Prevent the default action (destroying the window) by not
+            // calling `DefWindowProc`
+            return 0;
+        }
         winuser::WM_DPICHANGED => {
             // <https://docs.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged>:
             // > In order to handle this message correctly, you will need to
