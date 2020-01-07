@@ -287,9 +287,27 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 }
 
 fn phys_to_log(x: u32, dpi: u32) -> u32 {
-    (x * 96 + dpi / 2) / dpi
+    // Must be rounded up so that the drawn region (which is sized according to
+    // the logical size because the user only knows the logical size) completely
+    // covers a window's client region.
+    (x * 96 + dpi - 1) / dpi
 }
 
 fn log_to_phys(x: u32, dpi: u32) -> u32 {
-    (x * dpi + 48) / 96
+    // Must be rounded down so that `phys_to_log . log_to_phys` is an identity
+    // operation when `dpi >= 96`.
+    x * dpi / 96
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck_macros::quickcheck;
+
+    #[quickcheck]
+    fn phys_log_roundtrip(x: u16, dpi: u8) -> bool {
+        let x = x as u32;
+        let dpi = dpi as u32 + 96; // assume `dpi >= 96`
+        phys_to_log(log_to_phys(x, dpi), dpi) == x
+    }
 }
