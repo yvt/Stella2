@@ -18,7 +18,6 @@
 use cocoa::{
     base::{id, nil},
     foundation::{NSPoint, NSSize, NSString},
-    quartzcore::transaction,
 };
 use objc::{
     msg_send,
@@ -155,16 +154,8 @@ impl HWnd {
         });
     }
 
-    pub(super) fn update(&self, wm: Wm) {
-        if let Some(layer) = self.state().layer.take() {
-            with_autorelease_pool(|| {
-                transaction::begin();
-                transaction::set_animation_duration(0.0);
-                layer.flush(wm);
-                transaction::commit();
-            });
-            self.state().layer.set(Some(layer));
-        }
+    pub(super) fn update(&self, _: Wm) {
+        // The system automatically commits any implicit transaction
     }
 
     pub(super) fn request_update_ready(&self, _wm: Wm) {
