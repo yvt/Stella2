@@ -6,6 +6,9 @@ mod bitmap;
 mod codecvt;
 mod comp;
 mod eventloop;
+mod surface;
+mod utils;
+mod winapiext;
 mod window;
 
 pub use self::{

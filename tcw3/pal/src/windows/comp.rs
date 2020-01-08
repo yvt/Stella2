@@ -2,19 +2,34 @@
 use winapi::shared::ntdef::HRESULT;
 use winrt::{windows::ui::composition::Compositor, ComPtr, RtDefaultConstructible};
 
-use super::{LayerAttrs, Wm};
+use super::{surface, LayerAttrs, Wm};
 use crate::prelude::MtLazyStatic;
 
-mt_lazy_static! {
-    static <Wm> ref COMPOSITOR: ComPtr<Compositor> =>
-        |_| {
-            // Create a dispatch queue for the main thread
-            unsafe {
-                assert_eq!(tcw_comp_init(), 0);
-            }
+struct CompState {
+    compositor: ComPtr<Compositor>,
+    surface_map: surface::SurfaceMap,
+}
 
-            Compositor::new()
-        };
+impl CompState {
+    fn new(_: Wm) -> Self {
+        // Create a dispatch queue for the main thread
+        unsafe {
+            assert_eq!(tcw_comp_init(), 0);
+        }
+
+        let compositor = Compositor::new();
+
+        let surface_map = surface::SurfaceMap::new(&compositor);
+
+        CompState {
+            compositor,
+            surface_map,
+        }
+    }
+}
+
+mt_lazy_static! {
+    static <Wm> ref CS: CompState => CompState::new;
 }
 
 // Defined in `comp.cpp`
@@ -28,7 +43,7 @@ pub struct HLayer {
 }
 
 pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
-    let _ = COMPOSITOR.get_with_wm(wm);
+    let _ = CS.get_with_wm(wm);
 
     log::warn!("new_layer: stub!");
     HLayer {}
