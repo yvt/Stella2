@@ -25,6 +25,7 @@ unsafe_impl_object! {
     winapi::um::unknwnbase::IUnknown,
     winapi::um::d3d11::ID3D11Device,
     winapiext::ID3D11Device4,
+    winapiext::ICompositorDesktopInterop,
     winapiext::ICompositorInterop,
     winapiext::ICompositionGraphicsDeviceInterop,
     winapiext::ICompositionDrawingSurfaceInterop,

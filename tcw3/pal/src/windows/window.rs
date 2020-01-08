@@ -16,7 +16,7 @@ use winapi::{
     um::{libloaderapi, winuser},
 };
 
-use super::{codecvt::str_to_c_wstr, Wm, WndAttrs};
+use super::{codecvt::str_to_c_wstr, comp, Wm, WndAttrs};
 use crate::{iface, iface::Wm as WmTrait};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
@@ -49,6 +49,7 @@ struct Wnd {
     // - scroll_gesture
     listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
     cursor: Cell<HCURSOR>,
+    comp_wnd: comp::CompWnd,
 }
 
 impl fmt::Debug for Wnd {
@@ -57,6 +58,7 @@ impl fmt::Debug for Wnd {
             .field("hwnd", &self.hwnd)
             .field("listener", &self.listener.as_ptr())
             .field("cursor", &self.cursor)
+            .field("comp_wnd", &self.comp_wnd)
             .finish()
     }
 }
@@ -98,7 +100,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
 
     let hwnd = unsafe {
         winuser::CreateWindowExW(
-            0,
+            winuser::WS_EX_NOREDIRECTIONBITMAP,
             WND_CLASS.as_ptr(),
             null_mut(), // title
             style_for_flags(Default::default()),
@@ -115,11 +117,14 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
 
     assert_ne!(hwnd, null_mut());
 
+    let comp_wnd = comp::CompWnd::new(wm, hwnd);
+
     let pal_hwnd = HWnd {
         wnd: Rc::new(Wnd {
             hwnd: Cell::new(hwnd),
             listener: RefCell::new(Rc::new(())),
             cursor: Cell::new(unsafe { winuser::LoadCursorW(null_mut(), winuser::IDC_ARROW) }),
+            comp_wnd,
         }),
     };
 
@@ -144,7 +149,6 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     // TODO: min_size: Option<[u32; 2]>,
     // TODO: max_size: Option<[u32; 2]>,
-    // TODO: layer: Option<Option<TLayer>>,
 
     if let Some(shape) = attrs.cursor_shape {
         use self::iface::CursorShape;
@@ -277,6 +281,10 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     if let Some(listener) = attrs.listener {
         pal_hwnd.wnd.listener.replace(Rc::from(listener));
+    }
+
+    if let Some(layer) = attrs.layer {
+        pal_hwnd.wnd.comp_wnd.set_layer(layer);
     }
 
     if let Some(visible) = attrs.visible {

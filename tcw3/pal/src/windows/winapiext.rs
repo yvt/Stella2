@@ -4,8 +4,8 @@ use std::os::raw::c_int;
 use winapi::{
     shared::{
         guiddef::REFIID,
-        minwindef::DWORD,
-        windef::{POINT, RECT, SIZE},
+        minwindef::{BOOL, DWORD},
+        windef::{HWND, POINT, RECT, SIZE},
     },
     um::{
         d3d11_2::{ID3D11Device2, ID3D11Device2Vtbl},
@@ -14,7 +14,7 @@ use winapi::{
     },
     RIDL,
 };
-use winrt::windows::ui::composition::ICompositionGraphicsDevice;
+use winrt::windows::ui::composition::{desktop::IDesktopWindowTarget, ICompositionGraphicsDevice};
 
 pub enum Never {}
 
@@ -81,6 +81,16 @@ interface ICompositorInterop(ICompositorInteropVtbl):
     fn CreateGraphicsDevice(
         renderingDevice: *mut IUnknown,
         result: *mut *mut ICompositionGraphicsDevice,
+    ) -> HRESULT,
+}}
+
+RIDL! {#[uuid(0x29E691FA, 0x4567, 0x4DCA, 0xB3, 0x19, 0xD0, 0xF2, 0x07, 0xEB, 0x68, 0x07)]
+interface ICompositorDesktopInterop(ICompositorDesktopInteropVtbl):
+    IUnknown(IUnknownVtbl) {
+    fn CreateDesktopWindowTarget(
+        hwndTarget: HWND,
+        isTopmost: BOOL,
+        result: *mut *mut IDesktopWindowTarget,
     ) -> HRESULT,
 }}
 
