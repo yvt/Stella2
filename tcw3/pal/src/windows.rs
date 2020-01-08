@@ -4,6 +4,7 @@ use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
 mod bitmap;
 mod codecvt;
+mod comp;
 mod eventloop;
 mod window;
 
