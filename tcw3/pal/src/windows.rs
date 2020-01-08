@@ -10,6 +10,7 @@ mod window;
 
 pub use self::{
     bitmap::{Bitmap, BitmapBuilder, CharStyle, TextLayout},
+    comp::HLayer,
     eventloop::HInvoke,
     window::HWnd,
 };
@@ -99,19 +100,15 @@ impl iface::Wm for Wm {
     }
 
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
-        log::warn!("new_layer: stub!");
-        HLayer
+        comp::new_layer(self, attrs)
     }
     fn set_layer_attr(self, layer: &Self::HLayer, attrs: LayerAttrs) {
-        log::warn!("set_layer_attr: stub!");
+        comp::set_layer_attr(self, layer, attrs)
     }
     fn remove_layer(self, layer: &Self::HLayer) {
-        log::warn!("remove_layer: stub!");
+        comp::remove_layer(self, layer)
     }
 }
 
 struct AssertSend<T>(T);
 unsafe impl<T> Send for AssertSend<T> {}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HLayer;
