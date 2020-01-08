@@ -2457,6 +2457,7 @@ dependencies = [
  "svgbobdoc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wchar 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
+ "winrt 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerocopy 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2717,6 +2718,14 @@ dependencies = [
 [[package]]
 name = "winreg"
 version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
+]
+
+[[package]]
+name = "winrt"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
@@ -3037,6 +3046,7 @@ dependencies = [
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)" = "<none>"
 "checksum wincolor 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "96f5016b18804d24db43cebf3c77269e7569b8954a8464501c216cc5e070eaa9"
 "checksum winreg 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b2986deb581c4fe11b621998a5e53361efe6b48a151178d0cd9eeffa4dc6acc9"
+"checksum winrt 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c248f437add7df81d305a345e9d143c8c0a9de00a51e46b42453c337181d16c9"
 "checksum wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
 "checksum xattr 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
 "checksum xmlparser 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8110496c5bcc0d966b0b2da38d5a791aa139eeb0b80e7840a7463c2b806921eb"
