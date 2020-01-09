@@ -28,7 +28,10 @@ use winapi::{
     },
 };
 
-use super::{window, Wm};
+use super::{
+    utils::{assert_win32_nonnull, assert_win32_ok},
+    window, Wm,
+};
 use crate::{iface::Wm as WmTrait, MtSticky};
 
 /// `HWND`
@@ -138,24 +141,21 @@ pub fn invoke_after(wm: Wm, delay: Range<Duration>, f: Box<dyn FnOnce(Wm)>) -> H
     debug_assert_ne!(timer_id, 0);
 
     // `SetCoalescableTimer` needs Win 8 or later
-    assert_ne!(
-        unsafe {
-            SetCoalescableTimer(
-                hwnd,
-                timer_id,
-                delay_ms.start as UINT,
-                None, // use window proc
-                if delay_ms.end <= delay_ms.start {
-                    TIMERV_NO_COALESCING
-                } else {
-                    // Must be less than or equal to `0x7FFFFFF5`, or it will have
-                    // a different meaning
-                    delay_ms.end - delay_ms.start
-                },
-            )
-        },
-        0
-    );
+    assert_win32_ok(unsafe {
+        SetCoalescableTimer(
+            hwnd,
+            timer_id,
+            delay_ms.start as UINT,
+            None, // use window proc
+            if delay_ms.end <= delay_ms.start {
+                TIMERV_NO_COALESCING
+            } else {
+                // Must be less than or equal to `0x7FFFFFF5`, or it will have
+                // a different meaning
+                delay_ms.end - delay_ms.start
+            },
+        )
+    });
 
     HInvoke { ptr, token }
 }
@@ -293,23 +293,20 @@ fn init_main_thread() {
 
     let cur_hprocess = unsafe { GetCurrentProcess() };
     let mut cur_hthread = MaybeUninit::uninit();
-    assert_ne!(
-        unsafe {
-            DuplicateHandle(
-                cur_hprocess,
-                cur_pseudo_hthread, // source handle
-                cur_hprocess,
-                cur_hthread.as_mut_ptr(), // target handle
-                0, // desired access - ignored because of `DUPLICATE_SAME_ACCESS`
-                0, // do not inherit
-                DUPLICATE_SAME_ACCESS,
-            )
-        },
-        0
-    );
+    assert_win32_ok(unsafe {
+        DuplicateHandle(
+            cur_hprocess,
+            cur_pseudo_hthread, // source handle
+            cur_hprocess,
+            cur_hthread.as_mut_ptr(), // target handle
+            0,                        // desired access - ignored because of `DUPLICATE_SAME_ACCESS`
+            0,                        // do not inherit
+            DUPLICATE_SAME_ACCESS,
+        )
+    });
 
     let cur_hthread = unsafe { cur_hthread.assume_init() };
-    assert_ne!(cur_hthread, null_mut());
+    assert_win32_nonnull(cur_hthread as _);
 
     if MSG_HWND.compare_and_swap(0, hwnd as usize, Ordering::Relaxed) != 0 {
         panic!("MSG_HWND is already set - possible race condition");

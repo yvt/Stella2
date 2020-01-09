@@ -16,7 +16,12 @@ use winapi::{
     um::{libloaderapi, winuser},
 };
 
-use super::{codecvt::str_to_c_wstr, comp, Wm, WndAttrs};
+use super::{
+    codecvt::str_to_c_wstr,
+    comp,
+    utils::{assert_win32_nonnull, assert_win32_ok},
+    Wm, WndAttrs,
+};
 use crate::{iface, iface::Wm as WmTrait};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
@@ -115,7 +120,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
         )
     };
 
-    assert_ne!(hwnd, null_mut());
+    assert_win32_nonnull(hwnd as _);
 
     let comp_wnd = comp::CompWnd::new(wm, hwnd);
 
@@ -212,14 +217,11 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
     if let Some(new_size) = attrs.size {
         let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-        assert_ne!(dpi, 0);
+        assert_win32_ok(dpi);
 
         // Get the current client region
         let mut rect = MaybeUninit::uninit();
-        assert_ne!(
-            unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) },
-            0
-        );
+        assert_win32_ok(unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) });
         let mut rect = unsafe { rect.assume_init() };
 
         let size = [
@@ -242,32 +244,26 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
                 let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
                 let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
 
-                assert_ne!(
-                    winuser::AdjustWindowRectExForDpi(
-                        &mut rect, style, 0, // the window doesn't have a menu
-                        exstyle, dpi,
-                    ),
-                    0
-                );
+                assert_win32_ok(winuser::AdjustWindowRectExForDpi(
+                    &mut rect, style, 0, // the window doesn't have a menu
+                    exstyle, dpi,
+                ));
             }
 
             // Resize the window
             unsafe {
-                assert_ne!(
-                    winuser::SetWindowPos(
-                        hwnd,
-                        null_mut(),
-                        0, // ignored
-                        0, // ignored
-                        rect.right - rect.left,
-                        rect.bottom - rect.top,
-                        winuser::SWP_NOZORDER
-                            | winuser::SWP_NOMOVE
-                            | winuser::SWP_NOACTIVATE
-                            | winuser::SWP_NOOWNERZORDER,
-                    ),
-                    0
-                );
+                assert_win32_ok(winuser::SetWindowPos(
+                    hwnd,
+                    null_mut(),
+                    0, // ignored
+                    0, // ignored
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    winuser::SWP_NOZORDER
+                        | winuser::SWP_NOMOVE
+                        | winuser::SWP_NOACTIVATE
+                        | winuser::SWP_NOOWNERZORDER,
+                ));
             }
         }
     }
@@ -333,7 +329,7 @@ fn is_mouse_in_wnd(hwnd: HWND) -> bool {
     };
 
     unsafe {
-        assert_ne!(winuser::TrackMouseEvent(&mut te), 0);
+        assert_win32_ok(winuser::TrackMouseEvent(&mut te));
     }
 
     te.dwFlags & winuser::TME_LEAVE != 0
@@ -355,10 +351,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
 
     // Get the size of the client region
     let mut rect = MaybeUninit::uninit();
-    assert_ne!(
-        unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) },
-        0
-    );
+    assert_win32_ok(unsafe { winuser::GetClientRect(hwnd, rect.as_mut_ptr()) });
     let rect = unsafe { rect.assume_init() };
 
     let size = [
@@ -369,7 +362,7 @@ pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
     // Get the per-window DPI
     // (`GetDpiForWindow` requires Win 10, v1607)
     let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-    assert_ne!(dpi, 0);
+    assert_win32_ok(dpi);
 
     // Apply DPI scaling
     size.map(|i| phy_to_log(i, dpi))
@@ -379,7 +372,7 @@ pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
     let hwnd = pal_hwnd.expect_hwnd();
 
     let dpi = unsafe { winuser::GetDpiForWindow(hwnd) };
-    assert_ne!(dpi, 0);
+    assert_win32_ok(dpi);
 
     (dpi as f32) / 96.0
 }
@@ -449,21 +442,18 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             );
 
             unsafe {
-                assert_ne!(
-                    winuser::SetWindowPos(
-                        hwnd,
-                        null_mut(),
-                        rect.left,
-                        rect.top,
-                        rect.right - rect.left,
-                        rect.bottom - rect.top,
-                        winuser::SWP_NOZORDER
-                            | winuser::SWP_NOMOVE
-                            | winuser::SWP_NOACTIVATE
-                            | winuser::SWP_NOOWNERZORDER,
-                    ),
-                    0
-                );
+                assert_win32_ok(winuser::SetWindowPos(
+                    hwnd,
+                    null_mut(),
+                    rect.left,
+                    rect.top,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    winuser::SWP_NOZORDER
+                        | winuser::SWP_NOMOVE
+                        | winuser::SWP_NOACTIVATE
+                        | winuser::SWP_NOOWNERZORDER,
+                ));
             }
 
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
@@ -500,13 +490,10 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
                 let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
 
-                assert_ne!(
-                    winuser::AdjustWindowRectExForDpi(
-                        &mut rect, style, 0, // the window doesn't have a menu
-                        exstyle, new_dpi,
-                    ),
-                    0
-                );
+                assert_win32_ok(winuser::AdjustWindowRectExForDpi(
+                    &mut rect, style, 0, // the window doesn't have a menu
+                    exstyle, new_dpi,
+                ));
 
                 [rect.right - rect.left, rect.bottom - rect.top]
             };
@@ -542,7 +529,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             };
 
             unsafe {
-                assert_ne!(winuser::TrackMouseEvent(&mut te), 0);
+                assert_win32_ok(winuser::TrackMouseEvent(&mut te));
             }
 
             let lparam = lparam as DWORD;

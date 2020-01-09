@@ -1,6 +1,8 @@
 use std::{convert::TryInto, ptr::null_mut};
 use winapi::um::{stringapiset::MultiByteToWideChar, winnls::CP_UTF8};
 
+use super::utils::assert_win32_ok;
+
 /// Convert a given `str` into a null-terminated wide character string.
 ///
 /// Panics if the input string is too long.
@@ -14,7 +16,7 @@ pub fn str_to_c_wstr(s: &str) -> Box<[u16]> {
             let in_len = s.len().try_into().expect("string too long");
             let num_wchars =
                 MultiByteToWideChar(CP_UTF8, 0, s.as_ptr() as *const i8, in_len, null_mut(), 0);
-            assert_ne!(num_wchars, 0);
+            assert_win32_ok(num_wchars);
 
             let len: usize = num_wchars.try_into().expect("string too long");
             let len = len.checked_add(1).expect("string too long"); // null termination
