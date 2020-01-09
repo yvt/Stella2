@@ -5,3 +5,4 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
+winrt = { version = "0.6.0", default-features = false, optional = true }

@@ -12,6 +12,9 @@ use std::{
     ptr::{self, NonNull},
 };
 
+#[cfg(feature = "winrt")]
+mod winrt_comptr;
+
 /// Types whose value can be converted into a non-zero pointer-sized value
 /// and forth.
 ///
