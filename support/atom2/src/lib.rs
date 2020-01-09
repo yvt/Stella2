@@ -3,6 +3,7 @@
 //! [atom]: https://crates.io/crates/atom
 #![feature(box_into_raw_non_null)]
 #![feature(const_fn)] // `const fn` with a constrained type parameter (e.g., `T: PtrSized`)
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Arc, Weak};
@@ -426,6 +427,130 @@ where
 }
 
 impl<T: PtrSized> Drop for SetOnceAtom<T> {
+    fn drop(&mut self) {
+        unsafe {
+            T::option_from_raw(*self.ptr.get_mut());
+        }
+    }
+}
+
+/// Like `Atom` but allows assignment only once throughout its lifetime.
+/// Not thread safe.
+pub struct SetOnce<T: PtrSized> {
+    ptr: Cell<*mut ()>,
+    phantom: PhantomData<T>,
+}
+
+impl<T: PtrSized> Default for SetOnce<T> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<T: PtrSized> SetOnce<T> {
+    /// Construct an empty `SetOnce`.
+    pub const fn empty() -> Self {
+        Self {
+            ptr: Cell::new(ptr::null_mut()),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Construct a `SetOnce`.
+    pub fn new(x: Option<T>) -> Self {
+        Self {
+            ptr: Cell::new(T::option_into_raw(x) as *mut ()),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Store a value if nothing is stored yet.
+    ///
+    /// Returns `Ok(())` if the operation was successful. Returns `Err(x)`
+    /// if the cell was already occupied.
+    pub fn store(&self, x: Option<T>) -> Result<(), Option<T>> {
+        let new_ptr = T::option_into_raw(x);
+        if self.ptr.get().is_null() {
+            self.ptr.set(new_ptr);
+            Ok(())
+        } else {
+            Err(unsafe { T::option_from_raw(new_ptr) })
+        }
+    }
+
+    /// Return the inner object, consuming `self`.
+    pub fn into_inner(self) -> Option<T> {
+        let ret = unsafe { T::option_from_raw(self.ptr.get()) };
+
+        // Skip drop
+        mem::forget(self);
+
+        ret
+    }
+
+    /// Remove and return the inner object.
+    pub fn take(&mut self) -> Option<T> {
+        let ret = mem::replace(self.ptr.get_mut(), ptr::null_mut());
+        unsafe { T::option_from_raw(ret) }
+    }
+}
+
+impl<T: TrivialPtrSized> SetOnce<T> {
+    /// Get a reference to the inner object.
+    pub fn get(&self) -> Option<&T> {
+        if self.ptr.get().is_null() {
+            None
+        } else {
+            Some(unsafe { &*((&self.ptr) as *const _ as *const T) })
+        }
+    }
+
+    /// Get a mutable reference to the inner object.
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        if self.ptr.get_mut().is_null() {
+            None
+        } else {
+            Some(unsafe { &mut *((&mut self.ptr) as *mut _ as *mut T) })
+        }
+    }
+}
+
+impl<T: TypedPtrSized> SetOnce<T> {
+    /// Dereference the inner object.
+    pub fn as_inner_ref(&self) -> Option<&T::Target> {
+        let p = self.ptr.get() as *mut T::Target;
+        if p.is_null() {
+            None
+        } else {
+            Some(unsafe { &*p })
+        }
+    }
+}
+
+impl<T: TypedPtrSized + MutPtrSized> SetOnce<T> {
+    /// Mutably dereference the inner object.
+    pub fn as_inner_mut(&mut self) -> Option<&mut T::Target> {
+        let p = self.ptr.get() as *mut T::Target;
+        if p.is_null() {
+            None
+        } else {
+            Some(unsafe { &mut *p })
+        }
+    }
+}
+
+impl<T: TypedPtrSized> fmt::Debug for SetOnce<T>
+where
+    T::Target: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("SetOnce")
+            .field(&self.as_inner_ref())
+            .finish()
+    }
+}
+
+impl<T: PtrSized> Drop for SetOnce<T> {
     fn drop(&mut self) {
         unsafe {
             T::option_from_raw(*self.ptr.get_mut());
