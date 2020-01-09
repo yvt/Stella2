@@ -1,21 +1,36 @@
 //! Compositor
-use std::{fmt, mem::MaybeUninit};
+use cggeom::{box2, prelude::*, Box2};
+use cgmath::{prelude::*, Matrix3, Matrix4};
+use std::{cell::RefCell, fmt, mem::MaybeUninit, rc::Rc};
 use winapi::shared::{ntdef::HRESULT, windef::HWND};
 use winrt::{
-    windows::ui::composition::{desktop::IDesktopWindowTarget, Compositor, ICompositionTarget},
+    windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2},
+    windows::ui::composition::{
+        desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
+        CompositionGeometry, CompositionRectangleGeometry, Compositor, ContainerVisual,
+        ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
+    },
     ComPtr, RtDefaultConstructible, RtType,
 };
 
 use super::{
+    drawutils::{
+        extend_matrix3_with_identity_z, winrt_color_from_rgbaf32, winrt_m3x2_from_cgmath,
+        winrt_m4x4_from_cgmath, winrt_v2_from_cgmath_pt, winrt_v2_from_cgmath_vec,
+        winrt_v3_from_cgmath_pt, ExtendExt,
+    },
     surface,
     utils::{assert_hresult_ok, ComPtr as MyComPtr},
     winapiext::ICompositorDesktopInterop,
     LayerAttrs, Wm,
 };
-use crate::prelude::MtLazyStatic;
+use crate::{iface::LayerFlags, prelude::MtLazyStatic};
 
 struct CompState {
     comp: ComPtr<Compositor>,
+    comp2: ComPtr<ICompositor2>,
+    comp5: ComPtr<ICompositor5>,
+    comp6: ComPtr<ICompositor6>,
     comp_desktop: MyComPtr<ICompositorDesktopInterop>,
     surface_map: surface::SurfaceMap,
 }
@@ -36,8 +51,26 @@ impl CompState {
 
         let surface_map = surface::SurfaceMap::new(&comp);
 
+        // We need `ICompositor2` for `CreateLayerVisual`
+        let comp2: ComPtr<ICompositor2> = comp
+            .query_interface()
+            .expect("Could not obtain ICompositor2");
+
+        // We need `ICompositor5` for `CreateRectangleGeometry`
+        let comp5: ComPtr<ICompositor5> = comp
+            .query_interface()
+            .expect("Could not obtain ICompositor5");
+
+        // We need `ICompositor6` for `CreateGeometricClip`
+        let comp6: ComPtr<ICompositor6> = comp
+            .query_interface()
+            .expect("Could not obtain ICompositor6");
+
         CompState {
             comp,
+            comp2,
+            comp5,
+            comp6,
             comp_desktop,
             surface_map,
         }
@@ -84,24 +117,301 @@ impl CompWnd {
     }
 
     pub(super) fn set_layer(&self, layer: Option<HLayer>) {
-        log::warn!("set_layer: stub!");
+        self.target
+            .set_root(
+                layer
+                    .map(|hl| hl.layer.container_cvis.query_interface().unwrap())
+                    .as_ref()
+                    .unwrap_or_else(|| todo!()),
+            )
+            .unwrap();
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct HLayer {
-    // TODO
+    layer: Rc<Layer>,
+}
+
+impl PartialEq for HLayer {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.layer, &other.layer)
+    }
+}
+
+impl Eq for HLayer {}
+
+impl std::hash::Hash for HLayer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (&*self.layer as *const Layer).hash(state);
+    }
+}
+
+struct Layer {
+    // container_vis ~ clip, opacity
+    // |
+    // +-- layer_cvis (optional)
+    //     |
+    //     +-- solid.0 (optional) ~ bg_color
+    //	   |
+    //	   +-- image_vis (optional) ~ contents
+    //     |
+    //	   +-- (sublayers)
+    //
+    // - transform is applied to clip, bg_color, and contents
+    container_cvis: ComPtr<ContainerVisual>,
+    container_vis: ComPtr<Visual>,
+    state: RefCell<LayerState>,
+}
+
+impl fmt::Debug for Layer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Layer")
+            .field(&(&*self.container_cvis as *const _))
+            .finish()
+    }
+}
+
+/// The changing part of `Layer`
+struct LayerState {
+    layer_cvis: Option<ComPtr<ContainerVisual>>,
+    solid: Option<(ComPtr<Visual>, ComPtr<CompositionColorBrush>)>,
+    // TODO: image_vis: Option<ComPtr<SpriteVisual>>,
+    clip: Option<(
+        ComPtr<ICompositionClip2>,
+        ComPtr<CompositionRectangleGeometry>,
+    )>,
+    nonopaque: bool,
+    sublayers: Vec<HLayer>,
+    xform4x4: Matrix4x4,
+    xform3x2: Matrix3x2,
+    bounds: Box2<f32>,
 }
 
 pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
-    let _ = CS.get_with_wm(wm);
+    let cs = CS.get_with_wm(wm);
 
-    log::warn!("new_layer: stub!");
-    HLayer {}
+    let container_cvis = cs.comp.create_container_visual().unwrap().unwrap();
+    let container_vis: ComPtr<Visual> = container_cvis.query_interface().unwrap();
+
+    let layer = Layer {
+        container_cvis,
+        container_vis,
+        state: RefCell::new(LayerState {
+            layer_cvis: None,
+            solid: None,
+            clip: None,
+            nonopaque: false,
+            sublayers: Vec::new(),
+            xform4x4: winrt_m4x4_from_cgmath(Matrix4::identity()),
+            xform3x2: winrt_m3x2_from_cgmath(Matrix3::identity()),
+            bounds: box2! { min: [0.0; 2], max: [0.0; 2] },
+        }),
+    };
+
+    let hlayer = HLayer {
+        layer: Rc::new(layer),
+    };
+
+    set_layer_attr(wm, &hlayer, attrs);
+
+    hlayer
 }
-pub fn set_layer_attr(_: Wm, layer: &HLayer, attrs: LayerAttrs) {
-    log::warn!("set_layer_attr: stub!");
+
+pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
+    let cs = CS.get_with_wm(wm);
+
+    let layer = &*hlayer.layer;
+
+    let mut state = layer.state.borrow_mut();
+    let state = &mut *state; // enable split borrow
+
+    if let Some(op) = attrs.opacity {
+        if op < 1.0 {
+            state.nonopaque = true;
+        }
+        layer.container_vis.set_opacity(op).unwrap();
+    }
+
+    // Insert `layer_cvis`
+    if state.layer_cvis.is_none() {
+        let needs_layer = state.nonopaque && {
+            let has_solid = state.solid.is_some() | attrs.bg_color.is_some();
+            let has_image = matches!(attrs.contents, Some(Some(_)));
+            let num_sublayers = if let Some(sublayers) = &attrs.sublayers {
+                sublayers.len()
+            } else {
+                state.sublayers.len()
+            };
+
+            has_solid as usize + has_image as usize + num_sublayers > 1
+        };
+
+        if needs_layer {
+            // Construct a `LayerVisual`
+            let layer_lvis = cs.comp2.create_layer_visual().unwrap().unwrap();
+            let layer_cvis: ComPtr<ContainerVisual> = layer_lvis.query_interface().unwrap();
+            let layer_vis: ComPtr<Visual> = layer_lvis.query_interface().unwrap();
+
+            // Move everything from `container_cvis` to `layer_lvis`.
+            let container_cvis: &ComPtr<ContainerVisual> = &layer.container_cvis;
+
+            let layer_children = layer_cvis.get_children().unwrap().unwrap();
+            let container_children = container_cvis.get_children().unwrap().unwrap();
+
+            container_children.remove_all().unwrap();
+            container_children.insert_at_top(&layer_vis).unwrap();
+
+            if let Some((vis, _)) = &state.solid {
+                layer_children.insert_at_top(&vis).unwrap();
+            }
+            // TODO: `image_vis`
+            for sublayer in state.sublayers.iter() {
+                layer_children
+                    .insert_at_top(&sublayer.layer.container_vis)
+                    .unwrap();
+            }
+            state.layer_cvis = Some(layer_cvis);
+        }
+    }
+
+    // The existence or lack of `state.layer_cvis` is immutable beyond this
+    // point. This means that from this point on, child visuals can be just
+    // inserted to or removed from `visuals_container_cvis` defined here.
+    let visuals_container_cvis = state
+        .layer_cvis
+        .as_deref()
+        .unwrap_or(&*layer.container_cvis);
+
+    if let Some(mat) = attrs.transform {
+        state.xform4x4 = winrt_m4x4_from_cgmath(extend_matrix3_with_identity_z(mat));
+        state.xform3x2 = winrt_m3x2_from_cgmath(mat);
+        if let Some((clip, _)) = &state.clip {
+            clip.set_transform_matrix(state.xform3x2).unwrap();
+        }
+        if let Some((vis, _)) = &state.solid {
+            vis.set_transform_matrix(state.xform4x4).unwrap();
+        }
+        // TODO: `image_vis`
+    }
+
+    if let Some(_contents) = attrs.contents {
+        // TODO
+    }
+
+    if let Some(_center) = attrs.contents_center {
+        // TODO
+    }
+
+    if let Some(_scale) = attrs.contents_scale {
+        // TODO
+    }
+
+    let bounds_to_anchor = |b: Box2<f32>| Vector2 {
+        X: -b.min.x / b.size().x,
+        Y: -b.min.y / b.size().y,
+    };
+
+    if let Some(bounds) = attrs.bounds {
+        state.bounds = bounds;
+        if let Some((_, rect)) = &state.clip {
+            rect.set_offset(winrt_v2_from_cgmath_pt(state.bounds.min))
+                .unwrap();
+            rect.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                .unwrap();
+        }
+        if let Some((vis, _)) = &state.solid {
+            vis.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                .unwrap();
+            vis.set_anchor_point(bounds_to_anchor(state.bounds))
+                .unwrap();
+        }
+        // TODO: `image_vis`
+    }
+
+    if let Some(color) = attrs.bg_color {
+        let (_, brush) = if let Some(x) = &state.solid {
+            x
+        } else {
+            // Create `state.solid` and set properties
+            let brush = cs.comp.create_color_brush().unwrap().unwrap();
+
+            let svis = cs.comp.create_sprite_visual().unwrap().unwrap();
+            let vis: ComPtr<Visual> = svis.query_interface().unwrap();
+
+            svis.set_brush(&brush.query_interface::<CompositionBrush>().unwrap())
+                .unwrap();
+
+            vis.set_transform_matrix(state.xform4x4).unwrap();
+            vis.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                .unwrap();
+            vis.set_anchor_point(bounds_to_anchor(state.bounds))
+                .unwrap();
+
+            // Insert the newly created visual to the correct position
+            let children = visuals_container_cvis.get_children().unwrap().unwrap();
+            children.insert_at_bottom(&vis).unwrap();
+
+            state.solid = Some((vis, brush));
+            state.solid.as_ref().unwrap()
+        };
+
+        brush.set_color(winrt_color_from_rgbaf32(color)).unwrap();
+    }
+
+    if let Some(sublayers) = attrs.sublayers {
+        state.sublayers = sublayers;
+
+        // TODO: calculate the difference and only reconcile the changed portions
+        let children = visuals_container_cvis.get_children().unwrap().unwrap();
+        children.remove_all().unwrap();
+
+        if let Some((vis, _)) = &state.solid {
+            children.insert_at_top(&vis).unwrap();
+        }
+        // TODO: `image_vis`
+        for sublayer in state.sublayers.iter() {
+            children
+                .insert_at_top(&sublayer.layer.container_vis)
+                .unwrap();
+        }
+    }
+
+    if let Some(flags) = attrs.flags {
+        if flags.contains(LayerFlags::MASK_TO_BOUNDS) {
+            let (clip, _) = if let Some(x) = &state.clip {
+                x
+            } else {
+                // Create `state.clip` and set properties
+                let rect = cs.comp5.create_rectangle_geometry().unwrap().unwrap();
+
+                rect.set_offset(winrt_v2_from_cgmath_pt(state.bounds.min))
+                    .unwrap();
+                rect.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                    .unwrap();
+
+                let gclip = cs.comp6.create_geometric_clip().unwrap().unwrap();
+                gclip
+                    .set_geometry(&rect.query_interface::<CompositionGeometry>().unwrap())
+                    .unwrap();
+
+                let clip: ComPtr<ICompositionClip2> = gclip.query_interface().unwrap();
+                clip.set_transform_matrix(state.xform3x2).unwrap();
+
+                state.clip = Some((clip, rect));
+                state.clip.as_ref().unwrap()
+            };
+
+            layer
+                .container_vis
+                .set_clip(&clip.query_interface::<CompositionClip>().unwrap())
+                .unwrap();
+        } else {
+            // TODO: layer.container_vis.set_clip(None);
+        }
+    }
 }
-pub fn remove_layer(_: Wm, layer: &HLayer) {
-    log::warn!("remove_layer: stub!");
+
+pub fn remove_layer(_: Wm, _: &HLayer) {
+    // `Layer` is ref-counted, there's nothing to do here
 }

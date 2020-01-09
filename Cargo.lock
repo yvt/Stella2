@@ -115,6 +115,9 @@ dependencies = [
 [[package]]
 name = "atom2"
 version = "0.1.0"
+dependencies = [
+ "winrt 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "atty"

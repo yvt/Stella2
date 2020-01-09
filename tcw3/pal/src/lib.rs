@@ -4,6 +4,7 @@
 #![feature(const_fn)] // `'static` bounds on `const fn` parameters
 #![feature(is_sorted)] // `<[_]>::is_sorted`
 #![feature(unsized_locals)] // Call `dyn FnOnce`
+#![feature(matches_macro)] // `matches!` (stabilized by rust-lang/rust#67659)
 #![allow(clippy::float_cmp)]
 // this lint is ridiculous
 // When never type (`!`) is stabilized, `msg_send![ ... ];` will be no longer
