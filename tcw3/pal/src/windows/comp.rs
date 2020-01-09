@@ -7,8 +7,9 @@ use winrt::{
     windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2},
     windows::ui::composition::{
         desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
-        CompositionGeometry, CompositionRectangleGeometry, Compositor, ContainerVisual,
-        ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
+        CompositionGeometry, CompositionNineGridBrush, CompositionRectangleGeometry,
+        CompositionSurfaceBrush, Compositor, ContainerVisual, ICompositionClip2,
+        ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
     },
     ComPtr, RtDefaultConstructible, RtType,
 };
@@ -51,7 +52,8 @@ impl CompState {
 
         let surface_map = surface::SurfaceMap::new(&comp);
 
-        // We need `ICompositor2` for `CreateLayerVisual`
+        // We need `ICompositor2` for `CreateLayerVisual` and
+        // `CreateNineGridBrush`
         let comp2: ComPtr<ICompositor2> = comp
             .query_interface()
             .expect("Could not obtain ICompositor2");
@@ -154,7 +156,7 @@ struct Layer {
     //     |
     //     +-- solid.0 (optional) ~ bg_color
     //	   |
-    //	   +-- image_vis (optional) ~ contents
+    //	   +-- image.0 (optional) ~ contents
     //     |
     //	   +-- (sublayers)
     //
@@ -176,7 +178,11 @@ impl fmt::Debug for Layer {
 struct LayerState {
     layer_cvis: Option<ComPtr<ContainerVisual>>,
     solid: Option<(ComPtr<Visual>, ComPtr<CompositionColorBrush>)>,
-    // TODO: image_vis: Option<ComPtr<SpriteVisual>>,
+    image: Option<(
+        ComPtr<Visual>,
+        ComPtr<CompositionNineGridBrush>,
+        ComPtr<CompositionSurfaceBrush>,
+    )>,
     clip: Option<(
         ComPtr<ICompositionClip2>,
         ComPtr<CompositionRectangleGeometry>,
@@ -200,6 +206,7 @@ pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
         state: RefCell::new(LayerState {
             layer_cvis: None,
             solid: None,
+            image: None,
             clip: None,
             nonopaque: false,
             sublayers: Vec::new(),
@@ -265,7 +272,9 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             if let Some((vis, _)) = &state.solid {
                 layer_children.insert_at_top(&vis).unwrap();
             }
-            // TODO: `image_vis`
+            if let Some((vis, _, _)) = &state.image {
+                layer_children.insert_at_top(&vis).unwrap();
+            }
             for sublayer in state.sublayers.iter() {
                 layer_children
                     .insert_at_top(&sublayer.layer.container_vis)
@@ -292,19 +301,9 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         if let Some((vis, _)) = &state.solid {
             vis.set_transform_matrix(state.xform4x4).unwrap();
         }
-        // TODO: `image_vis`
-    }
-
-    if let Some(_contents) = attrs.contents {
-        // TODO
-    }
-
-    if let Some(_center) = attrs.contents_center {
-        // TODO
-    }
-
-    if let Some(_scale) = attrs.contents_scale {
-        // TODO
+        if let Some((vis, _, _)) = &state.image {
+            vis.set_transform_matrix(state.xform4x4).unwrap();
+        }
     }
 
     let bounds_to_anchor = |b: Box2<f32>| Vector2 {
@@ -326,7 +325,64 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             vis.set_anchor_point(bounds_to_anchor(state.bounds))
                 .unwrap();
         }
-        // TODO: `image_vis`
+        if let Some((vis, _, _)) = &state.image {
+            vis.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                .unwrap();
+            vis.set_anchor_point(bounds_to_anchor(state.bounds))
+                .unwrap();
+        }
+    }
+
+    if let Some(contents) = attrs.contents {
+        let (_, _, sbrush) = if let Some(x) = &state.image {
+            x
+        } else {
+            // Create `state.image` and set properties
+            let sbrush = cs.comp.create_surface_brush().unwrap().unwrap();
+
+            let nbrush = cs.comp2.create_nine_grid_brush().unwrap().unwrap();
+            nbrush
+                .set_source(&sbrush.query_interface::<CompositionBrush>().unwrap())
+                .unwrap();
+
+            let svis = cs.comp.create_sprite_visual().unwrap().unwrap();
+            let vis: ComPtr<Visual> = svis.query_interface().unwrap();
+
+            svis.set_brush(&nbrush.query_interface::<CompositionBrush>().unwrap())
+                .unwrap();
+
+            vis.set_transform_matrix(state.xform4x4).unwrap();
+            vis.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
+                .unwrap();
+            vis.set_anchor_point(bounds_to_anchor(state.bounds))
+                .unwrap();
+
+            // Insert the newly created visual to the correct position
+            let children = visuals_container_cvis.get_children().unwrap().unwrap();
+            if let Some((solid_vis, _)) = &state.solid {
+                children.insert_above(&vis, solid_vis).unwrap();
+            } else {
+                children.insert_at_bottom(&vis).unwrap();
+            }
+
+            state.image = Some((vis, nbrush, sbrush));
+            state.image.as_ref().unwrap()
+        };
+
+        if let Some(bitmap) = &contents {
+            let surface = cs.surface_map.get_surface_for_bitmap(wm, bitmap);
+            sbrush.set_surface(&surface).unwrap();
+        } else {
+            // TODO: Clear the contents
+        }
+    }
+
+    if let Some(_center) = attrs.contents_center {
+        // TODO
+    }
+
+    if let Some(_scale) = attrs.contents_scale {
+        // TODO
     }
 
     if let Some(color) = attrs.bg_color {
