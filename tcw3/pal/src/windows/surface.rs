@@ -1,19 +1,31 @@
 //! Maps `Bitmap` to `CompositionDrawingSurface`.
+use atom2::SetOnce;
 use std::{mem::MaybeUninit, ptr::null_mut};
 use winapi::um::{d3d11, d3dcommon, unknwnbase::IUnknown};
 use winrt::{
-    windows::ui::composition::{CompositionGraphicsDevice, Compositor},
+    windows::graphics::directx::{DirectXAlphaMode, DirectXPixelFormat},
+    windows::graphics::SizeInt32,
+    windows::ui::composition::{
+        CompositionGraphicsDevice, Compositor, ICompositionGraphicsDevice2, ICompositionSurface,
+    },
     ComPtr,
 };
 
 use super::{
+    bitmap::Bitmap,
     utils::{assert_hresult_ok, ComPtr as MyComPtr},
-    winapiext::{ICompositionGraphicsDeviceInterop, ICompositorInterop, ID3D11Device4},
+    winapiext::{
+        ICompositionDrawingSurfaceInterop, ICompositionGraphicsDeviceInterop, ICompositorInterop,
+        ID3D11Device4,
+    },
+    Wm,
 };
+use crate::MtSticky;
 
 /// Maps `Bitmap` to `CompositionDrawingSurface`.
 pub struct SurfaceMap {
     comp_device: ComPtr<CompositionGraphicsDevice>,
+    comp_device2: ComPtr<ICompositionGraphicsDevice2>,
     comp_device_interop: MyComPtr<ICompositionGraphicsDeviceInterop>,
 }
 
@@ -39,6 +51,10 @@ impl SurfaceMap {
         let comp_device: ComPtr<CompositionGraphicsDevice> =
             comp_idevice.query_interface().unwrap();
 
+        let comp_device2: ComPtr<ICompositionGraphicsDevice2> = comp_idevice
+            .query_interface()
+            .expect("Could not obtain ICompositionGraphicsDevice2");
+
         let comp_device_interop: MyComPtr<ICompositionGraphicsDeviceInterop> =
             MyComPtr::iunknown_from_winrt_comptr(comp_idevice)
                 .query_interface()
@@ -48,6 +64,7 @@ impl SurfaceMap {
 
         Self {
             comp_device,
+            comp_device2,
             comp_device_interop,
         }
     }
@@ -88,4 +105,60 @@ fn new_render_device() -> MyComPtr<ID3D11Device4> {
     d3d11_device
         .query_interface()
         .expect("Could not obtain ID3D11Device4")
+}
+
+/// Stored in `Bitmap`
+pub(super) type SurfacePtrCell = MtSticky<SetOnce<ComPtr<ICompositionSurface>>>;
+
+pub(super) fn new_surface_ptr_cell() -> SurfacePtrCell {
+    // This is safe because it doesn't contain `ComPtr` that is unsendable.
+    unsafe { MtSticky::new_unchecked(SetOnce::empty()) }
+}
+
+impl SurfaceMap {
+    /// Get an `ICompositionSurface` for a given `Bitmap`. May cache the
+    /// surface.
+    pub fn get_surface_for_bitmap(&self, wm: Wm, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
+        let surf_ptr_cell = bmp.inner.surf_ptr.get_with_wm(wm);
+
+        if let Some(surf) = surf_ptr_cell.as_inner_ref() {
+            // Clone from `surf_ptr_cell`
+            unsafe { surf.AddRef() };
+            return unsafe { ComPtr::wrap(surf as *const _ as *mut _) };
+        }
+
+        let surf = self.new_surface_for_bitmap(bmp);
+        let _ = surf_ptr_cell.store(Some(ComPtr::clone(&surf)));
+        surf
+    }
+
+    fn new_surface_for_bitmap(&self, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
+        use crate::iface::Bitmap;
+        use std::convert::TryInto;
+        let size = bmp.size();
+
+        let winrt_size = SizeInt32 {
+            Width: size[0].try_into().unwrap(),
+            Height: size[1].try_into().unwrap(),
+        };
+
+        let cdsurf = self
+            .comp_device2
+            .create_drawing_surface2(
+                winrt_size,
+                DirectXPixelFormat::R8G8B8A8UIntNormalized,
+                DirectXAlphaMode::Premultiplied,
+            )
+            .unwrap()
+            .unwrap();
+
+        let cdsurf_interop: MyComPtr<ICompositionDrawingSurfaceInterop> =
+            MyComPtr::iunknown_from_winrt_comptr(cdsurf.clone())
+                .query_interface()
+                .unwrap();
+
+        // TODO
+
+        cdsurf.query_interface().unwrap()
+    }
 }

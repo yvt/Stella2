@@ -17,7 +17,7 @@ use winapi::{
     },
 };
 
-use super::CharStyleAttrs;
+use super::{surface, CharStyleAttrs};
 use crate::iface;
 
 #[cold]
@@ -88,7 +88,7 @@ fn ensure_gdip_inited() {
 /// Implements `crate::iface::Bitmap`.
 #[derive(Clone)]
 pub struct Bitmap {
-    inner: Arc<BitmapInner>,
+    pub(super) inner: Arc<BitmapInner>,
 }
 
 impl fmt::Debug for Bitmap {
@@ -113,15 +113,25 @@ impl iface::Bitmap for Bitmap {
 }
 
 /// An owned pointer of `GpBitmap`.
-#[derive(Debug)]
-struct BitmapInner {
+pub(super) struct BitmapInner {
     gp_bmp: *mut GpBitmap,
+
+    /// The cached surface created in `surface.rs`.
+    pub(super) surf_ptr: surface::SurfacePtrCell,
 }
 
 // I just assume that GDI+ objects only require object-granular external
 // synchronization
 unsafe impl Send for BitmapInner {}
 unsafe impl Sync for BitmapInner {}
+
+impl fmt::Debug for BitmapInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BitmapInner")
+            .field("gp_bmp", &self.gp_bmp)
+            .finish()
+    }
+}
 
 impl BitmapInner {
     fn new(size: [u32; 2]) -> Self {
@@ -138,7 +148,9 @@ impl BitmapInner {
             })
         };
 
-        Self { gp_bmp }
+        let surf_ptr = surface::new_surface_ptr_cell();
+
+        Self { gp_bmp, surf_ptr }
     }
 }
 
