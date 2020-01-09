@@ -7,7 +7,10 @@ use winrt::{
 };
 
 use super::{
-    surface, utils::ComPtr as MyComPtr, winapiext::ICompositorDesktopInterop, LayerAttrs, Wm,
+    surface,
+    utils::{assert_hresult_ok, ComPtr as MyComPtr},
+    winapiext::ICompositorDesktopInterop,
+    LayerAttrs, Wm,
 };
 use crate::prelude::MtLazyStatic;
 
@@ -21,7 +24,7 @@ impl CompState {
     fn new(_: Wm) -> Self {
         // Create a dispatch queue for the main thread
         unsafe {
-            assert_eq!(tcw_comp_init(), 0);
+            assert_hresult_ok(tcw_comp_init());
         }
 
         let comp = Compositor::new();
@@ -68,10 +71,9 @@ impl CompWnd {
 
         let desktop_target = unsafe {
             let mut out = MaybeUninit::uninit();
-            assert_eq!(
+            assert_hresult_ok(
                 cs.comp_desktop
                     .CreateDesktopWindowTarget(hwnd, 0, out.as_mut_ptr()),
-                0
             );
             IDesktopWindowTarget::wrap(out.assume_init()).unwrap()
         };

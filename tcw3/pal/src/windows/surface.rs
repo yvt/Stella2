@@ -7,7 +7,7 @@ use winrt::{
 };
 
 use super::{
-    utils::ComPtr as MyComPtr,
+    utils::{assert_hresult_ok, ComPtr as MyComPtr},
     winapiext::{ICompositionGraphicsDeviceInterop, ICompositorInterop, ID3D11Device4},
 };
 
@@ -30,9 +30,8 @@ impl SurfaceMap {
 
         let comp_idevice = unsafe {
             let mut out = MaybeUninit::uninit();
-            assert_eq!(
+            assert_hresult_ok(
                 comp_interop.CreateGraphicsDevice(d3d_device.as_ptr() as _, out.as_mut_ptr()),
-                0
             );
             ComPtr::wrap(out.assume_init())
         };
@@ -70,21 +69,18 @@ fn new_render_device() -> MyComPtr<ID3D11Device4> {
     // necessary).
     let d3d11_device = unsafe {
         let mut out = MaybeUninit::uninit();
-        assert_eq!(
-            d3d11::D3D11CreateDevice(
-                null_mut(), // default adapter
-                d3dcommon::D3D_DRIVER_TYPE_HARDWARE,
-                null_mut(), // not asking for a SW driver, so not passing a module to one
-                0,          // no creation flags
-                feature_levels.as_ptr(),
-                feature_levels.len() as _,
-                d3d11::D3D11_SDK_VERSION,
-                out.as_mut_ptr(),
-                null_mut(), // not interested in which feature level is chosen
-                null_mut(), // not interested in `ID3D11DeviceContext`
-            ),
-            0,
-        );
+        assert_hresult_ok(d3d11::D3D11CreateDevice(
+            null_mut(), // default adapter
+            d3dcommon::D3D_DRIVER_TYPE_HARDWARE,
+            null_mut(), // not asking for a SW driver, so not passing a module to one
+            0,          // no creation flags
+            feature_levels.as_ptr(),
+            feature_levels.len() as _,
+            d3d11::D3D11_SDK_VERSION,
+            out.as_mut_ptr(),
+            null_mut(), // not interested in which feature level is chosen
+            null_mut(), // not interested in `ID3D11DeviceContext`
+        ));
         MyComPtr::from_ptr_unchecked(out.assume_init())
     };
 
