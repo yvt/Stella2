@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
-[dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 winrt = { version = "0.6.0", default-features = false, optional = true }

@@ -12,7 +12,7 @@ use std::{
     ptr::{self, NonNull},
 };
 
-#[cfg(feature = "winrt")]
+#[cfg(all(feature = "winrt", target_os = "windows"))]
 mod winrt_comptr;
 
 /// Types whose value can be converted into a non-zero pointer-sized value
