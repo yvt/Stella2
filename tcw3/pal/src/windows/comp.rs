@@ -1,7 +1,12 @@
 //! Compositor
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Matrix4};
-use std::{cell::RefCell, fmt, mem::MaybeUninit, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    fmt,
+    mem::MaybeUninit,
+    rc::Rc,
+};
 use winapi::{
     shared::{ntdef::HRESULT, windef::HWND},
     um::winuser,
@@ -195,7 +200,12 @@ struct Layer {
     container_cvis: ComPtr<ContainerVisual>,
     container_vis: ComPtr<Visual>,
     state: RefCell<LayerState>,
+    /// A temporary variable used while reconciling sublayers. Should be set
+    /// to `NONE` when unused.
+    tmp: Cell<usize>,
 }
+
+const NONE: usize = usize::max_value();
 
 impl fmt::Debug for Layer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -254,6 +264,7 @@ pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
             contents_center: box2! { min: [0.0; 2], max: [1.0; 2] },
             contents_scale: 1.0,
         }),
+        tmp: Cell::new(NONE),
     };
 
     let hlayer = HLayer {
@@ -488,23 +499,88 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
     }
 
     if let Some(sublayers) = attrs.sublayers {
-        state.sublayers = sublayers;
+        debug_assert!(is_layer_list_unique(&sublayers));
 
-        // TODO: calculate the difference and only reconcile the changed portions
+        // Our signed/unsigned trick assumes the element count is
+        // sufficiently small
+        debug_assert!(sublayers.len().checked_mul(4).is_some());
+
+        // We want to reconcile the changes in the layer list by calculating
+        // the difference between `state.sublayers` and `sublayers` and calling
+        // insertion/removal methods as needed.
+        //
+        // There is a simple dynamic programming algorithm that can find the
+        // optimal solution for this problem, which performs in O(n²). The
+        // Method of Russians can be use to further reduce the time complexity
+        // to O(n log n).
+        //
+        // I think they are all too complicated and too slow for this purpose.
+        // Therefore, we instead utilize a linear-time greedy algorithm that
+        // performs in O(n) but may produce a suboptimal solution under some
+        // circumstances (especially those involving reordering).
+        let old_sublayers = &state.sublayers[..];
+
+        // For each `old[i]`, `old[i].tmp := i`
+        for (old_i, hlayer) in old_sublayers.iter().enumerate() {
+            hlayer.layer.tmp.set(old_i);
+        }
+
+        // The topmost subvisual that belong to `self` itself
+        let mut insertion_ref_vis = if let Some((vis, _, _)) = &state.image {
+            Some(&**vis)
+        } else if let Some((vis, _)) = &state.solid {
+            Some(&**vis)
+        } else {
+            None
+        };
+
         let children = visuals_container_cvis.get_children().unwrap().unwrap();
-        children.remove_all().unwrap();
 
-        if let Some((vis, _)) = &state.solid {
-            children.insert_at_top(&vis).unwrap();
+        let mut next_old_i = 0;
+        for hlayer in sublayers.iter() {
+            let old_i = hlayer.layer.tmp.get();
+            let vis = &*hlayer.layer.container_vis;
+
+            if (old_i as isize) < (next_old_i as isize) {
+                // The above condition is equivalent to the following:
+                debug_assert!(
+                    // A new sublayer
+                    old_i == NONE ||
+                    // This layer was removed in a previous iteration, but now
+                    // should be re-inserted
+                    old_i < next_old_i
+                );
+
+                if let Some(ref_vis) = insertion_ref_vis {
+                    children.insert_above(vis, ref_vis).unwrap();
+                } else {
+                    children.insert_at_bottom(vis).unwrap();
+                }
+                insertion_ref_vis = Some(vis);
+            } else {
+                // `old_i` is now located at this position.
+
+                // Remove old sublayers which were skipped. Some of them might
+                // be encountered again in the future, in which case they will
+                // be re-inserted.
+                for hlayer in old_sublayers[next_old_i..old_i].iter() {
+                    children.remove(&hlayer.layer.container_vis).unwrap();
+                }
+
+                insertion_ref_vis = Some(vis);
+                next_old_i = old_i + 1;
+            }
         }
-        if let Some((vis, _, _)) = &state.image {
-            children.insert_at_top(&vis).unwrap();
+
+        for hlayer in old_sublayers[next_old_i..].iter() {
+            children.remove(&hlayer.layer.container_vis).unwrap();
         }
-        for sublayer in state.sublayers.iter() {
-            children
-                .insert_at_top(&sublayer.layer.container_vis)
-                .unwrap();
+
+        for hlayer in old_sublayers.iter() {
+            hlayer.layer.tmp.set(NONE);
         }
+
+        state.sublayers = sublayers;
     }
 
     if let Some(flags) = attrs.flags {
@@ -540,6 +616,25 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             // TODO: layer.container_vis.set_clip(None);
         }
     }
+}
+
+/// Check if the given list of layers contains duplicate elements or not.
+/// Used for debug assertion. Resets `Layer::tmp`.
+fn is_layer_list_unique(layers: &[HLayer]) -> bool {
+    debug_assert!(layers.iter().all(|hlayer| hlayer.layer.tmp.get() == NONE));
+
+    let is_unique = layers.iter().all(|hlayer| {
+        if hlayer.layer.tmp.get() == NONE {
+            hlayer.layer.tmp.set(0);
+            true
+        } else {
+            false
+        }
+    });
+
+    layers.iter().for_each(|hlayer| hlayer.layer.tmp.set(NONE));
+
+    is_unique
 }
 
 pub fn remove_layer(_: Wm, _: &HLayer) {
