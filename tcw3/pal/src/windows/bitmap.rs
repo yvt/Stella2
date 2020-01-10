@@ -324,6 +324,10 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             },
         };
 
+        unsafe {
+            gp::GdipSetSmoothingMode(gr.gp_gr, gdiplusenums::SmoothingModeAntiAlias);
+        }
+
         let path = UniqueGpPath {
             gp_path: unsafe {
                 create_gp_obj_with(|out| gp::GdipCreatePath(gdiplusenums::FillModeWinding, out))
