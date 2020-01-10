@@ -425,7 +425,9 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         if let Some((vis, _)) = &state.solid {
             children.insert_at_top(&vis).unwrap();
         }
-        // TODO: `image_vis`
+        if let Some((vis, _, _)) = &state.image {
+            children.insert_at_top(&vis).unwrap();
+        }
         for sublayer in state.sublayers.iter() {
             children
                 .insert_at_top(&sublayer.layer.container_vis)
