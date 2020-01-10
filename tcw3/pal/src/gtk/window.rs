@@ -67,7 +67,7 @@ struct MomentumScrollState {
 }
 
 const SCROLL_HISTORY_LEN: usize = 4;
-const MOMENTUM_DURATION: u32 = 1500; // 1500 << 10 microseconds
+const MOMENTUM_DURATION: u32 = 600; // 600 << 10 microseconds
 
 #[derive(Clone, Copy)]
 #[repr(align(16))]

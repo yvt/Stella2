@@ -127,7 +127,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// possible. Conversely, all attribute updates may be deferred until this
     /// method is called.
     ///
-    /// The implementation may call this automatically in the main event loop.
+    /// The implementation **may** call this automatically in the main event
+    /// loop, but the client must not assume that this will happen.
     fn update_wnd(self, window: &Self::HWnd);
 
     /// Request to have [`WndListener::update_ready`] called when the

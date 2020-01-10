@@ -2,12 +2,12 @@ use cggeom::prelude::*;
 use cgmath::{prelude::*, Matrix4};
 use cocoa::{
     base::{id, nil},
-    quartzcore::CALayer,
+    quartzcore::{transaction, CALayer},
 };
 use core_graphics::geometry::CGPoint;
 use iterpool::{Pool, PoolPtr};
 use objc::{class, msg_send, sel, sel_impl};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use super::super::iface::LayerFlags;
 use super::{
@@ -20,8 +20,6 @@ use super::{
 
 static LAYER_POOL: MtSticky<RefCell<Pool<Layer>>> = MtSticky::new(RefCell::new(Pool::new()));
 
-static DELETION_QUEUE: MtSticky<RefCell<Vec<HLayer>>> = MtSticky::new(RefCell::new(Vec::new()));
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     /// The pointer to a `Layer` in `LAYER_POOL`.
@@ -30,35 +28,6 @@ pub struct HLayer {
 
 struct Layer {
     ca_layer: CALayer,
-
-    /// Deferred attribute updates to be flushed.
-    ///
-    /// It only has `Some` values for updated attributes.
-    /// The new state after the next transaction are calculated like this:
-    /// `attrs_current.override_with(attrs_diff)`.
-    attrs_diff: RefCell<LayerAttrs>,
-
-    /// The current sublayers of `CALayer` expressed in `HLayer`s. In other
-    /// words, it tracks the committed state of the `sublayers` attribute.
-    sublayers: RefCell<Vec<HLayer>>,
-
-    /// This layer of one of its sublayers have pending updates in `attrs_diff`.
-    /// It may have a false-positive.
-    needs_update: Cell<bool>,
-
-    /// The superlayer.
-    ///
-    /// It's immediately updated when `set_attrs` is called.
-    /// Thus, it's based on the reverse mapping of
-    /// `attrs_diff.sublayers.unwrap_or(sublayers)`.
-    ///
-    /// Stores `HLayer::ptr` because `HLayer` itself is not `Copy`.
-    superlayer: Cell<Option<PoolPtr>>,
-
-    /// `true` if `remove` was called, but the layer can't be deleted because
-    /// `superlayer` is not `None`. It'll be deleted when its detached from the
-    /// superlayer.
-    pending_deletion: Cell<bool>,
 }
 
 impl Layer {
@@ -70,14 +39,7 @@ impl Layer {
         let ca_layer = CALayer::new();
         let () = unsafe { msg_send![ca_layer.id(), retain] };
 
-        Self {
-            ca_layer,
-            attrs_diff: RefCell::new(LayerAttrs::default()),
-            sublayers: RefCell::new(Vec::new()),
-            needs_update: Cell::new(false),
-            superlayer: Cell::new(None),
-            pending_deletion: Cell::new(false),
-        }
+        Self { ca_layer }
     }
 }
 
@@ -92,140 +54,18 @@ impl HLayer {
 
     pub(super) fn remove(&self, wm: Wm) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
-
-        let this_layer: &Layer = &layer_pool[self.ptr];
-
-        this_layer.pending_deletion.set(true);
-
-        if this_layer.superlayer.get().is_none() {
-            // We can delete the layer immediately if it doesn't
-            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
-            debug_assert!(deletion_queue.is_empty());
-
-            self.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
-
-            for hlayer in deletion_queue.drain(..) {
-                layer_pool.deallocate(hlayer.ptr);
-            }
-        }
-    }
-
-    /// Delete the layer if `pending_deletion == true`. This might cause cascade
-    /// deletion for sublayers with `pending_deletion.get() == true`
-    ///
-    /// The method doesn't actually do the deletion - it just adds the layers to
-    /// be deleted to `deletion_queue`.
-    fn handle_pending_deletion(
-        &self,
-        layer_pool: &Pool<Layer>,
-        wm: Wm,
-        deletion_queue: &mut Vec<HLayer>,
-    ) {
-        let this_layer: &Layer = &layer_pool[self.ptr];
-
-        if !this_layer.pending_deletion.get() {
-            return;
-        }
-
-        deletion_queue.push(self.clone());
-
-        let attrs_diff = this_layer.attrs_diff.borrow();
-        let committed_sublayers = this_layer.sublayers.borrow();
-        let sublayers = attrs_diff
-            .sublayers
-            .as_ref()
-            .unwrap_or(&*committed_sublayers);
-
-        for hlayer in sublayers.iter() {
-            hlayer.handle_pending_deletion(layer_pool, wm, &mut *deletion_queue);
-        }
+        layer_pool.deallocate(self.ptr).unwrap();
     }
 
     pub(super) fn set_attrs(&self, wm: Wm, attrs: LayerAttrs) {
         let mut layer_pool = LAYER_POOL.get_with_wm(wm).borrow_mut();
         let layer_pool = &mut *layer_pool; // enable split borrow
 
-        let update_sublayers = attrs.sublayers.is_some();
-
-        if update_sublayers {
-            // Disconnect sublayers first
-            let this_layer: &Layer = &layer_pool[self.ptr];
-            let attrs_diff = this_layer.attrs_diff.borrow();
-            let committed_sublayers = this_layer.sublayers.borrow();
-            let sublayers = attrs_diff
-                .sublayers
-                .as_ref()
-                .unwrap_or(&*committed_sublayers);
-
-            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
-            debug_assert!(deletion_queue.is_empty());
-
-            for hlayer in sublayers.iter() {
-                debug_assert_eq!(layer_pool[hlayer.ptr].superlayer.get(), Some(self.ptr));
-                layer_pool[hlayer.ptr].superlayer.set(None);
-                hlayer.handle_pending_deletion(&layer_pool, wm, &mut deletion_queue);
-            }
-        }
-
-        layer_pool[self.ptr]
-            .attrs_diff
-            .borrow_mut()
-            .override_with(attrs);
-
-        if update_sublayers {
-            // Connect sublayers
-            let this_layer: &Layer = &layer_pool[self.ptr];
-            let attrs_diff = this_layer.attrs_diff.borrow();
-            let sublayers = attrs_diff.sublayers.as_ref().unwrap();
-            for hlayer in sublayers.iter() {
-                debug_assert_eq!(
-                    layer_pool[hlayer.ptr].superlayer.get(),
-                    None,
-                    "layers only can have up to one parents."
-                );
-                layer_pool[hlayer.ptr].superlayer.set(Some(self.ptr));
-            }
-        }
-
-        // Propagate `needs_update`
-        {
-            let mut layer: &Layer = &layer_pool[self.ptr];
-            while !layer.needs_update.get() {
-                layer.needs_update.set(true);
-                if let Some(sup) = layer.superlayer.get() {
-                    layer = &layer_pool[sup];
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // Flush deferred layer deletion
-        if update_sublayers {
-            let mut deletion_queue = DELETION_QUEUE.get_with_wm(wm).borrow_mut();
-
-            for hlayer in deletion_queue.drain(..) {
-                layer_pool.deallocate(hlayer.ptr);
-            }
-        }
-    }
-
-    /// Apply deferred property updates to the underlying `CALayer`.
-    ///
-    /// The operation is performed recursively on sublayers.
-    fn flush_with_layer_pool(&self, layer_pool: &Pool<Layer>) {
         let this_layer: &Layer = &layer_pool[self.ptr];
 
-        // Update this layer's local properties
-        if !this_layer.needs_update.get() {
-            return;
-        }
-        this_layer.needs_update.set(false);
+        transaction::set_animation_duration(0.0);
 
-        let mut attrs_diff = this_layer.attrs_diff.borrow_mut();
-        let mut sublayers = this_layer.sublayers.borrow_mut();
-
-        if let Some(value) = attrs_diff.transform.take() {
+        if let Some(value) = attrs.transform {
             let m: Matrix4<f64> = extend_matrix3_with_identity_z(value).cast().unwrap();
             this_layer
                 .ca_layer
@@ -240,7 +80,7 @@ impl HLayer {
                 .set_sublayer_transform(ca_transform_3d_from_matrix4(m_inv));
         }
 
-        if let Some(value) = attrs_diff.contents.take() {
+        if let Some(value) = attrs.contents {
             // Be careful - Do not drop `value` until `set_contents` because
             // the following `cg_image` is just a `id`, not a smart pointer
             let cg_image = if let Some(ref bitmap) = value {
@@ -252,7 +92,7 @@ impl HLayer {
             unsafe { this_layer.ca_layer.set_contents(cg_image) };
         }
 
-        if let Some(value) = attrs_diff.bounds.take() {
+        if let Some(value) = attrs.bounds {
             this_layer
                 .ca_layer
                 .set_bounds(&cg_rect_from_box2(value.cast().unwrap()));
@@ -265,17 +105,17 @@ impl HLayer {
             ));
         }
 
-        if let Some(value) = attrs_diff.contents_center.take() {
+        if let Some(value) = attrs.contents_center {
             this_layer
                 .ca_layer
                 .set_contents_center(&cg_rect_from_box2(value.cast().unwrap()));
         }
 
-        if let Some(value) = attrs_diff.contents_scale.take() {
+        if let Some(value) = attrs.contents_scale {
             this_layer.ca_layer.set_contents_scale(value as f64);
         }
 
-        if let Some(value) = attrs_diff.bg_color.take() {
+        if let Some(value) = attrs.bg_color {
             let cf_color = if value.a > 0.0 {
                 let c = cg_color_from_rgbaf32(value);
                 std::mem::forget(c.clone());
@@ -286,10 +126,8 @@ impl HLayer {
             this_layer.ca_layer.set_background_color(cf_color);
         }
 
-        if let Some(value) = attrs_diff.sublayers.take() {
-            *sublayers = value;
-
-            let ca_sub_layers: Vec<_> = sublayers
+        if let Some(value) = attrs.sublayers {
+            let ca_sub_layers: Vec<_> = value
                 .iter()
                 .map(|hlayer| layer_pool[hlayer.ptr].ca_layer.id())
                 .collect();
@@ -306,28 +144,15 @@ impl HLayer {
             let () = unsafe { msg_send![this_layer.ca_layer.id(), setSublayers: array] };
         }
 
-        if let Some(value) = attrs_diff.opacity.take() {
+        if let Some(value) = attrs.opacity {
             this_layer.ca_layer.set_opacity(value);
         }
 
-        if let Some(value) = attrs_diff.flags.take() {
+        if let Some(value) = attrs.flags {
             this_layer
                 .ca_layer
                 .set_masks_to_bounds(value.contains(LayerFlags::MASK_TO_BOUNDS));
         }
-
-        // Recurse into sublayers
-        for hlayer in sublayers.iter() {
-            hlayer.flush_with_layer_pool(layer_pool);
-        }
-    }
-
-    /// Apply deferred property updates to the underlying `CALayer`.
-    ///
-    /// The operation is performed recursively on sublayers.
-    /// `wm` is used for compile-time thread checking.
-    pub(super) fn flush(&self, wm: Wm) {
-        self.flush_with_layer_pool(&LAYER_POOL.get_with_wm(wm).borrow());
     }
 
     /// Get the `CALayer` of a layer.
