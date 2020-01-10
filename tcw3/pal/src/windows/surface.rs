@@ -201,6 +201,8 @@ impl SurfaceMap {
             let mut d2d_dc = unsafe { direct2d::DeviceContext::from_raw(d2d_dc_cp.as_ptr()) };
             std::mem::forget(d2d_dc_cp); // ownership moved to `DeviceContext`
 
+            d2d_dc.clear((0, 0.0));
+
             // Createa  `Bitmap` from `bmp`
             let in_bitmap_data = bmp.inner.lock();
             let in_bitmap_slice = unsafe {
