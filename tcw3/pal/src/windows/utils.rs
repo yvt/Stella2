@@ -64,6 +64,9 @@ macro_rules! unsafe_impl_object {
 unsafe_impl_object! {
     winapi::um::unknwnbase::IUnknown,
     winapi::um::d3d11::ID3D11Device,
+    winapi::um::d2d1_1::ID2D1Device,
+    winapi::um::d2d1_1::ID2D1DeviceContext,
+    winapi::shared::dxgi::IDXGIDevice,
     winapiext::ID3D11Device4,
     winapiext::ICompositorDesktopInterop,
     winapiext::ICompositorInterop,

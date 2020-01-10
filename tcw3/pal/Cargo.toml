@@ -58,6 +58,7 @@ objc = "0.2.3"
 atom2 = { path = "../../support/atom2", features = ["winrt"] }
 directwrite = "0.1.4"
 direct2d = "0.2.0"
+dxgi = "0.1.7"
 wchar = "0.6.0"
 
 [target.'cfg(target_os = "windows")'.dependencies.winrt]

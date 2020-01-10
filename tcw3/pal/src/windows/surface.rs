@@ -1,7 +1,20 @@
 //! Maps `Bitmap` to `CompositionDrawingSurface`.
 use atom2::SetOnce;
-use std::{mem::MaybeUninit, ptr::null_mut};
-use winapi::um::{d3d11, d3dcommon, unknwnbase::IUnknown};
+use direct2d::{math::SizeU, RenderTarget};
+use std::{
+    mem::MaybeUninit,
+    ptr::{null, null_mut},
+};
+use winapi::{
+    shared::{dxgi::IDXGIDevice, windef::POINT},
+    um::{
+        d2d1_1::{D2D1CreateDevice, ID2D1DeviceContext},
+        d3d11, d3dcommon,
+        dcommon::D2D_SIZE_U,
+        unknwnbase::IUnknown,
+    },
+    Interface,
+};
 use winrt::{
     windows::graphics::directx::{DirectXAlphaMode, DirectXPixelFormat},
     windows::graphics::SizeInt32,
@@ -34,6 +47,14 @@ impl SurfaceMap {
         // Create the initial device
         let d3d_device = new_render_device();
 
+        // Create Direct2D device
+        let dxgi_device: MyComPtr<IDXGIDevice> = d3d_device.query_interface().unwrap();
+        let d2d_device = unsafe {
+            let mut out = MaybeUninit::uninit();
+            assert_hresult_ok(D2D1CreateDevice(&*dxgi_device, null(), out.as_mut_ptr()));
+            MyComPtr::from_ptr_unchecked(out.assume_init())
+        };
+
         // Create `CompositionGraphicsDevice`
         let comp = unsafe { MyComPtr::from_ptr_unchecked(comp as *const _ as *mut IUnknown) };
         unsafe { comp.AddRef() };
@@ -43,7 +64,7 @@ impl SurfaceMap {
         let comp_idevice = unsafe {
             let mut out = MaybeUninit::uninit();
             assert_hresult_ok(
-                comp_interop.CreateGraphicsDevice(d3d_device.as_ptr() as _, out.as_mut_ptr()),
+                comp_interop.CreateGraphicsDevice(d2d_device.as_ptr() as _, out.as_mut_ptr()),
             );
             ComPtr::wrap(out.assume_init())
         };
@@ -90,7 +111,7 @@ fn new_render_device() -> MyComPtr<ID3D11Device4> {
             null_mut(), // default adapter
             d3dcommon::D3D_DRIVER_TYPE_HARDWARE,
             null_mut(), // not asking for a SW driver, so not passing a module to one
-            0,          // no creation flags
+            d3d11::D3D11_CREATE_DEVICE_BGRA_SUPPORT, // needed for Direct2D
             feature_levels.as_ptr(),
             feature_levels.len() as _,
             d3d11::D3D11_SDK_VERSION,
@@ -152,12 +173,75 @@ impl SurfaceMap {
             .unwrap()
             .unwrap();
 
+        // TODO: Use `CompositionGraphicsDevice::RenderingDeviceReplaced`
+
         let cdsurf_interop: MyComPtr<ICompositionDrawingSurfaceInterop> =
             MyComPtr::iunknown_from_winrt_comptr(cdsurf.clone())
                 .query_interface()
                 .unwrap();
 
-        // TODO
+        // Retrieve a reference to the backing surface
+        let (d2d_dc_cp, offset): (MyComPtr<ID2D1DeviceContext>, POINT) = unsafe {
+            let mut out = MaybeUninit::uninit();
+            let mut out_offset = MaybeUninit::uninit();
+            assert_hresult_ok(cdsurf_interop.BeginDraw(
+                null(),
+                &ID2D1DeviceContext::uuidof(),
+                out.as_mut_ptr() as _,
+                out_offset.as_mut_ptr(),
+            ));
+            (
+                MyComPtr::from_ptr_unchecked(out.assume_init()),
+                out_offset.assume_init(),
+            )
+        };
+
+        // Draw into the Direct2D DC
+        {
+            let mut d2d_dc = unsafe { direct2d::DeviceContext::from_raw(d2d_dc_cp.as_ptr()) };
+            std::mem::forget(d2d_dc_cp); // ownership moved to `DeviceContext`
+
+            // Createa  `Bitmap` from `bmp`
+            let in_bitmap_data = bmp.inner.lock();
+            let in_bitmap_slice = unsafe {
+                std::slice::from_raw_parts(
+                    in_bitmap_data.as_ptr(),
+                    in_bitmap_data.size()[1] as usize * in_bitmap_data.stride() as usize,
+                )
+            };
+
+            let bitmap = direct2d::image::Bitmap::create(&d2d_dc)
+                .with_raw_data(
+                    SizeU(D2D_SIZE_U {
+                        width: size[0],
+                        height: size[1],
+                    }),
+                    in_bitmap_slice,
+                    in_bitmap_data.stride(),
+                )
+                .with_format(dxgi::Format::R8G8B8A8Unorm)
+                .with_alpha_mode(direct2d::enums::AlphaMode::Premultiplied)
+                .build()
+                .unwrap();
+
+            // Draw the bitmap into the DC
+            let in_rect = (0.0, 0.0, size[0] as f32, size[1] as f32);
+            let out_rect = (
+                offset.x as f32,
+                offset.y as f32,
+                size[0] as f32,
+                size[1] as f32,
+            );
+            d2d_dc.draw_bitmap(
+                &bitmap,
+                out_rect,
+                1.0,
+                direct2d::enums::BitmapInterpolationMode::NearestNeighbor,
+                in_rect,
+            );
+        }
+
+        assert_hresult_ok(unsafe { cdsurf_interop.EndDraw() });
 
         cdsurf.query_interface().unwrap()
     }

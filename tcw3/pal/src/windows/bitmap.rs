@@ -8,7 +8,11 @@ use winapi::{
         gdipluscolor, gdiplusenums,
         gdiplusenums::GraphicsState,
         gdiplusflat as gp,
-        gdiplusgpstubs::{GpBitmap, GpGraphics, GpMatrix, GpPath, GpPen, GpSolidFill, GpStatus},
+        gdiplusgpstubs::{
+            GpBitmap, GpGraphics, GpMatrix, GpPath, GpPen, GpRect, GpSolidFill, GpStatus,
+        },
+        gdiplusimaging,
+        gdiplusimaging::BitmapData,
         gdiplusinit, gdipluspixelformats,
         gdipluspixelformats::ARGB,
         gdiplustypes,
@@ -102,13 +106,7 @@ impl fmt::Debug for Bitmap {
 
 impl iface::Bitmap for Bitmap {
     fn size(&self) -> [u32; 2] {
-        let mut out = [0, 0];
-        let gp_bmp = self.inner.gp_bmp;
-        unsafe {
-            assert_gp_ok(gp::GdipGetImageWidth(gp_bmp as _, &mut out[0]));
-            assert_gp_ok(gp::GdipGetImageHeight(gp_bmp as _, &mut out[1]));
-        }
-        [out[0] as u32, out[1] as u32]
+        self.inner.size()
     }
 }
 
@@ -152,12 +150,73 @@ impl BitmapInner {
 
         Self { gp_bmp, surf_ptr }
     }
+
+    fn size(&self) -> [u32; 2] {
+        let mut out = [0, 0];
+        let gp_bmp = self.gp_bmp;
+        unsafe {
+            assert_gp_ok(gp::GdipGetImageWidth(gp_bmp as _, &mut out[0]));
+            assert_gp_ok(gp::GdipGetImageHeight(gp_bmp as _, &mut out[1]));
+        }
+        [out[0] as u32, out[1] as u32]
+    }
 }
 
 impl Drop for BitmapInner {
     fn drop(&mut self) {
         unsafe {
             assert_gp_ok(gp::GdipDisposeImage(self.gp_bmp as _));
+        }
+    }
+}
+
+pub(super) struct BitmapLockGuard<'a> {
+    bmp: &'a BitmapInner,
+    data: BitmapData,
+}
+
+impl BitmapInner {
+    pub(super) fn lock(&self) -> BitmapLockGuard<'_> {
+        let size = self.size();
+        let data = unsafe {
+            let mut out = MaybeUninit::uninit();
+            assert_gp_ok(gp::GdipBitmapLockBits(
+                self.gp_bmp,
+                &GpRect {
+                    X: 0,
+                    Y: 0,
+                    Width: size[0] as i32,
+                    Height: size[1] as i32,
+                },
+                gdiplusimaging::ImageLockModeRead,
+                gdipluspixelformats::PixelFormat32bppPARGB,
+                out.as_mut_ptr(),
+            ));
+            out.assume_init()
+        };
+
+        BitmapLockGuard { bmp: self, data }
+    }
+}
+
+impl BitmapLockGuard<'_> {
+    pub fn size(&self) -> [u32; 2] {
+        [self.data.Width, self.data.Height]
+    }
+
+    pub fn stride(&self) -> u32 {
+        self.data.Stride.abs() as u32
+    }
+
+    pub fn as_ptr(&self) -> *const u8 {
+        self.data.Scan0 as _
+    }
+}
+
+impl Drop for BitmapLockGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipBitmapUnlockBits(self.bmp.gp_bmp, &mut self.data));
         }
     }
 }
