@@ -326,6 +326,7 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
 
         unsafe {
             gp::GdipSetSmoothingMode(gr.gp_gr, gdiplusenums::SmoothingModeAntiAlias);
+            gp::GdipTranslateWorldTransform(gr.gp_gr, -0.5, -0.5, gdiplusenums::MatrixOrderPrepend);
         }
 
         let path = UniqueGpPath {
