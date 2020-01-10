@@ -151,11 +151,13 @@ impl CompWnd {
         assert_win32_ok(dpi);
 
         let scale = dpi as f32 / 96.0;
-        self.root_vis.set_scale(Vector3 {
-            X: scale,
-            Y: scale,
-            Z: 1.0,
-        });
+        self.root_vis
+            .set_scale(Vector3 {
+                X: scale,
+                Y: scale,
+                Z: 1.0,
+            })
+            .unwrap();
     }
 }
 
@@ -381,7 +383,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         } else {
             // Create `state.image` and set properties
             let sbrush = cs.comp.create_surface_brush().unwrap().unwrap();
-            sbrush.set_stretch(CompositionStretch::Fill);
+            sbrush.set_stretch(CompositionStretch::Fill).unwrap();
 
             let nbrush = cs.comp2.create_nine_grid_brush().unwrap().unwrap();
             nbrush
