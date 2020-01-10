@@ -33,7 +33,7 @@ use super::{
     },
     Wm,
 };
-use crate::MtSticky;
+use crate::MtLock;
 
 /// Maps `Bitmap` to `CompositionDrawingSurface`.
 pub struct SurfaceMap {
@@ -129,27 +129,39 @@ fn new_render_device() -> MyComPtr<ID3D11Device4> {
 }
 
 /// Stored in `Bitmap`
-pub(super) type SurfacePtrCell = MtSticky<SetOnce<ComPtr<ICompositionSurface>>>;
+pub(super) struct SurfacePtrCell {
+    surf: MtLock<SetOnce<ComPtr<ICompositionSurface>>>,
+}
+
+// Assert `SetOnce<ComPtr<ICompositionSurface>` is sendable, i.e.,
+// its destructor can run in any thread. (Otherwise, how could it be released
+// in a managed environment?)
+//
+// `MtSticky` doesn't require these, but instead requires the existence of
+// a main thread at the point of dropping.
+unsafe impl Send for SurfacePtrCell {}
+unsafe impl Sync for SurfacePtrCell {}
 
 pub(super) fn new_surface_ptr_cell() -> SurfacePtrCell {
-    // This is safe because it doesn't contain `ComPtr` that is unsendable.
-    unsafe { MtSticky::new_unchecked(SetOnce::empty()) }
+    SurfacePtrCell {
+        surf: MtLock::new(SetOnce::empty()),
+    }
 }
 
 impl SurfaceMap {
     /// Get an `ICompositionSurface` for a given `Bitmap`. May cache the
     /// surface.
     pub fn get_surface_for_bitmap(&self, wm: Wm, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
-        let surf_ptr_cell = bmp.inner.surf_ptr.get_with_wm(wm);
+        let surf_cell = bmp.inner.surf_ptr.surf.get_with_wm(wm);
 
-        if let Some(surf) = surf_ptr_cell.as_inner_ref() {
-            // Clone from `surf_ptr_cell`
+        if let Some(surf) = surf_cell.as_inner_ref() {
+            // Clone from `surf_cell`
             unsafe { surf.AddRef() };
             return unsafe { ComPtr::wrap(surf as *const _ as *mut _) };
         }
 
         let surf = self.new_surface_for_bitmap(bmp);
-        let _ = surf_ptr_cell.store(Some(ComPtr::clone(&surf)));
+        let _ = surf_cell.store(Some(ComPtr::clone(&surf)));
         surf
     }
 
