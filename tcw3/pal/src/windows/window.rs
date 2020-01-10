@@ -456,6 +456,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 ));
             }
 
+            pal_hwnd.wnd.comp_wnd.handle_dpi_change(hwnd);
+
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.dpi_scale_changed(wm, &pal_hwnd);
         } // WM_DPICHANGED

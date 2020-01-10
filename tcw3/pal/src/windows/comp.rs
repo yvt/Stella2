@@ -2,9 +2,12 @@
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{prelude::*, Matrix3, Matrix4};
 use std::{cell::RefCell, fmt, mem::MaybeUninit, rc::Rc};
-use winapi::shared::{ntdef::HRESULT, windef::HWND};
+use winapi::{
+    shared::{ntdef::HRESULT, windef::HWND},
+    um::winuser,
+};
 use winrt::{
-    windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2},
+    windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2, Vector3},
     windows::ui::composition::{
         desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
         CompositionGeometry, CompositionNineGridBrush, CompositionRectangleGeometry,
@@ -21,7 +24,7 @@ use super::{
         winrt_v3_from_cgmath_pt, ExtendExt,
     },
     surface,
-    utils::{assert_hresult_ok, ComPtr as MyComPtr},
+    utils::{assert_hresult_ok, assert_win32_ok, ComPtr as MyComPtr},
     winapiext::ICompositorDesktopInterop,
     LayerAttrs, Wm,
 };
@@ -122,11 +125,15 @@ impl CompWnd {
 
         target.set_root(&root_vis).unwrap();
 
-        Self {
+        let this = Self {
             target,
             root_vis,
             root_cvis,
-        }
+        };
+
+        this.handle_dpi_change(hwnd);
+
+        this
     }
 
     pub(super) fn set_layer(&self, hlayer: Option<HLayer>) {
@@ -137,6 +144,18 @@ impl CompWnd {
         if let Some(hlayer) = &hlayer {
             children.insert_at_top(&hlayer.layer.container_vis).unwrap();
         }
+    }
+
+    pub(super) fn handle_dpi_change(&self, hwnd: HWND) {
+        let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+        assert_win32_ok(dpi);
+
+        let scale = dpi as f32 / 96.0;
+        self.root_vis.set_scale(Vector3 {
+            X: scale,
+            Y: scale,
+            Z: 1.0,
+        });
     }
 }
 
