@@ -219,7 +219,7 @@ impl SurfaceMap {
                     in_bitmap_slice,
                     in_bitmap_data.stride(),
                 )
-                .with_format(dxgi::Format::R8G8B8A8Unorm)
+                .with_format(dxgi::Format::B8G8R8A8Unorm)
                 .with_alpha_mode(direct2d::enums::AlphaMode::Premultiplied)
                 .build()
                 .unwrap();
