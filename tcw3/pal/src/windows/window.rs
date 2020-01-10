@@ -138,7 +138,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
         winuser::SetWindowLongPtrW(
             hwnd,
             winuser::GWLP_USERDATA,
-            Rc::into_raw(Rc::clone(&pal_hwnd.wnd)) as isize,
+            Rc::into_raw(Rc::clone(&pal_hwnd.wnd)) as _,
         );
     }
 
