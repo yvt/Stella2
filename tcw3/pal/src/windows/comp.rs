@@ -221,6 +221,12 @@ struct LayerState {
     xform4x4: Matrix4x4,
     xform3x2: Matrix3x2,
     bounds: Box2<f32>,
+    /// The pixel size of `LayerAttrs::contents`.
+    contents_size: [f32; 2],
+    /// `LayerAttrs::contents_center`
+    contents_center: Box2<f32>,
+    /// `LayerAttrs::contents_scale`
+    contents_scale: f32,
 }
 
 pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
@@ -242,6 +248,9 @@ pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
             xform4x4: winrt_m4x4_from_cgmath(Matrix4::identity()),
             xform3x2: winrt_m3x2_from_cgmath(Matrix3::identity()),
             bounds: box2! { min: [0.0; 2], max: [0.0; 2] },
+            contents_size: [0.0; 2],
+            contents_center: box2! { min: [0.0; 2], max: [1.0; 2] },
+            contents_scale: 1.0,
         }),
     };
 
@@ -362,6 +371,10 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         }
     }
 
+    // The parameters for 9-grid scaling are dependent on various inputs
+    let update_slicing =
+        attrs.contents.is_some() | attrs.contents_center.is_some() | attrs.contents_scale.is_some();
+
     if let Some(contents) = attrs.contents {
         let (_, _, sbrush) = if let Some(x) = &state.image {
             x
@@ -402,17 +415,44 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         if let Some(bitmap) = &contents {
             let surface = cs.surface_map.get_surface_for_bitmap(wm, bitmap);
             sbrush.set_surface(&surface).unwrap();
+
+            use crate::iface::Bitmap;
+            use array::Array2;
+            state.contents_size = bitmap.size().map(|i| i as f32);
         } else {
             // TODO: Clear the contents
         }
     }
 
-    if let Some(_center) = attrs.contents_center {
-        // TODO
+    if let Some(center) = attrs.contents_center {
+        state.contents_center = center;
     }
 
-    if let Some(_scale) = attrs.contents_scale {
-        // TODO
+    if let Some(scale) = attrs.contents_scale {
+        state.contents_scale = scale;
+    }
+
+    if let (Some((_, nbrush, _)), true) = (&state.image, update_slicing) {
+        // Update the 9-grid slicing parameters if any of relevant
+        // inputs have changed
+        let scale = 1.0 / state.contents_scale;
+        nbrush.set_top_inset_scale(scale).unwrap();
+        nbrush.set_right_inset_scale(scale).unwrap();
+        nbrush.set_bottom_inset_scale(scale).unwrap();
+        nbrush.set_left_inset_scale(scale).unwrap();
+
+        let center = state.contents_center;
+        let csize = state.contents_size;
+        let margins = [
+            center.min.y * csize[1],
+            (1.0 - center.max.x) * csize[0],
+            (1.0 - center.max.y) * csize[1],
+            center.min.x * csize[0],
+        ];
+        nbrush.set_top_inset(margins[0]).unwrap();
+        nbrush.set_right_inset(margins[1]).unwrap();
+        nbrush.set_bottom_inset(margins[2]).unwrap();
+        nbrush.set_left_inset(margins[3]).unwrap();
     }
 
     if let Some(color) = attrs.bg_color {
