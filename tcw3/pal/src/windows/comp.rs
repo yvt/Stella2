@@ -90,6 +90,8 @@ extern "C" {
 
 pub(super) struct CompWnd {
     target: ComPtr<ICompositionTarget>,
+    root_vis: ComPtr<Visual>,
+    root_cvis: ComPtr<ContainerVisual>,
 }
 
 impl fmt::Debug for CompWnd {
@@ -113,20 +115,28 @@ impl CompWnd {
             IDesktopWindowTarget::wrap(out.assume_init()).unwrap()
         };
 
-        let target = desktop_target.query_interface().unwrap();
+        let target: ComPtr<ICompositionTarget> = desktop_target.query_interface().unwrap();
 
-        Self { target }
+        let root_cvis = cs.comp.create_container_visual().unwrap().unwrap();
+        let root_vis: ComPtr<Visual> = root_cvis.query_interface().unwrap();
+
+        target.set_root(&root_vis).unwrap();
+
+        Self {
+            target,
+            root_vis,
+            root_cvis,
+        }
     }
 
-    pub(super) fn set_layer(&self, layer: Option<HLayer>) {
-        self.target
-            .set_root(
-                layer
-                    .map(|hl| hl.layer.container_cvis.query_interface().unwrap())
-                    .as_ref()
-                    .unwrap_or_else(|| todo!()),
-            )
-            .unwrap();
+    pub(super) fn set_layer(&self, hlayer: Option<HLayer>) {
+        let children = self.root_cvis.get_children().unwrap().unwrap();
+
+        children.remove_all().unwrap();
+
+        if let Some(hlayer) = &hlayer {
+            children.insert_at_top(&hlayer.layer.container_vis).unwrap();
+        }
     }
 }
 
