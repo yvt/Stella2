@@ -8,8 +8,8 @@ use winrt::{
     windows::ui::composition::{
         desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
         CompositionGeometry, CompositionNineGridBrush, CompositionRectangleGeometry,
-        CompositionSurfaceBrush, Compositor, ContainerVisual, ICompositionClip2,
-        ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
+        CompositionStretch, CompositionSurfaceBrush, Compositor, ContainerVisual,
+        ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
     },
     ComPtr, RtDefaultConstructible, RtType,
 };
@@ -339,6 +339,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         } else {
             // Create `state.image` and set properties
             let sbrush = cs.comp.create_surface_brush().unwrap().unwrap();
+            sbrush.set_stretch(CompositionStretch::Fill);
 
             let nbrush = cs.comp2.create_nine_grid_brush().unwrap().unwrap();
             nbrush
