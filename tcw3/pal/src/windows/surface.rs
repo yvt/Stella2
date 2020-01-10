@@ -229,8 +229,8 @@ impl SurfaceMap {
             let out_rect = (
                 offset.x as f32,
                 offset.y as f32,
-                size[0] as f32,
-                size[1] as f32,
+                (size[0] + offset.x as u32) as f32,
+                (size[1] + offset.y as u32) as f32,
             );
             d2d_dc.draw_bitmap(
                 &bitmap,
