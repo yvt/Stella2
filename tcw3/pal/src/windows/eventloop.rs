@@ -112,11 +112,10 @@ pub fn invoke(wm: Wm, f: Box<dyn FnOnce(Wm) + Send>) {
 }
 
 fn invoke_inner(hwnd: HWND, f: Box<dyn FnOnce(Wm) + Send>) {
-    // TODO: find a way to avoid double boxing
-    let boxed: InvokePayload = Box::new(f);
+    let payload: InvokePayloadRaw = unsafe { std::mem::transmute(f) };
 
     unsafe {
-        PostMessageW(hwnd, MSG_WND_WM_INVOKE, Box::into_raw(boxed) as WPARAM, 0);
+        PostMessageW(hwnd, MSG_WND_WM_INVOKE, payload.wparam, payload.lparam);
     }
 }
 
@@ -242,7 +241,12 @@ const MSG_WND_CLASS: &[u16] = wch_c!("TcwMsgWnd");
 /// Message sent by `invoke_on_main_thread`.
 const MSG_WND_WM_INVOKE: UINT = WM_USER;
 
-type InvokePayload = Box<Box<dyn FnOnce(Wm) + Send>>;
+struct InvokePayloadRaw {
+    wparam: WPARAM,
+    lparam: LPARAM,
+}
+
+type InvokePayload = Box<dyn FnOnce(Wm) + Send>;
 
 /// Configures the current thread as a main thread. Panics if there is already
 /// a main thread.
@@ -332,7 +336,8 @@ extern "system" fn msg_wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: L
         MSG_WND_WM_INVOKE => {
             let wm = unsafe { Wm::global_unchecked() };
 
-            let payload = unsafe { InvokePayload::from_raw(wparam as _) };
+            let payload: InvokePayload =
+                unsafe { std::mem::transmute(InvokePayloadRaw { wparam, lparam }) };
             payload(wm);
             0
         }
