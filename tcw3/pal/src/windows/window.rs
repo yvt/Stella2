@@ -55,6 +55,8 @@ struct Wnd {
     listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
     cursor: Cell<HCURSOR>,
     comp_wnd: comp::CompWnd,
+    min_size: Cell<[u32; 2]>,
+    max_size: Cell<[u32; 2]>,
 }
 
 impl fmt::Debug for Wnd {
@@ -64,9 +66,14 @@ impl fmt::Debug for Wnd {
             .field("listener", &self.listener.as_ptr())
             .field("cursor", &self.cursor)
             .field("comp_wnd", &self.comp_wnd)
+            .field("min_size", &self.min_size)
+            .field("max_size", &self.max_size)
             .finish()
     }
 }
+
+/// Hard-coded limit for window size for various calculations not to overflow
+const MAX_WND_SIZE: u32 = 0x10000;
 
 impl HWnd {
     fn expect_hwnd(&self) -> HWND {
@@ -130,6 +137,8 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             listener: RefCell::new(Rc::new(())),
             cursor: Cell::new(unsafe { winuser::LoadCursorW(null_mut(), winuser::IDC_ARROW) }),
             comp_wnd,
+            min_size: Cell::new([0; 2]),
+            max_size: Cell::new([MAX_WND_SIZE; 2]),
         }),
     };
 
@@ -149,11 +158,6 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
 
 pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     let hwnd = pal_hwnd.expect_hwnd();
-
-    log::warn!("update_wnd({:?}, {:?}): stub!", pal_hwnd, attrs);
-
-    // TODO: min_size: Option<[u32; 2]>,
-    // TODO: max_size: Option<[u32; 2]>,
 
     if let Some(shape) = attrs.cursor_shape {
         use self::iface::CursorShape;
@@ -213,6 +217,22 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
         unsafe {
             winuser::SetWindowLongW(hwnd, winuser::GWL_STYLE, new_style as _);
         }
+    }
+
+    use std::cmp::min;
+    if let Some(new_size) = attrs.min_size {
+        // Clamp the value to a sane range for the calculation not to overflow
+        pal_hwnd
+            .wnd
+            .min_size
+            .set(new_size.map(|i| min(i, MAX_WND_SIZE)));
+    }
+    if let Some(new_size) = attrs.max_size {
+        // Ditto.
+        pal_hwnd
+            .wnd
+            .max_size
+            .set(new_size.map(|i| min(i, MAX_WND_SIZE)));
     }
 
     if let Some(new_size) = attrs.size {
@@ -496,6 +516,21 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             size_result.cy = req_size[1];
             return 1;
         } // WM_GETDPISCALEDSIZE
+
+        winuser::WM_GETMINMAXINFO => {
+            use std::cmp::{max, min};
+            let mut mmi = unsafe { &mut *(lparam as *mut winuser::MINMAXINFO) };
+            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+            let min_size = log_inner_to_phy_outer(hwnd, dpi, pal_hwnd.wnd.min_size.get());
+            let max_size = log_inner_to_phy_outer(hwnd, dpi, pal_hwnd.wnd.max_size.get());
+
+            mmi.ptMinTrackSize.x = max(mmi.ptMinTrackSize.x, min_size[0]);
+            mmi.ptMinTrackSize.y = max(mmi.ptMinTrackSize.y, min_size[1]);
+            mmi.ptMaxTrackSize.x = min(mmi.ptMaxTrackSize.x, max_size[0]);
+            mmi.ptMaxTrackSize.y = min(mmi.ptMaxTrackSize.y, max_size[1]);
+
+            return 0;
+        } // WM_GETMINMAXINFO
 
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
