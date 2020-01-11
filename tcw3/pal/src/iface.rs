@@ -368,6 +368,9 @@ pub trait WndListener<T: Wm> {
     ///
     /// This method gets called after the client calls
     /// `Wm::request_update_ready_wnd`.
+    ///
+    /// The implementation may call `Wm::request_update_ready_wnd` for
+    /// continuous animation.
     fn update_ready(&self, _: T, _: &T::HWnd) {}
 
     /// A window is being resized.
