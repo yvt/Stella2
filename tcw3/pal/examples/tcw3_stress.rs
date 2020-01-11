@@ -16,7 +16,7 @@ impl Xorshift32 {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Clone, Copy, Debug)]
 #[structopt(name = "tcw3_stress")]
 struct Opt {
     /// The number of particles.
@@ -34,6 +34,10 @@ struct Opt {
     /// Make particles opaque.
     #[structopt(short = "o", long = "opaque")]
     opaque: bool,
+
+    /// Make the background opaque.
+    #[structopt(short = "b", long = "bg")]
+    bg: bool,
 
     /// The shape of particles.
     #[structopt(
@@ -251,10 +255,22 @@ fn main() {
 
     let mut state = State::new(wm, opt);
 
+    let mut sublayers = state.layers.clone();
+
+    if opt.bg {
+        let bg_layer = wm.new_layer(pal::LayerAttrs {
+            bounds: Some(box2! { min: [0.0, 0.0], max: [FBSIZE[0] as f32, FBSIZE[1] as f32] }),
+            bg_color: Some([0.5, 0.5, 0.5, 1.0].into()),
+            ..Default::default()
+        });
+
+        sublayers.insert(0, bg_layer);
+    }
+
     wm.set_layer_attr(
         &layer,
         pal::LayerAttrs {
-            sublayers: Some(state.layers.clone()),
+            sublayers: Some(sublayers),
             ..Default::default()
         },
     );
