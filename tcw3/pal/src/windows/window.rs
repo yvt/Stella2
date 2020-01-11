@@ -231,6 +231,7 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
         let size = size.map(|i| phy_to_log(i, dpi));
 
         // Resize the window only if the logical size differs
+        // (That's why we don't use `log_inner_to_phy_outer` here)
         if size != new_size {
             if size[0] != new_size[0] {
                 rect.right = rect.left + log_to_phy(new_size[0], dpi) as i32;
@@ -481,24 +482,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             let orig_size = get_wnd_size(wm, &pal_hwnd);
 
             // Calculate the outer size using the new DPI
-            let req_size = unsafe {
-                let orig_outer_size = orig_size.map(|i| log_to_phy(i, new_dpi));
-                let mut rect = RECT {
-                    left: 0,
-                    top: 0,
-                    right: orig_outer_size[0] as i32,
-                    bottom: orig_outer_size[1] as i32,
-                };
-                let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
-                let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
-
-                assert_win32_ok(winuser::AdjustWindowRectExForDpi(
-                    &mut rect, style, 0, // the window doesn't have a menu
-                    exstyle, new_dpi,
-                ));
-
-                [rect.right - rect.left, rect.bottom - rect.top]
-            };
+            let req_size = log_inner_to_phy_outer(hwnd, new_dpi, orig_size);
 
             trace!(
                 "Received WM_GETDPISCALEDSIZE (new_dpi = {:?}, suggested_size = {:?}). Returning {:?}",
@@ -560,6 +544,28 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
     drop(pal_hwnd);
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+/// Calculate the physical outer size for a given logical inner size.
+fn log_inner_to_phy_outer(hwnd: HWND, dpi: u32, size: [u32; 2]) -> [i32; 2] {
+    unsafe {
+        let phy_size = size.map(|i| log_to_phy(i, dpi));
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: phy_size[0] as i32,
+            bottom: phy_size[1] as i32,
+        };
+        let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
+        let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
+
+        assert_win32_ok(winuser::AdjustWindowRectExForDpi(
+            &mut rect, style, 0, // the window doesn't have a menu
+            exstyle, dpi,
+        ));
+
+        [rect.right - rect.left, rect.bottom - rect.top]
+    }
 }
 
 fn phy_to_log(x: u32, dpi: u32) -> u32 {
