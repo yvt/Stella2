@@ -363,8 +363,8 @@ pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
     }
 }
 
-pub fn update_wnd(_: Wm, pal_hwnd: &HWnd) {
-    log::warn!("update_wnd({:?}): stub!", pal_hwnd);
+pub fn update_wnd(_: Wm, _pal_hwnd: &HWnd) {
+    // Composition is implicitly flushed, so nothing to do here
 }
 
 pub fn get_wnd_size(_: Wm, pal_hwnd: &HWnd) -> [u32; 2] {
