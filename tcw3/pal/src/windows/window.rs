@@ -92,7 +92,7 @@ pub(super) fn init(_: Wm) {
 
     // Create a window class for the message-only window
     let wnd_class = winuser::WNDCLASSW {
-        style: 0,
+        style: winuser::CS_HREDRAW | winuser::CS_VREDRAW,
         lpfnWndProc: Some(wnd_proc),
         hInstance: hinstance,
         lpszClassName: WND_CLASS.as_ptr(),
@@ -326,7 +326,7 @@ fn style_for_flags(flags: iface::WndFlags) -> DWORD {
         winuser::WS_CHILD
     } else {
         winuser::WS_OVERLAPPED | winuser::WS_CAPTION | winuser::WS_SYSMENU
-    };
+    } | winuser::WS_CLIPSIBLINGS;
 
     if flags.contains(WndFlags::RESIZABLE) {
         out |= winuser::WS_THICKFRAME | winuser::WS_MINIMIZEBOX | winuser::WS_MAXIMIZEBOX;
