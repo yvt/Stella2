@@ -18,7 +18,7 @@ use winapi::{
 
 use super::{
     codecvt::str_to_c_wstr,
-    comp,
+    comp, frameclock,
     utils::{assert_win32_nonnull, assert_win32_ok},
     Wm, WndAttrs,
 };
@@ -48,7 +48,6 @@ impl std::hash::Hash for HWnd {
 struct Wnd {
     hwnd: Cell<HWND>,
     // TODO: Raise the following events:
-    // - update_ready
     // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
@@ -57,6 +56,8 @@ struct Wnd {
     comp_wnd: comp::CompWnd,
     min_size: Cell<[u32; 2]>,
     max_size: Cell<[u32; 2]>,
+    /// Used by `FrameClockManager` through the trait `FrameClockClient`
+    update_ready_pending: Cell<bool>,
 }
 
 impl fmt::Debug for Wnd {
@@ -139,6 +140,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             comp_wnd,
             min_size: Cell::new([0; 2]),
             max_size: Cell::new([MAX_WND_SIZE; 2]),
+            update_ready_pending: Cell::new(false),
         }),
     };
 
@@ -398,8 +400,29 @@ pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
     (dpi as f32) / 96.0
 }
 
-pub fn request_update_ready_wnd(_: Wm, pal_hwnd: &HWnd) {
-    log::warn!("request_update_ready_wnd({:?}): stub!", pal_hwnd);
+static FRAME_CLOCK_MANAGER: frameclock::FrameClockManager<HWnd> =
+    frameclock::FrameClockManager::new();
+
+impl frameclock::FrameClockClient for HWnd {
+    fn set_pending(&mut self, x: bool) {
+        self.wnd.update_ready_pending.set(x);
+    }
+    fn is_pending(&mut self) -> bool {
+        self.wnd.update_ready_pending.get()
+    }
+    fn handle_frame_clock(&mut self, wm: Wm) {
+        if self.wnd.hwnd.get().is_null() {
+            // already deleted
+            return;
+        }
+
+        let listener = Rc::clone(&self.wnd.listener.borrow());
+        listener.update_ready(wm, &self);
+    }
+}
+
+pub fn request_update_ready_wnd(wm: Wm, pal_hwnd: &HWnd) {
+    FRAME_CLOCK_MANAGER.register(wm, pal_hwnd.clone());
 }
 
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

@@ -7,6 +7,7 @@ mod codecvt;
 mod comp;
 mod drawutils;
 mod eventloop;
+mod frameclock;
 mod surface;
 mod utils;
 mod winapiext;
