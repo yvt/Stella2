@@ -6,7 +6,7 @@ use std::{
     ptr::{null, null_mut},
 };
 use winapi::{
-    shared::{dxgi::IDXGIDevice, windef::POINT},
+    shared::{dxgi::IDXGIDevice, ntdef::HRESULT, windef::POINT},
     um::{
         d2d1_1::{D2D1CreateDevice, ID2D1Device, ID2D1DeviceContext},
         d3d11, d3dcommon,
@@ -28,7 +28,9 @@ use winrt::{
 
 use super::{
     bitmap::Bitmap,
-    utils::{assert_hresult_ok, assert_win32_nonnull, assert_win32_ok, ComPtr as MyComPtr},
+    utils::{
+        assert_hresult_ok, assert_win32_nonnull, assert_win32_ok, panic_hresult, ComPtr as MyComPtr,
+    },
     winapiext::{
         ICompositionDrawingSurfaceInterop, ICompositionGraphicsDeviceInterop, ICompositorInterop,
         ID3D11Device4,
@@ -44,22 +46,26 @@ pub struct SurfaceMap {
 
 impl SurfaceMap {
     pub fn new(comp: &Compositor) -> Self {
-        // Create the initial device
-        let (d3d_device, d2d_device) = new_render_device();
+        let (comp_idevice, d3d_device) = repeat_until_devlost_is_resolved_nodelay(|| {
+            // Create the initial device
+            let (d3d_device, d2d_device) = new_render_device()?;
 
-        // Create `CompositionGraphicsDevice`
-        let comp = unsafe { MyComPtr::from_ptr_unchecked(comp as *const _ as *mut IUnknown) };
-        unsafe { comp.AddRef() };
+            // Create `CompositionGraphicsDevice`
+            let comp = unsafe { MyComPtr::from_ptr_unchecked(comp as *const _ as *mut IUnknown) };
+            unsafe { comp.AddRef() };
 
-        let comp_interop: MyComPtr<ICompositorInterop> = comp.query_interface().unwrap();
+            let comp_interop: MyComPtr<ICompositorInterop> = comp.query_interface().unwrap();
 
-        let comp_idevice = unsafe {
-            let mut out = MaybeUninit::uninit();
-            assert_hresult_ok(
-                comp_interop.CreateGraphicsDevice(d2d_device.as_ptr() as _, out.as_mut_ptr()),
-            );
-            ComPtr::wrap(out.assume_init())
-        };
+            let comp_idevice = unsafe {
+                let mut out = MaybeUninit::uninit();
+                assert_hresult_ok_or_devlost(
+                    comp_interop.CreateGraphicsDevice(d2d_device.as_ptr() as _, out.as_mut_ptr()),
+                )?;
+                ComPtr::wrap(out.assume_init())
+            };
+
+            Ok((comp_idevice, d3d_device))
+        });
 
         let comp_device2: ComPtr<ICompositionGraphicsDevice2> = comp_idevice
             .query_interface()
@@ -130,7 +136,8 @@ fn listen_for_device_lost_events(
             assert_win32_ok(unsafe { CloseHandle(evt) });
 
             // Create a new set of devices
-            let (d3d_device, d2d_device) = new_render_device();
+            let (d3d_device, d2d_device) =
+                repeat_until_devlost_is_resolved_nodelay(new_render_device);
             assert_hresult_ok(unsafe {
                 ctx_ref
                     .comp_device_interop
@@ -168,7 +175,7 @@ fn listen_for_device_lost_events(
     })));
 }
 
-fn new_render_device() -> (MyComPtr<ID3D11Device4>, MyComPtr<ID2D1Device>) {
+fn new_render_device() -> Result<(MyComPtr<ID3D11Device4>, MyComPtr<ID2D1Device>), DeviceLost> {
     let feature_levels = &[
         d3dcommon::D3D_FEATURE_LEVEL_11_1,
         d3dcommon::D3D_FEATURE_LEVEL_11_0,
@@ -184,7 +191,7 @@ fn new_render_device() -> (MyComPtr<ID3D11Device4>, MyComPtr<ID2D1Device>) {
     // necessary).
     let d3d11_device = unsafe {
         let mut out = MaybeUninit::uninit();
-        assert_hresult_ok(d3d11::D3D11CreateDevice(
+        assert_hresult_ok_or_devlost(d3d11::D3D11CreateDevice(
             null_mut(), // default adapter
             d3dcommon::D3D_DRIVER_TYPE_HARDWARE,
             null_mut(), // not asking for a SW driver, so not passing a module to one
@@ -195,7 +202,7 @@ fn new_render_device() -> (MyComPtr<ID3D11Device4>, MyComPtr<ID2D1Device>) {
             out.as_mut_ptr(),
             null_mut(), // not interested in which feature level is chosen
             null_mut(), // not interested in `ID3D11DeviceContext`
-        ));
+        ))?;
         MyComPtr::from_ptr_unchecked(out.assume_init())
     };
 
@@ -208,11 +215,11 @@ fn new_render_device() -> (MyComPtr<ID3D11Device4>, MyComPtr<ID2D1Device>) {
     let dxgi_device: MyComPtr<IDXGIDevice> = d3d11_device.query_interface().unwrap();
     let d2d_device = unsafe {
         let mut out = MaybeUninit::uninit();
-        assert_hresult_ok(D2D1CreateDevice(&*dxgi_device, null(), out.as_mut_ptr()));
+        assert_hresult_ok_or_devlost(D2D1CreateDevice(&*dxgi_device, null(), out.as_mut_ptr()))?;
         MyComPtr::from_ptr_unchecked(out.assume_init())
     };
 
-    (d3d11_device4, d2d_device)
+    Ok((d3d11_device4, d2d_device))
 }
 
 /// Create a Win32 event and register a function to be called when the event
@@ -294,12 +301,15 @@ impl SurfaceMap {
             return unsafe { ComPtr::wrap(surf as *const _ as *mut _) };
         }
 
-        let surf = self.new_surface_for_bitmap(bmp);
+        let surf = repeat_until_devlost_is_resolved(|| self.new_surface_for_bitmap(bmp));
         let _ = surf_cell.store(Some(ComPtr::clone(&surf)));
         surf
     }
 
-    fn new_surface_for_bitmap(&self, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
+    fn new_surface_for_bitmap(
+        &self,
+        bmp: &Bitmap,
+    ) -> Result<ComPtr<ICompositionSurface>, DeviceLost> {
         use crate::iface::Bitmap;
         use std::convert::TryInto;
         let size = bmp.size();
@@ -309,7 +319,6 @@ impl SurfaceMap {
             Height: size[1].try_into().unwrap(),
         };
 
-        // FIXME: This method can return `0x887A0005` (`DXGI_ERROR_DEVICE_REMOVED`)
         let cdsurf = self
             .comp_device2
             .create_drawing_surface2(
@@ -317,7 +326,7 @@ impl SurfaceMap {
                 DirectXPixelFormat::R8G8B8A8UIntNormalized,
                 DirectXAlphaMode::Premultiplied,
             )
-            .unwrap()
+            .map_err(assert_winrt_devlost)?
             .unwrap();
 
         // TODO: Use `CompositionGraphicsDevice::RenderingDeviceReplaced`
@@ -331,12 +340,12 @@ impl SurfaceMap {
         let (d2d_dc_cp, offset): (MyComPtr<ID2D1DeviceContext>, POINT) = unsafe {
             let mut out = MaybeUninit::uninit();
             let mut out_offset = MaybeUninit::uninit();
-            assert_hresult_ok(cdsurf_interop.BeginDraw(
+            assert_hresult_ok_or_devlost(cdsurf_interop.BeginDraw(
                 null(),
                 &ID2D1DeviceContext::uuidof(),
                 out.as_mut_ptr() as _,
                 out_offset.as_mut_ptr(),
-            ));
+            ))?;
             (
                 MyComPtr::from_ptr_unchecked(out.assume_init()),
                 out_offset.assume_init(),
@@ -371,7 +380,7 @@ impl SurfaceMap {
                 .with_format(dxgi::Format::B8G8R8A8Unorm)
                 .with_alpha_mode(direct2d::enums::AlphaMode::Premultiplied)
                 .build()
-                .unwrap();
+                .map_err(assert_d2d_devlost)?;
 
             // Draw the bitmap into the DC
             let in_rect = (0.0, 0.0, size[0] as f32, size[1] as f32);
@@ -390,8 +399,109 @@ impl SurfaceMap {
             );
         }
 
-        assert_hresult_ok(unsafe { cdsurf_interop.EndDraw() });
+        assert_hresult_ok_or_devlost(unsafe { cdsurf_interop.EndDraw() })?;
 
-        cdsurf.query_interface().unwrap()
+        Ok(cdsurf.query_interface().unwrap())
+    }
+}
+
+/// Represents an error that will be resolved by recreating a DXGI device
+/// and related objects.
+struct DeviceLost(HRESULT);
+
+fn assert_hresult_ok_or_devlost(e: HRESULT) -> Result<(), DeviceLost> {
+    if e == 0 {
+        Ok(())
+    } else {
+        Err(assert_hresult_devlost(e))
+    }
+}
+
+/// Return `DeviceLost` if the error is recoverable. Panic otherwise.
+/// `S_OK` is treated as an error.
+fn assert_hresult_devlost(e: HRESULT) -> DeviceLost {
+    use winapi::shared::winerror;
+    match e {
+        winerror::D2DERR_RECREATE_TARGET
+        | winerror::DXGI_ERROR_DEVICE_REMOVED
+        | winerror::DXGI_ERROR_DEVICE_RESET => DeviceLost(e),
+        _ => panic_hresult(e),
+    }
+}
+
+/// Return `DeviceLost` if the error is recoverable. Panic otherwise.
+fn assert_d2d_devlost(e: direct2d::error::Error) -> DeviceLost {
+    assert_hresult_devlost(e.into())
+}
+
+/// Return `DeviceLost` if the error is recoverable. Panic otherwise.
+fn assert_winrt_devlost(e: winrt::Error) -> DeviceLost {
+    assert_hresult_devlost(e.as_hresult())
+}
+
+/// Call the given closure repeatedly until it succeeds.
+fn repeat_until_devlost_is_resolved<R>(mut f: impl FnMut() -> Result<R, DeviceLost>) -> R {
+    use winapi::um::synchapi::Sleep;
+    let mut wait = 1;
+    let mut count = 10;
+
+    loop {
+        let err = match f() {
+            Ok(r) => return r,
+            Err(DeviceLost(err)) => err,
+        };
+
+        count -= 1;
+        if count == 0 {
+            log::error!(
+                "Got HRESULT 0x{:08x}. Panicking - no attempts remaining",
+                err
+            );
+            panic_hresult(err);
+        } else {
+            log::warn!(
+                "Got HRESULT 0x{:08x}, which might have been caused by a \
+                 'device lost' or similar condition. Retrying in {} \
+                 millisecond(s)",
+                err,
+                wait
+            );
+        }
+
+        // We watch for "device removed" events in a background thread, so
+        // the error will be resolved if we wait for a bit
+        unsafe { Sleep(wait) };
+
+        // Exponential back-off with an upper bound of 4 seconds
+        wait = (wait * 2 - 1) & 4095;
+    }
+}
+
+/// Call the given closure repeatedly until it succeeds. On failure, it retries
+/// the operation immediately without calling `Sleep`.
+///
+/// The reason `repeat_until_devlost_is_resolved` inserts a sleep is to wait
+/// for the background thread to reinitialize the device object. However, if
+/// the current thread is the background thread, then there is no point in
+/// inserting a sleep. This method is suited for such a situation.
+fn repeat_until_devlost_is_resolved_nodelay<R>(mut f: impl FnMut() -> Result<R, DeviceLost>) -> R {
+    let mut count = 10;
+
+    loop {
+        let err = match f() {
+            Ok(r) => return r,
+            Err(DeviceLost(err)) => err,
+        };
+
+        count -= 1;
+        if count == 0 {
+            log::error!(
+                "Got HRESULT 0x{:08x}. Panicking - no attempts remaining",
+                err
+            );
+            panic_hresult(err);
+        } else {
+            log::warn!("Got HRESULT 0x{:08x}. Retrying", err);
+        }
     }
 }

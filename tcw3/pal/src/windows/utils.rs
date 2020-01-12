@@ -9,16 +9,16 @@ use super::winapiext;
 
 /// Check the given `HRESULT` and panic if it's not `S_OK`.
 pub fn assert_hresult_ok(result: HRESULT) -> HRESULT {
-    #[cold]
-    fn panic_hresult(result: HRESULT) -> ! {
-        panic!("HRESULT = 0x{:08x}", result);
-    }
-
     if result < 0 {
         panic_hresult(result);
     } else {
         result
     }
+}
+
+#[cold]
+pub fn panic_hresult(result: HRESULT) -> ! {
+    panic!("HRESULT = 0x{:08x}", result);
 }
 
 /// Panic with an error code returned by `GetLastError` if the
