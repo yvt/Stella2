@@ -1,4 +1,3 @@
-#![feature(proc_macro_hygiene)]
 use cggeom::prelude::*;
 use cgmath::{vec2, Matrix3, Vector2};
 use std::cell::RefCell;

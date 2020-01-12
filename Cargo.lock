@@ -2086,8 +2086,18 @@ dependencies = [
 name = "stvg_macro"
 version = "0.1.0"
 dependencies = [
+ "proc-macro-hack 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stvg_io 0.1.0",
+ "stvg_macro_impl 0.1.0",
+]
+
+[[package]]
+name = "stvg_macro_impl"
+version = "0.1.0"
+dependencies = [
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pathfinder_geometry 0.3.0 (git+https://github.com/servo/pathfinder.git?rev=678b6f12c7bc4b8076ed5c66bf77a60f7a56a9f6)",
+ "proc-macro-hack 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "stvg_io 0.1.0",

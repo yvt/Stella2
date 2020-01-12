@@ -1,0 +1,22 @@
+[package]
+name = "stvg_macro_impl"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+proc-macro-hack = "0.5.11"
+stvg_io = { path = "../../io" }
+usvg = "0.8.0"
+syn = "1"
+quote = "1"
+rgb = "0.8.13"
+cgmath = "0.17.0"
+
+[dependencies.pathfinder_geometry]
+git = "https://github.com/servo/pathfinder.git"
+rev = "678b6f12c7bc4b8076ed5c66bf77a60f7a56a9f6"
+
+[lib]
+path = "src/lib.rs"
+proc-macro = true

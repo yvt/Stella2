@@ -1,5 +1,4 @@
 //! Image assets for Stella2
-#![feature(proc_macro_hygiene)]
 
 pub type Stvg = (&'static [u8], [f32; 2]);
 

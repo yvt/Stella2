@@ -16,6 +16,7 @@ members = [
     "harmony",
     "stvg/io",
     "stvg/macro",
+    "stvg/macro/impl",
     "stvg/tcw3",
     "support/alt_fp",
     "support/as_any",

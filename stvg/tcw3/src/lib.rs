@@ -120,7 +120,6 @@ where
     /// # Examples
     ///
     /// ```
-    /// #![feature(proc_macro_hygiene)]
     /// static STVG_IMAGE: (&[u8], [f32; 2]) =
     ///     stvg_macro::include_stvg!("../tests/tiger.svgz");
     ///
@@ -155,7 +154,6 @@ where
 /// # Examples
 ///
 /// ```
-/// #![feature(proc_macro_hygiene)]
 /// static STVG_IMAGE: (&[u8], [f32; 2]) =
 ///     stvg_macro::include_stvg!("../tests/tiger.svgz");
 ///
