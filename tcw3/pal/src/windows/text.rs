@@ -84,8 +84,8 @@ impl CharStyle {
 }
 
 pub struct TextLayout {
-    dwrite_layout: directwrite::TextLayout,
-    color: Option<iface::RGBAF32>,
+    pub(super) dwrite_layout: directwrite::TextLayout,
+    pub(super) color: Option<iface::RGBAF32>,
 }
 
 impl fmt::Debug for TextLayout {

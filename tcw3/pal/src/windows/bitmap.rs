@@ -20,8 +20,10 @@ use winapi::{
     },
 };
 
-use super::{surface, TextLayout};
+use super::surface;
 use crate::iface;
+
+mod text;
 
 #[cold]
 fn panic_by_gp_status(st: GpStatus) -> ! {
@@ -550,11 +552,5 @@ impl iface::Canvas for BitmapBuilder {
                 gdiplusenums::MatrixOrderPrepend,
             ));
         }
-    }
-}
-
-impl iface::CanvasText<TextLayout> for BitmapBuilder {
-    fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
-        log::warn!("BitmapBuilder::draw_text: stub!");
     }
 }
