@@ -9,20 +9,21 @@ mod drawutils;
 mod eventloop;
 mod frameclock;
 mod surface;
+mod text;
 mod utils;
 mod winapiext;
 mod window;
 
 pub use self::{
-    bitmap::{Bitmap, BitmapBuilder, CharStyle, TextLayout},
+    bitmap::{Bitmap, BitmapBuilder},
     comp::HLayer,
     eventloop::HInvoke,
+    text::{CharStyle, CharStyleAttrs, TextLayout},
     window::HWnd,
 };
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
-pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {

@@ -1,5 +1,4 @@
 use arrayvec::ArrayVec;
-use cggeom::Box2;
 use cgmath::{Matrix3, Point2};
 use std::{convert::TryInto, fmt, mem::MaybeUninit, ptr::null_mut, sync::Arc};
 use winapi::{
@@ -21,7 +20,7 @@ use winapi::{
     },
 };
 
-use super::{surface, CharStyleAttrs};
+use super::{surface, TextLayout};
 use crate::iface;
 
 #[cold]
@@ -557,39 +556,5 @@ impl iface::Canvas for BitmapBuilder {
 impl iface::CanvasText<TextLayout> for BitmapBuilder {
     fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
         log::warn!("BitmapBuilder::draw_text: stub!");
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CharStyle;
-
-impl iface::CharStyle for CharStyle {
-    fn new(attrs: CharStyleAttrs) -> Self {
-        log::warn!("CharStyle::new: stub!");
-        Self
-    }
-
-    fn size(&self) -> f32 {
-        12.0 // TODO
-    }
-}
-
-#[derive(Debug)]
-pub struct TextLayout;
-
-impl iface::TextLayout for TextLayout {
-    type CharStyle = CharStyle;
-
-    fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
-        log::warn!("TextLayout::new: stub!");
-        Self
-    }
-
-    fn visual_bounds(&self) -> Box2<f32> {
-        cggeom::box2! { min: [0.0, 0.0], max: [40.0, 10.0] } // TODO
-    }
-
-    fn layout_bounds(&self) -> Box2<f32> {
-        cggeom::box2! { min: [0.0, 0.0], max: [40.0, 10.0] } // TODO
     }
 }
