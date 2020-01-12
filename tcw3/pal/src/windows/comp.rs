@@ -26,7 +26,6 @@ use super::{
     drawutils::{
         extend_matrix3_with_identity_z, winrt_color_from_rgbaf32, winrt_m3x2_from_cgmath,
         winrt_m4x4_from_cgmath, winrt_v2_from_cgmath_pt, winrt_v2_from_cgmath_vec,
-        winrt_v3_from_cgmath_pt, ExtendExt,
     },
     surface,
     utils::{assert_hresult_ok, assert_win32_ok, ComPtr as MyComPtr},

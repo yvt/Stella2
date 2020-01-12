@@ -103,6 +103,7 @@ impl<T: Object> std::ops::Deref for ComPtr<T> {
     }
 }
 
+#[allow(dead_code)]
 impl<T: Object> ComPtr<T> {
     pub unsafe fn new(ptr: NonNull<T>) -> Self {
         Self(ptr)

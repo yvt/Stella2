@@ -1,7 +1,7 @@
 use alt_fp::FloatOrd;
 use cgmath::{Matrix3, Matrix4};
 use winrt::{
-    windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2, Vector3},
+    windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2},
     windows::ui::Color,
 };
 
@@ -57,14 +57,6 @@ pub fn winrt_v2_from_cgmath_vec(v: cgmath::Vector2<f32>) -> Vector2 {
 
 pub fn winrt_v2_from_cgmath_pt(v: cgmath::Point2<f32>) -> Vector2 {
     Vector2 { X: v.x, Y: v.y }
-}
-
-pub fn winrt_v3_from_cgmath_pt(v: cgmath::Point3<f32>) -> Vector3 {
-    Vector3 {
-        X: v.x,
-        Y: v.y,
-        Z: v.z,
-    }
 }
 
 pub fn winrt_color_from_rgbaf32(c: crate::iface::RGBAF32) -> Color {

@@ -300,6 +300,6 @@ unsafe extern "system" fn sink_end_figure(
     }
 }
 
-unsafe extern "system" fn sink_close(this: *mut ID2D1SimplifiedGeometrySink) -> HRESULT {
+unsafe extern "system" fn sink_close(_this: *mut ID2D1SimplifiedGeometrySink) -> HRESULT {
     S_OK
 }

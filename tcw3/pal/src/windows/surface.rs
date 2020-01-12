@@ -18,9 +18,7 @@ use winapi::{
 use winrt::{
     windows::graphics::directx::{DirectXAlphaMode, DirectXPixelFormat},
     windows::graphics::SizeInt32,
-    windows::ui::composition::{
-        CompositionGraphicsDevice, Compositor, ICompositionGraphicsDevice2, ICompositionSurface,
-    },
+    windows::ui::composition::{Compositor, ICompositionGraphicsDevice2, ICompositionSurface},
     ComPtr,
 };
 
@@ -37,7 +35,6 @@ use crate::MtLock;
 
 /// Maps `Bitmap` to `CompositionDrawingSurface`.
 pub struct SurfaceMap {
-    comp_device: ComPtr<CompositionGraphicsDevice>,
     comp_device2: ComPtr<ICompositionGraphicsDevice2>,
     comp_device_interop: MyComPtr<ICompositionGraphicsDeviceInterop>,
 }
@@ -69,9 +66,6 @@ impl SurfaceMap {
             ComPtr::wrap(out.assume_init())
         };
 
-        let comp_device: ComPtr<CompositionGraphicsDevice> =
-            comp_idevice.query_interface().unwrap();
-
         let comp_device2: ComPtr<ICompositionGraphicsDevice2> = comp_idevice
             .query_interface()
             .expect("Could not obtain ICompositionGraphicsDevice2");
@@ -84,7 +78,6 @@ impl SurfaceMap {
         // TODO: listen for device lost events using `RegisterDeviceRemovedEvent`
 
         Self {
-            comp_device,
             comp_device2,
             comp_device_interop,
         }
