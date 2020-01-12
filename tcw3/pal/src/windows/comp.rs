@@ -23,6 +23,7 @@ use winrt::{
 };
 
 use super::{
+    bitmap::Bitmap,
     drawutils::{
         extend_matrix3_with_identity_z, winrt_color_from_rgbaf32, winrt_m3x2_from_cgmath,
         winrt_m4x4_from_cgmath, winrt_v2_from_cgmath_pt, winrt_v2_from_cgmath_vec,
@@ -238,6 +239,9 @@ struct LayerState {
     contents_center: Box2<f32>,
     /// `LayerAttrs::contents_scale`
     contents_scale: f32,
+    /// `LayerAttrs::contents`. `comp.rs` doesn't read this but needs to keep
+    /// it alive so that composition surfaces can be repainted on device lost.
+    _contents: Option<Bitmap>,
 }
 
 pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
@@ -262,6 +266,7 @@ pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
             contents_size: [0.0; 2],
             contents_center: box2! { min: [0.0; 2], max: [1.0; 2] },
             contents_scale: 1.0,
+            _contents: None,
         }),
         tmp: Cell::new(NONE),
     };
@@ -434,6 +439,8 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         } else {
             // TODO: Clear the contents
         }
+
+        state._contents = contents;
     }
 
     if let Some(center) = attrs.contents_center {

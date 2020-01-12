@@ -20,9 +20,12 @@ use winapi::{
     Interface,
 };
 use winrt::{
+    windows::foundation::{EventRegistrationToken, TypedEventHandler},
     windows::graphics::directx::{DirectXAlphaMode, DirectXPixelFormat},
     windows::graphics::SizeInt32,
-    windows::ui::composition::{Compositor, ICompositionGraphicsDevice2, ICompositionSurface},
+    windows::ui::composition::{
+        Compositor, ICompositionGraphicsDevice, ICompositionGraphicsDevice2, ICompositionSurface,
+    },
     ComPtr,
 };
 
@@ -35,12 +38,13 @@ use super::{
         ICompositionDrawingSurfaceInterop, ICompositionGraphicsDeviceInterop, ICompositorInterop,
         ID3D11Device4,
     },
-    Wm,
+    AssertSend, Wm,
 };
 use crate::MtLock;
 
 /// Maps `Bitmap` to `CompositionDrawingSurface`.
 pub struct SurfaceMap {
+    comp_device: ComPtr<ICompositionGraphicsDevice>,
     comp_device2: ComPtr<ICompositionGraphicsDevice2>,
 }
 
@@ -72,14 +76,17 @@ impl SurfaceMap {
             .expect("Could not obtain ICompositionGraphicsDevice2");
 
         let comp_device_interop: MyComPtr<ICompositionGraphicsDeviceInterop> =
-            MyComPtr::iunknown_from_winrt_comptr(comp_idevice)
+            MyComPtr::iunknown_from_winrt_comptr(comp_idevice.clone())
                 .query_interface()
                 .unwrap();
 
         // Listen for device lost events and recreate objects appropriately
         listen_for_device_lost_events(comp_device_interop, d3d_device);
 
-        Self { comp_device2 }
+        Self {
+            comp_device: comp_idevice,
+            comp_device2,
+        }
     }
 }
 
@@ -295,6 +302,19 @@ impl BitmapCompRepr {
     }
 }
 
+/// Unregisters an event handler of `RenderingDeviceReplaced` when dropped.
+struct RenderingDeviceReplacedEventRegistration {
+    comp_device: ComPtr<ICompositionGraphicsDevice>,
+    token: EventRegistrationToken,
+}
+
+impl Drop for RenderingDeviceReplacedEventRegistration {
+    fn drop(&mut self) {
+        self.comp_device
+            .remove_rendering_device_replaced(self.token);
+    }
+}
+
 impl SurfaceMap {
     /// Get an `ICompositionSurface` for a given `Bitmap`. May cache the
     /// surface.
@@ -312,10 +332,7 @@ impl SurfaceMap {
     }
 
     /// Construct a `BitmapCompReprInner` for a given `Bitmap`.
-    fn realize_bitmap(
-        &self,
-        bmp: &Bitmap,
-    ) -> Result<Box<BitmapCompReprInner>, DeviceLost> {
+    fn realize_bitmap(&self, bmp: &Bitmap) -> Result<Box<BitmapCompReprInner>, DeviceLost> {
         use crate::iface::Bitmap;
         use std::convert::TryInto;
         let size = bmp.size();
@@ -335,82 +352,115 @@ impl SurfaceMap {
             .map_err(assert_winrt_devlost)?
             .unwrap();
 
-        // TODO: Use `CompositionGraphicsDevice::RenderingDeviceReplaced`
-
         let cdsurf_interop: MyComPtr<ICompositionDrawingSurfaceInterop> =
             MyComPtr::iunknown_from_winrt_comptr(cdsurf.clone())
                 .query_interface()
                 .unwrap();
 
-        // Retrieve a reference to the backing surface
-        let (d2d_dc_cp, offset): (MyComPtr<ID2D1DeviceContext>, POINT) = unsafe {
-            let mut out = MaybeUninit::uninit();
-            let mut out_offset = MaybeUninit::uninit();
-            assert_hresult_ok_or_devlost(cdsurf_interop.BeginDraw(
-                null(),
-                &ID2D1DeviceContext::uuidof(),
-                out.as_mut_ptr() as _,
-                out_offset.as_mut_ptr(),
-            ))?;
-            (
-                MyComPtr::from_ptr_unchecked(out.assume_init()),
-                out_offset.assume_init(),
+        // Repaint the surface whenever a `RenderingDeviceReplaced`
+        // event is raised
+        let token = {
+            let bmp = bmp.clone();
+            let cdsurf_interop = AssertSend(cdsurf_interop.clone());
+            self.comp_device
+                .add_rendering_device_replaced(&TypedEventHandler::new(move |_, _| {
+                    // If it fails with `DeviceLost`, we'll receive another
+                    // `RenderingDeviceReplaced` event soon
+                    let _ = paint_surface(&bmp, &cdsurf_interop.0, size);
+                    Ok(())
+                }))
+                .unwrap()
+        };
+
+        let event_registration = RenderingDeviceReplacedEventRegistration {
+            comp_device: self.comp_device.clone(),
+            token,
+        };
+
+        // Paint the surface for the first time
+        paint_surface(bmp, &cdsurf_interop, size)?;
+
+        let surf: ComPtr<ICompositionSurface> = cdsurf.query_interface().unwrap();
+
+        Ok(Box::new(BitmapCompReprInner {
+            surf,
+            event_registration,
+        }))
+    }
+}
+
+/// Draw the contents of a given `CompositionDrawingSurface`.
+fn paint_surface(
+    bmp: &Bitmap,
+    cdsurf_interop: &ICompositionDrawingSurfaceInterop,
+    size: [u32; 2],
+) -> Result<(), DeviceLost> {
+    // Retrieve a reference to the backing surface
+    let (d2d_dc_cp, offset): (MyComPtr<ID2D1DeviceContext>, POINT) = unsafe {
+        let mut out = MaybeUninit::uninit();
+        let mut out_offset = MaybeUninit::uninit();
+        assert_hresult_ok_or_devlost(cdsurf_interop.BeginDraw(
+            null(),
+            &ID2D1DeviceContext::uuidof(),
+            out.as_mut_ptr() as _,
+            out_offset.as_mut_ptr(),
+        ))?;
+        (
+            MyComPtr::from_ptr_unchecked(out.assume_init()),
+            out_offset.assume_init(),
+        )
+    };
+
+    // Draw into the Direct2D DC
+    {
+        let mut d2d_dc = unsafe { direct2d::DeviceContext::from_raw(d2d_dc_cp.as_ptr()) };
+        std::mem::forget(d2d_dc_cp); // ownership moved to `DeviceContext`
+
+        d2d_dc.clear((0, 0.0));
+
+        // Createa  `Bitmap` from `bmp`
+        let in_bitmap_data = bmp.inner.lock();
+        let in_bitmap_slice = unsafe {
+            std::slice::from_raw_parts(
+                in_bitmap_data.as_ptr(),
+                in_bitmap_data.size()[1] as usize * in_bitmap_data.stride() as usize,
             )
         };
 
-        // Draw into the Direct2D DC
-        {
-            let mut d2d_dc = unsafe { direct2d::DeviceContext::from_raw(d2d_dc_cp.as_ptr()) };
-            std::mem::forget(d2d_dc_cp); // ownership moved to `DeviceContext`
+        let bitmap = direct2d::image::Bitmap::create(&d2d_dc)
+            .with_raw_data(
+                SizeU(D2D_SIZE_U {
+                    width: size[0],
+                    height: size[1],
+                }),
+                in_bitmap_slice,
+                in_bitmap_data.stride(),
+            )
+            .with_format(dxgi::Format::B8G8R8A8Unorm)
+            .with_alpha_mode(direct2d::enums::AlphaMode::Premultiplied)
+            .build()
+            .map_err(assert_d2d_devlost)?;
 
-            d2d_dc.clear((0, 0.0));
-
-            // Createa  `Bitmap` from `bmp`
-            let in_bitmap_data = bmp.inner.lock();
-            let in_bitmap_slice = unsafe {
-                std::slice::from_raw_parts(
-                    in_bitmap_data.as_ptr(),
-                    in_bitmap_data.size()[1] as usize * in_bitmap_data.stride() as usize,
-                )
-            };
-
-            let bitmap = direct2d::image::Bitmap::create(&d2d_dc)
-                .with_raw_data(
-                    SizeU(D2D_SIZE_U {
-                        width: size[0],
-                        height: size[1],
-                    }),
-                    in_bitmap_slice,
-                    in_bitmap_data.stride(),
-                )
-                .with_format(dxgi::Format::B8G8R8A8Unorm)
-                .with_alpha_mode(direct2d::enums::AlphaMode::Premultiplied)
-                .build()
-                .map_err(assert_d2d_devlost)?;
-
-            // Draw the bitmap into the DC
-            let in_rect = (0.0, 0.0, size[0] as f32, size[1] as f32);
-            let out_rect = (
-                offset.x as f32,
-                offset.y as f32,
-                (size[0] + offset.x as u32) as f32,
-                (size[1] + offset.y as u32) as f32,
-            );
-            d2d_dc.draw_bitmap(
-                &bitmap,
-                out_rect,
-                1.0,
-                direct2d::enums::BitmapInterpolationMode::NearestNeighbor,
-                in_rect,
-            );
-        }
-
-        assert_hresult_ok_or_devlost(unsafe { cdsurf_interop.EndDraw() })?;
-
-        let surf = cdsurf.query_interface().unwrap();
-
-        Ok(Box::new(BitmapCompReprInner { surf }))
+        // Draw the bitmap into the DC
+        let in_rect = (0.0, 0.0, size[0] as f32, size[1] as f32);
+        let out_rect = (
+            offset.x as f32,
+            offset.y as f32,
+            (size[0] + offset.x as u32) as f32,
+            (size[1] + offset.y as u32) as f32,
+        );
+        d2d_dc.draw_bitmap(
+            &bitmap,
+            out_rect,
+            1.0,
+            direct2d::enums::BitmapInterpolationMode::NearestNeighbor,
+            in_rect,
+        );
     }
+
+    assert_hresult_ok_or_devlost(unsafe { cdsurf_interop.EndDraw() })?;
+
+    Ok(())
 }
 
 /// Represents an error that will be resolved by recreating a DXGI device
