@@ -111,7 +111,7 @@ pub(super) fn init(_: Wm) {
 pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
     let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
 
-    let hwnd = unsafe {
+    let hwnd = assert_win32_nonnull(unsafe {
         winuser::CreateWindowExW(
             winuser::WS_EX_NOREDIRECTIONBITMAP,
             WND_CLASS.as_ptr(),
@@ -126,9 +126,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             hinstance,
             null_mut(),
         )
-    };
-
-    assert_win32_nonnull(hwnd as _);
+    });
 
     let comp_wnd = comp::CompWnd::new(wm, hwnd);
 

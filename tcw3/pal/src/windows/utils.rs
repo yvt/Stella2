@@ -31,9 +31,25 @@ pub fn assert_win32_ok<T: Default + PartialEq<T> + Copy>(b: T) {
 
 /// Panic with an error code returned by `GetLastError` if the
 /// given pointer is null.
-pub fn assert_win32_nonnull<T: ?Sized>(b: *const T) {
+pub fn assert_win32_nonnull<T: IsNull>(b: T) -> T {
     if b.is_null() {
         panic_last_error();
+    }
+    b
+}
+
+pub trait IsNull {
+    fn is_null(&self) -> bool;
+}
+
+impl<T: ?Sized> IsNull for *const T {
+    fn is_null(&self) -> bool {
+        (*self).is_null()
+    }
+}
+impl<T: ?Sized> IsNull for *mut T {
+    fn is_null(&self) -> bool {
+        (*self).is_null()
     }
 }
 

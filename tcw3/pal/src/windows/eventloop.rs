@@ -309,8 +309,7 @@ fn init_main_thread() {
         )
     });
 
-    let cur_hthread = unsafe { cur_hthread.assume_init() };
-    assert_win32_nonnull(cur_hthread as _);
+    let cur_hthread = assert_win32_nonnull(unsafe { cur_hthread.assume_init() });
 
     if MSG_HWND.compare_and_swap(0, hwnd as usize, Ordering::Relaxed) != 0 {
         panic!("MSG_HWND is already set - possible race condition");
