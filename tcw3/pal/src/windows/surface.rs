@@ -271,22 +271,26 @@ fn register_event_cb<T: FnOnce(HANDLE) + Send>(f: T) -> HANDLE {
 
 /// The compositor representation of a `Bitmap`. Stored in `Bitmap`.
 pub(super) struct BitmapCompRepr {
-    surf: MtLock<SetOnce<ComPtr<ICompositionSurface>>>,
+    inner: MtLock<SetOnce<Box<BitmapCompReprInner>>>,
 }
 
-// Assert `SetOnce<ComPtr<ICompositionSurface>` is sendable, i.e.,
-// its destructor can run in any thread. (Otherwise, how could it be released
-// in a managed environment?)
+struct BitmapCompReprInner {
+    surf: ComPtr<ICompositionSurface>,
+    event_registration: RenderingDeviceReplacedEventRegistration,
+}
+
+// The referenced objects (`CompositionSurface`)
+// are agile, thus can be accessed from any thread. `winrt-rust`'s code
+// generator does not take agility into account at the moment.
 //
-// `MtSticky` doesn't require these, but instead requires the existence of
-// a main thread at the point of dropping.
-unsafe impl Send for BitmapCompRepr {}
-unsafe impl Sync for BitmapCompRepr {}
+// `MtSticky` would allow us to get rid of this, but instead
+// would require the existence of a main thread at the point of dropping.
+unsafe impl Send for BitmapCompReprInner {}
 
 impl BitmapCompRepr {
     pub(super) fn new() -> Self {
         Self {
-            surf: MtLock::new(SetOnce::empty()),
+            inner: MtLock::new(SetOnce::empty()),
         }
     }
 }
@@ -295,23 +299,23 @@ impl SurfaceMap {
     /// Get an `ICompositionSurface` for a given `Bitmap`. May cache the
     /// surface.
     pub fn get_surface_for_bitmap(&self, wm: Wm, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
-        let surf_cell = bmp.inner.comp_repr.surf.get_with_wm(wm);
+        let inner_cell = bmp.inner.comp_repr.inner.get_with_wm(wm);
 
-        if let Some(surf) = surf_cell.as_inner_ref() {
-            // Clone from `surf_cell`
-            unsafe { surf.AddRef() };
-            return unsafe { ComPtr::wrap(surf as *const _ as *mut _) };
+        if let Some(inner) = inner_cell.as_inner_ref() {
+            return inner.surf.clone();
         }
 
-        let surf = repeat_until_devlost_is_resolved(|| self.new_surface_for_bitmap(bmp));
-        let _ = surf_cell.store(Some(ComPtr::clone(&surf)));
+        let inner = repeat_until_devlost_is_resolved(|| self.realize_bitmap(bmp));
+        let surf = inner.surf.clone();
+        let _ = inner_cell.store(Some(inner));
         surf
     }
 
-    fn new_surface_for_bitmap(
+    /// Construct a `BitmapCompReprInner` for a given `Bitmap`.
+    fn realize_bitmap(
         &self,
         bmp: &Bitmap,
-    ) -> Result<ComPtr<ICompositionSurface>, DeviceLost> {
+    ) -> Result<Box<BitmapCompReprInner>, DeviceLost> {
         use crate::iface::Bitmap;
         use std::convert::TryInto;
         let size = bmp.size();
@@ -403,7 +407,9 @@ impl SurfaceMap {
 
         assert_hresult_ok_or_devlost(unsafe { cdsurf_interop.EndDraw() })?;
 
-        Ok(cdsurf.query_interface().unwrap())
+        let surf = cdsurf.query_interface().unwrap();
+
+        Ok(Box::new(BitmapCompReprInner { surf }))
     }
 }
 
