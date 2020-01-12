@@ -307,6 +307,7 @@ pub struct BitmapBuilder {
     gr: UniqueGpGraphics,
     path: UniqueGpPath,
     brush: UniqueGpSolidFill,
+    brush2: UniqueGpSolidFill,
     pen: UniqueGpPen,
     mat: UniqueGpMatrix,
     state_stack: ArrayVec<[GraphicsState; 16]>,
@@ -341,6 +342,11 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
                 create_gp_obj_with(|out| gp::GdipCreateSolidFill(0xffffffff, out))
             },
         };
+        let brush2 = UniqueGpSolidFill {
+            gp_solid_fill: unsafe {
+                create_gp_obj_with(|out| gp::GdipCreateSolidFill(0xffffffff, out))
+            },
+        };
 
         let pen = UniqueGpPen {
             gp_pen: unsafe {
@@ -359,6 +365,7 @@ impl iface::BitmapBuilderNew for BitmapBuilder {
             gr,
             path,
             brush,
+            brush2,
             pen,
             mat,
             state_stack: ArrayVec::new(),

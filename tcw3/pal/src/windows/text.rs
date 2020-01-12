@@ -1,3 +1,4 @@
+use alt_fp::FloatOrd;
 use cggeom::Box2;
 use directwrite::{enums::FontWeight, factory::Factory};
 use std::fmt;
@@ -103,7 +104,7 @@ impl iface::TextLayout for TextLayout {
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
         let dwrite_layout = directwrite::TextLayout::create(&G.dwrite)
             .with_text(text)
-            .with_width(width.unwrap_or(std::f32::INFINITY))
+            .with_width(width.unwrap_or(std::f32::INFINITY).fmax(0.0))
             .with_height(0.0)
             .with_font(&style.to_dwrite_format())
             .build()
