@@ -115,8 +115,8 @@ impl iface::Bitmap for Bitmap {
 pub(super) struct BitmapInner {
     gp_bmp: *mut GpBitmap,
 
-    /// The cached surface created in `surface.rs`.
-    pub(super) surf_ptr: surface::SurfacePtrCell,
+    /// The compositor representation of the bitmap created in `surface.rs`.
+    pub(super) comp_repr: surface::BitmapCompRepr,
 }
 
 // I just assume that GDI+ objects only require object-granular external
@@ -147,9 +147,9 @@ impl BitmapInner {
             })
         };
 
-        let surf_ptr = surface::new_surface_ptr_cell();
+        let comp_repr = surface::BitmapCompRepr::new();
 
-        Self { gp_bmp, surf_ptr }
+        Self { gp_bmp, comp_repr }
     }
 
     fn size(&self) -> [u32; 2] {

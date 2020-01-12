@@ -269,8 +269,8 @@ fn register_event_cb<T: FnOnce(HANDLE) + Send>(f: T) -> HANDLE {
     evt
 }
 
-/// Stored in `Bitmap`
-pub(super) struct SurfacePtrCell {
+/// The compositor representation of a `Bitmap`. Stored in `Bitmap`.
+pub(super) struct BitmapCompRepr {
     surf: MtLock<SetOnce<ComPtr<ICompositionSurface>>>,
 }
 
@@ -280,12 +280,14 @@ pub(super) struct SurfacePtrCell {
 //
 // `MtSticky` doesn't require these, but instead requires the existence of
 // a main thread at the point of dropping.
-unsafe impl Send for SurfacePtrCell {}
-unsafe impl Sync for SurfacePtrCell {}
+unsafe impl Send for BitmapCompRepr {}
+unsafe impl Sync for BitmapCompRepr {}
 
-pub(super) fn new_surface_ptr_cell() -> SurfacePtrCell {
-    SurfacePtrCell {
-        surf: MtLock::new(SetOnce::empty()),
+impl BitmapCompRepr {
+    pub(super) fn new() -> Self {
+        Self {
+            surf: MtLock::new(SetOnce::empty()),
+        }
     }
 }
 
@@ -293,7 +295,7 @@ impl SurfaceMap {
     /// Get an `ICompositionSurface` for a given `Bitmap`. May cache the
     /// surface.
     pub fn get_surface_for_bitmap(&self, wm: Wm, bmp: &Bitmap) -> ComPtr<ICompositionSurface> {
-        let surf_cell = bmp.inner.surf_ptr.surf.get_with_wm(wm);
+        let surf_cell = bmp.inner.comp_repr.surf.get_with_wm(wm);
 
         if let Some(surf) = surf_cell.as_inner_ref() {
             // Clone from `surf_cell`
