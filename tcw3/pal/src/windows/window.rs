@@ -779,8 +779,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 fn lparam_to_mouse_loc(hwnd: HWND, lparam: LPARAM, is_screen: bool) -> cgmath::Point2<f32> {
     let lparam = lparam as DWORD;
     let mut loc_phy = POINT {
-        x: LOWORD(lparam) as LONG,
-        y: HIWORD(lparam) as LONG,
+        x: LOWORD(lparam) as i16 as LONG, // `GET_X_LPARAM(lparam) as LONG`
+        y: HIWORD(lparam) as i16 as LONG, // `GET_Y_LPARAM(lparam) as LONG`
     };
 
     if is_screen {
