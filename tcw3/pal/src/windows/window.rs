@@ -26,6 +26,15 @@ use crate::{iface, iface::Wm as WmTrait};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
 
+/// Mouse buttons
+mod buttons {
+    pub const L: u8 = 0;
+    pub const R: u8 = 1;
+    pub const M: u8 = 2;
+    pub const X1: u8 = 3;
+    pub const X2: u8 = 4;
+}
+
 #[derive(Debug, Clone)]
 pub struct HWnd {
     wnd: Rc<Wnd>,
@@ -48,7 +57,6 @@ impl std::hash::Hash for HWnd {
 struct Wnd {
     hwnd: Cell<HWND>,
     // TODO: Raise the following events:
-    // - mouse_drag
     // - scroll_motion
     // - scroll_gesture
     listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
@@ -58,6 +66,8 @@ struct Wnd {
     max_size: Cell<[u32; 2]>,
     /// Used by `FrameClockManager` through the trait `FrameClockClient`
     update_ready_pending: Cell<bool>,
+
+    drag_state: RefCell<Option<MouseDragState>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -71,6 +81,11 @@ impl fmt::Debug for Wnd {
             .field("max_size", &self.max_size)
             .finish()
     }
+}
+
+struct MouseDragState {
+    listener: Rc<dyn iface::MouseDragListener<Wm>>,
+    pressed_buttons: u8,
 }
 
 /// Hard-coded limit for window size for various calculations not to overflow
@@ -139,6 +154,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             min_size: Cell::new([0; 2]),
             max_size: Cell::new([MAX_WND_SIZE; 2]),
             update_ready_pending: Cell::new(false),
+            drag_state: RefCell::new(None),
         }),
     };
 
@@ -581,14 +597,150 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
             let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi));
 
+            let drag_state_cell = pal_hwnd.wnd.drag_state.borrow();
+            if let Some(drag_state) = &*drag_state_cell {
+                let drag_listener = Rc::clone(&drag_state.listener);
+                drop(drag_state_cell);
+
+                drag_listener.mouse_motion(wm, &pal_hwnd, loc.into());
+                return 0;
+            } else {
+                drop(drag_state_cell);
+            }
+
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.mouse_motion(wm, &pal_hwnd, loc.into());
+
+            return 0;
         } // WM_MOUSEMOVE
 
         winuser::WM_MOUSELEAVE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.mouse_leave(wm, &pal_hwnd);
         } // WM_MOUSELEAVE
+
+        // TODO: Use the pointer API (https://docs.microsoft.com/en-us/previous-versions/windows/desktop/inputmsg/messages-and-notifications)
+        winuser::WM_LBUTTONDOWN
+        | winuser::WM_RBUTTONDOWN
+        | winuser::WM_MBUTTONDOWN
+        | winuser::WM_XBUTTONDOWN => {
+            let button = match msg {
+                winuser::WM_LBUTTONDOWN => buttons::L,
+                winuser::WM_RBUTTONDOWN => buttons::R,
+                winuser::WM_MBUTTONDOWN => buttons::M,
+                winuser::WM_XBUTTONDOWN => match HIWORD(wparam as _) {
+                    1 => buttons::X1,
+                    2 => buttons::X2,
+                    _ => return 0,
+                },
+                _ => unreachable!(),
+            };
+            let button_mask = 1u8 << button;
+
+            let lparam = lparam as DWORD;
+            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
+
+            // Convert to logical pixels
+            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi)).into();
+
+            let mut drag_state_cell = pal_hwnd.wnd.drag_state.borrow_mut();
+
+            let drag_state = if let Some(drag_state) = &mut *drag_state_cell {
+                drag_state
+            } else {
+                // Unborrow `drag_state_cell` before calling into user code
+                let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+                drop(drag_state_cell);
+
+                // Create `MouseDragState`
+                let drag_state = MouseDragState {
+                    listener: listener.mouse_drag(wm, &pal_hwnd, loc, button).into(),
+                    pressed_buttons: 0,
+                };
+
+                unsafe { winuser::SetCapture(hwnd) };
+
+                // Re-borrow `drag_state_cell` and set `drag_state`
+                drag_state_cell = pal_hwnd.wnd.drag_state.borrow_mut();
+                debug_assert!(drag_state_cell.is_none());
+                *drag_state_cell = Some(drag_state);
+                drag_state_cell.as_mut().unwrap()
+            };
+
+            if (drag_state.pressed_buttons & button_mask) != 0 {
+                return 0;
+            }
+            drag_state.pressed_buttons |= button_mask;
+
+            // Call `MouseDragListener::mouse_down`
+            let drag_listener = Rc::clone(&drag_state.listener);
+
+            drop(drag_state_cell);
+            drag_listener.mouse_down(wm, &pal_hwnd, loc, button);
+
+            return 0;
+        } // WM_LBUTTONDOWN | ...
+
+        winuser::WM_LBUTTONUP
+        | winuser::WM_RBUTTONUP
+        | winuser::WM_MBUTTONUP
+        | winuser::WM_XBUTTONUP => {
+            let button = match msg {
+                winuser::WM_LBUTTONUP => buttons::L,
+                winuser::WM_RBUTTONUP => buttons::R,
+                winuser::WM_MBUTTONUP => buttons::M,
+                winuser::WM_XBUTTONUP => match HIWORD(wparam as _) {
+                    1 => buttons::X1,
+                    2 => buttons::X2,
+                    _ => return 0,
+                },
+                _ => unreachable!(),
+            };
+            let button_mask = 1u8 << button;
+
+            let lparam = lparam as DWORD;
+            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
+
+            // Convert to logical pixels
+            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi)).into();
+
+            let mut drag_state_cell = pal_hwnd.wnd.drag_state.borrow_mut();
+            let drag_state = if let Some(drag_state) = &mut *drag_state_cell {
+                drag_state
+            } else {
+                return 0;
+            };
+
+            if (drag_state.pressed_buttons & button_mask) == 0 {
+                return 0;
+            }
+            drag_state.pressed_buttons &= !button_mask;
+
+            let (drag_listener, release) = if drag_state.pressed_buttons == 0 {
+                // Remove `MouseDragState` from `Wnd`
+                (drag_state_cell.take().unwrap().listener, true)
+            } else {
+                (Rc::clone(&drag_state.listener), false)
+            };
+
+            // Call `MouseDragListener::mouse_up`
+            drop(drag_state_cell);
+            drag_listener.mouse_up(wm, &pal_hwnd, loc, button);
+
+            // `ReleaseCapture` will generate a `WM_CAPTURECHANGED` message, so
+            // it should be called last
+            if release {
+                unsafe { winuser::ReleaseCapture() };
+            }
+        } // WM_LBUTTONUP | ...
+
+        winuser::WM_CAPTURECHANGED => {
+            if let Some(drag_state) = pal_hwnd.wnd.drag_state.borrow_mut().take() {
+                drag_state.listener.cancel(wm, &pal_hwnd);
+            }
+        } // WM_CAPTURECHANGED
 
         winuser::WM_SIZE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
