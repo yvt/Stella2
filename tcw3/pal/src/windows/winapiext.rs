@@ -3,8 +3,9 @@
 use std::os::raw::c_int;
 use winapi::{
     shared::{
-        guiddef::REFIID,
-        minwindef::{BOOL, DWORD},
+        guiddef::{GUID, REFIID},
+        minwindef::{BOOL, DWORD, UINT},
+        ntdef::LPCWSTR,
         windef::{HWND, POINT, RECT, SIZE},
     },
     um::{
@@ -14,7 +15,10 @@ use winapi::{
     },
     RIDL,
 };
-use winrt::windows::ui::composition::{desktop::IDesktopWindowTarget, ICompositionGraphicsDevice};
+use winrt::{
+    windows::graphics::effects::IGraphicsEffectSource,
+    windows::ui::composition::{desktop::IDesktopWindowTarget, ICompositionGraphicsDevice},
+};
 
 pub enum Never {}
 
@@ -127,3 +131,51 @@ interface ICompositionDrawingSurfaceInterop(ICompositionDrawingSurfaceInteropVtb
     fn ResumeDraw() -> HRESULT,
     fn SuspendDraw() -> HRESULT,
 }}
+
+RIDL! {#[uuid(0x2FC57384, 0xA068, 0x44D7, 0xA3, 0x31, 0x30, 0x98, 0x2F, 0xCF, 0x71, 0x77)]
+interface IGraphicsEffectD2D1Interop(IGraphicsEffectD2D1InteropVtbl):
+    IUnknown(IUnknownVtbl) {
+    fn GetEffectId(
+        out: *mut GUID,
+    ) -> HRESULT,
+
+    fn GetNamedPropertyMapping(
+        name: LPCWSTR,
+        index: *mut UINT,
+        mapping: *mut GRAPHICS_EFFECT_PROPERTY_MAPPING,
+    ) -> HRESULT,
+
+    fn GetPropertyCount(
+        count: *mut UINT,
+    ) -> HRESULT,
+
+    fn GetProperty(
+        index: UINT,
+        value: *mut *mut winrt::windows::foundation::IPropertyValue,
+    ) -> HRESULT,
+
+    fn GetSource(
+        index: UINT,
+        source: *mut *mut IGraphicsEffectSource,
+    ) -> HRESULT,
+
+    fn GetSourceCount(
+        count: *mut UINT,
+    ) -> HRESULT,
+}}
+
+#[repr(C)]
+#[allow(dead_code)]
+pub enum GRAPHICS_EFFECT_PROPERTY_MAPPING {
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_UNKNOWN = 0,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_DIRECT,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_VECTORX,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_VECTORY,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_VECTORZ,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_VECTORW,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_RECT_TO_VECTOR4,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_RADIANS_TO_DEGREES,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_COLORMATRIX_ALPHA_MODE,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_COLOR_TO_VECTOR3,
+    GRAPHICS_EFFECT_PROPERTY_MAPPING_COLOR_TO_VECTOR4,
+}

@@ -15,11 +15,12 @@ use winrt::{
     windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2, Vector3},
     windows::ui::composition::{
         desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
-        CompositionGeometry, CompositionNineGridBrush, CompositionRectangleGeometry,
-        CompositionStretch, CompositionSurfaceBrush, Compositor, ContainerVisual,
-        ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
+        CompositionEffectBrush, CompositionGeometry, CompositionNineGridBrush,
+        CompositionRectangleGeometry, CompositionStretch, CompositionSurfaceBrush, Compositor,
+        ContainerVisual, ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5,
+        ICompositor6, Visual,
     },
-    ComPtr, RtDefaultConstructible, RtType,
+    ComPtr, FastHString, RtDefaultConstructible, RtType,
 };
 
 use super::{
@@ -35,12 +36,15 @@ use super::{
 };
 use crate::{iface::LayerFlags, prelude::MtLazyStatic};
 
+mod gaussianblureffect;
+
 struct CompState {
     comp: ComPtr<Compositor>,
     comp2: ComPtr<ICompositor2>,
     comp5: ComPtr<ICompositor5>,
     comp6: ComPtr<ICompositor6>,
     comp_desktop: MyComPtr<ICompositorDesktopInterop>,
+    fx_brush: ComPtr<CompositionBrush>,
     surface_map: surface::SurfaceMap,
 }
 
@@ -60,8 +64,8 @@ impl CompState {
 
         let surface_map = surface::SurfaceMap::new(&comp);
 
-        // We need `ICompositor2` for `CreateLayerVisual` and
-        // `CreateNineGridBrush`
+        // We need `ICompositor2` for `CreateLayerVisual`,
+        // `CreateNineGridBrush`, and `CreateBackdropBrush`
         let comp2: ComPtr<ICompositor2> = comp
             .query_interface()
             .expect("Could not obtain ICompositor2");
@@ -76,12 +80,31 @@ impl CompState {
             .query_interface()
             .expect("Could not obtain ICompositor6");
 
+        // Create a brush for the "blur behind" effect
+        let fx = gaussianblureffect::GaussianBlurEffect::new();
+        let fx_factory = comp
+            .create_effect_factory(&fx.query_interface().unwrap())
+            .unwrap()
+            .unwrap();
+        let fx_ebrush: ComPtr<CompositionEffectBrush> = fx_factory.create_brush().unwrap().unwrap();
+
+        let bd_brush = comp2.create_backdrop_brush().unwrap().unwrap();
+        fx_ebrush
+            .set_source_parameter(
+                &FastHString::new("source"),
+                &bd_brush.query_interface().unwrap(),
+            )
+            .unwrap();
+
+        let fx_brush: ComPtr<CompositionBrush> = fx_ebrush.query_interface().unwrap();
+
         CompState {
             comp,
             comp2,
             comp5,
             comp6,
             comp_desktop,
+            fx_brush,
             surface_map,
         }
     }
@@ -100,6 +123,7 @@ pub(super) struct CompWnd {
     target: ComPtr<ICompositionTarget>,
     root_vis: ComPtr<Visual>,
     root_cvis: ComPtr<ContainerVisual>,
+    blur_vis: ComPtr<Visual>,
 }
 
 impl fmt::Debug for CompWnd {
@@ -130,12 +154,20 @@ impl CompWnd {
 
         target.set_root(&root_vis).unwrap();
 
+        // Blur behind
+        let blur_svis = cs.comp.create_sprite_visual().unwrap().unwrap();
+        let blur_vis: ComPtr<Visual> = blur_svis.query_interface().unwrap();
+
+        blur_svis.set_brush(&cs.fx_brush).unwrap();
+
         let this = Self {
             target,
             root_vis,
             root_cvis,
+            blur_vis,
         };
 
+        this.set_layer(None);
         this.handle_dpi_change(hwnd);
 
         this
@@ -145,6 +177,8 @@ impl CompWnd {
         let children = self.root_cvis.get_children().unwrap().unwrap();
 
         children.remove_all().unwrap();
+
+        children.insert_at_top(&self.blur_vis).unwrap();
 
         if let Some(hlayer) = &hlayer {
             children.insert_at_top(&hlayer.layer.container_vis).unwrap();
@@ -161,6 +195,26 @@ impl CompWnd {
                 X: scale,
                 Y: scale,
                 Z: 1.0,
+            })
+            .unwrap();
+
+        self.handle_resize(hwnd);
+    }
+
+    pub(super) fn handle_resize(&self, hwnd: HWND) {
+        let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+        assert_win32_ok(dpi);
+
+        let rect = unsafe {
+            let mut rect = MaybeUninit::uninit();
+            assert_win32_ok(winuser::GetClientRect(hwnd, rect.as_mut_ptr()));
+            rect.assume_init()
+        };
+
+        self.blur_vis
+            .set_size(Vector2 {
+                X: (((rect.right - rect.left) as u32 * 96 + dpi - 1) / dpi) as f32,
+                Y: (((rect.bottom - rect.top) as u32 * 96 + dpi - 1) / dpi) as f32,
             })
             .unwrap();
     }

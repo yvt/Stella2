@@ -760,6 +760,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
         } // WM_MOUSEWHEEL
 
         winuser::WM_SIZE => {
+            pal_hwnd.wnd.comp_wnd.handle_resize(hwnd);
+
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.resize(wm, &pal_hwnd);
         } // WM_SIZE
