@@ -26,6 +26,7 @@ iota = "0.2.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 stella2_windres = { path = "../res/windres" }
+winapi = { version = "0.3.8", features = ["winuser", "libloaderapi"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.3"

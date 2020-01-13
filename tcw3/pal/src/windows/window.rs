@@ -6,13 +6,14 @@ use std::{
     mem::{size_of, MaybeUninit},
     ptr::null_mut,
     rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use wchar::wch_c;
 use winapi::{
     shared::{
         minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
         ntdef::LONG,
-        windef::{HCURSOR, HWND, POINT, RECT, SIZE},
+        windef::{HCURSOR, HICON, HWND, POINT, RECT, SIZE},
     },
     um::{libloaderapi, winuser},
 };
@@ -97,6 +98,16 @@ impl HWnd {
     }
 }
 
+static APP_HICON: AtomicUsize = AtomicUsize::new(0);
+
+/// Set the icon used in application windows.
+///
+/// This function should be called before the main thread is initialized
+/// to be effective.
+pub unsafe fn set_app_hicon(hicon: HICON) {
+    APP_HICON.store(hicon as _, Ordering::Relaxed);
+}
+
 /// Perform a one-time initialization for this module.
 ///
 /// (`mt_lazy_static!` would be a better choice for module decoupling, but
@@ -112,7 +123,7 @@ pub(super) fn init(_: Wm) {
         lpszClassName: WND_CLASS.as_ptr(),
         cbClsExtra: 0,
         cbWndExtra: 0,
-        hIcon: null_mut(),
+        hIcon: APP_HICON.load(Ordering::Relaxed) as _,
         hCursor: null_mut(),
         hbrBackground: null_mut(),
         lpszMenuName: null_mut(),

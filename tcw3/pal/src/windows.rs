@@ -1,4 +1,10 @@
 //! The Windows backend.
+//!
+//! # Backend-specific Features
+//!
+//! This backend provides a function named [`set_app_hicon`] that allows
+//! an application to provide its own window icon. The icon is applied to all
+//! windows created by `Wm::new_wnd`.
 use super::iface;
 use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
@@ -19,7 +25,7 @@ pub use self::{
     comp::HLayer,
     eventloop::HInvoke,
     text::{CharStyle, CharStyleAttrs, TextLayout},
-    window::HWnd,
+    window::{set_app_hicon, HWnd},
 };
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;

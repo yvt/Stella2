@@ -2104,6 +2104,7 @@ dependencies = [
  "stvg_tcw3 0.1.0",
  "subscriber_list 0.1.0",
  "tcw3 0.1.0",
+ "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
 ]
 
 [[package]]
