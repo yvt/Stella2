@@ -311,7 +311,8 @@ struct RenderingDeviceReplacedEventRegistration {
 impl Drop for RenderingDeviceReplacedEventRegistration {
     fn drop(&mut self) {
         self.comp_device
-            .remove_rendering_device_replaced(self.token);
+            .remove_rendering_device_replaced(self.token)
+            .unwrap();
     }
 }
 
