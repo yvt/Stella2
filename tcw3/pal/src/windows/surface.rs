@@ -283,7 +283,7 @@ pub(super) struct BitmapCompRepr {
 
 struct BitmapCompReprInner {
     surf: ComPtr<ICompositionSurface>,
-    event_registration: RenderingDeviceReplacedEventRegistration,
+    _event_registration: RenderingDeviceReplacedEventRegistration,
 }
 
 // The referenced objects (`CompositionSurface`)
@@ -385,7 +385,7 @@ impl SurfaceMap {
 
         Ok(Box::new(BitmapCompReprInner {
             surf,
-            event_registration,
+            _event_registration: event_registration,
         }))
     }
 }
