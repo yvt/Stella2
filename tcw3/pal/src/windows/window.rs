@@ -588,26 +588,21 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 assert_win32_ok(winuser::TrackMouseEvent(&mut te));
             }
 
-            let lparam = lparam as DWORD;
-            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
-
-            // Convert to logical pixels
-            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi));
+            let loc = lparam_to_mouse_loc(hwnd, lparam, false);
 
             let drag_state_cell = pal_hwnd.wnd.drag_state.borrow();
             if let Some(drag_state) = &*drag_state_cell {
                 let drag_listener = Rc::clone(&drag_state.listener);
                 drop(drag_state_cell);
 
-                drag_listener.mouse_motion(wm, &pal_hwnd, loc.into());
+                drag_listener.mouse_motion(wm, &pal_hwnd, loc);
                 return 0;
             } else {
                 drop(drag_state_cell);
             }
 
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
-            listener.mouse_motion(wm, &pal_hwnd, loc.into());
+            listener.mouse_motion(wm, &pal_hwnd, loc);
 
             return 0;
         } // WM_MOUSEMOVE
@@ -634,13 +629,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 _ => unreachable!(),
             };
             let button_mask = 1u8 << button;
-
-            let lparam = lparam as DWORD;
-            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
-
-            // Convert to logical pixels
-            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi)).into();
+            let loc = lparam_to_mouse_loc(hwnd, lparam, false);
 
             let mut drag_state_cell = pal_hwnd.wnd.drag_state.borrow_mut();
 
@@ -696,13 +685,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 _ => unreachable!(),
             };
             let button_mask = 1u8 << button;
-
-            let lparam = lparam as DWORD;
-            let loc_phy = [LOWORD(lparam), HIWORD(lparam)];
-
-            // Convert to logical pixels
-            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi)).into();
+            let loc = lparam_to_mouse_loc(hwnd, lparam, false);
 
             let mut drag_state_cell = pal_hwnd.wnd.drag_state.borrow_mut();
             let drag_state = if let Some(drag_state) = &mut *drag_state_cell {
@@ -743,15 +726,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
         // TODO: Generate continuous scroll events by using the Direct Manipulation APIs
         //       (https://docs.microsoft.com/en-us/previous-versions/windows/desktop/directmanipulation/direct-manipulation-portal)
         winuser::WM_MOUSEWHEEL | winuser::WM_MOUSEHWHEEL => {
-            let lparam = lparam as DWORD;
-            let loc_phy = [LOWORD(lparam) as LONG, HIWORD(lparam) as LONG];
-            let loc_phy = screen_to_client(hwnd, loc_phy);
-
+            let loc = lparam_to_mouse_loc(hwnd, lparam, true);
             let axis = (msg == winuser::WM_MOUSEWHEEL) as usize;
-
-            // Convert to logical pixels
-            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi));
 
             // Convert the value to `ScrollDelta`
             let mut amount = winuser::GET_WHEEL_DELTA_WPARAM(wparam) as f32 / [-120.0, 120.0][axis];
@@ -778,7 +754,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
             // Call the handler
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
-            listener.scroll_motion(wm, &pal_hwnd, loc.into(), &delta);
+            listener.scroll_motion(wm, &pal_hwnd, loc, &delta);
 
             return 0;
         } // WM_MOUSEWHEEL
@@ -795,11 +771,31 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
-/// Wraps `ScreenToClient`
-fn screen_to_client(hwnd: HWND, p: [LONG; 2]) -> [LONG; 2] {
-    let mut pt = POINT { x: p[0], y: p[1] };
-    assert_win32_ok(unsafe { winuser::ScreenToClient(hwnd, &mut pt) });
-    [pt.x, pt.y]
+/// Extract x- and y- coordinates from `LPARAM`. This is used by most types of
+/// mouse input events.
+///
+/// If `is_screen` is `true`, the coordinates are interpreted as screen
+/// coordinates, which will be converted to client coordinates by this function.
+fn lparam_to_mouse_loc(hwnd: HWND, lparam: LPARAM, is_screen: bool) -> cgmath::Point2<f32> {
+    let lparam = lparam as DWORD;
+    let mut loc_phy = POINT {
+        x: LOWORD(lparam) as LONG,
+        y: HIWORD(lparam) as LONG,
+    };
+
+    if is_screen {
+        assert_win32_ok(unsafe { winuser::ScreenToClient(hwnd, &mut loc_phy) });
+    }
+
+    // Convert to logical pixels
+    let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+    assert_win32_ok(dpi);
+
+    [
+        phy_to_log_f32(loc_phy.x as f32, dpi),
+        phy_to_log_f32(loc_phy.y as f32, dpi),
+    ]
+    .into()
 }
 
 /// Calculate the physical outer size for a given logical inner size.
