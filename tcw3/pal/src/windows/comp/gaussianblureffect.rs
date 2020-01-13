@@ -192,7 +192,7 @@ unsafe extern "system" fn gbe2_get_named_property_mapping(
     _this: *mut IGraphicsEffectD2D1Interop,
     _name: LPCWSTR,
     _index: *mut UINT,
-    mapping: *mut GRAPHICS_EFFECT_PROPERTY_MAPPING,
+    _mapping: *mut GRAPHICS_EFFECT_PROPERTY_MAPPING,
 ) -> HRESULT {
     E_NOTIMPL
 }
