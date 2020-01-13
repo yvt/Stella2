@@ -170,6 +170,7 @@ static SINK_VTBL: ID2D1SimplifiedGeometrySinkVtbl = ID2D1SimplifiedGeometrySinkV
     Close: sink_close,
 };
 
+#[repr(C)]
 struct SinkComRef {
     _vtbl: *const ID2D1SimplifiedGeometrySinkVtbl,
     gp_path: *mut GpPath,
