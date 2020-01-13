@@ -11,7 +11,8 @@ use wchar::wch_c;
 use winapi::{
     shared::{
         minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
-        windef::{HCURSOR, HWND, RECT, SIZE},
+        ntdef::LONG,
+        windef::{HCURSOR, HWND, POINT, RECT, SIZE},
     },
     um::{libloaderapi, winuser},
 };
@@ -56,9 +57,6 @@ impl std::hash::Hash for HWnd {
 
 struct Wnd {
     hwnd: Cell<HWND>,
-    // TODO: Raise the following events:
-    // - scroll_motion
-    // - scroll_gesture
     listener: RefCell<Rc<dyn iface::WndListener<Wm>>>,
     cursor: Cell<HCURSOR>,
     comp_wnd: comp::CompWnd,
@@ -742,6 +740,49 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             }
         } // WM_CAPTURECHANGED
 
+        // TODO: Generate continuous scroll events by using the Direct Manipulation APIs
+        //       (https://docs.microsoft.com/en-us/previous-versions/windows/desktop/directmanipulation/direct-manipulation-portal)
+        winuser::WM_MOUSEWHEEL | winuser::WM_MOUSEHWHEEL => {
+            let lparam = lparam as DWORD;
+            let loc_phy = [LOWORD(lparam) as LONG, HIWORD(lparam) as LONG];
+            let loc_phy = screen_to_client(hwnd, loc_phy);
+
+            let axis = (msg == winuser::WM_MOUSEWHEEL) as usize;
+
+            // Convert to logical pixels
+            let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+            let loc = loc_phy.map(|i| phy_to_log_f32(i as f32, dpi));
+
+            // Convert the value to `ScrollDelta`
+            let mut amount = winuser::GET_WHEEL_DELTA_WPARAM(wparam) as f32 / [-120.0, 120.0][axis];
+
+            amount *= unsafe {
+                let mut out = MaybeUninit::<UINT>::uninit();
+                assert_win32_ok(winuser::SystemParametersInfoW(
+                    [
+                        winuser::SPI_GETWHEELSCROLLCHARS,
+                        winuser::SPI_GETWHEELSCROLLLINES,
+                    ][axis],
+                    0,
+                    out.as_mut_ptr() as _,
+                    0,
+                ));
+                out.assume_init() as f32
+            };
+
+            let mut delta = iface::ScrollDelta {
+                precise: false,
+                delta: [0.0; 2].into(),
+            };
+            delta.delta[axis] = amount;
+
+            // Call the handler
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.scroll_motion(wm, &pal_hwnd, loc.into(), &delta);
+
+            return 0;
+        } // WM_MOUSEWHEEL
+
         winuser::WM_SIZE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.resize(wm, &pal_hwnd);
@@ -752,6 +793,13 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
     drop(pal_hwnd);
     unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+/// Wraps `ScreenToClient`
+fn screen_to_client(hwnd: HWND, p: [LONG; 2]) -> [LONG; 2] {
+    let mut pt = POINT { x: p[0], y: p[1] };
+    assert_win32_ok(unsafe { winuser::ScreenToClient(hwnd, &mut pt) });
+    [pt.x, pt.y]
 }
 
 /// Calculate the physical outer size for a given logical inner size.
