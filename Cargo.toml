@@ -50,5 +50,7 @@ debug = true
 tcw3_pal = { opt-level = 3 }
 
 [patch.crates-io.winapi]
+# Waiting for <https://github.com/retep998/winapi-rs/pull/599> (GDI+ support)
+# to be merged
 git = "https://github.com/yvt/winapi-rs.git"
 rev = "a6df41df91d6b8c156cff69bede2da2196c663cb"
