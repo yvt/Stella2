@@ -29,6 +29,17 @@ fn main() {
         env_logger::init();
     }
 
+    // Platform-specific initialization
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use std::ptr::null_mut;
+        use winapi::um::{libloaderapi, winuser};
+
+        // Register `IDI_ICON` (defined in `stella2.rc`) as the application icon
+        let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
+        pal::windows::set_app_hicon(winuser::LoadIconW(hinstance, 0x101 as _));
+    }
+
     debug!("Initializing WM");
     let wm = pal::Wm::global();
 

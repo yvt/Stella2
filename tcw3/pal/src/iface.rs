@@ -68,6 +68,9 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
 
     /// Enqueue a call to the specified function on the main thread. The calling
     /// thread can be any thread.
+    ///
+    /// This method may panic if it is called before a main thread is
+    /// determined.
     fn invoke_on_main_thread(f: impl FnOnce(Self) + Send + 'static);
 
     /// Enqueue a call to the specified function on the main thread.
@@ -84,7 +87,7 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// An attempt to surpass the limit causes a panic. The lower bound of the
     /// limit is currently `64` (the hard-coded limit of `TimerQueue`).
     ///
-    /// The delay must be shorter than 2³¹ milliseconds.
+    /// The delay must be shorter than 2³⁰ milliseconds.
     fn invoke_after(self, delay: Range<Duration>, f: impl FnOnce(Self) + 'static) -> Self::HInvoke;
 
     /// Cancel a pending function call enqueued by `invoke_after`. Does nothing

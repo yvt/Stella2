@@ -17,6 +17,14 @@ pub trait Img: Send + Sync + 'static {
 }
 
 /// Represents an image with an abstract representation.
+///
+/// # Needs a main thread
+///
+/// Although this type is thread-safe, it implicitly relies on the existence
+/// of a main thread (the one having access to `Wm`) for synchronization.
+/// Dropping `HImg` before defining a main thread might cause a panic on some
+/// backends. Therefore, you call a method such as `Wm::try_global` to ensure
+/// a main thread is defined.
 #[derive(Debug, Clone)]
 pub struct HImg {
     inner: Arc<ImgInner<dyn Img>>,
