@@ -3,6 +3,7 @@ name = "stvg_tcw3"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
+license = "MIT"
 
 [features]
 testing = ["tcw3/testing"]
