@@ -3,6 +3,7 @@ name = "stella2_meta"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
+license = "GPL-3.0-or-later"
 
 [build-dependencies]
 tcw3_designer = { path = "../../tcw3/designer" }

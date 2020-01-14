@@ -3,6 +3,7 @@ name = "stella2_mkmacosbundle"
 version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 structopt = { version = "0.3.0", default-features = false }
