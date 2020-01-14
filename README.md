@@ -117,4 +117,8 @@ This source tree includes the following third-party projects:
 
 ## License
 
-Yet to be determined. Probably it will be GPLv3 or a more tolerant one.
+The project as a whole is licensed under [the GNU General Public License v3.0] or later.
+
+Some subprojects such as TCW3 are licensed under a more liberal license. Some supporting libraries (especially those which are vendored) such as `alt_fp` are considered independent and have their own license, while other libraries are considered as a part of this project and thus licensed under the GPL 3.0+. Please check the `license` field of `Cargo.toml` to find out their license.
+
+[the GNU General Public License v3.0]: https://www.gnu.org/licenses/gpl-3.0.en.html
