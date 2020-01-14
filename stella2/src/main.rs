@@ -36,7 +36,7 @@ fn main() {
         use winapi::um::{libloaderapi, winuser};
 
         // Register `IDI_ICON` (defined in `stella2.rc`) as the application icon
-        let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
+        let hinstance = libloaderapi::GetModuleHandleW(null_mut());
         pal::windows::set_app_hicon(winuser::LoadIconW(hinstance, 0x101 as _));
     }
 
