@@ -1,33 +1,49 @@
 # Builds a release package for each target platform.
 jobs:
 
-# macOS
-# -------------------------------------------------------------------------
-- job: publish_macOS
-  displayName: Publish for macOS
+- job: publish
+  displayName: Publish nightly build
   continueOnError: true
+  strategy:
+    matrix:
+      MacOS:
+        vmImage: macOS-10.13
+        platformName: macOS
+      Windows:
+        vmImage: windows-2019
+        platformName: Windows
   pool:
-    vmImage: macOS-10.13
+    vmImage: $(vmImage)
   variables:
   - template: ../common.yml
+
   steps:
   - template: ../steps/install-rust.yml
     parameters:
       rustup_toolchain: ${{ variables.rustVersion }}
       components: [ rust-src ]
+
   - script: cargo install xargo --version 0.3.17
     displayName: Install xargo
+
   - script: ./build-mac.sh
     displayName: build-mac.sh
+    condition: eq(variables['Agent.OS'], 'Darwin')
+
+  - script: |
+      xargo build --target x86_64-pc-windows-msvc --release -p stella2
+      mkdir publish
+      copy target\x86_64-pc-windows-msvc\release\stella2.exe publish\
+    displayName: xargo build 
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
+
   - task: ArchiveFiles@2
     displayName: Archive the application package
     inputs:
       rootFolderOrFile: ./publish
       archiveType: zip
-      archiveFile: $(Build.ArtifactStagingDirectory)/Stella2-$(Build.SourceVersion)-macOS.zip
+      archiveFile: $(Build.ArtifactStagingDirectory)/Stella2-$(Build.SourceVersion)-$(platformName).zip
   - task: PublishBuildArtifacts@1
     displayName: "Publish"
     inputs:
-      artifactName: Stella2-nightly-macOS
-
-# TODO: Windows
+      artifactName: Stella2-nightly-$(platformName)

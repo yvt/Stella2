@@ -3,3 +3,8 @@
 # rely on macOS's CrashReporter.
 features = []
 default-features = false
+
+[target.x86_64-pc-windows-msvc.dependencies.std]
+# Build without the backtrace functionality.
+features = []
+default-features = false
