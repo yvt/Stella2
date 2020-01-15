@@ -11,7 +11,7 @@ use tcw3::{
     ui::theming::{self, ClassSet},
     ui::views::split::SplitDragListener,
     ui::AlignFlags,
-    uicore::{HWnd, WndListener},
+    uicore::{HWnd, WndListener, WndStyleFlags},
 };
 
 use crate::{model, stylesheet::elem_id};
@@ -113,6 +113,8 @@ impl WndView {
         hwnd.set_caption("Stella 2");
         hwnd.set_listener(WndViewWndListener);
         hwnd.set_visibility(true);
+        // TODO: Turn the "blur behind" effect off conditionally
+        hwnd.set_style_flags(WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR);
 
         let this = Rc::new(Self {
             _hwnd: hwnd,
