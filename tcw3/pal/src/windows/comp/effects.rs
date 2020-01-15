@@ -31,7 +31,9 @@ use super::super::winapiext::{
 /// `Microsoft.Graphics.Canvas.Effects.*` of Win2D.
 macro_rules! define_effect {
     (
-        pub struct $Name:ident;
+        pub struct $Name:ident {
+            $($pname:ident: $pty:ty),* $(,)*
+        }
 
         static $VTABLE:ident;
 
@@ -39,21 +41,25 @@ macro_rules! define_effect {
         num_sources: $num_sources:expr;
         num_props: $num_props:expr;
         props_map: |$index:ident| $props_map:expr;
-        // prop values are fixed for now
     ) => {
         #[repr(C)]
         pub struct $Name {
             _vtbl1: *const IGraphicsEffectVtbl,
             _vtbl2: *const IGraphicsEffectD2D1InteropVtbl,
             sources: [ComPtr<IGraphicsEffectSource>; $num_sources],
+            $($pname: $pty),*
         }
 
         impl $Name {
-            pub fn new(sources: [ComPtr<IGraphicsEffectSource>; $num_sources]) -> ComPtr<IUnknown> {
+            pub fn new(
+               sources: [ComPtr<IGraphicsEffectSource>; $num_sources],
+               $($pname: $pty),*
+            ) -> ComPtr<IUnknown> {
                 let this = Arc::new($Name {
                     _vtbl1: &$VTABLE.0,
                     _vtbl2: &$VTABLE.1,
                     sources,
+                    $($pname),*
                 });
                 unsafe { ComPtr::wrap(Arc::into_raw(this) as _) }
             }
@@ -185,12 +191,14 @@ macro_rules! define_effect {
                 S_OK
             }
 
+            #[allow(unused_variables)]
             unsafe extern "system" fn impl2_get_property(
-                _this: *mut IGraphicsEffectD2D1Interop,
+                this: *mut IGraphicsEffectD2D1Interop,
                 index: UINT,
                 out_value: *mut *mut IPropertyValue,
             ) -> HRESULT {
                 let $index = index; // input to `$props_map`
+                let this = &*vtbl2_to_1(this);
                 let value = $props_map;
 
                 let value: ComPtr<IPropertyValue> =
@@ -259,7 +267,7 @@ macro_rules! define_effect {
 } // macro_rules! define_effect
 
 define_effect! {
-    pub struct GaussianBlurEffect;
+    pub struct GaussianBlurEffect {}
 
     static GAUSSIAN_BLUR_EFFECT_VTBL;
 
@@ -281,7 +289,7 @@ define_effect! {
 }
 
 define_effect! {
-    pub struct BlendEffect;
+    pub struct BlendEffect {}
 
     static BLEND_EFFECT_VTBL;
 
@@ -297,7 +305,7 @@ define_effect! {
 }
 
 define_effect! {
-    pub struct CompositeEffect;
+    pub struct CompositeEffect {}
 
     static COMPOSITE_EFFECT_VTBL;
 
@@ -313,7 +321,7 @@ define_effect! {
 }
 
 define_effect! {
-    pub struct SaturationEffect;
+    pub struct SaturationEffect {}
 
     static SATURATION_EFFECT_VTBL;
 
@@ -337,7 +345,7 @@ mod d2d1effects_2_win10_rs1 {
 }
 
 define_effect! {
-    pub struct OpacityEffect;
+    pub struct OpacityEffect {}
 
     static OPACITY_EFFECT_VTBL;
 
@@ -353,7 +361,7 @@ define_effect! {
 }
 
 define_effect! {
-    pub struct BorderEffect;
+    pub struct BorderEffect {}
 
     static BORDER_EFFECT_VTBL;
 
