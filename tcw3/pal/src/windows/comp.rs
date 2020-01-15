@@ -15,10 +15,10 @@ use winrt::{
     windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2, Vector3},
     windows::ui::composition::{
         desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
-        CompositionEffectBrush, CompositionGeometry, CompositionNineGridBrush,
-        CompositionRectangleGeometry, CompositionStretch, CompositionSurfaceBrush, Compositor,
-        ContainerVisual, ICompositionClip2, ICompositionTarget, ICompositor2, ICompositor5,
-        ICompositor6, Visual,
+        CompositionEffectBrush, CompositionEffectSourceParameter, CompositionGeometry,
+        CompositionNineGridBrush, CompositionRectangleGeometry, CompositionStretch,
+        CompositionSurfaceBrush, Compositor, ContainerVisual, ICompositionClip2,
+        ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, Visual,
     },
     ComPtr, FastHString, RtDefaultConstructible, RtType,
 };
@@ -36,7 +36,7 @@ use super::{
 };
 use crate::{iface::LayerFlags, prelude::MtLazyStatic};
 
-mod gaussianblureffect;
+mod effects;
 
 struct CompState {
     comp: ComPtr<Compositor>,
@@ -81,7 +81,9 @@ impl CompState {
             .expect("Could not obtain ICompositor6");
 
         // Create a brush for the "blur behind" effect
-        let fx = gaussianblureffect::GaussianBlurEffect::new();
+        let src_backdrop =
+            CompositionEffectSourceParameter::create(&FastHString::new("source")).unwrap();
+        let fx = effects::GaussianBlurEffect::new([src_backdrop.query_interface().unwrap()]);
         let fx_factory = comp
             .create_effect_factory(&fx.query_interface().unwrap())
             .unwrap()
