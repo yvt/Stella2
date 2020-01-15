@@ -516,10 +516,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                     rect.top,
                     rect.right - rect.left,
                     rect.bottom - rect.top,
-                    winuser::SWP_NOZORDER
-                        | winuser::SWP_NOMOVE
-                        | winuser::SWP_NOACTIVATE
-                        | winuser::SWP_NOOWNERZORDER,
+                    winuser::SWP_NOZORDER | winuser::SWP_NOACTIVATE | winuser::SWP_NOOWNERZORDER,
                 ));
             }
 
