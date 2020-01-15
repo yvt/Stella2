@@ -212,6 +212,15 @@ bitflags! {
     pub struct WndFlags: u32 {
         const RESIZABLE = 1;
         const BORDERLESS = 1 << 1;
+
+        /// Makes the window background transparent and enables the "blur
+        /// behind" effect if supported by the system.
+        ///
+        /// In general, every pixel of the window must be covered by fully
+        /// opaque layer contents (including the background color). If this
+        /// flag is set, layers with a `BACKDROP_BLUR` flag also count as
+        /// opaque contents (even if they don't have actual contents).
+        const TRANSPARENT_BACKDROP_BLUR = 1 << 2;
     }
 }
 
@@ -356,6 +365,20 @@ bitflags! {
         /// it via `set_layer_attr` might cause visual corruption on some
         /// backends (namely, `swrast`).
         const MASK_TO_BOUNDS = 1;
+
+        /// Draw the "blur behind" effect behind the layer.
+        ///
+        /// The following condition must be upheld for this flag to work in
+        /// a consistent way:
+        ///
+        ///  - There must be no layer behind this layer. (Some backends might
+        ///    blur the contents behind the window while the others use the
+        ///    contents behind the layer.)
+        ///  - The containing window has a `TRANSPARENT_BACKDROP_BLUR` flag.
+        ///  - The region occupied by the layer must be an axis-aligned
+        ///    rectangular region.
+        /// 
+        const BACKDROP_BLUR = 1 << 1;
     }
 }
 
