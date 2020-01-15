@@ -27,20 +27,6 @@ use super::super::winapiext::{
     IGraphicsEffectD2D1Interop, IGraphicsEffectD2D1InteropVtbl, GRAPHICS_EFFECT_PROPERTY_MAPPING,
 };
 
-// `RIDL!` enforces `pub`, so most of these aren't actually `pub`
-#[repr(u8)]
-pub enum EffectOptimization {
-    Speed = 0,
-    Balanced = 1,
-    Quality = 2,
-}
-
-#[repr(u8)]
-pub enum EffectBorderMode {
-    Soft = 0,
-    Hard = 1,
-}
-
 static GAUSSIAN_BLUR_EFFECT_VTBL1: IGraphicsEffectVtbl = IGraphicsEffectVtbl {
     parent: IInspectableVtbl {
         parent: IUnknownVtbl {
