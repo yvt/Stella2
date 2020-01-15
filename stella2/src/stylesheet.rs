@@ -1,9 +1,10 @@
 use cggeom::box2;
 use cgmath::{Deg, Vector2};
+use std::f32::NAN;
 use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 use tcw3::{
-    images::himg_from_rounded_rect,
+    images::{himg_from_rounded_rect, HImg},
     pal::SysFontType,
     stylesheet,
     ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
@@ -34,20 +35,26 @@ pub mod elem_id {
     }
 }
 
+// Import IDs (e.g., `#GO_BACK`) into the scope
+use self::elem_id::*;
+
+fn himg_from_stvg(data: (&'static [u8], [f32; 2])) -> HImg {
+    StvgImg::new(data).into_himg()
+}
+
+fn himg_from_stvg_col(data: (&'static [u8], [f32; 2]), c: tcw3::pal::RGBAF32) -> HImg {
+    StvgImg::new(data)
+        .with_color_xform(stvg_tcw3::replace_color(c))
+        .into_himg()
+}
+
 fn new_custom_stylesheet() -> impl Stylesheet {
-    use std::f32::NAN;
-
-    // Import IDs (e.g., `#GO_BACK`) into the scope
-    use self::elem_id::*;
-
     const TOOLBAR_IMG_SIZE: Vector2<f32> = Vector2::new(24.0, 16.0);
     const TOOLBAR_IMG_METRICS: Metrics = Metrics {
         margin: [NAN; 4],
         size: TOOLBAR_IMG_SIZE,
     };
     const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(30.0, 22.0);
-
-    let himg_from_stvg = |data| StvgImg::new(data).into_himg();
 
     stylesheet! {
         ([.SPLITTER]) (priority = 10000) {
@@ -225,9 +232,59 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn new_custom_platform_stylesheet() -> impl Stylesheet {
+    stylesheet! {
+        ([.BUTTON:not(.HOVER)]) (priority = 20000) {
+            layer_opacity[0]: 0.3,
+        },
+        ([.BUTTON]) (priority = 20000) {
+            layer_bg_color[0]: [0.7, 0.7, 0.7, 1.0].into(),
+            layer_img[0]: None,
+        },
+        ([.BUTTON.ACTIVE]) (priority = 21000) {
+            layer_bg_color[0]: [0.2, 0.4, 0.9, 1.0].into(),
+            layer_img[0]: None,
+        },
+
+        ([#TOOLBAR]) (priority = 20000) {
+            layer_bg_color[0]: [1.0; 4].into(),
+        },
+
+        ([#SEARCH_FIELD]) (priority = 20000) {
+            num_layers: 3,
+
+            layer_img[0]: None,
+            layer_bg_color[0]: [0.0, 0.0, 0.0, 0.2].into(),
+            layer_img[1]: None,
+            layer_bg_color[1]: [1.0; 4].into(),
+            layer_metrics[1]: Metrics {
+                margin: [1.0, 1.0, 1.0, 1.0],
+                ..Default::default()
+            },
+            layer_center[1]: box2! { point: [0.5, 0.5] },
+
+            layer_img[2]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
+            layer_metrics[2]: Metrics {
+                margin: [NAN, NAN, NAN, 4.0],
+                size: [16.0, 16.0].into(),
+            },
+        },
+        ([.LABEL] < [#SEARCH_FIELD]) (priority = 20000) {
+            fg_color: [0.0, 0.0, 0.0, 0.6].into(),
+        },
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn new_custom_platform_stylesheet() -> impl Stylesheet {
+    stylesheet! {}
+}
+
 pub fn register_stylesheet(manager: &'static Manager) {
     manager.subscribe_new_sheet_set(Box::new(move |_, _, ctx| {
         ctx.insert_stylesheet(new_custom_stylesheet());
+        ctx.insert_stylesheet(new_custom_platform_stylesheet());
     }));
     manager.update_sheet_set();
 }
