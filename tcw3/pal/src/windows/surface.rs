@@ -420,7 +420,7 @@ fn paint_surface(
         d2d_dc.clear((0, 0.0));
 
         // Createa  `Bitmap` from `bmp`
-        let in_bitmap_data = bmp.inner.lock();
+        let in_bitmap_data = bmp.inner.read();
         let in_bitmap_slice = unsafe {
             std::slice::from_raw_parts(
                 in_bitmap_data.as_ptr(),

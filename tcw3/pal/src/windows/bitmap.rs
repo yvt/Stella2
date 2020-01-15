@@ -171,15 +171,20 @@ impl Drop for BitmapInner {
     }
 }
 
-pub(super) struct BitmapLockGuard<'a> {
+pub(super) struct BitmapWriteGuard<'a> {
+    bmp: &'a BitmapInner,
+    data: BitmapData,
+}
+
+pub(super) struct BitmapReadGuard<'a> {
     bmp: &'a BitmapInner,
     data: BitmapData,
 }
 
 impl BitmapInner {
-    pub(super) fn lock(&self) -> BitmapLockGuard<'_> {
+    fn lock(&self, flags: u32) -> BitmapData {
         let size = self.size();
-        let data = unsafe {
+        unsafe {
             let mut out = MaybeUninit::uninit();
             assert_gp_ok(gp::GdipBitmapLockBits(
                 self.gp_bmp,
@@ -189,18 +194,50 @@ impl BitmapInner {
                     Width: size[0] as i32,
                     Height: size[1] as i32,
                 },
-                gdiplusimaging::ImageLockModeRead,
+                flags,
                 gdipluspixelformats::PixelFormat32bppPARGB,
                 out.as_mut_ptr(),
             ));
             out.assume_init()
-        };
+        }
+    }
 
-        BitmapLockGuard { bmp: self, data }
+    pub(super) fn read(&self) -> BitmapReadGuard<'_> {
+        let data = self.lock(gdiplusimaging::ImageLockModeRead);
+
+        BitmapReadGuard { bmp: self, data }
+    }
+
+    fn write(&self) -> BitmapWriteGuard<'_> {
+        let data = self.lock(gdiplusimaging::ImageLockModeWrite);
+
+        BitmapWriteGuard { bmp: self, data }
     }
 }
 
-impl BitmapLockGuard<'_> {
+impl BitmapWriteGuard<'_> {
+    fn size(&self) -> [u32; 2] {
+        [self.data.Width, self.data.Height]
+    }
+
+    fn stride(&self) -> u32 {
+        self.data.Stride.abs() as u32
+    }
+
+    fn as_ptr(&self) -> *mut u8 {
+        self.data.Scan0 as _
+    }
+}
+
+impl Drop for BitmapWriteGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipBitmapUnlockBits(self.bmp.gp_bmp, &mut self.data));
+        }
+    }
+}
+
+impl BitmapReadGuard<'_> {
     pub fn size(&self) -> [u32; 2] {
         [self.data.Width, self.data.Height]
     }
@@ -214,7 +251,7 @@ impl BitmapLockGuard<'_> {
     }
 }
 
-impl Drop for BitmapLockGuard<'_> {
+impl Drop for BitmapReadGuard<'_> {
     fn drop(&mut self) {
         unsafe {
             assert_gp_ok(gp::GdipBitmapUnlockBits(self.bmp.gp_bmp, &mut self.data));
