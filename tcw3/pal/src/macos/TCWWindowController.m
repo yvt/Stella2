@@ -55,15 +55,8 @@ extern CGSConnection CGSDefaultConnectionForThread();
         self->window.contentView.wantsLayer = YES;
         self->window.contentView.layer.masksToBounds = NO;
 
-        // Remove titlebar and background. The alpha component of
-        // `backgroundColor` must be non-zero. Otherwise, the window shadow is
-        // calculated based on opaque contents, which has a severe performance
-        // impact. However, it must be at least `0.01` for the blur behind
-        // effect to work.
+        // Remove the titlebar.
         self->window.titlebarAppearsTransparent = YES;
-        self->window.backgroundColor =
-            [[NSColor clearColor] colorWithAlphaComponent:0.01];
-        self->window.opaque = NO;
 
         // Enable "blur behind"
         CGSConnection connection = CGSDefaultConnectionForThread();
@@ -126,6 +119,22 @@ extern CGSConnection CGSDefaultConnectionForThread();
     } else {
         masks |= NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
                  NSWindowStyleMaskTitled;
+    }
+
+    if (flags & kTCW3WndFlagsTransparentBackdropBlur) {
+        // Remove the background. The alpha component of `backgroundColor` must
+        // be non-zero. Otherwise, the window shadow is calculated based on
+        // opaque contents, which has a severe performance impact. However, it
+        // must be at least `0.01` for the blur behind effect to work.
+        self->window.backgroundColor =
+            [[NSColor clearColor] colorWithAlphaComponent:0.01];
+        self->window.opaque = NO;
+    } else {
+        // The API contract of `TRANSPARENT_BACKDROP_BLUR` requires that every
+        // pixel is covered by something, so `backgroundColor` actually
+        // doesn't matter.
+        self->window.backgroundColor = [NSColor windowBackgroundColor];
+        self->window.opaque = YES;
     }
 
     self->window.styleMask = masks;
