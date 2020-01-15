@@ -49,7 +49,7 @@ struct CompState {
 }
 
 impl CompState {
-    fn new(_: Wm) -> Self {
+    fn new(wm: Wm) -> Self {
         // Create a dispatch queue for the main thread
         unsafe {
             assert_hresult_ok(tcw_comp_init());
@@ -80,21 +80,50 @@ impl CompState {
             .query_interface()
             .expect("Could not obtain ICompositor6");
 
-        // Create a brush for the "blur behind" effect
-        let src_backdrop =
-            CompositionEffectSourceParameter::create(&FastHString::new("source")).unwrap();
-        let fx = effects::GaussianBlurEffect::new([src_backdrop.query_interface().unwrap()]);
+        // Create a brush to simulate the acrylic material. The exclusion layer
+        // is excluded to save time and power.
+        // - "Acrylic material"
+        //   https://docs.microsoft.com/en-us/windows/uwp/design/style/acrylic
+        // - "WPF Effects Sample"
+        //   https://github.com/microsoft/Windows.UI.Composition-Win32-Samples/tree/master/dotnet/WPF/AcrylicEffect
+        let backdrop_src =
+            CompositionEffectSourceParameter::create(&FastHString::new("backdrop")).unwrap();
+        let noise_src =
+            CompositionEffectSourceParameter::create(&FastHString::new("noise")).unwrap();
+        let blur_fx = effects::GaussianBlurEffect::new([backdrop_src.query_interface().unwrap()]);
+        let sat_fx = effects::SaturationEffect::new([blur_fx.query_interface().unwrap()]);
+        let noise_fx = effects::BorderEffect::new([noise_src.query_interface().unwrap()]);
+        let noise_fx = effects::OpacityEffect::new([noise_fx.query_interface().unwrap()]);
+        let out_fx = effects::BlendEffect::new([
+            sat_fx.query_interface().unwrap(),
+            noise_fx.query_interface().unwrap(),
+        ]);
+
         let fx_factory = comp
-            .create_effect_factory(&fx.query_interface().unwrap())
+            .create_effect_factory(&out_fx.query_interface().unwrap())
             .unwrap()
             .unwrap();
+
         let fx_ebrush: ComPtr<CompositionEffectBrush> = fx_factory.create_brush().unwrap().unwrap();
 
         let bd_brush = comp2.create_backdrop_brush().unwrap().unwrap();
+
+        let noise = super::bitmap::new_noise_bmp();
+        let noise_surf = surface_map.get_surface_for_bitmap(wm, &noise);
+        let noise_sbrush = comp.create_surface_brush().unwrap().unwrap();
+        noise_sbrush.set_stretch(CompositionStretch::None).unwrap();
+        noise_sbrush.set_surface(&noise_surf).unwrap();
+
         fx_ebrush
             .set_source_parameter(
-                &FastHString::new("source"),
+                &FastHString::new("backdrop"),
                 &bd_brush.query_interface().unwrap(),
+            )
+            .unwrap();
+        fx_ebrush
+            .set_source_parameter(
+                &FastHString::new("noise"),
+                &noise_sbrush.query_interface().unwrap(),
             )
             .unwrap();
 

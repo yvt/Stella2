@@ -10,6 +10,7 @@ use winapi::{
         winerror::{E_INVALIDARG, E_NOTIMPL, S_OK},
     },
     um::{
+        d2d1_1, d2d1effects,
         unknwnbase::{IUnknown, IUnknownVtbl},
         winnt::HRESULT,
     },
@@ -139,7 +140,7 @@ macro_rules! define_effect {
                 (p as isize).wrapping_add(offs) as *mut T
             }
 
-            fn vtbl2_to_1(this: *mut IGraphicsEffectD2D1Interop) -> *mut GaussianBlurEffect {
+            fn vtbl2_to_1(this: *mut IGraphicsEffectD2D1Interop) -> *mut $Name {
                 byte_offset_by(this, -(size_of::<usize>() as isize)) as _
             }
 
@@ -189,7 +190,6 @@ macro_rules! define_effect {
                 index: UINT,
                 out_value: *mut *mut IPropertyValue,
             ) -> HRESULT {
-                use winapi::um::d2d1effects;
                 let $index = index; // input to `$props_map`
                 let value = $props_map;
 
@@ -275,6 +275,97 @@ define_effect! {
         }
         d2d1effects::D2D1_GAUSSIANBLUR_PROP_BORDER_MODE => {
             PropertyValue::create_uint32(d2d1effects::D2D1_BORDER_MODE_HARD)
+        }
+        _ => return E_INVALIDARG,
+    };
+}
+
+define_effect! {
+    pub struct BlendEffect;
+
+    static BLEND_EFFECT_VTBL;
+
+    effect_id: winapi::um::d2d1effects::CLSID_D2D1Blend;
+    num_sources: 2;
+    num_props: 1;
+    props_map: |index| match index {
+        d2d1effects::D2D1_BLEND_PROP_MODE => {
+            PropertyValue::create_uint32(d2d1effects::D2D1_BLEND_MODE_OVERLAY)
+        }
+        _ => return E_INVALIDARG,
+    };
+}
+
+define_effect! {
+    pub struct CompositeEffect;
+
+    static COMPOSITE_EFFECT_VTBL;
+
+    effect_id: winapi::um::d2d1effects::CLSID_D2D1Composite;
+    num_sources: 2;
+    num_props: 1;
+    props_map: |index| match index {
+        d2d1effects::D2D1_COMPOSITE_PROP_MODE => {
+            PropertyValue::create_uint32(d2d1_1::D2D1_COMPOSITE_MODE_SOURCE_OVER)
+        }
+        _ => return E_INVALIDARG,
+    };
+}
+
+define_effect! {
+    pub struct SaturationEffect;
+
+    static SATURATION_EFFECT_VTBL;
+
+    effect_id: winapi::um::d2d1effects::CLSID_D2D1Saturation;
+    num_sources: 1;
+    num_props: 1;
+    props_map: |index| match index {
+        d2d1effects::D2D1_SATURATION_PROP_SATURATION => {
+            PropertyValue::create_single(2.0)
+        }
+        _ => return E_INVALIDARG,
+    };
+}
+
+/// `NTDDI_VERSION >= NTDDI_WIN10_RS1`
+mod d2d1effects_2_win10_rs1 {
+    winapi::DEFINE_GUID! {CLSID_D2D1Opacity,
+    0x811d79a4, 0xde28, 0x4454, 0x80, 0x94, 0xc6, 0x46, 0x85, 0xf8, 0xbd, 0x4c}
+
+    pub const D2D1_OPACITY_PROP_OPACITY: u32 = 0;
+}
+
+define_effect! {
+    pub struct OpacityEffect;
+
+    static OPACITY_EFFECT_VTBL;
+
+    effect_id: d2d1effects_2_win10_rs1::CLSID_D2D1Opacity;
+    num_sources: 1;
+    num_props: 1;
+    props_map: |index| match index {
+        d2d1effects_2_win10_rs1::D2D1_OPACITY_PROP_OPACITY => {
+            PropertyValue::create_single(0.03)
+        }
+        _ => return E_INVALIDARG,
+    };
+}
+
+define_effect! {
+    pub struct BorderEffect;
+
+    static BORDER_EFFECT_VTBL;
+
+    effect_id: winapi::um::d2d1effects::CLSID_D2D1Border;
+    num_sources: 1;
+    num_props: 2;
+    props_map: |index| match index {
+        d2d1effects::D2D1_BORDER_PROP_EDGE_MODE_X => {
+            PropertyValue::create_uint32(d2d1effects::D2D1_BORDER_EDGE_MODE_WRAP)
+        }
+        d2d1effects::D2D1_BORDER_PROP_EDGE_MODE_Y => {
+            PropertyValue::create_uint32(d2d1effects::D2D1_BORDER_EDGE_MODE_WRAP)
         }
         _ => return E_INVALIDARG,
     };

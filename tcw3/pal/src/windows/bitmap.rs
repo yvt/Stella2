@@ -598,3 +598,47 @@ impl iface::Canvas for BitmapBuilder {
         }
     }
 }
+
+/// Create a monochrome noise image.
+pub fn new_noise_bmp() -> Bitmap {
+    struct Xorshift32(u32);
+
+    impl Xorshift32 {
+        fn next(&mut self) -> u32 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 17;
+            self.0 ^= self.0 << 5;
+            self.0
+        }
+    }
+
+    const SIZE: usize = 128;
+
+    let bmp = Bitmap {
+        inner: Arc::new(BitmapInner::new([SIZE as u32; 2])),
+    };
+
+    {
+        let bmp_data = bmp.inner.write();
+        debug_assert_eq!(bmp_data.size(), [SIZE as u32; 2]);
+        assert!(bmp_data.stride() >= SIZE as u32 * 4);
+        assert!(bmp_data.stride() % 4 == 0);
+        let data = unsafe {
+            std::slice::from_raw_parts_mut(
+                bmp_data.as_ptr(),
+                (SIZE - 1) * bmp_data.stride() as usize + SIZE * 4,
+            )
+        };
+
+        let mut rng = Xorshift32(0x4F6CDD1D);
+        for pix in data.chunks_exact_mut(4) {
+            let color = rng.next() as u8;
+            pix[0] = color;
+            pix[1] = color;
+            pix[2] = color;
+            pix[3] = 0xff;
+        }
+    }
+
+    bmp
+}
