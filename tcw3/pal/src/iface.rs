@@ -384,6 +384,12 @@ bitflags! {
     }
 }
 
+impl Default for LayerFlags {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 /// Window event handlers.
 ///
 /// The receiver is immutable because event handlers may manipulate windows,
