@@ -171,15 +171,20 @@ impl Drop for BitmapInner {
     }
 }
 
-pub(super) struct BitmapLockGuard<'a> {
+pub(super) struct BitmapWriteGuard<'a> {
+    bmp: &'a BitmapInner,
+    data: BitmapData,
+}
+
+pub(super) struct BitmapReadGuard<'a> {
     bmp: &'a BitmapInner,
     data: BitmapData,
 }
 
 impl BitmapInner {
-    pub(super) fn lock(&self) -> BitmapLockGuard<'_> {
+    fn lock(&self, flags: u32) -> BitmapData {
         let size = self.size();
-        let data = unsafe {
+        unsafe {
             let mut out = MaybeUninit::uninit();
             assert_gp_ok(gp::GdipBitmapLockBits(
                 self.gp_bmp,
@@ -189,18 +194,50 @@ impl BitmapInner {
                     Width: size[0] as i32,
                     Height: size[1] as i32,
                 },
-                gdiplusimaging::ImageLockModeRead,
+                flags,
                 gdipluspixelformats::PixelFormat32bppPARGB,
                 out.as_mut_ptr(),
             ));
             out.assume_init()
-        };
+        }
+    }
 
-        BitmapLockGuard { bmp: self, data }
+    pub(super) fn read(&self) -> BitmapReadGuard<'_> {
+        let data = self.lock(gdiplusimaging::ImageLockModeRead);
+
+        BitmapReadGuard { bmp: self, data }
+    }
+
+    fn write(&self) -> BitmapWriteGuard<'_> {
+        let data = self.lock(gdiplusimaging::ImageLockModeWrite);
+
+        BitmapWriteGuard { bmp: self, data }
     }
 }
 
-impl BitmapLockGuard<'_> {
+impl BitmapWriteGuard<'_> {
+    fn size(&self) -> [u32; 2] {
+        [self.data.Width, self.data.Height]
+    }
+
+    fn stride(&self) -> u32 {
+        self.data.Stride.abs() as u32
+    }
+
+    fn as_ptr(&self) -> *mut u8 {
+        self.data.Scan0 as _
+    }
+}
+
+impl Drop for BitmapWriteGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            assert_gp_ok(gp::GdipBitmapUnlockBits(self.bmp.gp_bmp, &mut self.data));
+        }
+    }
+}
+
+impl BitmapReadGuard<'_> {
     pub fn size(&self) -> [u32; 2] {
         [self.data.Width, self.data.Height]
     }
@@ -214,7 +251,7 @@ impl BitmapLockGuard<'_> {
     }
 }
 
-impl Drop for BitmapLockGuard<'_> {
+impl Drop for BitmapReadGuard<'_> {
     fn drop(&mut self) {
         unsafe {
             assert_gp_ok(gp::GdipBitmapUnlockBits(self.bmp.gp_bmp, &mut self.data));
@@ -560,4 +597,55 @@ impl iface::Canvas for BitmapBuilder {
             ));
         }
     }
+}
+
+/// Create a monochrome noise image.
+pub fn new_noise_bmp() -> Bitmap {
+    struct Xorshift32(u32);
+
+    impl Xorshift32 {
+        fn next(&mut self) -> u32 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 17;
+            self.0 ^= self.0 << 5;
+            self.0
+        }
+    }
+
+    const SIZE: usize = 128;
+
+    let bmp = Bitmap {
+        inner: Arc::new(BitmapInner::new([SIZE as u32; 2])),
+    };
+
+    {
+        let bmp_data = bmp.inner.write();
+        debug_assert_eq!(bmp_data.size(), [SIZE as u32; 2]);
+        assert!(bmp_data.stride() >= SIZE as u32 * 4);
+        assert!(bmp_data.stride() % 4 == 0);
+        let data = unsafe {
+            std::slice::from_raw_parts_mut(
+                bmp_data.as_ptr(),
+                (SIZE - 1) * bmp_data.stride() as usize + SIZE * 4,
+            )
+        };
+
+        let mut rng = Xorshift32(0x4F6CDD1D);
+        for pix in data.chunks_exact_mut(4) {
+            let rnd = rng.next().to_ne_bytes();
+
+            // Approximate Gaussian distribution
+            let color = (rnd[0] as u32 + rnd[1] as u32 + rnd[2] as u32 + rnd[3] as u32) / 4;
+
+            // Tone adjustment
+            let color = (color * color / 256) as u8;
+
+            pix[0] = color;
+            pix[1] = color;
+            pix[2] = color;
+            pix[3] = 0xff;
+        }
+    }
+
+    bmp
 }

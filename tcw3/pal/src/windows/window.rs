@@ -326,7 +326,7 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     }
 
     if let Some(layer) = attrs.layer {
-        pal_hwnd.wnd.comp_wnd.set_layer(layer);
+        pal_hwnd.wnd.comp_wnd.set_layer(hwnd, layer);
     }
 
     if let Some(visible) = attrs.visible {
