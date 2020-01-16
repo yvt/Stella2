@@ -249,7 +249,14 @@ fn main() {
         visible: Some(true),
         layer: Some(Some(layer.clone())),
         size: Some(FBSIZE),
-        flags: Some(pal::WndFlags::default() - pal::WndFlags::RESIZABLE),
+        flags: Some(
+            (pal::WndFlags::default() - pal::WndFlags::RESIZABLE) |
+            if opt.bg {
+                pal::WndFlags::empty()
+            } else {
+                pal::WndFlags::TRANSPARENT_BACKDROP_BLUR
+            }
+        ),
         ..Default::default()
     });
 
@@ -257,15 +264,22 @@ fn main() {
 
     let mut sublayers = state.layers.clone();
 
-    if opt.bg {
-        let bg_layer = wm.new_layer(pal::LayerAttrs {
-            bounds: Some(box2! { min: [0.0, 0.0], max: [FBSIZE[0] as f32, FBSIZE[1] as f32] }),
-            bg_color: Some([0.5, 0.5, 0.5, 1.0].into()),
-            ..Default::default()
-        });
+    let bg_layer = wm.new_layer(pal::LayerAttrs {
+        bounds: Some(box2! { min: [0.0, -100.0], max: [FBSIZE[0] as f32, FBSIZE[1] as f32] }),
+        bg_color: if opt.bg {
+            Some([0.5, 0.5, 0.5, 1.0].into())
+        } else {
+            Some([0.05, 0.05, 0.05, 0.7].into())
+        },
+        flags: if opt.bg {
+            None
+        } else {
+            Some(pal::LayerFlags::BACKDROP_BLUR)
+        },
+        ..Default::default()
+    });
 
-        sublayers.insert(0, bg_layer);
-    }
+    sublayers.insert(0, bg_layer);
 
     wm.set_layer_attr(
         &layer,
