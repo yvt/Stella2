@@ -250,12 +250,12 @@ fn main() {
         layer: Some(Some(layer.clone())),
         size: Some(FBSIZE),
         flags: Some(
-            (pal::WndFlags::default() - pal::WndFlags::RESIZABLE) |
-            if opt.bg {
-                pal::WndFlags::empty()
-            } else {
-                pal::WndFlags::TRANSPARENT_BACKDROP_BLUR
-            }
+            (pal::WndFlags::default() - pal::WndFlags::RESIZABLE)
+                | if opt.bg {
+                    pal::WndFlags::empty()
+                } else {
+                    pal::WndFlags::TRANSPARENT_BACKDROP_BLUR
+                },
         ),
         ..Default::default()
     });
