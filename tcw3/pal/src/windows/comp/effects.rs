@@ -330,7 +330,7 @@ define_effect! {
     num_props: 1;
     props_map: |index| match index {
         d2d1effects::D2D1_SATURATION_PROP_SATURATION => {
-            PropertyValue::create_single(2.0)
+            PropertyValue::create_single(1.2)
         }
         _ => return E_INVALIDARG,
     };
