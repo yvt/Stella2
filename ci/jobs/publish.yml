@@ -34,7 +34,8 @@ jobs:
       xargo build --target x86_64-pc-windows-msvc --release -p stella2
       mkdir publish
       copy target\x86_64-pc-windows-msvc\release\stella2.exe publish\
-    displayName: xargo build 
+      copy target\x86_64-pc-windows-msvc\release\stella2.pdb publish\
+    displayName: xargo build
     condition: eq(variables['Agent.OS'], 'Windows_NT')
 
   - task: ArchiveFiles@2
