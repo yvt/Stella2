@@ -45,11 +45,18 @@ impl HWnd {
             return;
         }
 
-        let mut attrs = Default::default();
         let style_attrs = self.wnd.style_attrs.borrow();
         let dirty = &self.wnd.dirty;
-        style_attrs.transfer_to_pal(dirty.get(), &mut attrs);
-        dirty.set(dirty.get() - WndDirtyFlags::style());
+        let mut transferred_flags = WndDirtyFlags::style();
+        if style_attrs.visible {
+            // Don't make the visible just yet - the size is
+            // not calculated yet and the contents are empty
+            transferred_flags -= WndDirtyFlags::STYLE_VISIBLE;
+        }
+        dirty.set(dirty.get() - transferred_flags);
+
+        let mut attrs = Default::default();
+        style_attrs.transfer_to_pal(transferred_flags, &mut attrs);
 
         let pal_wnd = self.wnd.wm.new_wnd(attrs);
         *pal_wnd_cell = Some(pal_wnd);
