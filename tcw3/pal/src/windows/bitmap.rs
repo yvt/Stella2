@@ -614,6 +614,8 @@ pub fn new_noise_bmp() -> Bitmap {
 
     const SIZE: usize = 128;
 
+    ensure_gdip_inited();
+
     let bmp = Bitmap {
         inner: Arc::new(BitmapInner::new([SIZE as u32; 2])),
     };
