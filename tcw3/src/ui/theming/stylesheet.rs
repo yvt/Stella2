@@ -303,6 +303,16 @@ macro_rules! prop {
         )
     };
 
+    (@kind layer_flags[$i:expr]) => {
+        $crate::ui::theming::Prop::LayerFlags($i).kind_flags()
+    };
+    (layer_flags[$i:expr]: $val:expr) => {
+        (
+            $crate::ui::theming::Prop::LayerFlags($i),
+            $crate::ui::theming::PropValue::LayerFlags($val),
+        )
+    };
+
     (@kind layer_metrics[$i:expr]) => {
         $crate::ui::theming::Prop::LayerMetrics($i).kind_flags()
     };

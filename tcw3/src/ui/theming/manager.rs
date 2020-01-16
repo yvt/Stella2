@@ -390,6 +390,7 @@ bitflags! {
         const LAYER_OPACITY = 1 << 4;
         const LAYER_CENTER = 1 << 5;
         const LAYER_XFORM = 1 << 6;
+        const LAYER_FLAGS = 1 << 7;
         /// Any properties of decorative layers.
         const LAYER_ALL = Self::NUM_LAYERS.bits |
             Self::LAYER_IMG.bits |
@@ -397,11 +398,12 @@ bitflags! {
             Self::LAYER_BG_COLOR.bits |
             Self::LAYER_OPACITY.bits |
             Self::LAYER_CENTER.bits |
-            Self::LAYER_XFORM.bits;
-        const CLIP_LAYER = 1 << 7;
-        const LAYOUT = 1 << 8;
-        const FONT = 1 << 9;
-        const FG_COLOR = 1 << 10;
+            Self::LAYER_XFORM.bits |
+            Self::LAYER_FLAGS.bits;
+        const CLIP_LAYER = 1 << 8;
+        const LAYOUT = 1 << 9;
+        const FONT = 1 << 10;
+        const FG_COLOR = 1 << 11;
     }
 }
 
@@ -415,6 +417,7 @@ impl Prop {
             Prop::LayerOpacity(_) => PropKindFlags::LAYER_OPACITY,
             Prop::LayerCenter(_) => PropKindFlags::LAYER_CENTER,
             Prop::LayerXform(_) => PropKindFlags::LAYER_XFORM,
+            Prop::LayerFlags(_) => PropKindFlags::LAYER_FLAGS,
             Prop::SubviewMetrics(_) => PropKindFlags::LAYOUT,
             Prop::SubviewVisibility(_) => PropKindFlags::LAYOUT,
             Prop::MinSize => PropKindFlags::LAYOUT,

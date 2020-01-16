@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Rad, Vector2};
 
-use crate::pal::{SysFontType, RGBAF32};
+use crate::pal::{LayerFlags, SysFontType, RGBAF32};
 
 bitflags! {
     /// A set of styling classes.
@@ -118,6 +118,9 @@ pub enum Prop {
     /// The transformation of the `n`-th layer.
     LayerXform(u32),
 
+    /// The flags of the `n`-th layer.
+    LayerFlags(u32),
+
     /// The [`Metrics`] of a subview.
     SubviewMetrics(Role),
 
@@ -150,6 +153,7 @@ pub enum PropValue {
     Box2(Box2<f32>),
     LayerXform(LayerXform),
     SysFontType(SysFontType),
+    LayerFlags(LayerFlags),
 }
 
 impl PropValue {
@@ -164,6 +168,7 @@ impl PropValue {
                 min: [0.0, 0.0], max: [1.0, 1.0]
             }),
             Prop::LayerXform(_) => PropValue::LayerXform(LayerXform::default()),
+            Prop::LayerFlags(_) => PropValue::LayerFlags(LayerFlags::default()),
             Prop::SubviewMetrics(_) => PropValue::Metrics(Metrics::default()),
             Prop::SubviewVisibility(_) => PropValue::Bool(true),
             Prop::ClipMetrics => PropValue::Metrics(Metrics::default()),
