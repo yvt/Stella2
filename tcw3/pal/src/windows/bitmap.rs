@@ -632,7 +632,14 @@ pub fn new_noise_bmp() -> Bitmap {
 
         let mut rng = Xorshift32(0x4F6CDD1D);
         for pix in data.chunks_exact_mut(4) {
-            let color = rng.next() as u8;
+            let rnd = rng.next().to_ne_bytes();
+
+            // Approximate Gaussian distribution
+            let color = (rnd[0] as u32 + rnd[1] as u32 + rnd[2] as u32 + rnd[3] as u32) / 4;
+
+            // Tone adjustment
+            let color = (color * color / 256) as u8;
+
             pix[0] = color;
             pix[1] = color;
             pix[2] = color;

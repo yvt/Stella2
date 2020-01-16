@@ -276,7 +276,7 @@ define_effect! {
     num_props: 3;
     props_map: |index| match index {
         d2d1effects::D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION => {
-            PropertyValue::create_single(30.0)
+            PropertyValue::create_single(15.0)
         }
         d2d1effects::D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION => {
             PropertyValue::create_uint32(d2d1effects::D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED)
@@ -354,7 +354,7 @@ define_effect! {
     num_props: 1;
     props_map: |index| match index {
         d2d1effects_2_win10_rs1::D2D1_OPACITY_PROP_OPACITY => {
-            PropertyValue::create_single(0.03)
+            PropertyValue::create_single(0.02)
         }
         _ => return E_INVALIDARG,
     };
