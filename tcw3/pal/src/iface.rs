@@ -377,6 +377,8 @@ bitflags! {
         ///  - The containing window has a `TRANSPARENT_BACKDROP_BLUR` flag.
         ///  - The region occupied by the layer must be an axis-aligned
         ///    rectangular region.
+        ///  - The layer's transformation matrix must only consist of
+        ///    translation.
         ///
         const BACKDROP_BLUR = 1 << 1;
     }
