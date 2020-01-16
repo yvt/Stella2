@@ -14,12 +14,12 @@ use winapi::{
 use winrt::{
     windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2, Vector3},
     windows::ui::composition::{
-        desktop::IDesktopWindowTarget, CompositionBrush, CompositionClip, CompositionColorBrush,
-        CompositionEffectBrush, CompositionEffectFactory, CompositionEffectSourceParameter,
-        CompositionGeometry, CompositionNineGridBrush, CompositionRectangleGeometry,
-        CompositionStretch, CompositionSurfaceBrush, Compositor, ContainerVisual,
-        ICompositionClip2, ICompositionSurfaceBrush2, ICompositionTarget, ICompositor2,
-        ICompositor5, ICompositor6, SpriteVisual, Visual,CompositionBitmapInterpolationMode, ICompositionSurface
+        desktop::IDesktopWindowTarget, CompositionBitmapInterpolationMode, CompositionBrush,
+        CompositionClip, CompositionColorBrush, CompositionEffectBrush, CompositionEffectFactory,
+        CompositionEffectSourceParameter, CompositionGeometry, CompositionNineGridBrush,
+        CompositionRectangleGeometry, CompositionStretch, CompositionSurfaceBrush, Compositor,
+        ContainerVisual, ICompositionClip2, ICompositionSurface, ICompositionSurfaceBrush2,
+        ICompositionTarget, ICompositor2, ICompositor5, ICompositor6, SpriteVisual, Visual,
     },
     ComPtr, FastHString, RtDefaultConstructible, RtType,
 };
@@ -148,8 +148,7 @@ pub(super) struct CompWnd {
     target: ComPtr<ICompositionTarget>,
     root_vis: ComPtr<Visual>,
     root_cvis: ComPtr<ContainerVisual>,
-    noise_brush: ComPtr<CompositionBrush>,
-    noise_sbrush2: ComPtr<ICompositionSurfaceBrush2>,
+    root_layer: Cell<Option<HLayer>>,
 }
 
 impl fmt::Debug for CompWnd {
@@ -180,30 +179,20 @@ impl CompWnd {
 
         target.set_root(&root_vis).unwrap();
 
-        let noise_sbrush = comp.create_surface_brush().unwrap().unwrap();
-        let noise_sbrush2: ComPtr<ICompositionSurfaceBrush2> =
-            noise_sbrush.query_interface().unwrap();
-        noise_sbrush.set_stretch(CompositionStretch::None).unwrap();
-        noise_sbrush.set_surface(&cs.noise_surf).unwrap();
-        noise_sbrush.set_bitmap_interpolation_mode(CompositionBitmapInterpolationMode::NearestNeighbor);
-
-        let noise_brush: ComPtr<CompositionBrush> = noise_sbrush.query_interface().unwrap();
-
         let this = Self {
             target,
             root_vis,
             root_cvis,
-            noise_brush,
-            noise_sbrush2,
+            root_layer: Cell::new(None),
         };
 
-        this.set_layer(None);
+        this.set_layer(hwnd, None);
         this.handle_dpi_change(hwnd);
 
         this
     }
 
-    pub(super) fn set_layer(&self, hlayer: Option<HLayer>) {
+    pub(super) fn set_layer(&self, hwnd: HWND, hlayer: Option<HLayer>) {
         let children = self.root_cvis.get_children().unwrap().unwrap();
 
         children.remove_all().unwrap();
@@ -211,6 +200,11 @@ impl CompWnd {
         if let Some(hlayer) = &hlayer {
             children.insert_at_top(&hlayer.layer.container_vis).unwrap();
         }
+
+        self.root_layer.set(hlayer);
+
+        // Update the new root layer's `dpi_iscale`
+        self.handle_dpi_change(hwnd);
     }
 
     pub(super) fn handle_dpi_change(&self, hwnd: HWND) {
@@ -226,8 +220,11 @@ impl CompWnd {
             })
             .unwrap();
 
-        let iscale = 96.0 / dpi as f32;
-        self.noise_sbrush2.set_scale(Vector2 { X: iscale, Y: iscale }).unwrap();
+        // Update `Layer::dpi_iscale` and noise layers' scale
+        if let Some(hlayer) = self.root_layer.take() {
+            self.root_layer.set(Some(hlayer.clone()));
+            set_layer_dpi_scale(&hlayer, 96.0 / dpi as f32);
+        }
 
         self.handle_resize(hwnd);
     }
@@ -269,6 +266,8 @@ struct Layer {
     container_cvis: ComPtr<ContainerVisual>,
     container_vis: ComPtr<Visual>,
     state: RefCell<LayerState>,
+    /// The reciprocal of the DPI scale of the containing window.
+    dpi_iscale: Cell<f32>,
     /// A temporary variable used while reconciling sublayers. Should be set
     /// to `NONE` when unused.
     tmp: Cell<usize>,
@@ -287,12 +286,7 @@ impl fmt::Debug for Layer {
 /// The changing part of `Layer`
 struct LayerState {
     layer_cvis: Option<ComPtr<ContainerVisual>>,
-    solid: Option<(
-        ComPtr<Visual>,
-        ComPtr<SpriteVisual>,
-        ComPtr<CompositionColorBrush>,
-        bool,
-    )>,
+    solid: Option<Solid>,
     image: Option<(
         ComPtr<Visual>,
         ComPtr<CompositionNineGridBrush>,
@@ -317,6 +311,17 @@ struct LayerState {
     /// `LayerAttrs::contents`. `comp.rs` doesn't read this but needs to keep
     /// it alive so that composition surfaces can be repainted on device lost.
     _contents: Option<Bitmap>,
+}
+
+struct Solid {
+    vis: ComPtr<Visual>,
+    svis: ComPtr<SpriteVisual>,
+    cbrush: ComPtr<CompositionColorBrush>,
+    backdrop: Option<BackdropBlurLayer>,
+}
+
+struct BackdropBlurLayer {
+    noise_sbrush2: ComPtr<ICompositionSurfaceBrush2>,
 }
 
 pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
@@ -344,6 +349,7 @@ pub fn new_layer(wm: Wm, attrs: LayerAttrs) -> HLayer {
             contents_scale: 1.0,
             _contents: None,
         }),
+        dpi_iscale: Cell::new(1.0),
         tmp: Cell::new(NONE),
     };
 
@@ -400,7 +406,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             container_children.remove_all().unwrap();
             container_children.insert_at_top(&layer_vis).unwrap();
 
-            if let Some((vis, _, _, _)) = &state.solid {
+            if let Some(Solid { vis, .. }) = &state.solid {
                 layer_children.insert_at_top(&vis).unwrap();
             }
             if let Some((vis, _, _)) = &state.image {
@@ -429,7 +435,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         if let Some((clip, _)) = &state.clip {
             clip.set_transform_matrix(state.xform3x2).unwrap();
         }
-        if let Some((vis, _, _, _)) = &state.solid {
+        if let Some(Solid { vis, .. }) = &state.solid {
             vis.set_transform_matrix(state.xform4x4).unwrap();
         }
         if let Some((vis, _, _)) = &state.image {
@@ -450,7 +456,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             rect.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
                 .unwrap();
         }
-        if let Some((vis, _, _, _)) = &state.solid {
+        if let Some(Solid { vis, .. }) = &state.solid {
             vis.set_size(winrt_v2_from_cgmath_vec(state.bounds.size()))
                 .unwrap();
             vis.set_anchor_point(bounds_to_anchor(state.bounds))
@@ -495,7 +501,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
 
             // Insert the newly created visual to the correct position
             let children = visuals_container_cvis.get_children().unwrap().unwrap();
-            if let Some((solid_vis, _, _, _)) = &state.solid {
+            if let Some(Solid { vis: solid_vis, .. }) = &state.solid {
                 children.insert_above(&vis, solid_vis).unwrap();
             } else {
                 children.insert_at_bottom(&vis).unwrap();
@@ -556,16 +562,21 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
     let check_solid = attrs.bg_color.is_some() || change_backdrop_blur;
 
     if check_solid {
-        let (_, svis, brush, is_blur) = if let Some(x) = &mut state.solid {
+        let Solid {
+            svis,
+            cbrush,
+            backdrop,
+            ..
+        } = if let Some(x) = &mut state.solid {
             x
         } else {
             // Create `state.solid` and set properties
-            let brush = cs.comp.create_color_brush().unwrap().unwrap();
+            let cbrush = cs.comp.create_color_brush().unwrap().unwrap();
 
             let svis = cs.comp.create_sprite_visual().unwrap().unwrap();
             let vis: ComPtr<Visual> = svis.query_interface().unwrap();
 
-            svis.set_brush(&brush.query_interface::<CompositionBrush>().unwrap())
+            svis.set_brush(&cbrush.query_interface::<CompositionBrush>().unwrap())
                 .unwrap();
 
             vis.set_transform_matrix(state.xform4x4).unwrap();
@@ -578,12 +589,40 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
             let children = visuals_container_cvis.get_children().unwrap().unwrap();
             children.insert_at_bottom(&vis).unwrap();
 
-            state.solid = Some((vis, svis, brush, false));
+            state.solid = Some(Solid {
+                vis,
+                svis,
+                cbrush,
+                backdrop: None,
+            });
             state.solid.as_mut().unwrap()
         };
 
-        if *is_blur != has_backdrop_blur {
+        if backdrop.is_some() != has_backdrop_blur {
+            *backdrop = None;
+
             if has_backdrop_blur {
+                // Create noise layer. It's rescaled according to the containing
+                // window's DPI factor.
+                let noise_sbrush = cs.comp.create_surface_brush().unwrap().unwrap();
+                let noise_sbrush2: ComPtr<ICompositionSurfaceBrush2> =
+                    noise_sbrush.query_interface().unwrap();
+                noise_sbrush.set_stretch(CompositionStretch::None).unwrap();
+                noise_sbrush.set_surface(&cs.noise_surf).unwrap();
+                noise_sbrush
+                    .set_bitmap_interpolation_mode(
+                        CompositionBitmapInterpolationMode::NearestNeighbor,
+                    )
+                    .unwrap();
+                noise_sbrush2
+                    .set_scale(Vector2 {
+                        X: layer.dpi_iscale.get(),
+                        Y: layer.dpi_iscale.get(),
+                    })
+                    .unwrap();
+
+                let noise_brush: ComPtr<CompositionBrush> = noise_sbrush.query_interface().unwrap();
+
                 // The solid color is incorporated into the backdrop blur
                 // effect's filter graph.
                 let fx_ebrush: ComPtr<CompositionEffectBrush> =
@@ -593,26 +632,27 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
                     .set_source_parameter(&FastHString::new("backdrop"), &cs.backdrop_brush)
                     .unwrap();
                 fx_ebrush
-                    .set_source_parameter(&FastHString::new("noise"), &cs.noise_brush)
+                    .set_source_parameter(&FastHString::new("noise"), &noise_brush)
                     .unwrap();
                 fx_ebrush
                     .set_source_parameter(
                         &FastHString::new("color"),
-                        &brush.query_interface().unwrap(),
+                        &cbrush.query_interface().unwrap(),
                     )
                     .unwrap();
 
                 let fx_brush: ComPtr<CompositionBrush> = fx_ebrush.query_interface().unwrap();
 
                 svis.set_brush(&fx_brush).unwrap();
+
+                *backdrop = Some(BackdropBlurLayer { noise_sbrush2 });
             } else {
-                svis.set_brush(&brush.query_interface().unwrap()).unwrap();
+                svis.set_brush(&cbrush.query_interface().unwrap()).unwrap();
             }
-            *is_blur = has_backdrop_blur;
         }
 
         if let Some(color) = attrs.bg_color {
-            brush.set_color(winrt_color_from_rgbaf32(color)).unwrap();
+            cbrush.set_color(winrt_color_from_rgbaf32(color)).unwrap();
         }
     }
 
@@ -646,7 +686,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         // The topmost subvisual that belong to `self` itself
         let mut insertion_ref_vis = if let Some((vis, _, _)) = &state.image {
             Some(&**vis)
-        } else if let Some((vis, _, _, _)) = &state.solid {
+        } else if let Some(Solid { vis, .. }) = &state.solid {
             Some(&**vis)
         } else {
             None
@@ -655,6 +695,7 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         let children = visuals_container_cvis.get_children().unwrap().unwrap();
 
         let mut next_old_i = 0;
+        let dpi_iscale = layer.dpi_iscale.get();
         for hlayer in sublayers.iter() {
             let old_i = hlayer.layer.tmp.get();
             let vis = &*hlayer.layer.container_vis;
@@ -668,6 +709,9 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
                     // should be re-inserted
                     old_i < next_old_i
                 );
+
+                // Update `hlayer.layer.dpi_iscale`
+                set_layer_dpi_scale(hlayer, dpi_iscale);
 
                 if let Some(ref_vis) = insertion_ref_vis {
                     children.insert_above(vis, ref_vis).unwrap();
@@ -735,6 +779,36 @@ pub fn set_layer_attr(wm: Wm, hlayer: &HLayer, attrs: LayerAttrs) {
         }
     }
     state.flags = new_flags;
+}
+
+fn set_layer_dpi_scale(hlayer: &HLayer, new_dpi_iscale: f32) {
+    let layer = &*hlayer.layer;
+    if layer.dpi_iscale.get() == new_dpi_iscale {
+        return;
+    }
+
+    layer.dpi_iscale.set(new_dpi_iscale);
+
+    let state = layer.state.borrow();
+
+    if let Some(Solid {
+        backdrop: Some(backdrop),
+        ..
+    }) = &state.solid
+    {
+        backdrop
+            .noise_sbrush2
+            .set_scale(Vector2 {
+                X: new_dpi_iscale,
+                Y: new_dpi_iscale,
+            })
+            .unwrap();
+    }
+
+    // Update sublayers' `dpi_iscale` as well
+    for sublayer in state.sublayers.iter() {
+        set_layer_dpi_scale(sublayer, new_dpi_iscale);
+    }
 }
 
 /// Check if the given list of layers contains duplicate elements or not.
