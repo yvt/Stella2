@@ -5,7 +5,7 @@ use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 use tcw3::{
     images::{himg_from_rounded_rect, HImg},
-    pal::{SysFontType, LayerFlags},
+    pal::{LayerFlags, SysFontType},
     stylesheet,
     ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
 };
