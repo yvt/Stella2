@@ -62,6 +62,7 @@ impl HWnd {
         *pal_wnd_cell = Some(pal_wnd);
 
         drop(pal_wnd_cell);
+        drop(style_attrs);
 
         // Set the listener after creating the window. The listener's methods
         // expect `pal_wnd` to be borrowable.
@@ -74,7 +75,15 @@ impl HWnd {
                 })),
                 ..Default::default()
             },
-        )
+        );
+
+        // Raise `got_focus` if needed
+        if self.wnd.wm.is_wnd_focused(pal_wnd_cell.as_ref().unwrap()) {
+            let handlers = self.wnd.got_focus_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(self.wnd.wm, self);
+            }
+        }
     }
 
     /// Pend an update.
@@ -457,6 +466,24 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
     fn dpi_scale_changed(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
             let handlers = hwnd.wnd.dpi_scale_changed_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(hwnd.wnd.wm, &hwnd);
+            }
+        }
+    }
+
+    fn got_focus(&self, _: Wm, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            let handlers = hwnd.wnd.got_focus_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(hwnd.wnd.wm, &hwnd);
+            }
+        }
+    }
+
+    fn lost_focus(&self, _: Wm, _: &pal::HWnd) {
+        if let Some(hwnd) = self.hwnd() {
+            let handlers = hwnd.wnd.lost_focus_handlers.borrow();
             for handler in handlers.iter() {
                 handler(hwnd.wnd.wm, &hwnd);
             }

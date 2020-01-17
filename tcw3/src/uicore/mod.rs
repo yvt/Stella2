@@ -162,6 +162,8 @@ struct Wnd {
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
     frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, &HWnd)>>,
+    got_focus_handlers: RefCell<SubscriberList<WndCb>>,
+    lost_focus_handlers: RefCell<SubscriberList<WndCb>>,
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
@@ -185,6 +187,8 @@ impl fmt::Debug for Wnd {
             .field("dpi_scale_changed_handlers", &())
             .field("frame_handlers", &())
             .field("mouse_state", &self.mouse_state)
+            .field("got_focus_handlers", &())
+            .field("lost_focus_handlers", &())
             .finish()
     }
 }
@@ -209,6 +213,8 @@ impl Wnd {
             frame_handlers: LinkedListCell::new(),
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
+            got_focus_handlers: RefCell::new(SubscriberList::new()),
+            lost_focus_handlers: RefCell::new(SubscriberList::new()),
         }
     }
 }
@@ -594,6 +600,37 @@ impl HWnd {
     pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {
         self.wnd
             .dpi_scale_changed_handlers
+            .borrow_mut()
+            .insert(cb)
+            .untype()
+    }
+
+    /// Get a flag indicating whether the window has focus or not.
+    ///
+    /// This function returns `false` if the window is not materialized yet.
+    pub fn is_focused(&self) -> bool {
+        if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
+            self.wnd.wm.is_wnd_focused(pal_wnd)
+        } else {
+            false
+        }
+    }
+
+    /// Register a function that gets called whenever the window gets focus.
+    ///
+    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
+    /// unregister the function.
+    pub fn subscribe_got_focus(&self, cb: WndCb) -> Sub {
+        self.wnd.got_focus_handlers.borrow_mut().insert(cb).untype()
+    }
+
+    /// Register a function that gets called whenever the window loses focus.
+    ///
+    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
+    /// unregister the function.
+    pub fn subscribe_lost_focus(&self, cb: WndCb) -> Sub {
+        self.wnd
+            .lost_focus_handlers
             .borrow_mut()
             .insert(cb)
             .untype()
