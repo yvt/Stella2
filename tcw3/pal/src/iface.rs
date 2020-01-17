@@ -401,11 +401,8 @@ pub trait WndListener<T: Wm> {
     /// The user has attempted to close a window.
     fn close_requested(&self, _: T, _: &T::HWnd) {}
 
-    /// The window got focus.
-    fn got_focus(&self, _: T, _: &T::HWnd) {}
-
-    /// The window lost focus.
-    fn lost_focus(&self, _: T, _: &T::HWnd) {}
+    /// The window got or lost focus.
+    fn focus(&self, _: T, _: &T::HWnd) {}
 
     /// The window is ready to accept a new update.
     ///

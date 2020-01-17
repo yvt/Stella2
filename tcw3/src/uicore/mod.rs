@@ -162,8 +162,7 @@ struct Wnd {
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
     frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, &HWnd)>>,
-    got_focus_handlers: RefCell<SubscriberList<WndCb>>,
-    lost_focus_handlers: RefCell<SubscriberList<WndCb>>,
+    focus_handlers: RefCell<SubscriberList<WndCb>>,
 
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
@@ -187,8 +186,7 @@ impl fmt::Debug for Wnd {
             .field("dpi_scale_changed_handlers", &())
             .field("frame_handlers", &())
             .field("mouse_state", &self.mouse_state)
-            .field("got_focus_handlers", &())
-            .field("lost_focus_handlers", &())
+            .field("focus_handlers", &())
             .finish()
     }
 }
@@ -213,8 +211,7 @@ impl Wnd {
             frame_handlers: LinkedListCell::new(),
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
-            got_focus_handlers: RefCell::new(SubscriberList::new()),
-            lost_focus_handlers: RefCell::new(SubscriberList::new()),
+            focus_handlers: RefCell::new(SubscriberList::new()),
         }
     }
 }
@@ -616,24 +613,13 @@ impl HWnd {
         }
     }
 
-    /// Register a function that gets called whenever the window gets focus.
+    /// Register a function that gets called whenever the window gets or loses
+    /// focus.
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_got_focus(&self, cb: WndCb) -> Sub {
-        self.wnd.got_focus_handlers.borrow_mut().insert(cb).untype()
-    }
-
-    /// Register a function that gets called whenever the window loses focus.
-    ///
-    /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
-    /// unregister the function.
-    pub fn subscribe_lost_focus(&self, cb: WndCb) -> Sub {
-        self.wnd
-            .lost_focus_handlers
-            .borrow_mut()
-            .insert(cb)
-            .untype()
+    pub fn subscribe_focus(&self, cb: WndCb) -> Sub {
+        self.wnd.focus_handlers.borrow_mut().insert(cb).untype()
     }
 
     /// Get the content view of a window.

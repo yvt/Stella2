@@ -129,14 +129,7 @@ impl WndView {
         }));
 
         let this_weak = Rc::downgrade(&this);
-        this.hwnd.subscribe_got_focus(Box::new(move |_, _| {
-            if let Some(this) = this_weak.upgrade() {
-                this.update_focus();
-            }
-        }));
-
-        let this_weak = Rc::downgrade(&this);
-        this.hwnd.subscribe_lost_focus(Box::new(move |_, _| {
+        this.hwnd.subscribe_focus(Box::new(move |_, _| {
             if let Some(this) = this_weak.upgrade() {
                 this.update_focus();
             }

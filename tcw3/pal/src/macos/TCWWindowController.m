@@ -348,13 +348,13 @@ extern CGSConnection CGSDefaultConnectionForThread();
 /** Implements `NSWindowDelegate`. */
 - (void)windowDidBecomeKey:(NSNotification *)notification {
     (void)notification;
-    tcw_wndlistener_got_focus(self.listenerUserData);
+    tcw_wndlistener_focus(self.listenerUserData);
 }
 
 /** Implements `NSWindowDelegate`. */
 - (void)windowDidResignKey:(NSNotification *)notification {
     (void)notification;
-    tcw_wndlistener_lost_focus(self.listenerUserData);
+    tcw_wndlistener_focus(self.listenerUserData);
 }
 
 /**
