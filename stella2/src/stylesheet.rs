@@ -32,6 +32,8 @@ pub mod elem_id {
                 , SIDEBAR_GROUP_HEADER
                 , SIDEBAR_GROUP_BULLET
                 , SIDEBAR_ITEM
+
+                , WND
     }
 }
 
@@ -90,8 +92,10 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Pane background
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
+            layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
+        },
+        ([#SIDEBAR] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
-            // TODO: Turn the "blur behind" effect off conditionally
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
         },
         ([#LOG_VIEW]) (priority = 10000) {

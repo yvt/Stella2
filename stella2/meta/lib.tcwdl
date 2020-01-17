@@ -4,7 +4,7 @@ use tcw3::{
         AlignFlags,
         views::{Label, Button, Split, FixedSpacer},
         layouts::TableLayout,
-        theming::{self, Manager, StyledBox},
+        theming::{self, Manager, StyledBox, ClassSet},
     },
     uicore::HView,
     pal,
@@ -32,6 +32,19 @@ comp crate::view::MainView {
 
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
+
+    pub prop wnd_focused: bool = false;
+
+    /// The root styling element for the main window. It has the `ACTIVE` class
+    /// if the window has focus.
+    const style_elem = theming::Elem::new! {
+        style_manager,
+        class_set = if get!(wnd_focused) {
+            elem_id::WND | ClassSet::ACTIVE
+        } else {
+            elem_id::WND
+        },
+    };
 
     pub const view = HView::new! {
         layout = TableLayout::stack_vert(
@@ -63,6 +76,10 @@ comp crate::view::MainView {
     };
     const sidebar_view = ChannelListView::new! { wm, style_manager };
 
+    on (init) {
+        get!(&style_elem).insert_child(get!(sidebar_view_wrap.style_elem));
+    }
+
     // The main area
     // -----------------------------------------------------------------------
     const split_editor = Split::new! {
@@ -74,6 +91,10 @@ comp crate::view::MainView {
         class_set = ClassSet::SPLITTER | ClassSet::VERTICAL | elem_id::EDITOR_SPLIT,
     };
 
+    on (init) {
+        get!(&style_elem).insert_child(get!(split_editor.style_elem));
+    }
+
     // Chat log
     // -----------------------------------------------------------------------
     const log_view_wrap = StyledBox::new! {
@@ -82,6 +103,10 @@ comp crate::view::MainView {
         subview_generic = get!(log_view.view),
     };
     const log_view = LogView::new! { wm, style_manager };
+
+    on (init) {
+        get!(&style_elem).insert_child(get!(log_view_wrap.style_elem));
+    }
 
     // Composing area
     // -----------------------------------------------------------------------
@@ -101,6 +126,10 @@ comp crate::view::MainView {
                 .map(|&(view, align)| (view.clone(), align))
         ),
     };
+
+    on (init) {
+        get!(&style_elem).insert_child(get!(editor_view_wrap.style_elem));
+    }
 
     const editor_field = StyledBox::new! {
         style_manager,
