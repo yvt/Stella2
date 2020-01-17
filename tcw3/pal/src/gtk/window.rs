@@ -319,6 +319,11 @@ impl HWnd {
         gtk_wnd.get_scale_factor() as f32
     }
 
+    // Implements `Wm::is_wnd_focused`.
+    pub(super) fn is_wnd_focused(&self, _: Wm) -> bool {
+        true // TODO
+    }
+
     /// Implements `Wm::request_update_ready_wnd`.
     pub(super) fn request_update_ready_wnd(&self, wm: Wm) {
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();

@@ -170,6 +170,10 @@ impl HWnd {
     pub(super) fn get_dpi_scale(&self, _: Wm) -> f32 {
         unsafe { msg_send![*self.ctrler, dpiScale] }
     }
+
+    pub(super) fn is_focused(&self, _: Wm) -> bool {
+        true // TODO
+    }
 }
 
 // These functions are called by `TCWWindowController`

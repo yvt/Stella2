@@ -423,6 +423,10 @@ pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
     (dpi as f32) / 96.0
 }
 
+pub fn is_wnd_focused(_: Wm, pal_hwnd: &HWnd) -> bool {
+    true // TODO
+}
+
 static FRAME_CLOCK_MANAGER: frameclock::FrameClockManager<HWnd> =
     frameclock::FrameClockManager::new();
 

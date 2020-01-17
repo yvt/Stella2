@@ -128,6 +128,10 @@ impl iface::Wm for Wm {
         window.get_dpi_scale(self)
     }
 
+    fn is_wnd_focused(self, window: &Self::HWnd) -> bool {
+        window.is_focused(self)
+    }
+
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
         HLayer::new(self, attrs)
     }

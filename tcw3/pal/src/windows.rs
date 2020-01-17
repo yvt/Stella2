@@ -107,6 +107,10 @@ impl iface::Wm for Wm {
         window::get_wnd_dpi_scale(self, window)
     }
 
+    fn is_wnd_focused(self, window: &Self::HWnd) -> bool {
+        window::is_wnd_focused(self, window)
+    }
+
     fn request_update_ready_wnd(self, window: &Self::HWnd) {
         window::request_update_ready_wnd(self, window)
     }
