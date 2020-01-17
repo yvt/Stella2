@@ -1,0 +1,13 @@
+use crate::ui::theming::{ClassSet, HElem, Manager, ElemChangeCb};
+
+#[prototype_only]
+#[builder(simple)]
+pub comp crate::ui::theming::Elem {
+    const style_manager: &Manager { pub set; }
+
+    prop on_change: ElemChangeCb { pub set; } = unreachable!();
+
+    prop class_set: ClassSet { pub set; pub get; } = unreachable!();
+
+    const helem: HElem { pub get clone; } = unreachable!();
+}
