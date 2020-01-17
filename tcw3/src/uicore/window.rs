@@ -421,6 +421,17 @@ impl PalWndListener {
     fn hwnd(&self) -> Option<HWnd> {
         self.wnd.upgrade().map(|wnd| HWnd { wnd })
     }
+
+    fn invoke_later_with_hwnd(&self, wm: Wm, f: impl FnOnce(HWnd) + 'static) {
+        use super::WmExt;
+
+        let wnd = self.wnd.clone();
+        wm.invoke_on_update(move |_| {
+            if let Some(wnd) = wnd.upgrade() {
+                f(HWnd { wnd });
+            }
+        });
+    }
 }
 
 impl pal::iface::WndListener<Wm> for PalWndListener {
@@ -472,22 +483,26 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
         }
     }
 
-    fn got_focus(&self, _: Wm, _: &pal::HWnd) {
-        if let Some(hwnd) = self.hwnd() {
+    fn got_focus(&self, wm: Wm, _: &pal::HWnd) {
+        // This handler can be called from `set_wnd_attrs`, which might conflict
+        // with a mutable borrow for `style_attrs`
+        self.invoke_later_with_hwnd(wm, |hwnd| {
             let handlers = hwnd.wnd.got_focus_handlers.borrow();
             for handler in handlers.iter() {
                 handler(hwnd.wnd.wm, &hwnd);
             }
-        }
+        });
     }
 
-    fn lost_focus(&self, _: Wm, _: &pal::HWnd) {
-        if let Some(hwnd) = self.hwnd() {
+    fn lost_focus(&self, wm: Wm, _: &pal::HWnd) {
+        // This handler can be called from `set_wnd_attrs`, which might conflict
+        // with a mutable borrow for `style_attrs`
+        self.invoke_later_with_hwnd(wm, |hwnd| {
             let handlers = hwnd.wnd.lost_focus_handlers.borrow();
             for handler in handlers.iter() {
                 handler(hwnd.wnd.wm, &hwnd);
             }
-        }
+        });
     }
 
     fn mouse_drag(
