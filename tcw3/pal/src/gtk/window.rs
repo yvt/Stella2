@@ -132,6 +132,15 @@ impl HWnd {
             Inhibit(true)
         });
 
+        wnd.gtk_wnd.connect_state_flags_changed(move |_, _| {
+            let listener = {
+                let wnds = WNDS.get_with_wm(wm).borrow();
+                Rc::clone(&wnds[ptr].listener)
+            };
+
+            listener.focus(wm, &Self { ptr });
+        });
+
         // `set_wnd_attr` borrows `WNDS`, so unborrow it before calling that
         drop(wnds);
 
@@ -320,8 +329,12 @@ impl HWnd {
     }
 
     // Implements `Wm::is_wnd_focused`.
-    pub(super) fn is_wnd_focused(&self, _: Wm) -> bool {
-        true // TODO
+    pub(super) fn is_wnd_focused(&self, wm: Wm) -> bool {
+        let wnds = WNDS.get_with_wm(wm).borrow();
+        let gtk_wnd = &wnds[self.ptr].gtk_wnd;
+        !gtk_wnd
+            .get_state_flags()
+            .contains(gtk::StateFlags::BACKDROP)
     }
 
     /// Implements `Wm::request_update_ready_wnd`.
