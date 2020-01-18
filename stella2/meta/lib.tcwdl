@@ -58,6 +58,10 @@ comp crate::view::MainView {
 
     on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
 
+    on (init) {
+        get!(&style_elem).insert_child(get!(toolbar.style_elem));
+    }
+
     const split_side = Split::new! {
         style_manager,
         vertical = false,
@@ -78,6 +82,7 @@ comp crate::view::MainView {
 
     on (init) {
         get!(&style_elem).insert_child(get!(sidebar_view_wrap.style_elem));
+        get!(&style_elem).insert_child(get!(sidebar_view.style_elem));
     }
 
     // The main area

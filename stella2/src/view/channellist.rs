@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, rc::Rc};
 use tcw3::{
     ui::{
         mixins::scrollwheel::ScrollAxisFlags,
@@ -22,6 +22,7 @@ impl ChannelListView {
             let mut edit = self.table().table().edit().unwrap();
             edit.set_model(TableModelQuery {
                 style_manager: self.style_manager(),
+                elem: Rc::clone(self.elem()),
             });
             edit.insert(LineTy::Row, 0..29);
             edit.insert(LineTy::Col, 0..1);
@@ -32,6 +33,7 @@ impl ChannelListView {
 
 struct TableModelQuery {
     style_manager: &'static theming::Manager,
+    elem: Rc<theming::Elem>,
 }
 
 impl table::TableModelQuery for TableModelQuery {
@@ -61,6 +63,8 @@ impl table::TableModelQuery for TableModelQuery {
                 theming::ClassSet::empty()
             },
         );
+
+        self.elem.insert_child(wrap.style_elem());
 
         let button = if cell[1] % 4 == 0 {
             let button = Button::new(self.style_manager);

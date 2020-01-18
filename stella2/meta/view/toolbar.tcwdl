@@ -4,7 +4,7 @@ use tcw3::{
         AlignFlags,
         views::{Label, Button, FixedSpacer},
         layouts::TableLayout,
-        theming::{self, Manager, StyledBox},
+        theming::{self, Manager, StyledBox, HElem},
     },
     uicore::HView,
     pal,
@@ -43,6 +43,7 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     };
 
     pub const view: HView = get!(wrapper.view);
+    pub const style_elem: HElem = get!(wrapper.style_elem);
 
     const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
     const spacer2 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
