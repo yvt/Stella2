@@ -338,7 +338,7 @@ fn get_split_position(
         _ => unreachable!(),
     };
 
-    let position = position.fmin(max).fmax(min);
+    let position = position.round().fmin(max).fmax(min);
 
     (position, position == min, position == max)
 }
