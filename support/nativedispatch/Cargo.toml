@@ -14,3 +14,10 @@ dispatch = "0.2.0"
 [target.'cfg(not(any(target_os = "macos", target_os = "windows")))'.dependencies]
 glib-sys = "0.9.1"
 lazy_static = "1"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "bench"
+harness = false
