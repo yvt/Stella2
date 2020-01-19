@@ -49,7 +49,7 @@ impl HWnd {
         let dirty = &self.wnd.dirty;
         let mut transferred_flags = WndDirtyFlags::style();
         if style_attrs.visible {
-            // Don't make the visible just yet - the size is
+            // Don't make the window visible just yet - the size is
             // not calculated yet and the contents are empty
             transferred_flags -= WndDirtyFlags::STYLE_VISIBLE;
         }
