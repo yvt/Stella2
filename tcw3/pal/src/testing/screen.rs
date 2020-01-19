@@ -177,6 +177,9 @@ impl Screen {
         let state = self.state.borrow();
         state.wnds[hwnd.ptr].dpi_scale
     }
+    pub(super) fn is_wnd_focused(&self, hwnd: &HWnd) -> bool {
+        true // TODO
+    }
 
     pub(super) fn new_layer(&self, attrs: LayerAttrs) -> HLayer {
         let mut state = self.state.borrow_mut();

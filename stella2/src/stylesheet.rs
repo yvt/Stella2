@@ -32,6 +32,8 @@ pub mod elem_id {
                 , SIDEBAR_GROUP_HEADER
                 , SIDEBAR_GROUP_BULLET
                 , SIDEBAR_ITEM
+
+                , WND
     }
 }
 
@@ -69,7 +71,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Toolbar and titlebar background
         ([#TOOLBAR]) (priority = 10000) {
             num_layers: 2,
-            layer_bg_color[0]: [0.6, 0.6, 0.6, 1.0].into(),
+            layer_bg_color[0]: [0.8, 0.8, 0.8, 1.0].into(),
             layer_metrics[0]: Metrics {
                 margin: [-100.0, 0.0, 0.0, 0.0],
                 ..Default::default()
@@ -86,12 +88,17 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 ..Default::default()
             },
         },
+        ([#TOOLBAR] .. [#WND.ACTIVE]) (priority = 10500) {
+            layer_bg_color[0]: [0.6, 0.6, 0.6, 1.0].into(),
+        },
 
         // Pane background
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
+            layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
+        },
+        ([#SIDEBAR] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
-            // TODO: Turn the "blur behind" effect off conditionally
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
         },
         ([#LOG_VIEW]) (priority = 10000) {
@@ -226,6 +233,9 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
             num_layers: 1,
+            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.3].into(),
+        },
+        ([#SIDEBAR_ITEM.ACTIVE] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: [0.1, 0.3, 0.6, 0.9].into(),
         },
         ([.LABEL] < [#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {

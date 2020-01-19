@@ -16,6 +16,10 @@ impl WndListener<pal::Wm> for Listener {
         wm.terminate();
     }
 
+    fn focus(&self, wm: pal::Wm, wnd: &pal::HWnd) {
+        info!("is_wnd_focused = {:?}", wm.is_wnd_focused(wnd));
+    }
+
     fn resize(&self, wm: pal::Wm, hwnd: &pal::HWnd) {
         let [w, h] = wm.get_wnd_size(hwnd);
         wm.set_layer_attr(

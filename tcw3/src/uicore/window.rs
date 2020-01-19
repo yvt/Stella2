@@ -62,6 +62,7 @@ impl HWnd {
         *pal_wnd_cell = Some(pal_wnd);
 
         drop(pal_wnd_cell);
+        drop(style_attrs);
 
         // Set the listener after creating the window. The listener's methods
         // expect `pal_wnd` to be borrowable.
@@ -74,7 +75,15 @@ impl HWnd {
                 })),
                 ..Default::default()
             },
-        )
+        );
+
+        // Raise `got_focus` if needed
+        if self.wnd.wm.is_wnd_focused(pal_wnd_cell.as_ref().unwrap()) {
+            let handlers = self.wnd.focus_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(self.wnd.wm, self);
+            }
+        }
     }
 
     /// Pend an update.
@@ -412,6 +421,17 @@ impl PalWndListener {
     fn hwnd(&self) -> Option<HWnd> {
         self.wnd.upgrade().map(|wnd| HWnd { wnd })
     }
+
+    fn invoke_later_with_hwnd(&self, wm: Wm, f: impl FnOnce(HWnd) + 'static) {
+        use super::WmExt;
+
+        let wnd = self.wnd.clone();
+        wm.invoke_on_update(move |_| {
+            if let Some(wnd) = wnd.upgrade() {
+                f(HWnd { wnd });
+            }
+        });
+    }
 }
 
 impl pal::iface::WndListener<Wm> for PalWndListener {
@@ -461,6 +481,17 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
                 handler(hwnd.wnd.wm, &hwnd);
             }
         }
+    }
+
+    fn focus(&self, wm: Wm, _: &pal::HWnd) {
+        // This handler can be called from `set_wnd_attrs`, which might conflict
+        // with a mutable borrow for `style_attrs`
+        self.invoke_later_with_hwnd(wm, |hwnd| {
+            let handlers = hwnd.wnd.focus_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(hwnd.wnd.wm, &hwnd);
+            }
+        });
     }
 
     fn mouse_drag(

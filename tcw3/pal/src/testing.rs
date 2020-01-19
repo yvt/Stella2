@@ -638,6 +638,18 @@ impl iface::Wm for Wm {
         }
     }
 
+    fn is_wnd_focused(self, hwnd: &Self::HWnd) -> bool {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => wm.is_wnd_focused(hwnd),
+            (BackendAndWm::Testing, HWndInner::Testing(tc_hwnd)) => {
+                let value = SCREEN.get_with_wm(self).is_wnd_focused(tc_hwnd);
+                trace!("is_wnd_focused({:?}) -> {:?}", hwnd, value);
+                value
+            }
+            _ => unreachable!(),
+        }
+    }
+
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
         match self.backend_and_wm() {
             BackendAndWm::Native { wm } => {

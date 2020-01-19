@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use tcw3::{
     ui::{
         theming::{self, Manager},
@@ -15,6 +16,10 @@ pub(crate) comp crate::view::channellist::ChannelListView {
     const style_manager: &Manager { pub set; get clone; }
 
     const view: HView { pub get; } = get!(table.view);
+    const style_elem: theming::HElem { pub get; } = get!(&elem).helem();
+
+    const elem: Rc<theming::Elem> =
+        std::rc::Rc::new(theming::Elem::new(get!(style_manager)));
 
     const table = ScrollableTable::new! {
         style_manager,
@@ -28,5 +33,8 @@ pub(crate) comp crate::view::channellist::ChannelListView {
         },
     };
 
-    on (init) get!(&this).init();
+    on (init) {
+        get!(&this).init();
+        get!(&elem).insert_child(get!(table.style_elem));
+    }
 }

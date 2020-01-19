@@ -423,6 +423,12 @@ pub fn get_wnd_dpi_scale(_: Wm, pal_hwnd: &HWnd) -> f32 {
     (dpi as f32) / 96.0
 }
 
+pub fn is_wnd_focused(_: Wm, pal_hwnd: &HWnd) -> bool {
+    let hwnd = pal_hwnd.expect_hwnd();
+
+    hwnd == unsafe { winuser::GetForegroundWindow() }
+}
+
 static FRAME_CLOCK_MANAGER: frameclock::FrameClockManager<HWnd> =
     frameclock::FrameClockManager::new();
 
@@ -482,6 +488,11 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     let pal_hwnd = HWnd { wnd };
 
     match msg {
+        winuser::WM_ACTIVATE => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+            listener.focus(wm, &pal_hwnd);
+        } // WM_ACTIVATE
+
         winuser::WM_CLOSE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.close_requested(wm, &pal_hwnd);

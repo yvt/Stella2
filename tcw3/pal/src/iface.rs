@@ -150,6 +150,9 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
         1.0
     }
 
+    /// Get a flag indicating whether the specified window has focus.
+    fn is_wnd_focused(self, window: &Self::HWnd) -> bool;
+
     /// Create a layer.
     fn new_layer(self, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
@@ -397,6 +400,9 @@ impl Default for LayerFlags {
 pub trait WndListener<T: Wm> {
     /// The user has attempted to close a window.
     fn close_requested(&self, _: T, _: &T::HWnd) {}
+
+    /// The window got or lost focus.
+    fn focus(&self, _: T, _: &T::HWnd) {}
 
     /// The window is ready to accept a new update.
     ///

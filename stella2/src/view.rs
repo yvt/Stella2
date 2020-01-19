@@ -91,7 +91,7 @@ impl AppView {
 }
 
 struct WndView {
-    _hwnd: HWnd,
+    hwnd: HWnd,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
     main_view: MainView,
 }
@@ -113,11 +113,9 @@ impl WndView {
         hwnd.set_caption("Stella 2");
         hwnd.set_listener(WndViewWndListener);
         hwnd.set_visibility(true);
-        // TODO: Turn the "blur behind" effect off conditionally
-        hwnd.set_style_flags(WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR);
 
         let this = Rc::new(Self {
-            _hwnd: hwnd,
+            hwnd,
             dispatch: RefCell::new(Box::new(|_| {})),
             main_view,
         });
@@ -130,11 +128,28 @@ impl WndView {
             }
         }));
 
+        let this_weak = Rc::downgrade(&this);
+        this.hwnd.subscribe_focus(Box::new(move |_, _| {
+            if let Some(this) = this_weak.upgrade() {
+                this.update_focus();
+            }
+        }));
+
         this
     }
 
     fn set_dispatch(&self, cb: impl Fn(model::WndAction) + 'static) {
         *self.dispatch.borrow_mut() = Box::new(cb);
+    }
+
+    fn update_focus(&self) {
+        let is_focused = self.hwnd.is_focused();
+        self.hwnd.set_style_flags(if is_focused {
+            WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
+        } else {
+            WndStyleFlags::default()
+        });
+        self.main_view.set_wnd_focused(is_focused);
     }
 
     fn poll(&self, new_wnd_state: &Elem<model::WndState>) {

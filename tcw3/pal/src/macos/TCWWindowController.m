@@ -172,6 +172,11 @@ extern CGSConnection CGSDefaultConnectionForThread();
 }
 
 /** Called by `window.rs` */
+- (BOOL)isKeyWindow {
+    return self->window.keyWindow;
+}
+
+/** Called by `window.rs` */
 - (void)requestUpdateReady {
     if (!self->displayLink) {
         [self renewDisplayLink];
@@ -338,6 +343,18 @@ extern CGSConnection CGSDefaultConnectionForThread();
 - (void)windowDidChangeScreen:(NSNotification *)notification {
     (void)notification;
     [self renewDisplayLink];
+}
+
+/** Implements `NSWindowDelegate`. */
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+    (void)notification;
+    tcw_wndlistener_focus(self.listenerUserData);
+}
+
+/** Implements `NSWindowDelegate`. */
+- (void)windowDidResignKey:(NSNotification *)notification {
+    (void)notification;
+    tcw_wndlistener_focus(self.listenerUserData);
 }
 
 /**

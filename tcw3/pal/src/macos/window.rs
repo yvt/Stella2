@@ -170,6 +170,11 @@ impl HWnd {
     pub(super) fn get_dpi_scale(&self, _: Wm) -> f32 {
         unsafe { msg_send![*self.ctrler, dpiScale] }
     }
+
+    pub(super) fn is_focused(&self, _: Wm) -> bool {
+        let value: BOOL = unsafe { msg_send![*self.ctrler, isKeyWindow] };
+        value != 0
+    }
 }
 
 // These functions are called by `TCWWindowController`
@@ -217,6 +222,13 @@ unsafe extern "C" fn tcw_wndlistener_resize(ud: TCWListenerUserData) {
 unsafe extern "C" fn tcw_wndlistener_dpi_scale_changed(ud: TCWListenerUserData) {
     method_impl(ud, |wm, state| {
         state.listener.borrow().dpi_scale_changed(wm, &state.hwnd);
+    });
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_focus(ud: TCWListenerUserData) {
+    method_impl(ud, |wm, state| {
+        state.listener.borrow().focus(wm, &state.hwnd);
     });
 }
 
