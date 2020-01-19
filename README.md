@@ -35,13 +35,13 @@ TODO
 - **Stable Rust support.**
 - **Using innovative and/or awesome technologies.** Other goals shown here should be taken into consideration when choosing technologies and approaches. Nothing should be preferred simply because it's cool. Nothing should be disregarded simply because it's old-fashioned.
 - **"Rusty" Rust code.**
+- **Supporting running on the web platform.**
 
 **Anti-goals:**
 
 - **Memory imperialism.** We may be tempted to put everything (e.g., a 2D vector graphics library or even the entirety of a web rendering engine) in the executable by static linking and get rid of runtime dependencies. This practice is harmful for several reasons: (1) It prevents individual components from being updated and causes security problems. (2) It increases the total working set of the system because static linking impedes code sharing between processes. Instead, we should make a liberal use of common/system libraries offered by the target platform. We should leverage the target platform's error reporting facility such as CrashReporter (macOS) and `MiniDumpWriteDump` (Windows).
 - **Native-looking widgets.** Attempts to imitate the look and feel of each platform's native widgets are prone to end up with being alien to every platform.
 - **Writing UI completely separately for every supported platform.** That makes it hard to make changes to UI and to maintain feature parity between platforms.
-- **Supporting the web platform.** It kind of defeats the point of writing a native app.
 - **Supporting mobile platforms.** Their UI norms are significantly different from those of desktop apps and practically require us to write a separate UI front-end for each kind of platform.
 - **Interpreted language.** The bytecode of an interpreted language is more compact than native machine instructions, but it's utterly inefficient to execute, contradicting many of this project's goals. Furthermore, its control flow is defined purely by read/writable data, meaning its not protected by control-flow hardening techniques. Practical interpreted languages usually have an escape hatch such as FFI that enables memory-unsafe operations. This implies interpreted languages can be less secure than compiled languages which are designed for memory safety.
 
@@ -51,9 +51,11 @@ TODO
      │
      ├╴ci               CI configuration
      │
+     ├╴docs             Assets for README.md
+     │
      ├╴stella2          The main program
      │
-     ├╴stellca2_assets
+     ├╴stella2_assets   Image resources for the main program
      │
      ├╴res              Things related to metadata attached to Stella2's executable
      │  │
@@ -85,28 +87,38 @@ When testing the whole workspace, specifying features on individual crates won't
 
 ## Prerequisites
 
-The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work.
+### Build Toolchain
 
-When building for a Linux system or using TCW3's `testing` backend, dependent crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system. You also need **GTK3**, **GDK3**, and **ATK** development files when building for a Linux system.
+The nightly Rust compiler is required. Depending on when you are reading this, a stable compiler might work. If you use rustup, it will automatically install the required toolchain (specified by [`rust-toolchain`](./rust-toolchain)) when running the `cargo` command.
 
-Fedora:
+**Windows:**
+
+You need a MSVC toolchain with MSVC 2019 and the latest Windows SDK. MinGW toolchains are not supported.
+
+### GTK/GLib
+
+When building for a Linux system or using TCW3's `testing` backend, some crates expect **GLib**, **Cairo**, and **Pango** development files to be installed on your system. You also need **GTK3**, **GDK3**, and **ATK** development files when building for a Linux system.
+
+**Fedora:**
 
 ```shell
 sudo yum install glib2-devel cairo-devel cairo-gobject-devel pango-devel \
      gtk3-devel atk-devel
 ```
 
-Nix:
+**Nix:**
 
 ```shell
-# Assumes `cargo` and the nightly toolchain are already available.
-nix-shell -p gtk3 pkgconfig --run 'cargo build --release -p stella2'
+nix-shell --pure -p rustup gtk3 pkgconfig --run 'cargo build --release -p stella2'
 
 # Without GTK3 (e.g., when building on macOS):
-nix-shell -p glib pango harfbuzz pkgconfig --run 'cargo build --release -p stella2'
+nix-shell --pure -p rustup glib pango harfbuzz pkgconfig \
+     --run 'cargo build --release -p stella2'
 ```
 
-Windows isn't supported yet, but you can build and run it anyway if you have GTK+ SDK installed on your system. [gtk-rs's Requirements page](https://gtk-rs.org/docs-src/requirements.html) provides an excellent guide on how to configure a development environment for GTK.
+**Windows:**
+
+[gtk-rs's Requirements page](https://gtk-rs.org/docs-src/requirements.html) provides an excellent guide on how to configure a development environment for GTK.
 
 ## Third-party software
 
