@@ -9,6 +9,11 @@ mod dispatch;
 #[cfg(target_os = "macos")]
 use self::dispatch::QueueImpl;
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+mod glib;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+use self::glib::QueueImpl;
+
 // --------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
