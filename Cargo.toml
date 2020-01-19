@@ -25,6 +25,7 @@ members = [
     "support/demotools",
     "support/iterpool",
     "support/minisort",
+    "support/nativedispatch",
     "support/neo_linked_list",
     "support/rope",
     "support/subscriber_list",

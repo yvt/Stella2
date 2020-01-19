@@ -1260,6 +1260,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nativedispatch"
+version = "0.1.0"
+
+[[package]]
 name = "ndarray"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
