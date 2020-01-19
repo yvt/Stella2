@@ -4,12 +4,17 @@
 // --------------------------------------------------------------------------
 // Backend implementations
 
-// TODO
+#[cfg(target_os = "macos")]
+mod dispatch;
+#[cfg(target_os = "macos")]
+use self::dispatch::QueueImpl;
 
 // --------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-pub struct Queue {}
+pub struct Queue {
+    imp: QueueImpl,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QueuePriority {
@@ -22,7 +27,9 @@ pub enum QueuePriority {
 impl Queue {
     /// Get a global queue with a specified priority.
     pub fn global(pri: QueuePriority) -> Self {
-        todo!()
+        Self {
+            imp: QueueImpl::global(pri),
+        }
     }
 
     /// Get a global queue with `QueuePriority::High`.
@@ -47,7 +54,7 @@ impl Queue {
 
     /// Execute a closure asynchronously.
     pub fn invoke(&self, work: impl FnOnce() + Send + 'static) {
-        todo!();
+        self.imp.invoke(work)
     }
 }
 
