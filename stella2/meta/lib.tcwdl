@@ -16,6 +16,7 @@ use crate::{
     view::{
         channellist::ChannelListView,
         logview::LogView,
+        splitutils::SplitEventAdapter,
         toolbar::ToolbarView,
     },
 };
@@ -23,6 +24,7 @@ use crate::{
 import!("view/channellist.tcwdl");
 import!("view/dpiscalewatcher.tcwdl");
 import!("view/logview.tcwdl");
+import!("view/splitutils.tcwdl");
 import!("view/toolbar.tcwdl");
 
 #[widget]
@@ -71,6 +73,13 @@ comp crate::view::MainView {
         zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
     };
 
+    const split_side_event_adapter = SplitEventAdapter::new! { view = get!(&split_side) };
+
+    on (split_side_event_adapter.drag_complete) {
+        let new_size = get!(&split_side).value();
+        get!(&this).raise_dispatch(model::WndAction::SetSidebarWidth(new_size));
+    }
+
     // Sidebar
     // -----------------------------------------------------------------------
     const sidebar_view_wrap = StyledBox::new! {
@@ -98,6 +107,13 @@ comp crate::view::MainView {
 
     on (init) {
         get!(&style_elem).insert_child(get!(split_editor.style_elem));
+    }
+
+    const split_editor_event_adapter = SplitEventAdapter::new! { view = get!(&split_editor) };
+
+    on (split_editor_event_adapter.drag_complete) {
+        let new_size = get!(&split_editor).value();
+        get!(&this).raise_dispatch(model::WndAction::SetEditorHeight(new_size));
     }
 
     // Chat log

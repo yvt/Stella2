@@ -1,0 +1,13 @@
+use tcw3::ui::views::Split;
+
+/// Attaches a handler to a given `Split` by calling `Split::set_on_drag` and
+/// raises `drag_complete` on mouse drag completion (whether cancelled or not).
+#[builder(simple)]
+#[prototype_only]
+pub comp crate::view::splitutils::SplitEventAdapter {
+    /// This is actually given a type `for<'a> &'a Split`, which is not
+    /// supported by Designer.
+    pub const view: &Split { pub set; }
+
+    pub event drag_complete();
+}

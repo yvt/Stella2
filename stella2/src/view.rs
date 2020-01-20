@@ -9,7 +9,6 @@ use tcw3::{
     pal::prelude::*,
     ui::layouts::{FillLayout, TableLayout},
     ui::theming::{self, ClassSet},
-    ui::views::split::SplitDragListener,
     ui::AlignFlags,
     uicore::{HWnd, WndListener, WndStyleFlags},
 };
@@ -19,6 +18,7 @@ use crate::{model, stylesheet::elem_id};
 mod channellist;
 mod dpiscalewatcher;
 mod logview;
+mod splitutils;
 mod toolbar;
 
 pub struct AppView {
@@ -171,55 +171,9 @@ stella2_meta::designer_impl! {
 
 impl MainView {
     /// Handle `init` event.
-    fn init(&self) {
-        // TODO: there is no way to get a weak reference at the moment
-        /*
-        {
-            let this_weak = Rc::downgrade(&this);
-            this.split_editor.set_on_drag(move |_| {
-                let this_weak = this_weak.clone();
-                Box::new(OnDrop::new(move || {
-                    if let Some(this) = this_weak.upgrade() {
-                        let new_size = this.split_editor.value();
-                        this.dispatch.borrow()(model::WndAction::SetEditorHeight(new_size));
-                    }
-                }))
-            });
-        }
-        {
-            let this_weak = Rc::downgrade(&this);
-            this.split_side.set_on_drag(move |_| {
-                let this_weak = this_weak.clone();
-                Box::new(OnDrop::new(move || {
-                    if let Some(this) = this_weak.upgrade() {
-                        let new_size = this.split_side.value();
-                        this.dispatch.borrow()(model::WndAction::SetSidebarWidth(new_size));
-                    }
-                }))
-            });
-        }
-        */
-    }
+    fn init(&self) {}
 }
 
 stella2_meta::designer_impl! {
     crate::view::PlaceholderView
-}
-
-struct OnDrop<F: FnOnce()>(Option<F>);
-
-impl<F: FnOnce()> OnDrop<F> {
-    fn new(x: F) -> Self {
-        Self(Some(x))
-    }
-}
-
-/// The inner function is called when `<Self as SplitDragListener>` is dropped,
-/// i.e., a mouse drag gesture is finished
-impl<F: FnOnce()> SplitDragListener for OnDrop<F> {}
-
-impl<F: FnOnce()> Drop for OnDrop<F> {
-    fn drop(&mut self) {
-        (self.0.take().unwrap())();
-    }
 }
