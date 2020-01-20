@@ -575,6 +575,11 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "dispatch"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "displaydoc"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1257,6 +1262,17 @@ source = "git+https://github.com/llogiq/momo.git?rev=3d9d9709a5675bf3f5ebddcb3c1
 dependencies = [
  "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nativedispatch"
+version = "0.1.0"
+dependencies = [
+ "criterion 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dispatch 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glib-sys 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
 ]
 
 [[package]]
@@ -2854,6 +2870,7 @@ dependencies = [
 "checksum direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7fa6ff10857eb253d1ae16987ebfd27372f4129b0c7a3fa41466fbdf7e453e75"
 "checksum directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8cdcd739e9351c411b8caf5cab32a27c818cfe06260595da121382ecdd22083d"
 "checksum dispatch 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "04e93ca78226c51902d7aa8c12c988338aadd9e85ed9c6be8aaac39192ff3605"
+"checksum dispatch 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 "checksum displaydoc 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a06d4ceb0482364a62aa1e4393da51c8aa3229432e8893fe7e3da9f884c97130"
 "checksum dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1639bbfd6765e92a40267d217a7acbac5b49320b68013f39a8e4376aa8c1e091"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
