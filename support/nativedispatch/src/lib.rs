@@ -4,20 +4,25 @@
 // --------------------------------------------------------------------------
 // Backend implementations
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "native"))]
 mod dispatch;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "native"))]
 use self::dispatch::QueueImpl;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "native"))]
 mod windows;
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "native"))]
 use self::windows::QueueImpl;
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(all(not(any(target_os = "macos", target_os = "windows")), feature = "native"))]
 mod glib;
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(all(not(any(target_os = "macos", target_os = "windows")), feature = "native"))]
 use self::glib::QueueImpl;
+
+#[cfg(feature = "async-std")]
+mod asyncstd;
+#[cfg(feature = "async-std")]
+use self::asyncstd::QueueImpl;
 
 // --------------------------------------------------------------------------
 
