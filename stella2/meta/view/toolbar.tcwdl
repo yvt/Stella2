@@ -55,8 +55,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         class_set = theming::ClassSet::BUTTON
             | [elem_id::SIDEBAR_SHOW, elem_id::SIDEBAR_HIDE]
                 [get!(&wnd_state).sidebar_visible as usize],
-
-        // TODO: `on_activate` is set by `init` for now
     };
 
     on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
