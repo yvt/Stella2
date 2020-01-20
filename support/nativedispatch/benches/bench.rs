@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     sync::atomic::{AtomicUsize, Ordering},
     thread,
 };
@@ -9,7 +10,7 @@ use nativedispatch::Queue;
 fn criterion_benchmark(c: &mut Criterion) {
     let sizes: Vec<_> = (0..12).map(|i| 1usize << i).collect();
 
-    let mut group = c.benchmark_group("invoke");
+    let mut group = c.benchmark_group("invoke-noop");
     for &size in &sizes {
         group.throughput(Throughput::Elements(size as u64));
 
@@ -76,6 +77,51 @@ fn criterion_benchmark(c: &mut Criterion) {
             });
         });
     }
+    drop(group);
+
+    let sizes: Vec<_> = (4..12).map(|i| 1usize << i).collect();
+
+    let mut group = c.benchmark_group("invoke-zerofill");
+    for &size in &sizes {
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_function(BenchmarkId::new("parallel", size), move |b| {
+            b.iter(|| {
+                static COUNT: AtomicUsize = AtomicUsize::new(0);
+
+                let cur_thread = thread::current();
+                let queue = Queue::global_med();
+                COUNT.store(size, Ordering::Relaxed);
+
+                // Spawn independent tasks
+                for _ in 0..size {
+                    // Extend the lifetime of `cur_thread`
+                    let cur_thread = unsafe { &*((&cur_thread) as *const thread::Thread) };
+                    queue.invoke(move || {
+                        BUFFER.with(|buffer| {
+                            let mut buffer = buffer.borrow_mut();
+                            for el in buffer.iter_mut() {
+                                *el = 0;
+                            }
+                        });
+
+                        if COUNT.fetch_sub(1, Ordering::Relaxed) == 1 {
+                            cur_thread.unpark();
+                        }
+                    });
+                }
+
+                // Wait until all tasks are complete
+                while COUNT.load(Ordering::Relaxed) > 0 {
+                    thread::park();
+                }
+            });
+        });
+    }
+}
+
+thread_local! {
+    static BUFFER: RefCell<Vec<u128>> = RefCell::new(vec![0; 16384]);
 }
 
 criterion_group!(benches, criterion_benchmark);
