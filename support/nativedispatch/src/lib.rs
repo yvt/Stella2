@@ -14,9 +14,15 @@ mod windows;
 #[cfg(all(target_os = "windows", feature = "native"))]
 use self::windows::QueueImpl;
 
-#[cfg(all(not(any(target_os = "macos", target_os = "windows")), feature = "native"))]
+#[cfg(all(
+    not(any(target_os = "macos", target_os = "windows")),
+    feature = "native"
+))]
 mod glib;
-#[cfg(all(not(any(target_os = "macos", target_os = "windows")), feature = "native"))]
+#[cfg(all(
+    not(any(target_os = "macos", target_os = "windows")),
+    feature = "native"
+))]
 use self::glib::QueueImpl;
 
 #[cfg(feature = "async-std")]
