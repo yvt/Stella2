@@ -17,6 +17,7 @@ mod dropgen;
 mod evalgen;
 mod initgen;
 pub mod iterutils;
+mod weakrefgen;
 
 /// Paths to standard library items.
 mod paths {
@@ -25,6 +26,7 @@ mod paths {
     pub const OPTION: &str = "::std::option::Option";
     pub const SOME: &str = "::std::option::Option::Some";
     pub const RC: &str = "::std::rc::Rc";
+    pub const WEAK: &str = "::std::rc::Weak";
     pub const CELL: &str = "::std::cell::Cell";
     pub const REF_CELL: &str = "::std::cell::RefCell";
     pub const DEFAULT: &str = "::std::default::Default";
@@ -49,6 +51,8 @@ mod fields {
 
 mod methods {
     pub const SET_DIRTY_FLAGS: &str = "set_dirty_flags";
+    pub const DOWNGRADE: &str = "downgrade";
+    pub const UPGRADE: &str = "upgrade";
     pub const COMMIT: &str = "__commit";
 }
 
@@ -217,6 +221,10 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
     // `ComponentType::__commit`
     initgen::gen_commit(&analysis, &dep_analysis, ctx, &item_meta2sem_map, &mut out);
     writeln!(out, "}}").unwrap();
+
+    // `struct WeakComponentType`
+    // -------------------------------------------------------------------
+    weakrefgen::gen_weakref_items(ctx, &mut out);
 
     // `struct ComponentTypeShared`
     // -------------------------------------------------------------------
@@ -388,6 +396,11 @@ impl<T: fmt::Display> fmt::Display for Angle<T> {
 struct CompTy<T>(T);
 impl<T: fmt::Display> fmt::Display for CompTy<T> {
     fn_fmt_write! { |this| ("{}", this.0) }
+}
+
+struct WeakCompTy<T>(T);
+impl<T: fmt::Display> fmt::Display for WeakCompTy<T> {
+    fn_fmt_write! { |this| ("Weak{}", this.0) }
 }
 
 struct CompSharedTy<T>(T);

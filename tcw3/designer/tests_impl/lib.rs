@@ -22,6 +22,10 @@ mod interop {
     mod builder_simple;
 }
 
+mod misc {
+    mod weakref;
+}
+
 mod objinit {
     mod shorthand;
 }

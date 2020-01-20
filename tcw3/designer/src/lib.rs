@@ -351,7 +351,7 @@
 //!
 //! ## Component Types
 //!
-//! For a `pub` component named `Component`, the following four types are
+//! For a `pub` component named `Component`, the following five types are
 //! defined (they are inserted to a source file by `designer_impl` macro):
 //!
 //! ```rust,no_compile
@@ -362,6 +362,10 @@
 //!
 //! pub struct Component {
 //!     shared: Rc<ComponentShared>,
+//! }
+//!
+//! pub struct WeakComponent {
+//!     shared: Weak<ComponentShared>,
 //! }
 //!
 //! struct ComponentShared {
@@ -627,6 +631,20 @@
 //! fails if it is called from the same event's handler. For this reason, the
 //! `Drop` implementation just enqueues a closure using `Wm::invoke`, and this
 //! closure unregisters the event handlers.
+//!
+//! ## Weak Reference
+//!
+//! `WeakComponent` represents a weak reference to the component. The following
+//! methods to convert between `Component` and `WeakComponent` are provided:
+//!
+//! ```rust,no_compile
+//! impl Component {
+//!     pub fn downgrade(&self) -> WeakComponent { /* ... */ }
+//! }
+//! impl WeakComponent {
+//!     pub fn upgrade(&self) -> Option<Component> { /* ... */ }
+//! }
+//! ```
 //!
 //! # Tests
 //!
