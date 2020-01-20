@@ -1,5 +1,5 @@
 use crate::{
-    ui::theming::{ClassSet, HElem, Manager, StyledBoxOverride},
+    ui::theming::{ClassSet, HElem, Manager, StyledBoxOverride, Widget},
     uicore::{HView, ViewFlags},
 };
 
@@ -13,8 +13,11 @@ pub comp crate::ui::theming::StyledBox {
     prop class_set: ClassSet { pub set; pub get; } = unreachable!();
     prop r#override: Box<dyn StyledBoxOverride> { pub set; } = unreachable!();
 
-    /// Work-around for the lack of indexed prop support
+    // Work-around for the lack of indexed prop support. Props of
+    // non-`'static` reference types are not supported by Designer, actually.
     prop subview_generic: Option<HView> { pub set; } = unreachable!();
+    prop subelement_generic: HElem { pub set; } = unreachable!();
+    prop child_generic: &dyn Widget { pub set; } = unreachable!();
 
     const view: HView { pub get; } = unreachable!();
     const style_elem: HElem { pub get clone; } = unreachable!();

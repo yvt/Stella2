@@ -180,13 +180,6 @@ impl StyledBox {
         self.shared.set_dirty(PropKindFlags::LAYOUT);
     }
 
-    #[doc(hidden)]
-    /// Calls `set_subview` with `Role::Generic`. Work-arounds the lack of
-    /// indexed prop support in Designer.
-    pub fn set_subview_generic(&self, view: impl Into<Option<HView>>) {
-        self.set_subview(Role::Generic, view.into());
-    }
-
     /// Set a subelement for the specified `Role`.
     pub fn set_subelement(&self, role: Role, helem: Option<HElem>) {
         let elem_cell = &self.shared.subelems[role as usize];
@@ -249,6 +242,22 @@ impl StyledBox {
     /// Get the styling element representing the styled box.
     pub fn style_elem(&self) -> HElem {
         self.shared.style_elem.helem()
+    }
+}
+
+#[doc(hidden)]
+/// Work-arounds the lack of indexed prop support in Designer.
+impl StyledBox {
+    pub fn set_subview_generic(&self, view: impl Into<Option<HView>>) {
+        self.set_subview(Role::Generic, view.into());
+    }
+
+    pub fn set_subelement_generic(&self, element: impl Into<Option<HElem>>) {
+        self.set_subelement(Role::Generic, element.into());
+    }
+
+    pub fn set_child_generic(&self, widget: &dyn Widget) {
+        self.set_child(Role::Generic, Some(widget));
     }
 }
 

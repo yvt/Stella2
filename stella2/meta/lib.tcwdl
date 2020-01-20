@@ -150,17 +150,13 @@ comp crate::view::MainView {
                 Some((get!(editor_placeholder.view), AlignFlags::TOP | AlignFlags::LEFT))
             ),
         },
+        subelement_generic = get!(editor_placeholder.style_elem),
     };
     const editor_placeholder = Label::new! {
         style_manager,
         text = "Message #random",
     };
     on (init) {
-        // TODO: find a prettier way
-        get!(&editor_field).set_subelement(
-            tcw3::ui::theming::Role::Generic,
-            Some(get!(editor_placeholder.style_elem))
-        );
         get!(&editor_field.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
     }
 

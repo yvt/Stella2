@@ -81,14 +81,9 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
         },
         class_set = elem_id::SEARCH_FIELD,
-        subview_generic = get!(search_bar_placeholder.view),
+        child_generic = get!(&search_bar_placeholder),
     };
     on (init) {
-        // TODO: find a prettier way
-        get!(&search_bar).set_subelement(
-            tcw3::ui::theming::Role::Generic,
-            Some(get!(search_bar_placeholder.style_elem))
-        );
         get!(&search_bar.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
     }
 
