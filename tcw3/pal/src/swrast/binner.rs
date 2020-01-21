@@ -1178,8 +1178,8 @@ fn saturating_aabb_f32_to_u16(bx: Box2<f32>) -> Option<Box2<u16>> {
     const MAX: f32 = <u16>::max_value() as f32;
 
     let bx = box2! {
-        min: [bx.min.x.fmax(0.0) as u16, bx.min.y.fmax(0.0) as u16],
-        max: [bx.max.x.fmin(MAX) as u16, bx.max.y.fmin(MAX) as u16],
+        min: [bx.min.x.fmax(0.0).fmin(MAX) as u16, bx.min.y.fmax(0.0).fmin(MAX) as u16],
+        max: [bx.max.x.fmax(0.0).fmin(MAX) as u16, bx.max.y.fmax(0.0).fmin(MAX) as u16],
     };
 
     if bx.is_empty() {
