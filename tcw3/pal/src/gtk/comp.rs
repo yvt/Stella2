@@ -85,15 +85,11 @@ impl Compositor {
     ///
     /// `surf_size_sz` and `surf_dpi_scale` specify the desired properties of
     /// the backing store.
-    ///
-    /// If `update_layers` is `false`, it does not commit changes in the layer
-    /// tree.
     pub(super) fn update_wnd(
         &mut self,
         wnd: &mut Wnd,
         surf_size_sz: [usize; 2],
         surf_dpi_scale: f32,
-        update_layers: bool,
     ) -> Option<Box2<usize>> {
         // Check the surface size
         let [size_w, size_h] = surf_size_sz;
@@ -124,11 +120,7 @@ impl Compositor {
         }
 
         // Compute the dirty region
-        let new_dirty = if update_layers {
-            self.sr_scrn.update_wnd(&wnd.sr_wnd)
-        } else {
-            None
-        };
+        let new_dirty = self.sr_scrn.update_wnd(&wnd.sr_wnd);
 
         if let Some(new_dirty) = new_dirty {
             if let Some(x) = &mut wnd.dirty_rect {

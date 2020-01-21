@@ -298,7 +298,6 @@ impl HWnd {
             &mut wnd.comp_wnd,
             surf_size,
             dpi_scale,
-            true,
         );
 
         if let Some(r) = added_dirty_rect {
@@ -464,7 +463,7 @@ extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_
         let mut compositor = COMPOSITOR.get_with_wm(wm).borrow_mut();
 
         let (surf_size, dpi_scale) = comp_surf_props_for_widget(&wnd.gtk_widget);
-        compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale, false);
+        compositor.update_wnd(&mut wnd.comp_wnd, surf_size, dpi_scale);
 
         compositor.paint_wnd(&mut wnd.comp_wnd);
 
