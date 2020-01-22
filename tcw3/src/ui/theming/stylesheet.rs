@@ -455,18 +455,41 @@ macro_rules! ruleprops {
 ///             // like the following:
 ///             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
 ///         },
+///
+///         #[cfg(target_os = "windows")]
+///         ([.BUTTON]) (priority = 10000) {
+///             // This rule is compiled in only when targetting Windows
+///             layer_opacity[0]: 0.5,
+///         },
 ///     };
 ///
 #[macro_export]
 macro_rules! stylesheet {
-    ($( $( ($( $meta:tt )*) )* { $( $rule:tt )* } ),* $(,)*) => {{
+    (
+        // for each rule...
+        $(
+            // `#[cfg(...)]`, etc.
+            $( #[$cfg:meta] )*
+            // scope and priority
+            $( ($( $meta:tt )*) )*
+            // props
+            { $( $rule:tt )* }
+        ),*
+        $(,)*
+    ) => {{
         static RULES: &[$crate::ui::theming::Rule] = &[
-            $( $crate::rule!( $(($($meta)*))* {$($rule)*} ), )*
+            $(
+                $( #[$cfg] )*
+                $crate::rule!( $(($($meta)*))* {$($rule)*} ),
+            )*
         ];
         $crate::ui::theming::StylesheetMacroOutput {
             rules: RULES,
             ruleprops: std::vec![
-                $( $crate::ruleprops!( $(($($meta)*))* {$($rule)*} ), )*
+                $(
+                    $( #[$cfg] )*
+                    $crate::ruleprops!( $(($($meta)*))* {$($rule)*} ),
+                )*
             ],
         }
     }};
