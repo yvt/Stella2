@@ -13,7 +13,10 @@ use tcw3::{
     uicore::{HWnd, WndListener, WndStyleFlags},
 };
 
-use crate::{model, stylesheet::elem_id};
+use crate::{
+    model,
+    stylesheet::{self, elem_id},
+};
 
 mod channellist;
 mod dpiscalewatcher;
@@ -144,11 +147,13 @@ impl WndView {
 
     fn update_focus(&self) {
         let is_focused = self.hwnd.is_focused();
-        self.hwnd.set_style_flags(if is_focused {
-            WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
-        } else {
-            WndStyleFlags::default()
-        });
+        if stylesheet::ENABLE_BACKDROP_BLUR {
+            self.hwnd.set_style_flags(if is_focused {
+                WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
+            } else {
+                WndStyleFlags::default()
+            });
+        }
         self.main_view.set_wnd_focused(is_focused);
     }
 

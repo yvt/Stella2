@@ -3,6 +3,7 @@ use cgmath::{Deg, Vector2};
 use std::f32::NAN;
 use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
+#[allow(unused_imports)]
 use tcw3::{
     images::{himg_from_rounded_rect, HImg},
     pal::{LayerFlags, SysFontType},
@@ -97,6 +98,11 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 1,
             layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
         },
+        // Backdrop blur isn't supported by the GTK backend. The translucent
+        // sidebar looks awkward without backdrop blur, so we disable
+        // transparency in this case.
+        // See also: `self::ENABLE_BACKDROP_BLUR`
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
         ([#SIDEBAR] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
@@ -292,6 +298,8 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
 fn new_custom_platform_stylesheet() -> impl Stylesheet {
     stylesheet! {}
 }
+
+pub const ENABLE_BACKDROP_BLUR: bool = cfg!(any(target_os = "windows", target_os = "macos"));
 
 pub fn register_stylesheet(manager: &'static Manager) {
     manager.subscribe_new_sheet_set(Box::new(move |_, _, ctx| {
