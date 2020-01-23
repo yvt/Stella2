@@ -88,7 +88,9 @@ impl HWnd {
 
     /// Pend an update.
     pub(super) fn pend_update(&self) {
-        assert!(!self.wnd.closed.get(), "the window has been already closed");
+        if self.wnd.closed.get() {
+            return;
+        }
 
         // Already queued?
         let dirty = &self.wnd.dirty;
