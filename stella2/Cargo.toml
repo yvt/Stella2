@@ -18,6 +18,7 @@ stella2_meta = { path = "meta" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"
+dirs = "2.0.2"
 stvg_tcw3 = { path = "../stvg/tcw3" }
 subscriber_list = { path = "../support/subscriber_list" }
 enclose = "1.1.6"

@@ -10,6 +10,7 @@
 use log::debug;
 use tcw3::pal::{self, prelude::*};
 
+mod config;
 mod crashhandler;
 mod model;
 mod stylesheet;
@@ -60,6 +61,12 @@ fn main() {
         let hinstance = libloaderapi::GetModuleHandleW(null_mut());
         pal::windows::set_app_hicon(winuser::LoadIconW(hinstance, 0x101 as _));
     }
+
+    // Load the default profile
+    let profile = config::profile::Profile::default();
+    let profile = Box::leak(Box::new(profile));
+    log::info!("Default profile: {:?}", profile);
+    profile.prepare().unwrap();
 
     debug!("Initializing WM");
     let wm = pal::Wm::global();
