@@ -26,8 +26,29 @@ fn main() {
     // Enable logging only in debug builds
     #[cfg(debug_assertions)]
     {
+        #[cfg(target_os = "windows")]
+        {
+            use std::str::FromStr;
+
+            let cfg = std::env::var("RUST_LOG").ok();
+            let cfg = cfg.as_deref().unwrap_or("info");
+            if let Ok(level) = log::Level::from_str(&cfg) {
+                windebug_logger::init_with_level(level).unwrap();
+            } else {
+                windebug_logger::init_with_level(log::Level::Info).unwrap();
+                log::warn!(
+                    "Invalid log level was specified by `RUST_LOG` ({:>}). \
+                     Defaulting to `info`",
+                    cfg
+                );
+            }
+        }
+
+        #[cfg(not(target_os = "windows"))]
         env_logger::init();
     }
+
+    log::info!("Logging started");
 
     // Platform-specific initialization
     #[cfg(target_os = "windows")]

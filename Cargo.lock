@@ -2121,6 +2121,7 @@ dependencies = [
  "subscriber_list 0.1.0",
  "tcw3 0.1.0",
  "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
+ "windebug_logger 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2747,6 +2748,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "windebug_logger"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wchar 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)",
+]
+
+[[package]]
 name = "winreg"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3077,6 +3088,7 @@ dependencies = [
 "checksum winapi-util 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7168bab6e1daee33b4557efd0e95d5ca70a03706d39fa5f3fe7a236f584b03c9"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (git+https://github.com/yvt/winapi-rs.git?rev=a6df41df91d6b8c156cff69bede2da2196c663cb)" = "<none>"
 "checksum wincolor 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "96f5016b18804d24db43cebf3c77269e7569b8954a8464501c216cc5e070eaa9"
+"checksum windebug_logger 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0556e6ff83e3a3f04cb092b68a3f0c5e5103d4019d3198c8fc4e60b798a719f3"
 "checksum winreg 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b2986deb581c4fe11b621998a5e53361efe6b48a151178d0cd9eeffa4dc6acc9"
 "checksum winrt 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c248f437add7df81d305a345e9d143c8c0a9de00a51e46b42453c337181d16c9"
 "checksum wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
