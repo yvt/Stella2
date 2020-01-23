@@ -41,10 +41,13 @@ pub mod elem_id {
 // Import IDs (e.g., `#GO_BACK`) into the scope
 use self::elem_id::*;
 
+/// Construct a `HImg` from an StVG image.
 fn himg_from_stvg(data: (&'static [u8], [f32; 2])) -> HImg {
     StvgImg::new(data).into_himg()
 }
 
+/// Construct a colorized `HImg` from an StVG image.
+#[allow(dead_code)]
 fn himg_from_stvg_col(data: (&'static [u8], [f32; 2]), c: tcw3::pal::RGBAF32) -> HImg {
     StvgImg::new(data)
         .with_color_xform(stvg_tcw3::replace_color(c))
