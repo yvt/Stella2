@@ -27,6 +27,7 @@ mod toolbar;
 
 pub struct AppView {
     wm: pal::Wm,
+    profile: &'static Profile,
     state: RefCell<Elem<model::AppState>>,
     pending_actions: RefCell<Vec<model::AppAction>>,
     persist_sched: viewpersistence::PersistenceScheduler,
@@ -46,6 +47,7 @@ impl AppView {
 
         let this = Rc::new(Self {
             wm,
+            profile,
             main_wnd,
             state: RefCell::new(state),
             pending_actions: RefCell::new(Vec::new()),
@@ -61,7 +63,7 @@ impl AppView {
         this.main_wnd.set_quit(move || {
             // Persist the state to disk before quitting
             if let Some(this) = this_weak.upgrade() {
-                this.persist_sched.flush(wm, &this.state.borrow());
+                this.persist_sched.flush(wm, &this.state.borrow(), profile);
             }
 
             wm.terminate();
@@ -103,7 +105,8 @@ impl AppView {
             *state = new_state;
 
             // Persist the app state
-            self.persist_sched.handle_update(self.wm, &state);
+            self.persist_sched
+                .handle_update(self.wm, &state, self.profile);
         }
 
         let state = self.state.borrow();

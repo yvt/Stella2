@@ -80,4 +80,8 @@ impl Profile {
 
         Ok(())
     }
+
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
+    }
 }
