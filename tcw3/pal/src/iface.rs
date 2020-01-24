@@ -33,7 +33,7 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     type HLayer: Debug + Clone + PartialEq + Eq + Hash;
 
     /// Represents a function call pended by `invoke_after`.
-    type HInvoke: Debug + Clone + PartialEq + Eq + Hash;
+    type HInvoke: Debug + Clone + PartialEq + Eq + Hash + Send + Sync;
 
     /// A bitmap type.
     type Bitmap: Bitmap;

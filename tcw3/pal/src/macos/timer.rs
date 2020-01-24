@@ -11,6 +11,31 @@ pub struct HInvoke {
     timer: IdRef,
 }
 
+// This is safe because
+//
+// 1. `NSTimer` is explicitly described as thread-safe:
+//
+//    <https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/ThreadSafetySummary/ThreadSafetySummary.html>:
+//
+//    > The following classes and functions are generally considered to be
+//    > thread-safe. You can use the same instance from multiple threads without
+//    > first acquiring a lock.
+//
+// 2. `tcw_invoke_cancel` is called when the timer's target object is
+//    released, which happens when the timer is invalidated. The invalidation
+//    occurs because of one of the following causes, both of which take place
+//    in the main thread:
+//
+//     - The timer fires. This happens in the same thread as the one where the
+//       timer is created, which is the main thread, where `Wm::invoke_after` is
+//       called.
+//
+//     - The timer is explicitly invalidated by `[NSTimer invalidate]`.  This
+//       is only allowed through `Wm::cancel_invoke`, which requires `Wm`.
+//
+unsafe impl Send for HInvoke {}
+unsafe impl Sync for HInvoke {}
+
 /// Implements `Wm::invoke_after`.
 pub fn invoke_after(_: Wm, delay: Range<Duration>, f: impl FnOnce(Wm) + 'static) -> HInvoke {
     let start = delay.start.as_secs_f64();
