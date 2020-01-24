@@ -7,7 +7,7 @@ jobs:
   strategy:
     matrix:
       MacOS:
-        vmImage: macOS-10.13
+        vmImage: macOS-10.14
         platformName: macOS
       Windows:
         vmImage: windows-2019
