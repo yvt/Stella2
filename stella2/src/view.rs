@@ -14,6 +14,7 @@ use tcw3::{
 };
 
 use crate::{
+    config::{profile::Profile, viewpersistence},
     model,
     stylesheet::{self, elem_id},
 };
@@ -28,28 +29,43 @@ pub struct AppView {
     wm: pal::Wm,
     state: RefCell<Elem<model::AppState>>,
     pending_actions: RefCell<Vec<model::AppAction>>,
+    persist_sched: viewpersistence::PersistenceScheduler,
     main_wnd: Rc<WndView>,
 }
 
 impl AppView {
-    pub fn new(wm: pal::Wm) -> Rc<Self> {
-        let state = model::AppState::new();
+    pub fn new(wm: pal::Wm, profile: &'static Profile) -> Rc<Self> {
+        let mut state = Elem::new(model::AppState::new());
+
+        // Restore the app state from the user profile
+        state = viewpersistence::restore_state(profile, state);
+
+        let persist_sched = viewpersistence::PersistenceScheduler::new(&state);
 
         let main_wnd = WndView::new(wm, Elem::clone(&state.main_wnd));
 
         let this = Rc::new(Self {
             wm,
             main_wnd,
-            state: RefCell::new(Elem::new(state)),
+            state: RefCell::new(state),
             pending_actions: RefCell::new(Vec::new()),
+            persist_sched,
         });
 
-        {
-            let this_weak = Rc::downgrade(&this);
-            this.main_wnd.set_dispatch(move |wnd_action| {
-                Self::dispatch_weak(&this_weak, model::AppAction::Wnd(wnd_action))
-            });
-        }
+        let this_weak = Rc::downgrade(&this);
+        this.main_wnd.set_dispatch(move |wnd_action| {
+            Self::dispatch_weak(&this_weak, model::AppAction::Wnd(wnd_action))
+        });
+
+        let this_weak = Rc::downgrade(&this);
+        this.main_wnd.set_quit(move || {
+            // Persist the state to disk before quitting
+            if let Some(this) = this_weak.upgrade() {
+                this.persist_sched.flush(wm, &this.state.borrow());
+            }
+
+            wm.terminate();
+        });
 
         this
     }
@@ -85,6 +101,9 @@ impl AppView {
                 new_state = model::AppState::reduce(new_state, &action);
             }
             *state = new_state;
+
+            // Persist the app state
+            self.persist_sched.handle_update(self.wm, &state);
         }
 
         let state = self.state.borrow();
@@ -96,6 +115,7 @@ impl AppView {
 struct WndView {
     hwnd: HWnd,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
+    quit: RefCell<Box<dyn Fn()>>,
     main_view: MainView,
 }
 
@@ -114,16 +134,20 @@ impl WndView {
             .set_layout(FillLayout::new(main_view.view().clone()));
 
         hwnd.set_caption("Stella 2");
-        hwnd.set_listener(WndViewWndListener);
         hwnd.set_visibility(true);
 
         let this = Rc::new(Self {
             hwnd,
             dispatch: RefCell::new(Box::new(|_| {})),
+            quit: RefCell::new(Box::new(|| {})),
             main_view,
         });
 
         // Event handlers
+        this.hwnd.set_listener(WndViewWndListener {
+            owner: Rc::downgrade(&this),
+        });
+
         let this_weak = Rc::downgrade(&this);
         this.main_view.subscribe_dispatch(Box::new(move |action| {
             if let Some(this) = this_weak.upgrade() {
@@ -145,6 +169,10 @@ impl WndView {
         *self.dispatch.borrow_mut() = Box::new(cb);
     }
 
+    fn set_quit(&self, cb: impl Fn() + 'static) {
+        *self.quit.borrow_mut() = Box::new(cb);
+    }
+
     fn update_focus(&self) {
         let is_focused = self.hwnd.is_focused();
         if stylesheet::ENABLE_BACKDROP_BLUR {
@@ -162,11 +190,15 @@ impl WndView {
     }
 }
 
-struct WndViewWndListener;
+struct WndViewWndListener {
+    owner: Weak<WndView>,
+}
 
 impl WndListener for WndViewWndListener {
-    fn close(&self, wm: pal::Wm, _: &HWnd) {
-        wm.terminate();
+    fn close(&self, _: pal::Wm, _: &HWnd) {
+        if let Some(owner) = self.owner.upgrade() {
+            owner.quit.borrow()();
+        }
     }
 }
 

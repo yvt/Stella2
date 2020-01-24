@@ -75,7 +75,7 @@ fn main() {
     let style_manager = tcw3::ui::theming::Manager::global(wm);
     stylesheet::register_stylesheet(style_manager);
 
-    let _view = self::view::AppView::new(wm);
+    let _view = self::view::AppView::new(wm, profile);
 
     debug!("Entering the main loop");
     wm.enter_main_loop();
