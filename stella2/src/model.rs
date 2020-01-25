@@ -1,11 +1,12 @@
 use harmony::{set_field, Elem};
+use miniserde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub main_wnd: Elem<WndState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WndState {
     // UI state - It could be a local state of widget controllers, but we store
     // it here instead so that it can be intercepted by a persistence middleware

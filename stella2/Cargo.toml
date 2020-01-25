@@ -12,17 +12,21 @@ default-run = "stella2"
 [dependencies]
 chrono = "0.4"
 tcw3 = { path = "../tcw3" }
-harmony = { path = "../harmony" }
+harmony = { path = "../harmony", features = ["miniserde"] }
 stella2_assets = { path = "../stella2_assets" }
 stella2_meta = { path = "meta" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 cfg-if = "0.1.7"
+displaydoc = "0.1.5"
+dirs = "2.0.2"
+nativedispatch = { path = "../support/nativedispatch" }
 stvg_tcw3 = { path = "../stvg/tcw3" }
 subscriber_list = { path = "../support/subscriber_list" }
 enclose = "1.1.6"
 env_logger = "0.7.0"
 iota = "0.2.1"
+miniserde = "0.1.12"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 stella2_windres = { path = "../res/windres" }

@@ -10,6 +10,7 @@
 use log::debug;
 use tcw3::pal::{self, prelude::*};
 
+mod config;
 mod crashhandler;
 mod model;
 mod stylesheet;
@@ -61,6 +62,12 @@ fn main() {
         pal::windows::set_app_hicon(winuser::LoadIconW(hinstance, 0x101 as _));
     }
 
+    // Load the default profile
+    let profile = config::profile::Profile::default();
+    let profile = Box::leak(Box::new(profile));
+    log::info!("Default profile: {:?}", profile);
+    profile.prepare().unwrap();
+
     debug!("Initializing WM");
     let wm = pal::Wm::global();
 
@@ -68,7 +75,7 @@ fn main() {
     let style_manager = tcw3::ui::theming::Manager::global(wm);
     stylesheet::register_stylesheet(style_manager);
 
-    let _view = self::view::AppView::new(wm);
+    let _view = self::view::AppView::new(wm, profile);
 
     debug!("Entering the main loop");
     wm.enter_main_loop();

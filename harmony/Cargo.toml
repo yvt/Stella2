@@ -4,4 +4,8 @@ version = "0.1.0"
 authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
+[features]
+default = []
+
 [dependencies]
+miniserde = { version = "0.1.12", optional = true }

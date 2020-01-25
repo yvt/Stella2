@@ -60,6 +60,9 @@
 #![feature(specialization)]
 use std::{fmt, rc::Rc};
 
+#[cfg(feature = "miniserde")]
+mod miniserde;
+
 /// A container type for state data.
 ///
 /// `Elem` is conceptually immutable, but may perform in-place mutation when
