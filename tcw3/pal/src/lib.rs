@@ -141,6 +141,9 @@ pub type HInvoke = <Wm as iface::Wm>::HInvoke;
 /// A specialization of `WndAttrs` for the default backend.
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 
+/// A specialization of `AlertAttrs` for the default backend.
+pub type AlertAttrs<'a> = iface::AlertAttrs<'a, Wm, HWnd>;
+
 /// A specialization of `LayerAttrs` for the default backend.
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 

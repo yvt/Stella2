@@ -129,6 +129,7 @@ mod wndlistenershim;
 pub use self::{logging::Logger, wmapi::TestingWm};
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
+pub type AlertAttrs<'a> = iface::AlertAttrs<'a, Wm, HWnd>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 pub type CharStyleAttrs = iface::CharStyleAttrs<CharStyle>;
 
@@ -650,6 +651,25 @@ impl iface::Wm for Wm {
         }
     }
 
+    fn alert(self, attrs: AlertAttrs<'_>) {
+        match self.backend_and_wm() {
+            BackendAndWm::Native { wm } => {
+                let callback = attrs.callback;
+
+                wm.alter(iface::AlertAttrs {
+                    primary_text: attrs.primary_text,
+                    secondary_text: attrs.secondary_text,
+                    owner_wnd: attrs.owner_wnd.map(|w| w.native_hwnd_ref().unwrap()),
+                    buttons: attrs.buttons,
+                    callback: Box::new(move |_, i| {
+                        callback(wm, i);
+                    }),
+                });
+            }
+            BackendAndWm::Testing => todo!(),
+        }
+    }
+
     fn new_layer(self, attrs: LayerAttrs) -> Self::HLayer {
         match self.backend_and_wm() {
             BackendAndWm::Native { wm } => {
@@ -721,6 +741,13 @@ impl From<&screen::HWnd> for HWnd {
 }
 
 impl HWnd {
+    fn native_hwnd_ref(&self) -> Option<&native::HWnd> {
+        match &self.inner {
+            HWndInner::Native(imp) => Some(imp),
+            HWndInner::Testing(_) => None,
+        }
+    }
+
     fn testing_hwnd_ref(&self) -> Option<&screen::HWnd> {
         match &self.inner {
             HWndInner::Native(_) => None,

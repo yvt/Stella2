@@ -153,6 +153,12 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// Get a flag indicating whether the specified window has focus.
     fn is_wnd_focused(self, window: &Self::HWnd) -> bool;
 
+    /// Display a standard alert dialog.
+    ///
+    /// This method returns immediately. The specified callback function will be
+    /// called when the user responds by clicking a button.
+    fn alert(self, attrs: AlertAttrs<'_, Self, Self::HWnd>);
+
     /// Create a layer.
     fn new_layer(self, attrs: LayerAttrs<Self::Bitmap, Self::HLayer>) -> Self::HLayer;
 
@@ -248,6 +254,41 @@ impl<T: Wm, TLayer: Debug> Debug for WndAttrs<'_, T, TLayer> {
             )
             .field("layer", &self.layer)
             .finish()
+    }
+}
+
+/// Specifies alert dialog attributes.
+pub struct AlertAttrs<'a, TWm, TWnd> {
+    pub primary_text: &'a str,
+    pub secondary_text: &'a str,
+    pub owner_wnd: Option<&'a TWnd>,
+    /// The list of buttons for the user to choose from. Must not be empty.
+    /// The first element is the default choice.
+    pub buttons: &'a [&'a str],
+    pub callback: Box<dyn FnOnce(TWm, usize) + 'static>,
+}
+
+impl<TWm, TWnd: Debug> Debug for AlertAttrs<'_, TWm, TWnd> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AlertAttrs")
+            .field("primary_text", &self.primary_text)
+            .field("secondary_text", &self.secondary_text)
+            .field("owner_wnd", &self.owner_wnd)
+            .field("buttons", &self.buttons)
+            .field("callback", &((&*self.callback) as *const _))
+            .finish()
+    }
+}
+
+impl<TWm, TWnd> Default for AlertAttrs<'_, TWm, TWnd> {
+    fn default() -> Self {
+        Self {
+            primary_text: "",
+            secondary_text: "",
+            owner_wnd: None,
+            buttons: &["OK"],
+            callback: Box::new(|_, _| {}),
+        }
     }
 }
 
