@@ -16,6 +16,7 @@ use crate::model;
 const DEBOUNCE_LATENCY_MIN: Duration = Duration::from_secs(5);
 const DEBOUNCE_LATENCY_MAX: Duration = Duration::from_secs(20);
 
+/// The projection of an app state to be persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PersistedState {
     main_wnd: Elem<model::WndState>,
@@ -82,6 +83,7 @@ pub fn restore_state(profile: &Profile, app_state: Elem<model::AppState>) -> Ele
     app_state
 }
 
+/// Load `PersistedState` from the specified path.
 fn load_persisted_state(path: &Path) -> Result<PersistedState, std::io::Error> {
     let json = std::fs::read_to_string(path)?;
 
@@ -101,21 +103,25 @@ fn load_persisted_state(path: &Path) -> Result<PersistedState, std::io::Error> {
     })
 }
 
-fn write_state_file(path: &Path, tmp_path: &Path, json: &str) -> Result<(), std::io::Error> {
+/// Write a file atomically.
+fn write_atomically(path: &Path, tmp_path: &Path, contents: &str) -> Result<(), std::io::Error> {
     // Use a temporary file `tmp_path` to atomically update `patH`.
-    std::fs::write(tmp_path, json)?;
+    std::fs::write(tmp_path, contents)?;
 
     // Move `tmp_path` to `path`, overwriting it. It's okay to leave
     // `tmp_path` on failure.
     std::fs::rename(tmp_path, path)
 }
 
+/// Schedules the asynchronous persistence operations of an app state.
 pub struct PersistenceScheduler {
     persisted: Cell<Option<Elem<PersistedState>>>,
     shared: Arc<PersistenceSchedulerShared>,
 }
 
 impl PersistenceScheduler {
+    /// Construct a `PersistenceScheduler` with an initial app state, which it
+    /// will *not* persist to disk.
     pub fn new(app_state: &model::AppState) -> Self {
         Self {
             persisted: Cell::new(Some(PersistedState::new(app_state))),
@@ -129,7 +135,8 @@ impl PersistenceScheduler {
         }
     }
 
-    /// Persist the current app state to disk immediately.
+    /// Persist the current app state to disk immediately. Blocks the current
+    /// thread until the operation is complete.
     pub fn flush(&self, wm: Wm, app_state: &model::AppState, profile: &'static Profile) {
         let mut persisted = self.persisted.take().unwrap();
 
@@ -334,7 +341,7 @@ impl PersistenceSchedulerShared {
                 tmp_path
             );
 
-            if let Err(e) = write_state_file(&path, &tmp_path, &json) {
+            if let Err(e) = write_atomically(&path, &tmp_path, &json) {
                 // TODO: Report the error to the user
                 log::error!(
                     "Could not write the state to {:?} using a temporary file at {:?}: {}",
