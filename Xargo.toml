@@ -5,6 +5,7 @@ features = []
 default-features = false
 
 [target.x86_64-pc-windows-msvc.dependencies.std]
-# Build without the backtrace functionality.
-features = []
+# Build without the backtrace functionality. On panic, abort the process
+# immediately because the panic message won't be shown to the user anyway.
+features = ["panic_immediate_abort"]
 default-features = false
