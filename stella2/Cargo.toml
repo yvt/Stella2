@@ -20,6 +20,7 @@ cgmath = "0.17.0"
 cfg-if = "0.1.7"
 displaydoc = "0.1.5"
 dirs = "2.0.2"
+fslock = "0.1.4"
 nativedispatch = { path = "../support/nativedispatch" }
 stvg_tcw3 = { path = "../stvg/tcw3" }
 subscriber_list = { path = "../support/subscriber_list" }

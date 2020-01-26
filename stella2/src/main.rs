@@ -68,6 +68,17 @@ fn main() {
     log::info!("Default profile: {:?}", profile);
     profile.prepare().unwrap();
 
+    // Prevent multiple instances of the application from running
+    let lock_guard = config::lock::try_lock(profile).unwrap();
+    if lock_guard.is_none() {
+        log::warn!(
+            "Exiting because it appears that another application instance \
+            using the same profile is already running"
+        );
+        return;
+    }
+    std::mem::forget(lock_guard); // let the system do unlocking
+
     debug!("Initializing WM");
     let wm = pal::Wm::global();
 
