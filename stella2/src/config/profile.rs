@@ -13,6 +13,9 @@ pub struct Profile {
 /// The directory name used for application-specific directories.
 const APP_DIR_NAME: &str = "Stella2";
 
+/// The directory name used for a portable profile.
+const PORTABLE_PROFILE_DIR_NAME: &str = "Stella Profile";
+
 impl Default for Profile {
     fn default() -> Self {
         let portable_profile_dir = portable_profile_dir();
@@ -53,7 +56,12 @@ impl Default for Profile {
 }
 
 fn portable_profile_dir() -> Option<PathBuf> {
-    Some(std::env::current_exe().ok()?.parent()?.join("Profile"))
+    Some(
+        std::env::current_exe()
+            .ok()?
+            .parent()?
+            .join(PORTABLE_PROFILE_DIR_NAME),
+    )
 }
 
 impl Profile {
