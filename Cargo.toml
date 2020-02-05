@@ -43,7 +43,7 @@ lto = true
 lto = true
 debug = true
 
-[profile.dev.overrides]
+[profile.dev.package]
 # A software-based compositor (`swrast`) is used when other backends are not
 # available for some reason. This is horrendously slow on debug builds and hurts
 # developer experience. To mitigate this issue, always enable optimization for
