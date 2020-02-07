@@ -11,6 +11,6 @@ array = "0.0.1"
 cggeom = { path = "../../support/cggeom" }
 cgmath = "0.17.0"
 iterpool = { path = "../../support/iterpool" }
-quick-error2 = "2.0.1"
+quick-error = "1.2.3"
 
 tcw3_pal = { path = "../pal" }

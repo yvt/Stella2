@@ -1,5 +1,5 @@
 use iterpool::{intrusive_list, Pool, PoolPtr};
-use quick_error2::quick_error;
+use quick_error::quick_error;
 use std::{cell::RefCell, fmt, sync::Arc};
 use tcw3_pal::{self as pal, iface::Wm as _, Bitmap, MtLock, MtSticky, Wm};
 
