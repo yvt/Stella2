@@ -522,11 +522,7 @@ mod tests {
     trait Transpose: Sized {
         fn t(self) -> Self;
         fn t_if(self, cond: bool) -> Self {
-            if cond {
-                self.t()
-            } else {
-                self
-            }
+            if cond { self.t() } else { self }
         }
     }
 

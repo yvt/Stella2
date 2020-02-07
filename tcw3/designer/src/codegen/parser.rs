@@ -444,7 +444,7 @@ impl Parse for CompItemOn {
                 return Err(Error::new_spanned(
                     vis,
                     "visibility specification is not allowed for `on`",
-                ))
+                ));
             }
         }
 
@@ -690,7 +690,7 @@ impl Parse for ObjInit {
                 return Err(Error::new_spanned(
                     mac,
                     "Invalid delimiter for object initialization literal",
-                ))
+                ));
             }
         };
 

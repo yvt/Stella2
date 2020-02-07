@@ -48,20 +48,22 @@ impl DisplayLink {
 
             let inner = self.inner.as_inner_ref().unwrap();
 
-            std::thread::spawn(move || loop {
-                // Suspend if the display link is requested to stop.
-                if !inner.running.load(Ordering::Relaxed) {
-                    let mut guard = inner.mutex.lock().unwrap();
-                    while !inner.running.load(Ordering::Relaxed) {
-                        guard = inner.cv.wait(guard).unwrap();
+            std::thread::spawn(move || {
+                loop {
+                    // Suspend if the display link is requested to stop.
+                    if !inner.running.load(Ordering::Relaxed) {
+                        let mut guard = inner.mutex.lock().unwrap();
+                        while !inner.running.load(Ordering::Relaxed) {
+                            guard = inner.cv.wait(guard).unwrap();
+                        }
                     }
+
+                    // This is rather surprising, but actually what Firefox
+                    // seems to do.
+                    unsafe { DwmFlush() };
+
+                    handler();
                 }
-
-                // This is rather surprising, but actually what Firefox
-                // seems to do.
-                unsafe { DwmFlush() };
-
-                handler();
             });
 
             inner

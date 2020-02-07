@@ -23,20 +23,12 @@ pub trait ElementWisePartialOrd {
 
 #[inline]
 fn num_min<T: BaseNum>(x: T, y: T) -> T {
-    if y < x {
-        y
-    } else {
-        x
-    }
+    if y < x { y } else { x }
 }
 
 #[inline]
 fn num_max<T: BaseNum>(x: T, y: T) -> T {
-    if y > x {
-        y
-    } else {
-        x
-    }
+    if y > x { y } else { x }
 }
 
 impl<T: BaseNum> ElementWiseOp for Point2<T> {

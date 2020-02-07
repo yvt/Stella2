@@ -191,11 +191,7 @@ pub trait AxisAlignedBox<T>: Sized {
             self.min().element_wise_max(&other.min()),
             self.max().element_wise_min(&other.max()),
         );
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
-        }
+        if s.is_empty() { None } else { Some(s) }
     }
 
     #[inline]

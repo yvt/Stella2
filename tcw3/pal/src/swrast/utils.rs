@@ -95,11 +95,7 @@ mod tests {
     fn test_box2_usize_union(coords: Vec<usize>) -> TestResult {
         let boxes = coords.chunks_exact(4).map(|coords| {
             let bx = box2! { min: [coords[0], coords[1]], max: [coords[2], coords[3]] };
-            if bx.is_empty() {
-                None
-            } else {
-                Some(bx)
-            }
+            if bx.is_empty() { None } else { Some(bx) }
         });
 
         let expected = boxes

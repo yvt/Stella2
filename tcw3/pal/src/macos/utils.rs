@@ -28,11 +28,7 @@ impl IdRef {
     }
 
     pub fn non_nil(self) -> Option<IdRef> {
-        if self.0 == nil {
-            None
-        } else {
-            Some(self)
-        }
+        if self.0 == nil { None } else { Some(self) }
     }
 }
 

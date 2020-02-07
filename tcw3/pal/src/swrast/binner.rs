@@ -1182,11 +1182,7 @@ fn saturating_aabb_f32_to_u16(bx: Box2<f32>) -> Option<Box2<u16>> {
         max: [bx.max.x.fmax(0.0).fmin(MAX) as u16, bx.max.y.fmax(0.0).fmin(MAX) as u16],
     };
 
-    if bx.is_empty() {
-        None
-    } else {
-        Some(bx)
-    }
+    if bx.is_empty() { None } else { Some(bx) }
 }
 
 /// Given a parallelogram, construct clip planes.

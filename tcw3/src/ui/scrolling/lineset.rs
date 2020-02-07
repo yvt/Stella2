@@ -1815,11 +1815,7 @@ fn line_gr_decim_excl(
 /// and below.
 fn lod_coverage(lod: u8, scale: Index) -> Index {
     debug_assert!(scale >= 0);
-    if lod > 0 {
-        scale << (lod - 1)
-    } else {
-        0
-    }
+    if lod > 0 { scale << (lod - 1) } else { 0 }
 }
 
 /// Get the smallest `lod` such that `lod_coverage(lod, scale) >= i`.

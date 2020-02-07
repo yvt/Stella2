@@ -18,11 +18,13 @@ fn bench_iter(b: &mut Bencher, count: usize) {
 
     let mut it = rope.iter();
 
-    b.iter(|| loop {
-        if let Some(e) = it.next() {
-            break e;
-        } else {
-            it = rope.iter();
+    b.iter(|| {
+        loop {
+            if let Some(e) = it.next() {
+                break e;
+            } else {
+                it = rope.iter();
+            }
         }
     });
 }

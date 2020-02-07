@@ -62,40 +62,24 @@ pub trait FloatOrd {
 impl FloatOrd for f32 {
     #[inline]
     fn fmin(self, x: Self) -> Self {
-        if self < x {
-            self
-        } else {
-            x
-        }
+        if self < x { self } else { x }
     }
 
     #[inline]
     fn fmax(self, x: Self) -> Self {
-        if self > x {
-            self
-        } else {
-            x
-        }
+        if self > x { self } else { x }
     }
 }
 
 impl FloatOrd for f64 {
     #[inline]
     fn fmin(self, x: Self) -> Self {
-        if self < x {
-            self
-        } else {
-            x
-        }
+        if self < x { self } else { x }
     }
 
     #[inline]
     fn fmax(self, x: Self) -> Self {
-        if self > x {
-            self
-        } else {
-            x
-        }
+        if self > x { self } else { x }
     }
 }
 

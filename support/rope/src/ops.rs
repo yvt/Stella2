@@ -78,11 +78,7 @@ where
 
         if let Some((c, o)) = co {
             // TODO: This is utterly inefficient
-            if c == self.end() {
-                None
-            } else {
-                Some((c, o))
-            }
+            if c == self.end() { None } else { Some((c, o)) }
         } else {
             None
         }
