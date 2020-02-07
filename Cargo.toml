@@ -1,5 +1,3 @@
-cargo-features = ["profile-overrides"]  # Enable the use of `[profile.dev.overrides]`
-
 [workspace]
 members = [
     "stella2",
