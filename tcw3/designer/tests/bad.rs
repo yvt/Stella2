@@ -31,7 +31,7 @@ fn run_should_error(source_path: &str) {
 
     // Extract error messages
     lazy_static::lazy_static! {
-        static ref RE: Regex = Regex::new(r#"error: ((?m).+?)\s*--> .*:(\d+):\d+$"#)
+        static ref RE: Regex = Regex::new(r#"(?m)error: (.+?)\s*--> .*:(\d+):\d+$"#)
             .unwrap();
     }
 
