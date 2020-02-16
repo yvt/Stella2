@@ -990,6 +990,7 @@ pub struct TcwWndWidget {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct TcwWndWidgetClass {
     parent_class: gtk_sys::GtkDrawingAreaClass,
 }
