@@ -106,15 +106,13 @@ sudo yum install glib2-devel cairo-devel cairo-gobject-devel pango-devel \
      gtk3-devel atk-devel
 ```
 
-**Nix:**
+**[Nix]:** (Works on macOS and NixOS)
 
 ```shell
-nix-shell --pure -p rustup gtk3 pkgconfig --run 'cargo build --release -p stella2'
-
-# Without GTK3 (e.g., when building on macOS):
-nix-shell --pure -p rustup glib pango harfbuzz pkgconfig \
-     --run 'cargo build --release -p stella2'
+nix-shell --run 'cargo build --release -p stella2'
 ```
+
+[Nix]: https://nixos.org/nix/
 
 **Windows:**
 
