@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "cairo-rs"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b528aca2ef1026235d0122495dbaee0b09479f77c51f6df8d9bb9cb1c6d6f87"
+checksum = "157049ba9618aa3a61c39d5d785102c04d3b1f40632a706c621a9aedc21e6084"
 dependencies = [
  "bitflags",
  "cairo-sys-rs",
