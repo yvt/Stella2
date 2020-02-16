@@ -10,24 +10,24 @@ license = "GPL-3.0-or-later"
 default-run = "stella2"
 
 [dependencies]
-chrono = "0.4"
-tcw3 = { path = "../tcw3" }
-harmony = { path = "../harmony", features = ["miniserde"] }
-stella2_assets = { path = "../stella2_assets" }
-stella2_meta = { path = "meta" }
+cfg-if = "0.1.7"
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
-cfg-if = "0.1.7"
-displaydoc = "0.1.5"
+chrono = "0.4"
 dirs = "2.0.2"
-fslock = "0.1.4"
-nativedispatch = { path = "../support/nativedispatch" }
-stvg_tcw3 = { path = "../stvg/tcw3" }
-subscriber_list = { path = "../support/subscriber_list" }
+displaydoc = "0.1.5"
 enclose = "1.1.6"
 env_logger = "0.7.0"
+fslock = "0.1.4"
+harmony = { path = "../harmony", features = ["miniserde"] }
 iota = "0.2.1"
 miniserde = "0.1.12"
+nativedispatch = { path = "../support/nativedispatch" }
+stella2_assets = { path = "../stella2_assets" }
+stella2_meta = { path = "meta" }
+stvg_tcw3 = { path = "../stvg/tcw3" }
+subscriber_list = { path = "../support/subscriber_list" }
+tcw3 = { path = "../tcw3" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 stella2_windres = { path = "../res/windres" }
@@ -35,8 +35,8 @@ winapi = { version = "0.3.8", features = ["winuser", "libloaderapi"] }
 windebug_logger = "0.1.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc = "0.2.3"
 cocoa = "0.20.0"
+objc = "0.2.3"
 
 [dependencies.log]
 version = "0.4"
