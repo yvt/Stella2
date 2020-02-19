@@ -81,6 +81,11 @@ impl Profile {
         }
     }
 
+    /// Construct a `Profile` from a path specified via a command-line argument.
+    pub fn from_custom_dir(d: &Path) -> Self {
+        Self::from_portable_dir(d)
+    }
+
     /// Ensure the profile directory exists.
     pub fn prepare(&self) -> Result<(), Error> {
         log::debug!("Creating the directory {:?}", self.data_dir);

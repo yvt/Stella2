@@ -67,9 +67,13 @@ fn main() {
     let args = config::cmdline::Args::from_env_or_exit();
 
     // Load the default profile
-    let profile = config::profile::Profile::default();
+    let profile = if let Some(profile_path) = &args.profile {
+        config::profile::Profile::from_custom_dir(profile_path)
+    } else {
+        config::profile::Profile::default()
+    };
     let profile = Box::leak(Box::new(profile));
-    log::info!("Default profile: {:?}", profile);
+    log::info!("Profile: {:?}", profile);
     profile.prepare().unwrap();
 
     // Prevent multiple instances of the application from running

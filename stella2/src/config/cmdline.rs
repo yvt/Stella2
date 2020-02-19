@@ -9,7 +9,7 @@ use std::{
 #[derive(Default)]
 pub struct Args {
     /// the path to a custom profile directory
-    pub profile: Option<PathBuf>, // TODO: Use this value
+    pub profile: Option<PathBuf>,
 }
 
 impl Args {
