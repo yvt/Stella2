@@ -62,6 +62,10 @@ fn main() {
         pal::windows::set_app_hicon(winuser::LoadIconW(hinstance, 0x101 as _));
     }
 
+    // Parse command-line arguments. Exit on parsing error or after displaying
+    // a help message.
+    let args = config::cmdline::Args::from_env_or_exit();
+
     // Load the default profile
     let profile = config::profile::Profile::default();
     let profile = Box::leak(Box::new(profile));
