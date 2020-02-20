@@ -44,7 +44,7 @@ impl Layout for FillLayout {
     }
 
     fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
-        let st = ctx.subview_size_traits(&self.subview[0]);
+        let st = ctx.subview_size_traits(self.subview[0].as_ref());
         let extra = vec2(
             self.margin[1] + self.margin[3],
             self.margin[0] + self.margin[2],
@@ -58,7 +58,7 @@ impl Layout for FillLayout {
 
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         ctx.set_subview_frame(
-            &self.subview[0],
+            self.subview[0].as_ref(),
             box2! {
                 min: [self.margin[3], self.margin[0]],
                 max: [size.x - self.margin[1], size.y - self.margin[2]],

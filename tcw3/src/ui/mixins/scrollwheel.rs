@@ -11,7 +11,7 @@ use std::{cell::Cell, rc::Rc};
 use crate::{
     pal,
     prelude::*,
-    uicore::{HView, HWndRef, ScrollDelta, ScrollListener},
+    uicore::{HViewRef, HWndRef, ScrollDelta, ScrollListener},
 };
 
 /// A view listener mix-in that facilitates scrolling and provides a consistent
@@ -293,7 +293,7 @@ impl Inner {
     /// Handles movement in the `Momentum` state. May transition into `Bounce`.
     fn bouncing_flush(
         this: Rc<Self>,
-        hview: &HView,
+        hview: HViewRef<'_>,
         vertical: bool,
         (velocity, velocity_precise): (f32, bool),
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
@@ -344,7 +344,7 @@ impl Inner {
 
     fn start_bounce(
         this: Rc<Self>,
-        hview: &HView,
+        hview: HViewRef<'_>,
         vertical: bool,
         velocity: f32,
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
@@ -409,7 +409,7 @@ impl Inner {
 
     fn start_relaxation(
         this: Rc<Self>,
-        hview: &HView,
+        hview: HViewRef<'_>,
         model_getter: Rc<dyn Fn() -> Box<dyn ScrollModel>>,
     ) {
         this.stop();
@@ -526,7 +526,13 @@ impl ScrollListenerImpl {
 }
 
 impl ScrollListener for ScrollListenerImpl {
-    fn motion(&self, wm: pal::Wm, hview: &HView, delta: &ScrollDelta, velocity: Vector2<f32>) {
+    fn motion(
+        &self,
+        wm: pal::Wm,
+        hview: HViewRef<'_>,
+        delta: &ScrollDelta,
+        velocity: Vector2<f32>,
+    ) {
         let delta = ScrollDelta {
             delta: filter_vec_by_axis_flags(delta.delta, self.inner.axes.get()),
             ..*delta
@@ -550,7 +556,7 @@ impl ScrollListener for ScrollListenerImpl {
             self.inner.flush_enqueued.set(true);
 
             let this = self.clone();
-            let hview = hview.clone();
+            let hview = hview.upgrade();
 
             wm.invoke_on_update(move |_| {
                 let inner = &this.inner;
@@ -563,7 +569,7 @@ impl ScrollListener for ScrollListenerImpl {
                 if this.momentum.get() {
                     Inner::bouncing_flush(
                         this.inner,
-                        &hview,
+                        hview.as_ref(),
                         this.vertical.get(),
                         this.velocity.get(),
                         this.model_getter,
@@ -576,7 +582,7 @@ impl ScrollListener for ScrollListenerImpl {
         }
     }
 
-    fn start_momentum_phase(&self, _: pal::Wm, hview: &HView) {
+    fn start_momentum_phase(&self, _: pal::Wm, hview: HViewRef<'_>) {
         let mut model = (self.model_getter)();
         let pos = model.pos();
         let bounds = model.bounds();
@@ -603,7 +609,7 @@ impl ScrollListener for ScrollListenerImpl {
         self.momentum.set(true);
     }
 
-    fn end(&self, _: pal::Wm, hview: &HView) {
+    fn end(&self, _: pal::Wm, hview: HViewRef<'_>) {
         if !self.is_valid() {
             return;
         }
@@ -632,7 +638,7 @@ impl ScrollListener for ScrollListenerImpl {
         Inner::start_relaxation(Rc::clone(&self.inner), hview, Rc::clone(&self.model_getter));
     }
 
-    fn cancel(&self, _: pal::Wm, _: &HView) {
+    fn cancel(&self, _: pal::Wm, _: HViewRef<'_>) {
         if !self.is_valid() {
             return;
         }
@@ -923,7 +929,7 @@ mod tests {
 
         scroll.motion(
             wm,
-            &hview,
+            hview.as_ref(),
             &ScrollDelta {
                 precise: true,
                 delta: [-5.0, -10.0].into(),
@@ -937,7 +943,7 @@ mod tests {
         let expected_pos = expected_pos + Vector2::new(0.0, 10.0);
         assert_eq!(model_st.value.get(), expected_pos);
 
-        scroll.end(wm, &hview);
+        scroll.end(wm, hview.as_ref());
         twm.step_unsend();
         wait_for(twm, 100);
 
@@ -964,7 +970,7 @@ mod tests {
 
         scroll.motion(
             wm,
-            &hview,
+            hview.as_ref(),
             &ScrollDelta {
                 precise: true,
                 delta: [0.0, -1.0e8].into(),
@@ -977,7 +983,7 @@ mod tests {
 
         scroll.motion(
             wm,
-            &hview,
+            hview.as_ref(),
             &ScrollDelta {
                 precise: true,
                 delta: [-1.0e8, 0.0].into(),
@@ -993,7 +999,7 @@ mod tests {
         assert!(pos.element_wise_gt(&model_st.bounds.get().max).all());
         assert!(pos.x < 1000.0 && pos.y < 1000.0);
 
-        scroll.end(wm, &hview);
+        scroll.end(wm, hview.as_ref());
 
         for i in 0..100 {
             // `value` should decrease gradually until it reaches `max`

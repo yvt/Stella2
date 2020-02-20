@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     ui::scrolling::lineset::{DispCb, Index, Size},
-    uicore::HView,
+    uicore::HViewRef,
 };
 
 /// A lock guard type for updating a [`Table`]'s internal representation of a
@@ -27,7 +27,7 @@ use crate::{
 /// [`Table::edit`]: super::Table::edit
 #[derive(Debug)]
 pub struct TableEdit<'a> {
-    pub(super) view: &'a HView,
+    pub(super) view: HViewRef<'a>,
     pub(super) inner: &'a Rc<Inner>,
     pub(super) state: ManuallyDrop<RefMut<'a, State>>,
 }

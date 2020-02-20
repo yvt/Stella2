@@ -118,7 +118,7 @@ use crate::ui::scrolling::{
     lineset::{Index, Lineset, Size},
     tableremap::LineIdxMap,
 };
-use crate::uicore::{HView, SizeTraits, Sub, ViewFlags};
+use crate::uicore::{HView, HViewRef, SizeTraits, Sub, ViewFlags};
 
 /// A scrollable widget displaying subviews along imaginary table cells.
 ///
@@ -525,8 +525,8 @@ impl Table {
     }
 
     /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> &HView {
-        &self.view
+    pub fn view(&self) -> HViewRef<'_> {
+        self.view.as_ref()
     }
 
     /// Attempt to acquire a lock to update and/or examine the table model and
@@ -544,7 +544,7 @@ impl Table {
             .map_err(|_| EditLockError)?;
 
         Ok(TableEdit {
-            view: &self.view,
+            view: self.view.as_ref(),
             state: ManuallyDrop::new(state),
             inner: &self.inner,
         })
@@ -557,7 +557,7 @@ impl Table {
     pub fn set_size_traits(&self, value: SizeTraits) {
         self.inner.size_traits.set(value);
         self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
-        Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
+        Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), self.view.as_ref());
     }
 
     /// Set new table flags.
@@ -569,7 +569,11 @@ impl Table {
         self.inner.flags.set(value);
         if diff.intersects(TableFlags::GROW_LAST_COL | TableFlags::GROW_LAST_ROW) {
             self.inner.set_dirty_flags(DirtyFlags::LAYOUT);
-            Inner::update_layout_if_needed(&self.inner, &self.inner.state.borrow(), &self.view);
+            Inner::update_layout_if_needed(
+                &self.inner,
+                &self.inner.state.borrow(),
+                self.view.as_ref(),
+            );
         }
     }
 

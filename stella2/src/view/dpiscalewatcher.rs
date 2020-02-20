@@ -7,7 +7,7 @@ use subscriber_list::SubscriberList;
 use tcw3::{
     pal,
     ui::layouts::FillLayout,
-    uicore::{HView, HWndRef, Sub, ViewListener, WndCb},
+    uicore::{HView, HViewRef, HWndRef, Sub, ViewListener, WndCb},
 };
 
 pub struct DpiScaleWatcher {
@@ -35,8 +35,8 @@ impl DpiScaleWatcher {
         Self { shared, view }
     }
 
-    pub fn view(&self) -> &HView {
-        &self.view
+    pub fn view(&self) -> HViewRef<'_> {
+        self.view.as_ref()
     }
 
     pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {
@@ -50,7 +50,7 @@ struct DpiScaleWatcherViewListener {
 }
 
 impl ViewListener for DpiScaleWatcherViewListener {
-    fn mount(&self, _: pal::Wm, _: &HView, wnd: HWndRef<'_>) {
+    fn mount(&self, _: pal::Wm, _: HViewRef<'_>, wnd: HWndRef<'_>) {
         let shared = Rc::clone(&self.shared);
         self.sub
             .set(wnd.subscribe_dpi_scale_changed(Box::new(move |wm, wnd| {
@@ -60,7 +60,7 @@ impl ViewListener for DpiScaleWatcherViewListener {
             })));
     }
 
-    fn unmount(&self, _: pal::Wm, _: &HView) {
+    fn unmount(&self, _: pal::Wm, _: HViewRef<'_>) {
         self.sub.take().unsubscribe().unwrap();
     }
 }

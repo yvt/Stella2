@@ -3,9 +3,10 @@ use cggeom::{prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
 use flags_macro::flags;
 use log::trace;
+use rc_borrow::RcBorrow;
 use std::{fmt, rc::Rc};
 
-use super::{HView, ViewDirtyFlags, ViewFlags};
+use super::{HView, HViewRef, ViewDirtyFlags, ViewFlags};
 use crate::pal::Wm;
 
 /// Represents a type defining the positioning of subviews.
@@ -15,7 +16,7 @@ use crate::pal::Wm;
 /// arrangement of its subviews.
 ///
 /// [`HView`]: crate::uicore::HView
-/// [`set_layout`]: crate::uicore::HView::set_layout
+/// [`set_layout`]: crate::uicore::HViewRef::set_layout
 ///
 /// `Layout` is logically immutable. That means the return values of these
 /// methods only can change based on input values. You should always
@@ -132,7 +133,7 @@ impl SizeTraits {
     }
 }
 
-impl HView {
+impl HViewRef<'_> {
     /// Get the frame (bounding rectangle) of a view in the superview's
     /// coordinate space.
     ///
@@ -144,7 +145,7 @@ impl HView {
     /// final value of `frame` can be retrieved reliably.
     ///
     /// [`ViewListener::position`]: crate::uicore::ViewListener::position
-    pub fn frame(&self) -> Box2<f32> {
+    pub fn frame(self) -> Box2<f32> {
         self.view.frame.get()
     }
 
@@ -155,7 +156,7 @@ impl HView {
     /// certain circumstances. See [`frame`] for details.
     ///
     /// [`frame`]: crate::uicore::HView::frame
-    pub fn global_frame(&self) -> Box2<f32> {
+    pub fn global_frame(self) -> Box2<f32> {
         self.view.global_frame.get()
     }
 
@@ -164,7 +165,7 @@ impl HView {
     ///
     /// Returns `true` if `size_traits` has changed. The return value is used to
     /// implement a recursive algorithm of `update_size_traits` itself.
-    pub(super) fn update_size_traits(&self) -> bool {
+    pub(super) fn update_size_traits(self) -> bool {
         let dirty = &self.view.dirty;
         let layout = self.view.layout.borrow();
 
@@ -177,7 +178,7 @@ impl HView {
             // Check `size_traits` of subviews first
             let mut needs_recalculate = false;
             for subview in layout.subviews().iter() {
-                if subview.update_size_traits() {
+                if subview.as_ref().update_size_traits() {
                     needs_recalculate = true;
                 }
             }
@@ -216,7 +217,7 @@ impl HView {
     /// `LayoutCtx::set_layout`. When this happens, relevant dirty flags are
     /// set on ancestor views as if `HView::set_layout` is called as usual. The
     /// caller must detect this kind of situation and take an appropriate action.
-    pub(super) fn update_subview_frames(&self) {
+    pub(super) fn update_subview_frames(self) {
         let dirty = &self.view.dirty;
         let layout = self.view.layout.borrow();
 
@@ -251,7 +252,7 @@ impl HView {
             dirty.set(dirty.get() - ViewDirtyFlags::DESCENDANT_SUBVIEWS_FRAME);
 
             for subview in layout.subviews().iter() {
-                subview.update_subview_frames();
+                subview.as_ref().update_subview_frames();
             }
         }
 
@@ -269,15 +270,19 @@ impl HView {
     }
 
     /// Call `ViewListener::position` for subviews as necessary.
-    pub(super) fn flush_position_event(&self, wm: Wm) {
-        fn update_global_frame(this: &HView, global_offset: Point2<f32>) {
+    pub(super) fn flush_position_event(self, wm: Wm) {
+        fn update_global_frame(this: HViewRef<'_>, global_offset: Point2<f32>) {
             // Global position
             let frame = this.view.frame.get();
             let global_frame = frame.translate(vec2(global_offset.x, global_offset.y));
             this.view.global_frame.set(global_frame);
         }
 
-        fn traverse_all(this: &HView, cb: &mut impl FnMut(&HView), global_offset: Point2<f32>) {
+        fn traverse_all(
+            this: HViewRef<'_>,
+            cb: &mut impl FnMut(HViewRef<'_>),
+            global_offset: Point2<f32>,
+        ) {
             let dirty = &this.view.dirty;
             let layout = this.view.layout.borrow();
 
@@ -289,11 +294,15 @@ impl HView {
             cb(this);
 
             for subview in layout.subviews().iter() {
-                traverse_all(subview, &mut *cb, this.view.global_frame.get().min);
+                traverse_all(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
             }
         }
 
-        fn traverse(this: &HView, cb: &mut impl FnMut(&HView), global_offset: Point2<f32>) {
+        fn traverse(
+            this: HViewRef<'_>,
+            cb: &mut impl FnMut(HViewRef<'_>),
+            global_offset: Point2<f32>,
+        ) {
             let dirty = &this.view.dirty;
             let layout = this.view.layout.borrow();
 
@@ -309,7 +318,7 @@ impl HView {
                 // If we encounter `POSITION_EVENT`, call `position` on every
                 // descendant.
                 for subview in layout.subviews().iter() {
-                    traverse_all(subview, &mut *cb, this.view.global_frame.get().min);
+                    traverse_all(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
                 }
             } else if dirty
                 .get()
@@ -318,7 +327,7 @@ impl HView {
                 dirty.set(dirty.get() - ViewDirtyFlags::DESCENDANT_POSITION_EVENT);
 
                 for subview in layout.subviews().iter() {
-                    traverse(subview, &mut *cb, this.view.global_frame.get().min);
+                    traverse(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
                 }
             }
         }
@@ -359,13 +368,13 @@ impl HView {
         // Check subviews
         let layout = self.view.layout.borrow();
         for subview in layout.subviews().iter().rev() {
-            if let Some(found_view) = subview.hit_test(p, accept_flag, deny_flag) {
+            if let Some(found_view) = subview.as_ref().hit_test(p, accept_flag, deny_flag) {
                 return Some(found_view);
             }
         }
 
         if hit_local && flags.intersects(accept_flag) {
-            Some(self.clone())
+            Some(self.upgrade())
         } else {
             None
         }
@@ -374,14 +383,14 @@ impl HView {
 
 /// The context for [`Layout::arrange`] and [`Layout::size_traits`].
 pub struct LayoutCtx<'a> {
-    active_view: &'a HView,
+    active_view: HViewRef<'a>,
     /// A new layout object, optionally set by `self.set_layout`.
     new_layout: Option<Box<dyn Layout>>,
 }
 
 impl<'a> LayoutCtx<'a> {
     /// Get `SizeTraits` for a subview `hview`.
-    pub fn subview_size_traits(&self, hview: &HView) -> SizeTraits {
+    pub fn subview_size_traits(&self, hview: HViewRef<'_>) -> SizeTraits {
         self.ensure_subview(hview);
         hview.view.size_traits.get()
     }
@@ -389,7 +398,7 @@ impl<'a> LayoutCtx<'a> {
     /// Set the frame (bounding rectangle) of a subview `hview`.
     ///
     /// This method only can be called from [`Layout::arrange`].
-    pub fn set_subview_frame(&mut self, hview: &HView, frame: Box2<f32>) {
+    pub fn set_subview_frame(&mut self, hview: HViewRef<'_>, frame: Box2<f32>) {
         self.ensure_subview(hview);
 
         // Local position
@@ -412,10 +421,10 @@ impl<'a> LayoutCtx<'a> {
 
     /// Panic if `hview` is not a subview of the active view and
     /// debug assertions are enabled.
-    fn ensure_subview(&self, hview: &HView) {
+    fn ensure_subview(&self, hview: HViewRef<'_>) {
         debug_assert_eq!(
             *hview.view.superview.borrow(),
-            Rc::downgrade(&self.active_view.view),
+            Rc::downgrade(&RcBorrow::upgrade(self.active_view.view)),
             "the view is not a subview"
         );
     }

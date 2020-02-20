@@ -4,7 +4,7 @@ use log::{trace, warn};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use super::{CursorShape, HView, HWnd, ScrollDelta, ViewFlags, Wnd};
+use super::{CursorShape, HView, HViewRef, HWnd, ScrollDelta, ViewFlags, Wnd};
 use crate::{pal, pal::Wm};
 
 /// Mouse event handlers for mouse drag gestures.
@@ -18,10 +18,10 @@ use crate::{pal, pal::Wm};
 pub trait MouseDragListener {
     /// The mouse pointer has moved inside a window when at least one of the
     /// mouse buttons are pressed.
-    fn mouse_motion(&self, _: Wm, _: &HView, _loc: Point2<f32>) {}
+    fn mouse_motion(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>) {}
 
     /// A mouse button was pressed inside a window.
-    fn mouse_down(&self, _: Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
+    fn mouse_down(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>, _button: u8) {}
 
     /// A mouse button was released inside a window.
     ///
@@ -31,10 +31,10 @@ pub trait MouseDragListener {
     /// [`WndListener::mouse_drag`] next time a mouse button is pressed.
     ///
     /// [`WndListener::mouse_drag`]: crate::pal::iface::WndListener::mouse_drag
-    fn mouse_up(&self, _: Wm, _: &HView, _loc: Point2<f32>, _button: u8) {}
+    fn mouse_up(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>, _button: u8) {}
 
     /// A mouse drag gesture was cancelled.
-    fn cancel(&self, _: Wm, _: &HView) {}
+    fn cancel(&self, _: Wm, _: HViewRef<'_>) {}
 }
 
 /// A default implementation of [`MouseDragListener`].
@@ -52,19 +52,19 @@ pub trait ScrollListener {
     ///
     /// `velocity` represents the estimated current scroll speed, which is
     /// useful for implementing the rubber-band effect during intertia scrolling.
-    fn motion(&self, _: Wm, _: &HView, _delta: &ScrollDelta, _velocity: Vector2<f32>) {}
+    fn motion(&self, _: Wm, _: HViewRef<'_>, _delta: &ScrollDelta, _velocity: Vector2<f32>) {}
 
     /// Mark the start of a momentum phase (also known as *inertia scrolling*).
     ///
     /// After calling this method, the system will keep generating `motion`
     /// events with dissipating delta values.
-    fn start_momentum_phase(&self, _: Wm, _: &HView) {}
+    fn start_momentum_phase(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The gesture was completed.
-    fn end(&self, _: Wm, _: &HView) {}
+    fn end(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The gesture was cancelled.
-    fn cancel(&self, _: Wm, _: &HView) {}
+    fn cancel(&self, _: Wm, _: HViewRef<'_>) {}
 }
 
 /// A default implementation of [`ScrollListener`].
@@ -125,7 +125,7 @@ impl HWnd {
 
         let new_hover_view = loc.and_then(|loc| {
             let content_view = self.wnd.content_view.borrow();
-            content_view.as_ref().unwrap().hit_test(
+            content_view.as_ref().unwrap().as_ref().hit_test(
                 loc,
                 ViewFlags::ACCEPT_MOUSE_OVER,
                 ViewFlags::DENY_MOUSE,
@@ -145,7 +145,9 @@ impl HWnd {
 
         fn get_path(hview: &Option<HView>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
             if let Some(hview) = hview {
-                hview.for_each_ancestor(|hview| out_path.push(hview));
+                hview
+                    .as_ref()
+                    .for_each_ancestor(|hview| out_path.push(hview));
             }
         }
 
@@ -163,16 +165,32 @@ impl HWnd {
 
         // Call the handlers
         if let Some(hview) = &st.hover_view {
-            hview.view.listener.borrow().mouse_out(self.wnd.wm, hview);
+            hview
+                .view
+                .listener
+                .borrow()
+                .mouse_out(self.wnd.wm, hview.as_ref());
         }
         for hview in path1[..path1.len() - lca_depth].iter() {
-            hview.view.listener.borrow().mouse_leave(self.wnd.wm, hview);
+            hview
+                .view
+                .listener
+                .borrow()
+                .mouse_leave(self.wnd.wm, hview.as_ref());
         }
         for hview in path2[..path2.len() - lca_depth].iter().rev() {
-            hview.view.listener.borrow().mouse_enter(self.wnd.wm, hview);
+            hview
+                .view
+                .listener
+                .borrow()
+                .mouse_enter(self.wnd.wm, hview.as_ref());
         }
         if let Some(hview) = &new_hover_view {
-            hview.view.listener.borrow().mouse_over(self.wnd.wm, hview);
+            hview
+                .view
+                .listener
+                .borrow()
+                .mouse_over(self.wnd.wm, hview.as_ref());
         }
 
         st.hover_view = new_hover_view;
@@ -210,7 +228,7 @@ impl HWnd {
 
         let hit_view = {
             let content_view = self.wnd.content_view.borrow();
-            content_view.as_ref().unwrap().hit_test(
+            content_view.as_ref().unwrap().as_ref().hit_test(
                 loc,
                 ViewFlags::ACCEPT_MOUSE_DRAG,
                 ViewFlags::DENY_MOUSE,
@@ -229,7 +247,7 @@ impl HWnd {
             // Call the view's drag event handler
             let view_drag_listener = {
                 let listener = hit_view.view.listener.borrow();
-                listener.mouse_drag(self.wnd.wm, &hit_view, loc, button)
+                listener.mouse_drag(self.wnd.wm, hit_view.as_ref(), loc, button)
             };
 
             // Remember the gesture
@@ -261,7 +279,7 @@ impl HWnd {
 
         let hit_view = {
             let content_view = self.wnd.content_view.borrow();
-            content_view.as_ref().unwrap().hit_test(
+            content_view.as_ref().unwrap().as_ref().hit_test(
                 loc,
                 ViewFlags::ACCEPT_SCROLL,
                 ViewFlags::DENY_MOUSE,
@@ -279,7 +297,7 @@ impl HWnd {
         if let Some(hit_view) = hit_view {
             // Call the view's drag event handler
             let listener = hit_view.view.listener.borrow();
-            listener.scroll_motion(self.wnd.wm, &hit_view, loc, delta);
+            listener.scroll_motion(self.wnd.wm, hit_view.as_ref(), loc, delta);
         }
     }
 
@@ -305,7 +323,7 @@ impl HWnd {
 
         let hit_view = {
             let content_view = self.wnd.content_view.borrow();
-            content_view.as_ref().unwrap().hit_test(
+            content_view.as_ref().unwrap().as_ref().hit_test(
                 loc,
                 ViewFlags::ACCEPT_SCROLL,
                 ViewFlags::DENY_MOUSE,
@@ -323,7 +341,7 @@ impl HWnd {
             // Call the view's drag event handler
             let view_scr_listener = {
                 let listener = hit_view.view.listener.borrow();
-                listener.scroll_gesture(self.wnd.wm, &hit_view, loc)
+                listener.scroll_gesture(self.wnd.wm, hit_view.as_ref(), loc)
             };
 
             // Remember the gesture
@@ -342,43 +360,43 @@ impl HWnd {
     }
 }
 
-impl HView {
+impl HViewRef<'_> {
     /// Cancel all active mouse gestures for the specified view and its
     /// subviews.
-    pub(super) fn cancel_mouse_gestures_of_subviews(&self, wnd: &Wnd) {
+    pub(super) fn cancel_mouse_gestures_of_subviews(self, wnd: &Wnd) {
         let cancelled_drag = wnd
             .mouse_state
             .borrow_mut()
             .cancel_drag_gestures(self, true);
 
         if let Some(drag) = cancelled_drag {
-            drag.listener.cancel(wnd.wm, &drag.view);
+            drag.listener.cancel(wnd.wm, drag.view.as_ref());
         }
     }
 
     /// Cancel active mouse drag gestures for the specified view (but not
     /// subviews).
-    pub(super) fn cancel_mouse_drag_gestures(&self, wnd: &Wnd) {
+    pub(super) fn cancel_mouse_drag_gestures(self, wnd: &Wnd) {
         let cancelled_drag = wnd
             .mouse_state
             .borrow_mut()
             .cancel_drag_gestures(self, false);
 
         if let Some(drag) = cancelled_drag {
-            drag.listener.cancel(wnd.wm, &drag.view);
+            drag.listener.cancel(wnd.wm, drag.view.as_ref());
         }
     }
 
     /// Recalculate the current cursor shape if `self` is relevant to the
     /// calculation.
-    pub(super) fn update_cursor(&self, wnd: &Wnd) {
+    pub(super) fn update_cursor(self, wnd: &Wnd) {
         let st = wnd.mouse_state.borrow();
 
         if let Some(view) = &st.hover_view {
-            if view.is_improper_subview_of(self) {
+            if view.as_ref().is_improper_subview_of(self) {
                 // Update the cursor shape of the window
                 let mut cursor_shape = CursorShape::default();
-                view.for_each_ancestor(|hview| {
+                view.as_ref().for_each_ancestor(|hview| {
                     if let Some(shape) = hview.view.cursor_shape.get() {
                         cursor_shape = shape;
                     }
@@ -396,13 +414,17 @@ impl WndMouseState {
     ///
     /// Returns `Some(drag)` if the drag gesture `drag` is cancelled. The caller
     /// should call `drag.listener.cancel` after unborrowing `Wnd::mouse_state`.
-    fn cancel_drag_gestures(&mut self, view: &HView, subview: bool) -> Option<Rc<DragGesture>> {
+    fn cancel_drag_gestures(
+        &mut self,
+        view: HViewRef<'_>,
+        subview: bool,
+    ) -> Option<Rc<DragGesture>> {
         let cancel_drag;
         if let Some(drag) = &self.drag_gestures {
             if subview {
-                cancel_drag = drag.view.is_improper_subview_of(view);
+                cancel_drag = drag.view.as_ref().is_improper_subview_of(view);
             } else {
-                cancel_drag = drag.view == *view;
+                cancel_drag = drag.view.as_ref() == view;
             }
         } else {
             cancel_drag = false;
@@ -461,22 +483,23 @@ impl Drop for PalDragListener {
 impl pal::iface::MouseDragListener<pal::Wm> for PalDragListener {
     fn mouse_motion(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>) {
         self.with_drag_gesture(|drag| {
-            drag.listener.mouse_motion(wm, &drag.view, loc);
+            drag.listener.mouse_motion(wm, drag.view.as_ref(), loc);
         })
     }
     fn mouse_down(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         self.with_drag_gesture(|drag| {
-            drag.listener.mouse_down(wm, &drag.view, loc, button);
+            drag.listener
+                .mouse_down(wm, drag.view.as_ref(), loc, button);
         })
     }
     fn mouse_up(&self, wm: Wm, _: &pal::HWnd, loc: Point2<f32>, button: u8) {
         self.with_drag_gesture(|drag| {
-            drag.listener.mouse_up(wm, &drag.view, loc, button);
+            drag.listener.mouse_up(wm, drag.view.as_ref(), loc, button);
         })
     }
     fn cancel(&self, wm: Wm, _: &pal::HWnd) {
         self.with_drag_gesture(|drag| {
-            drag.listener.cancel(wm, &drag.view);
+            drag.listener.cancel(wm, drag.view.as_ref());
         })
     }
 }
@@ -522,22 +545,26 @@ impl Drop for PalScrollListener {
 impl pal::iface::ScrollListener<pal::Wm> for PalScrollListener {
     fn motion(&self, wm: Wm, _: &pal::HWnd, delta: &pal::ScrollDelta, velocity: Vector2<f32>) {
         self.with_scroll_gesture(|gesture| {
-            gesture.listener.motion(wm, &gesture.view, delta, velocity);
+            gesture
+                .listener
+                .motion(wm, gesture.view.as_ref(), delta, velocity);
         })
     }
     fn start_momentum_phase(&self, wm: Wm, _: &pal::HWnd) {
         self.with_scroll_gesture(|gesture| {
-            gesture.listener.start_momentum_phase(wm, &gesture.view);
+            gesture
+                .listener
+                .start_momentum_phase(wm, gesture.view.as_ref());
         })
     }
     fn end(&self, wm: Wm, _: &pal::HWnd) {
         self.with_scroll_gesture(|gesture| {
-            gesture.listener.end(wm, &gesture.view);
+            gesture.listener.end(wm, gesture.view.as_ref());
         })
     }
     fn cancel(&self, wm: Wm, _: &pal::HWnd) {
         self.with_scroll_gesture(|gesture| {
-            gesture.listener.cancel(wm, &gesture.view);
+            gesture.listener.cancel(wm, gesture.view.as_ref());
         })
     }
 }

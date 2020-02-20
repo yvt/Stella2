@@ -6,7 +6,7 @@ use std::{cell::Cell, rc::Rc};
 
 use crate::{
     pal::Wm,
-    uicore::{HView, MouseDragListener},
+    uicore::{HViewRef, MouseDragListener},
 };
 
 /// A view listener mix-in that allows the client to implement the behaviour of
@@ -18,14 +18,14 @@ pub struct ButtonMixin {
 
 pub trait ButtonListener {
     /// The state of the push button was updated.
-    fn update(&self, _: Wm, _: &HView) {}
+    fn update(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The push button was activated.
     ///
     /// This method is called from a view's event handler, the same restrictions
     /// of `ViewListener` apply. Consider using `Wm::invoke` to circumvent
     /// them.
-    fn activate(&self, _: Wm, _: &HView) {}
+    fn activate(&self, _: Wm, _: HViewRef<'_>) {}
 }
 
 #[derive(Debug)]
@@ -88,7 +88,7 @@ struct MouseDragListenerImpl {
 }
 
 impl MouseDragListener for MouseDragListenerImpl {
-    fn mouse_motion(&self, wm: Wm, view: &HView, loc: Point2<f32>) {
+    fn mouse_motion(&self, wm: Wm, view: HViewRef<'_>, loc: Point2<f32>) {
         let inner = &self.inner;
         let mut state = inner.state.get();
         if state.contains(StateFlags::DRAG) {
@@ -99,7 +99,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         }
     }
 
-    fn mouse_down(&self, wm: Wm, view: &HView, _loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: Wm, view: HViewRef<'_>, _loc: Point2<f32>, button: u8) {
         if button != 0 {
             return;
         }
@@ -113,7 +113,7 @@ impl MouseDragListener for MouseDragListenerImpl {
         );
     }
 
-    fn mouse_up(&self, wm: Wm, view: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: Wm, view: HViewRef<'_>, loc: Point2<f32>, button: u8) {
         if button != 0 {
             return;
         }
@@ -126,13 +126,13 @@ impl MouseDragListener for MouseDragListenerImpl {
         }
     }
 
-    fn cancel(&self, wm: Wm, view: &HView) {
+    fn cancel(&self, wm: Wm, view: HViewRef<'_>) {
         self.inner
             .set_state(&*self.client_listener, wm, view, StateFlags::empty());
     }
 }
 
-fn hit_test(view: &HView, loc: Point2<f32>) -> bool {
+fn hit_test(view: HViewRef<'_>, loc: Point2<f32>) -> bool {
     view.global_frame().contains_point(&loc)
 }
 
@@ -142,7 +142,7 @@ impl Inner {
         &self,
         listener: &dyn ButtonListener,
         wm: Wm,
-        view: &HView,
+        view: HViewRef<'_>,
         new_flags: StateFlags,
     ) {
         let should_call_update = (new_flags ^ self.state.get()).contains(StateFlags::PRESS);

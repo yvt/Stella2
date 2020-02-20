@@ -6,8 +6,8 @@ use tcw3::{
     pal::prelude::*,
     ui::{layouts::AbsLayout, mixins::CanvasMixin, AlignFlags},
     uicore::{
-        HView, HWnd, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener,
-        WndStyleFlags,
+        HView, HViewRef, HWnd, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener,
+        WndListener, WndStyleFlags,
     },
 };
 
@@ -26,7 +26,7 @@ impl MyViewListener {
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: pal::Wm, view: &HView, wnd: HWndRef<'_>) {
+    fn mount(&self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
         self.canvas.borrow_mut().mount(wm, view, wnd);
         wm.set_layer_attr(
             self.canvas.borrow().layer().unwrap(),
@@ -37,15 +37,15 @@ impl ViewListener for MyViewListener {
         );
     }
 
-    fn unmount(&self, wm: pal::Wm, view: &HView) {
+    fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.canvas.borrow_mut().unmount(wm, view);
     }
 
-    fn position(&self, wm: pal::Wm, view: &HView) {
+    fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.canvas.borrow_mut().position(wm, view);
     }
 
-    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         self.canvas.borrow_mut().update(wm, view, ctx, |draw_ctx| {
             let c = &mut draw_ctx.canvas;
 

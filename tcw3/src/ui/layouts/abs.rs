@@ -42,11 +42,11 @@ impl Layout for AbsLayout {
 
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, _: Vector2<f32>) {
         for (subview, (frame, align)) in self.subviews.iter().zip(self.items.iter()) {
-            let st = ctx.subview_size_traits(subview);
+            let st = ctx.subview_size_traits(subview.as_ref());
 
             let subview_frame = align.arrange_child(frame, &st);
 
-            ctx.set_subview_frame(subview, subview_frame);
+            ctx.set_subview_frame(subview.as_ref(), subview_frame);
         }
     }
 }

@@ -28,7 +28,7 @@ impl table::TableModelQuery for TableModelQuery {
         let label = Label::new(self.style_manager);
         label.set_text(format!("{:?}", cell));
 
-        (label.view().clone(), Box::new(()))
+        (label.view().upgrade(), Box::new(()))
     }
 
     fn range_size(&mut self, line_ty: LineTy, range: Range<u64>, _approx: bool) -> f64 {
@@ -67,7 +67,7 @@ fn main() {
     }
 
     wnd.content_view()
-        .set_layout(FillLayout::new(table.view().clone()).with_uniform_margin(10.0));
+        .set_layout(FillLayout::new(table.view().upgrade()).with_uniform_margin(10.0));
 
     wm.enter_main_loop();
 }

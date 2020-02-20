@@ -11,7 +11,7 @@ use crate::{
         theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Label,
     },
-    uicore::{HView, Sub, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, Sub, ViewFlags, ViewListener},
 };
 
 /// A push button widget.
@@ -51,7 +51,7 @@ impl Button {
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
         );
 
-        view.set_layout(FillLayout::new(styled_box.view().clone()));
+        view.set_layout(FillLayout::new(styled_box.view().upgrade()));
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
@@ -68,8 +68,8 @@ impl Button {
     }
 
     /// Get the view representing a push button widget.
-    pub fn view(&self) -> &HView {
-        &self.view
+    pub fn view(&self) -> HViewRef<'_> {
+        self.view.as_ref()
     }
 
     /// Get the styling element representing the widget.
@@ -116,7 +116,7 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn view(&self) -> &HView {
+    fn view(&self) -> HViewRef<'_> {
         self.view()
     }
 
@@ -130,7 +130,7 @@ struct ButtonViewListener {
 }
 
 impl ViewListener for ButtonViewListener {
-    fn mouse_enter(&self, wm: pal::Wm, _: &HView) {
+    fn mouse_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let inner = Rc::clone(&self.inner);
         wm.invoke_on_update(move |_| {
             let styled_box = &inner.styled_box;
@@ -138,7 +138,7 @@ impl ViewListener for ButtonViewListener {
         })
     }
 
-    fn mouse_leave(&self, wm: pal::Wm, _: &HView) {
+    fn mouse_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let inner = Rc::clone(&self.inner);
         wm.invoke_on_update(move |_| {
             let styled_box = &inner.styled_box;
@@ -149,7 +149,7 @@ impl ViewListener for ButtonViewListener {
     fn mouse_drag(
         &self,
         _: pal::Wm,
-        _: &HView,
+        _: HViewRef<'_>,
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn crate::uicore::MouseDragListener> {
@@ -166,7 +166,7 @@ struct ButtonMixinListener {
 }
 
 impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
-    fn update(&self, _: pal::Wm, _: &HView) {
+    fn update(&self, _: pal::Wm, _: HViewRef<'_>) {
         let styled_box = &self.inner.styled_box;
 
         let mut class_set = styled_box.class_set();
@@ -174,7 +174,7 @@ impl crate::ui::mixins::button::ButtonListener for ButtonMixinListener {
         styled_box.set_class_set(class_set);
     }
 
-    fn activate(&self, wm: pal::Wm, _: &HView) {
+    fn activate(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let inner = Rc::clone(&self.inner);
         wm.invoke(move |wm| {
             let handlers = inner.activate_handlers.borrow();

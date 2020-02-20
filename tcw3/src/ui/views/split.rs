@@ -16,7 +16,7 @@ use crate::{
         theming::{ClassSet, HElem, Manager, StyledBox, Widget},
     },
     uicore::{
-        CursorShape, HView, Layout, LayoutCtx, MouseDragListener, SizeTraits, ViewFlags,
+        CursorShape, HView, HViewRef, Layout, LayoutCtx, MouseDragListener, SizeTraits, ViewFlags,
         ViewListener,
     },
 };
@@ -149,7 +149,8 @@ impl Split {
         let mut margin = [0.0; 4];
         margin[!vertical as usize] = SPLITTER_TOLERANCE;
         margin[!vertical as usize + 2] = SPLITTER_TOLERANCE;
-        splitter.set_layout(FillLayout::new(shared.splitter_sb.view().clone()).with_margin(margin));
+        splitter
+            .set_layout(FillLayout::new(shared.splitter_sb.view().upgrade()).with_margin(margin));
 
         container.set_layout(shared.layout());
 
@@ -157,8 +158,8 @@ impl Split {
     }
 
     /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> &HView {
-        &self.container
+    pub fn view(&self) -> HViewRef<'_> {
+        self.container.as_ref()
     }
 
     /// Get the styling element of the splitter.
@@ -224,7 +225,7 @@ impl Split {
 }
 
 impl Widget for Split {
-    fn view(&self) -> &HView {
+    fn view(&self) -> HViewRef<'_> {
         self.view()
     }
 
@@ -357,9 +358,9 @@ impl Layout for SplitLayout {
     }
 
     fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
-        let st1 = ctx.subview_size_traits(&self.subviews[0]);
-        let st2 = ctx.subview_size_traits(&self.subviews[1]);
-        let st_spl = ctx.subview_size_traits(&self.subviews[2]);
+        let st1 = ctx.subview_size_traits(self.subviews[0].as_ref());
+        let st2 = ctx.subview_size_traits(self.subviews[1].as_ref());
+        let st_spl = ctx.subview_size_traits(self.subviews[2].as_ref());
 
         let axis_pri = self.vertical as usize;
         let axis_sec = axis_pri ^ 1;
@@ -382,9 +383,9 @@ impl Layout for SplitLayout {
     }
 
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
-        let st1 = ctx.subview_size_traits(&self.subviews[0]);
-        let st2 = ctx.subview_size_traits(&self.subviews[1]);
-        let st_spl = ctx.subview_size_traits(&self.subviews[2]);
+        let st1 = ctx.subview_size_traits(self.subviews[0].as_ref());
+        let st2 = ctx.subview_size_traits(self.subviews[1].as_ref());
+        let st_spl = ctx.subview_size_traits(self.subviews[2].as_ref());
 
         let axis_pri = self.vertical as usize;
 
@@ -407,14 +408,14 @@ impl Layout for SplitLayout {
         frame1.max[axis_pri] = pos;
         frame2.min[axis_pri] = pos + splitter_width;
 
-        ctx.set_subview_frame(&self.subviews[0], frame1);
-        ctx.set_subview_frame(&self.subviews[1], frame2);
+        ctx.set_subview_frame(self.subviews[0].as_ref(), frame1);
+        ctx.set_subview_frame(self.subviews[1].as_ref(), frame2);
 
         // Arrange the splitter
         spl_frame.min[axis_pri] = pos - SPLITTER_TOLERANCE;
         spl_frame.max[axis_pri] = pos + splitter_width + SPLITTER_TOLERANCE;
 
-        ctx.set_subview_frame(&self.subviews[2], spl_frame);
+        ctx.set_subview_frame(self.subviews[2].as_ref(), spl_frame);
 
         // Set the cursor shape. It's dependent on whether the splitter position
         // is at a limit or not.
@@ -452,7 +453,7 @@ impl ViewListener for SplitterListener {
     fn mouse_drag(
         &self,
         wm: pal::Wm,
-        _: &HView,
+        _: HViewRef<'_>,
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
@@ -487,7 +488,7 @@ struct DragState {
 }
 
 impl MouseDragListener for SplitterDragListener {
-    fn mouse_down(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: pal::Wm, _: HViewRef<'_>, loc: Point2<f32>, button: u8) {
         if let Some(shared) = self.shared.upgrade() {
             if button == 0 {
                 let axis_pri = shared.vertical as usize;
@@ -504,7 +505,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn mouse_motion(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>) {
+    fn mouse_motion(&self, wm: pal::Wm, _: HViewRef<'_>, loc: Point2<f32>) {
         if let (Some(shared), Some(drag)) = (self.shared.upgrade(), self.drag.borrow().clone()) {
             let axis_pri = shared.vertical as usize;
 
@@ -519,7 +520,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: pal::Wm, _: HViewRef<'_>, _loc: Point2<f32>, button: u8) {
         if button == 0 {
             *self.drag.borrow_mut() = None;
 
@@ -527,7 +528,7 @@ impl MouseDragListener for SplitterDragListener {
         }
     }
 
-    fn cancel(&self, wm: pal::Wm, _: &HView) {
+    fn cancel(&self, wm: pal::Wm, _: HViewRef<'_>) {
         if let Some(shared) = self.shared.upgrade() {
             self.user_listener.cancel(wm);
 

@@ -13,17 +13,18 @@ use std::{
 };
 
 use super::{
-    invocation::process_pending_invocations, CursorShape, HView, HWnd, HWndRef, Superview,
-    SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags,
+    invocation::process_pending_invocations, CursorShape, HView, HViewRef, HWnd, HWndRef,
+    Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd,
+    WndStyleFlags,
 };
 use crate::pal::{self, prelude::Wm as _, Wm};
 
-impl HView {
+impl HViewRef<'_> {
     /// Get the containing window for a view.
-    pub fn containing_wnd(&self) -> Option<HWnd> {
+    pub fn containing_wnd(self) -> Option<HWnd> {
         match self.view.superview.borrow().upgrade() {
             None => None,
-            Some(SuperviewStrong::View(sv)) => HView { view: sv }.containing_wnd(),
+            Some(SuperviewStrong::View(sv)) => HView { view: sv }.as_ref().containing_wnd(),
             Some(SuperviewStrong::Window(wnd)) => Some(HWnd { wnd }),
         }
     }
@@ -259,10 +260,10 @@ impl HWndRef<'_> {
                 };
             }
 
-            view.call_pending_mount_if_dirty(self.wnd.wm, self);
+            view.as_ref().call_pending_mount_if_dirty(self.wnd.wm, self);
 
             // Layout: down phase
-            view.update_size_traits();
+            view.as_ref().update_size_traits();
 
             // Constrain the window size
             let size_traits = view.view.size_traits.get();
@@ -317,11 +318,12 @@ impl HWndRef<'_> {
             if new_frame != view.view.frame.get() {
                 view.view.frame.set(new_frame);
                 view.view.global_frame.set(new_frame);
-                view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+                view.as_ref()
+                    .set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
             // Layout: up phase
-            view.update_subview_frames();
+            view.as_ref().update_subview_frames();
 
             if view
                 .view
@@ -335,10 +337,10 @@ impl HWndRef<'_> {
             }
 
             // Position views
-            view.flush_position_event(self.wnd.wm);
+            view.as_ref().flush_position_event(self.wnd.wm);
 
             // Update visual
-            view.update_layers(self.wnd.wm, self);
+            view.as_ref().update_layers(self.wnd.wm, self);
         }
 
         panic!("Window update did not converge");
@@ -373,8 +375,8 @@ impl Wnd {
 
             *view.view.superview.borrow_mut() = Superview::empty();
 
-            view.cancel_mouse_gestures_of_subviews(self);
-            view.call_unmount(self.wm);
+            view.as_ref().cancel_mouse_gestures_of_subviews(self);
+            view.as_ref().call_unmount(self.wm);
         }
 
         if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
@@ -469,7 +471,8 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
                 let view = hwnd.wnd.content_view.borrow();
                 let view = view.as_ref().unwrap();
 
-                view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+                view.as_ref()
+                    .set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
             hwnd.wnd.set_dirty_flags(WndDirtyFlags::CONTENTS);
@@ -567,7 +570,7 @@ impl RootViewListener {
 }
 
 impl ViewListener for RootViewListener {
-    fn mount(&self, wm: Wm, _: &HView, _: HWndRef<'_>) {
+    fn mount(&self, wm: Wm, _: HViewRef<'_>, _: HWndRef<'_>) {
         *self.layer.borrow_mut() = Some(wm.new_layer(pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(box2! { min: [0.0, 0.0], max: [1.0, 1.0] }),
@@ -575,13 +578,13 @@ impl ViewListener for RootViewListener {
         }));
     }
 
-    fn unmount(&self, wm: Wm, _: &HView) {
+    fn unmount(&self, wm: Wm, _: HViewRef<'_>) {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }
     }
 
-    fn update(&self, wm: Wm, _: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: Wm, _: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 

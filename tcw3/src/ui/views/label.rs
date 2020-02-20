@@ -8,7 +8,9 @@ use crate::{
     pal::prelude::*,
     ui::mixins::CanvasMixin,
     ui::theming::{ClassSet, Elem, HElem, Manager, Prop, PropKindFlags, PropValue, Widget},
-    uicore::{HView, HWndRef, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{
+        HView, HViewRef, HWndRef, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener,
+    },
 };
 
 /// A widget for displaying a static text.
@@ -56,13 +58,13 @@ impl Label {
         };
 
         // Get notified when a styling property changes
-        let view = this.view().downgrade();
+        let view = this.view.downgrade();
         let inner = Rc::downgrade(&this.inner);
         this.inner
             .style_elem
             .set_on_change(Box::new(move |_, kind_flags| {
                 if let (Some(inner), Some(view)) = (inner.upgrade(), view.upgrade()) {
-                    reapply_style(&inner, &view, kind_flags);
+                    reapply_style(&inner, view.as_ref(), kind_flags);
                 }
             }));
 
@@ -75,8 +77,8 @@ impl Label {
     }
 
     /// Get the view representing a label widget.
-    pub fn view(&self) -> &HView {
-        &self.view
+    pub fn view(&self) -> HViewRef<'_> {
+        self.view.as_ref()
     }
 
     /// Get the view representing a label widget, consuming `self`.
@@ -100,7 +102,7 @@ impl Label {
             }
             state.text = value;
             state.invalidate_text_layout();
-            state.canvas.pend_draw(&self.view);
+            state.canvas.pend_draw(self.view.as_ref());
         }
 
         // Invalidate the layout, since the label size might be changed
@@ -131,7 +133,7 @@ impl Label {
 }
 
 impl Widget for Label {
-    fn view(&self) -> &HView {
+    fn view(&self) -> HViewRef<'_> {
         self.view()
     }
 
@@ -140,7 +142,7 @@ impl Widget for Label {
     }
 }
 
-fn reapply_style(inner: &Rc<Inner>, view: &HView, kind_flags: PropKindFlags) {
+fn reapply_style(inner: &Rc<Inner>, view: HViewRef<'_>, kind_flags: PropKindFlags) {
     let mut state = inner.state.borrow_mut();
 
     if kind_flags.intersects(PropKindFlags::FG_COLOR) {
@@ -233,19 +235,19 @@ impl Layout for LabelListener {
 }
 
 impl ViewListener for LabelListener {
-    fn mount(&self, wm: pal::Wm, view: &HView, wnd: HWndRef<'_>) {
+    fn mount(&self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
         self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
     }
 
-    fn unmount(&self, wm: pal::Wm, view: &HView) {
+    fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.unmount(wm, view);
     }
 
-    fn position(&self, wm: pal::Wm, view: &HView) {
+    fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.position(wm, view);
     }
 
-    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         let mut state = self.inner.state.borrow_mut();
         let state = &mut *state; // enable split borrow
 

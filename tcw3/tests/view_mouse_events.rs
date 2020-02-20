@@ -10,7 +10,9 @@ use tcw3::{
         layouts::{EmptyLayout, FillLayout, TableLayout},
         AlignFlags,
     },
-    uicore::{HView, HWnd, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
+    uicore::{
+        HView, HViewRef, HWnd, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener,
+    },
 };
 
 #[derive(Debug, PartialEq)]
@@ -26,23 +28,28 @@ enum Event {
 struct RecordingViewListener(u8, Rc<RefCell<Vec<(u8, Event)>>>);
 
 impl ViewListener for RecordingViewListener {
-    fn mouse_enter(&self, _: pal::Wm, _: &HView) {
+    fn mouse_enter(&self, _: pal::Wm, _: HViewRef<'_>) {
         self.1.borrow_mut().push((self.0, Event::MouseEnter));
     }
-    fn mouse_leave(&self, _: pal::Wm, _: &HView) {
+    fn mouse_leave(&self, _: pal::Wm, _: HViewRef<'_>) {
         self.1.borrow_mut().push((self.0, Event::MouseLeave));
     }
-    fn mouse_over(&self, _: pal::Wm, _: &HView) {
+    fn mouse_over(&self, _: pal::Wm, _: HViewRef<'_>) {
         self.1.borrow_mut().push((self.0, Event::MouseOver));
     }
-    fn mouse_out(&self, _: pal::Wm, _: &HView) {
+    fn mouse_out(&self, _: pal::Wm, _: HViewRef<'_>) {
         self.1.borrow_mut().push((self.0, Event::MouseOut));
     }
 
-    fn scroll_motion(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>, _delta: &ScrollDelta) {
+    fn scroll_motion(&self, _: pal::Wm, _: HViewRef<'_>, _loc: Point2<f32>, _delta: &ScrollDelta) {
         self.1.borrow_mut().push((self.0, Event::ScrollMotion));
     }
-    fn scroll_gesture(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
+    fn scroll_gesture(
+        &self,
+        _: pal::Wm,
+        _: HViewRef<'_>,
+        _loc: Point2<f32>,
+    ) -> Box<dyn ScrollListener> {
         self.1.borrow_mut().push((self.0, Event::ScrollGesture));
         Box::new(())
     }
