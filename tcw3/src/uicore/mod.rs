@@ -893,6 +893,9 @@ impl HView {
         // `layout.rs`
         pub fn frame(&self) -> Box2<f32>;
         pub fn global_frame(&self) -> Box2<f32>;
+
+        // `window.rs`
+        pub fn containing_wnd(&self) -> Option<HWnd>;
     }
 }
 
