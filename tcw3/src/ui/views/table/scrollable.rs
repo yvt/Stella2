@@ -52,7 +52,7 @@ impl ScrollableTable {
             Scrollbar::new(style_manager, true),
         ];
 
-        styled_box.set_subview(Role::Generic, Some(table.view().upgrade()));
+        styled_box.set_subview(Role::Generic, Some(table.view()));
         styled_box.set_child(Role::HorizontalScrollbar, Some(&scrollbars[0]));
         styled_box.set_child(Role::VerticalScrollbar, Some(&scrollbars[1]));
 
@@ -60,7 +60,7 @@ impl ScrollableTable {
 
         // Create a view for receiving scroll wheel events
         let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
-        wrapper.set_layout(FillLayout::new(styled_box.view().upgrade()));
+        wrapper.set_layout(FillLayout::new(styled_box.view()));
 
         let this = Self {
             inner: Rc::new(Inner {
@@ -144,8 +144,13 @@ impl ScrollableTable {
         this
     }
 
-    /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.inner.wrapper.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.inner.wrapper.as_ref()
     }
 
@@ -200,7 +205,7 @@ impl ScrollableTable {
 
 impl Widget for ScrollableTable {
     fn view_ref(&self) -> HViewRef<'_> {
-        self.view()
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {
@@ -327,8 +332,7 @@ mod tests {
         let table = Rc::new(ScrollableTable::new(style_manager));
 
         let wnd = HWnd::new(wm);
-        wnd.content_view()
-            .set_layout(FillLayout::new(table.view().upgrade()));
+        wnd.content_view().set_layout(FillLayout::new(table.view()));
         wnd.set_visibility(true);
 
         twm.step_unsend();

@@ -524,8 +524,13 @@ impl Table {
         Self { view, inner }
     }
 
-    /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.view.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.view.as_ref()
     }
 

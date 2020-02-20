@@ -125,7 +125,7 @@ impl Scrollbar {
         let wrapper = HView::new(
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
         );
-        wrapper.set_layout(FillLayout::new(frame.view().upgrade()));
+        wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
             vertical,
@@ -218,8 +218,13 @@ impl Scrollbar {
         *self.shared.on_page_step.borrow_mut() = Box::new(handler);
     }
 
-    /// Get the view representing the widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.shared.wrapper.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.shared.wrapper.as_ref()
     }
 
@@ -231,7 +236,7 @@ impl Scrollbar {
 
 impl Widget for Scrollbar {
     fn view_ref(&self) -> HViewRef<'_> {
-        self.view()
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {
@@ -561,8 +566,7 @@ mod tests {
         let sb = Rc::new(Scrollbar::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
-        wnd.content_view()
-            .set_layout(FillLayout::new(sb.view().upgrade()));
+        wnd.content_view().set_layout(FillLayout::new(sb.view()));
         wnd.set_visibility(true);
 
         twm.step_unsend();

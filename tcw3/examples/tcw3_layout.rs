@@ -105,7 +105,7 @@ fn main() {
         view.set_layout(AbsLayout::new(
             size_traits,
             Some((
-                label.view().upgrade(),
+                label.view(),
                 box2! { point: Point2::new(5.0, 5.0) },
                 flags![AlignFlags::{LEFT | TOP}],
             )),

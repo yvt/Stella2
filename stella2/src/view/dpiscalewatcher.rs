@@ -35,8 +35,8 @@ impl DpiScaleWatcher {
         Self { shared, view }
     }
 
-    pub fn view(&self) -> HViewRef<'_> {
-        self.view.as_ref()
+    pub fn view(&self) -> HView {
+        self.view.clone()
     }
 
     pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {

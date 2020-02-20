@@ -51,7 +51,7 @@ impl Button {
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
         );
 
-        view.set_layout(FillLayout::new(styled_box.view().upgrade()));
+        view.set_layout(FillLayout::new(styled_box.view()));
 
         let inner = Rc::new(Inner {
             button_mixin: ButtonMixin::new(),
@@ -67,8 +67,13 @@ impl Button {
         Self { view, inner }
     }
 
-    /// Get the view representing a push button widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing a push button widget.
+    pub fn view(&self) -> HView {
+        self.view.clone()
+    }
+
+    /// Borrow the handle to the view representing a push button widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.view.as_ref()
     }
 

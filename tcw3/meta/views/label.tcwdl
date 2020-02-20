@@ -12,6 +12,6 @@ pub comp crate::ui::views::Label {
     prop text: String { pub set; } = unreachable!();
     prop class_set: ClassSet { pub set; get clone; } = unreachable!();
 
-    const view: HView { pub get; } = unreachable!();
+    const view: HView { pub get clone; } = unreachable!();
     const style_elem: HElem { pub get clone; } = unreachable!();
 }

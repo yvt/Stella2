@@ -149,16 +149,20 @@ impl Split {
         let mut margin = [0.0; 4];
         margin[!vertical as usize] = SPLITTER_TOLERANCE;
         margin[!vertical as usize + 2] = SPLITTER_TOLERANCE;
-        splitter
-            .set_layout(FillLayout::new(shared.splitter_sb.view().upgrade()).with_margin(margin));
+        splitter.set_layout(FillLayout::new(shared.splitter_sb.view()).with_margin(margin));
 
         container.set_layout(shared.layout());
 
         Self { container, shared }
     }
 
-    /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.container.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.container.as_ref()
     }
 
@@ -226,7 +230,7 @@ impl Split {
 
 impl Widget for Split {
     fn view_ref(&self) -> HViewRef<'_> {
-        self.view()
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {

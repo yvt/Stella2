@@ -200,7 +200,7 @@ impl StyledBox {
     /// Set a child widget using `set_subview` and `set_subelement`.
     pub fn set_child(&self, role: Role, widget: Option<&dyn Widget>) {
         if let Some(widget) = widget {
-            self.set_subview(role, Some(widget.view().upgrade()));
+            self.set_subview(role, Some(widget.view_ref().upgrade()));
             self.set_subelement(role, widget.style_elem());
         } else {
             self.set_subview(role, None);
@@ -237,8 +237,13 @@ impl StyledBox {
         self.shared.set_dirty(dirty_flags);
     }
 
-    /// Get the view representing the styled box.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing the styled box.
+    pub fn view(&self) -> HView {
+        self.view.clone()
+    }
+
+    /// Borrow the handle to the view representing the styled box.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.view.as_ref()
     }
 
@@ -266,7 +271,7 @@ impl StyledBox {
 
 impl Widget for StyledBox {
     fn view_ref(&self) -> HViewRef<'_> {
-        self.view()
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {

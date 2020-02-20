@@ -52,8 +52,8 @@ fn main() {
     }
 
     let cells = vec![
-        (label.view().upgrade(), [0, 0], AlignFlags::JUSTIFY),
-        (scrollbar.view().upgrade(), [0, 1], AlignFlags::JUSTIFY),
+        (label.view(), [0, 0], AlignFlags::JUSTIFY),
+        (scrollbar.view(), [0, 1], AlignFlags::JUSTIFY),
     ];
 
     wnd.content_view()

@@ -13,7 +13,7 @@ use crate::{
 #[builder(simple)]
 pub comp crate::ui::views::Table {
     /// Get a handle to the view representing the widget.
-    const view: HView { pub get borrow; } = unreachable!();
+    const view: HView { pub get clone; } = unreachable!();
 
     /// Set new size traits.
     ///
@@ -42,7 +42,7 @@ pub comp crate::ui::views::ScrollableTable {
     const style_manager: &Manager { pub set; }
 
     /// Get a handle to the view representing the widget.
-    const view: HView { pub get borrow; } = unreachable!();
+    const view: HView { pub get clone; } = unreachable!();
 
     /// Get the styling element representing the widget.
     const style_elem: HElem { pub get clone; } = unreachable!();

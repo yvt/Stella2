@@ -76,12 +76,17 @@ impl Label {
         this
     }
 
-    /// Get the view representing a label widget.
-    pub fn view(&self) -> HViewRef<'_> {
+    /// Get an owned handle to the view representing a label widget.
+    pub fn view(&self) -> HView {
+        self.view.clone()
+    }
+
+    /// Borrow the handle to the view representing a label widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
         self.view.as_ref()
     }
 
-    /// Get the view representing a label widget, consuming `self`.
+    /// Get the handle to the view representing a label widget, consuming `self`.
     pub fn into_view(self) -> HView {
         self.view
     }
@@ -134,7 +139,7 @@ impl Label {
 
 impl Widget for Label {
     fn view_ref(&self) -> HViewRef<'_> {
-        self.view()
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {

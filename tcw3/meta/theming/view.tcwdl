@@ -19,6 +19,6 @@ pub comp crate::ui::theming::StyledBox {
     prop subelement_generic: HElem { pub set; } = unreachable!();
     prop child_generic: &dyn Widget { pub set; } = unreachable!();
 
-    const view: HView { pub get; } = unreachable!();
+    const view: HView { pub get clone; } = unreachable!();
     const style_elem: HElem { pub get clone; } = unreachable!();
 }
