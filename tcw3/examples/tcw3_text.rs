@@ -10,7 +10,7 @@ use tcw3::{
         layouts::{EmptyLayout, FillLayout},
         mixins::CanvasMixin,
     },
-    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
+    uicore::{HView, HWnd, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener, WndListener},
 };
 
 #[derive(StructOpt, Debug)]
@@ -36,7 +36,7 @@ impl MyViewListener {
 }
 
 impl ViewListener for MyViewListener {
-    fn mount(&self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, view: &HView, wnd: HWndRef<'_>) {
         self.canvas.borrow_mut().mount(wm, view, wnd);
         wm.set_layer_attr(
             self.canvas.borrow().layer().unwrap(),
@@ -96,7 +96,7 @@ impl ViewListener for MyViewListener {
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::Wm, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: HWndRef<'_>) {
         wm.terminate();
     }
 }

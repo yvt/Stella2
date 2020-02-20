@@ -8,13 +8,13 @@ use tcw3::{
         views::{scrollbar::ScrollbarDragListener, Label, Scrollbar},
         AlignFlags,
     },
-    uicore::{HWnd, WndListener},
+    uicore::{HWnd, HWndRef, WndListener},
 };
 
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::Wm, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: HWndRef<'_>) {
         wm.terminate();
     }
 }

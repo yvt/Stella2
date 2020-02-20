@@ -18,7 +18,9 @@ use super::{
 use crate::{
     pal,
     pal::prelude::*,
-    uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{
+        HView, HWndRef, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener,
+    },
 };
 
 /// A box styled based on styling properties.
@@ -443,7 +445,7 @@ impl SbListener {
 }
 
 impl ViewListener for SbListener {
-    fn mount(&self, wm: pal::Wm, _: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, _: &HView, wnd: HWndRef<'_>) {
         let mut layers = self.layers.borrow_mut();
         assert!(layers.is_none());
 

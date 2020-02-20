@@ -5,7 +5,7 @@ use std::cmp::max;
 use crate::{
     pal,
     pal::prelude::*,
-    uicore::{HView, HWnd, Sub, UpdateCtx},
+    uicore::{HView, HWndRef, Sub, UpdateCtx},
 };
 
 /// A view listener mix-in that allows the client to add `Canvas`-based 2D
@@ -60,7 +60,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::mount`].
     ///
     /// [`ViewListener::mount`]: crate::uicore::ViewListener::mount
-    pub fn mount(&mut self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
+    pub fn mount(&mut self, wm: pal::Wm, view: &HView, wnd: HWndRef<'_>) {
         assert!(self.state.is_none());
 
         let layer = wm.new_layer(pal::LayerAttrs {
@@ -116,7 +116,7 @@ impl CanvasMixin {
         &mut self,
         wm: pal::Wm,
         view: &HView,
-        wnd: &HWnd,
+        wnd: HWndRef,
         visual_bounds: Box2<f32>,
         paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
@@ -208,7 +208,7 @@ impl CanvasMixin {
         &mut self,
         wm: pal::Wm,
         view: &HView,
-        wnd: &HWnd,
+        wnd: HWndRef,
         radius: f32,
         paint: impl FnOnce(&mut PaintContext<'_>),
     ) {

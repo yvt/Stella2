@@ -8,13 +8,13 @@ use tcw3::{
         theming,
         views::{table, table::LineTy, Label, ScrollableTable},
     },
-    uicore::{HView, HWnd, SizeTraits, WndListener},
+    uicore::{HView, HWnd, HWndRef, SizeTraits, WndListener},
 };
 
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::Wm, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: HWndRef<'_>) {
         wm.terminate();
     }
 }

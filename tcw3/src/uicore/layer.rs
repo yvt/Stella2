@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use flags_macro::flags;
 
-use super::{HView, HWnd, ViewDirtyFlags, ViewFlags};
+use super::{HView, HWndRef, ViewDirtyFlags, ViewFlags};
 use crate::pal::{self, Wm};
 
 impl HView {
@@ -33,7 +33,7 @@ impl HView {
     ///
     /// Returns `true` if `layers` has changed. The return value is used to
     /// implement a recursive algorithm of `update_layers` itself.
-    pub(super) fn update_layers(&self, wm: Wm, hwnd: &HWnd) -> bool {
+    pub(super) fn update_layers(&self, wm: Wm, hwnd: HWndRef<'_>) -> bool {
         let dirty = &self.view.dirty;
 
         let mut layers_changed = false;
@@ -108,12 +108,12 @@ pub struct UpdateCtx<'a> {
     sublayers: Option<Vec<pal::HLayer>>,
     layers: &'a mut Vec<pal::HLayer>,
     layers_updated: bool,
-    hwnd: &'a HWnd,
+    hwnd: HWndRef<'a>,
 }
 
 impl<'a> UpdateCtx<'a> {
     /// Get the window the view belongs to.
-    pub fn hwnd(&self) -> &HWnd {
+    pub fn hwnd(&self) -> HWndRef<'_> {
         self.hwnd
     }
 

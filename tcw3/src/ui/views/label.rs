@@ -8,7 +8,7 @@ use crate::{
     pal::prelude::*,
     ui::mixins::CanvasMixin,
     ui::theming::{ClassSet, Elem, HElem, Manager, Prop, PropKindFlags, PropValue, Widget},
-    uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{HView, HWndRef, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
 };
 
 /// A widget for displaying a static text.
@@ -233,7 +233,7 @@ impl Layout for LabelListener {
 }
 
 impl ViewListener for LabelListener {
-    fn mount(&self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, view: &HView, wnd: HWndRef<'_>) {
         self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
     }
 

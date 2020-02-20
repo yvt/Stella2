@@ -9,7 +9,7 @@ use tcw3::{
         prelude::*,
         views::{table, table::LineTy},
     },
-    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewListener},
+    uicore::{HView, HWndRef, SizeTraits, UpdateCtx, ViewListener},
 };
 
 stella2_meta::designer_impl! {
@@ -141,7 +141,7 @@ impl RowViewListener {
 }
 
 impl ViewListener for RowViewListener {
-    fn mount(&self, wm: pal::Wm, hview: &HView, _: &HWnd) {
+    fn mount(&self, wm: pal::Wm, hview: &HView, _: HWndRef<'_>) {
         self.layer.set(Some(wm.new_layer(pal::LayerAttrs {
             contents: Some(Some(self.row_visual.bmp.clone())),
             ..Default::default()

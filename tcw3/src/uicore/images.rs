@@ -1,11 +1,11 @@
 use tcw3_images::{dpi_scale_add_ref, dpi_scale_release};
 use tcw3_pal::{self as pal, prelude::*};
 
-use super::HWnd;
+use super::HWndRef;
 
 /// Register a hook (`subscribe_dpi_scale_changed`) on `HWnd` to keep the list
 /// of known DPI scale values up-to-date based on currently open windows.
-pub(crate) fn handle_new_wnd(hwnd: &HWnd) {
+pub(crate) fn handle_new_wnd(hwnd: HWndRef<'_>) {
     use std::cell::Cell;
 
     struct ListenerState {

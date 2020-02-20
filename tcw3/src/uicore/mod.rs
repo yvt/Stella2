@@ -21,6 +21,7 @@ use flags_macro::flags;
 use log::trace;
 use momo::momo;
 use neo_linked_list::{linked_list::Node, AssertUnpin, LinkedListCell};
+use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -84,7 +85,19 @@ pub struct WeakHWnd {
     wnd: Weak<Wnd>,
 }
 
+/// Borrowed version of [`HWnd`].
+#[derive(Copy, Clone)]
+pub struct HWndRef<'a> {
+    wnd: RcBorrow<'a, Wnd>,
+}
+
 impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        HWndRef::from(self).fmt(f)
+    }
+}
+
+impl fmt::Debug for HWndRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if f.alternate() {
             return f.debug_tuple("HWnd").field(&self.wnd).finish();
@@ -106,7 +119,7 @@ impl fmt::Debug for HWnd {
 pub trait WndListener {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
-    fn close_requested(&self, _: Wm, _: &HWnd) -> bool {
+    fn close_requested(&self, _: Wm, _: HWndRef<'_>) -> bool {
         true
     }
 
@@ -114,7 +127,7 @@ pub trait WndListener {
     ///
     /// This will not be called if the window was closed programatically (via
     /// `HWnd::close`).
-    fn close(&self, _: Wm, _: &HWnd) {}
+    fn close(&self, _: Wm, _: HWndRef<'_>) {}
 }
 
 /// A no-op implementation of `WndListener`.
@@ -127,7 +140,7 @@ impl<T: WndListener + 'static> From<T> for Box<dyn WndListener> {
 }
 
 /// The boxed function type for window callbacks with no extra parameters.
-pub type WndCb = Box<dyn Fn(Wm, &HWnd)>;
+pub type WndCb = Box<dyn Fn(Wm, HWndRef<'_>)>;
 
 /// Represents an event subscription.
 ///
@@ -145,9 +158,9 @@ pub type Sub = UntypedSubscription;
 ///    `HWnd` take less code to call.
 ///  - Windows being destructed do not have `HWnd`. Even in such situations,
 ///    `Wnd::drop` has to call `Wnd::close`.
-///  - Functions accepting `&Wnd` are more generic than those accepting `&HWnd`.
-///    However, the implementation of those accepting `&Wnd` can't retain
-///    a reference to the provided `Wnd`.
+///  - Functions accepting `&Wnd` are more generic than those accepting
+///    `HWndRef`. However, the implementation of those accepting `&Wnd` can't
+///    retain a reference to the provided `Wnd`.
 ///
 struct Wnd {
     wm: Wm,
@@ -161,7 +174,7 @@ struct Wnd {
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
-    frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, &HWnd)>>,
+    frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, HWndRef<'_>)>>,
     focus_handlers: RefCell<SubscriberList<WndCb>>,
 
     // Mouse inputs
@@ -322,7 +335,7 @@ pub trait ViewListener {
     ///
     /// If the view has one or more associated layers, they should be created
     /// here. Also, it's advised to insert a call to [`HView::pend_update`] here.
-    fn mount(&self, _: Wm, _: &HView, _: &HWnd) {}
+    fn mount(&self, _: Wm, _: &HView, _: HWndRef<'_>) {}
 
     /// A view was removed from a window.
     ///
@@ -534,6 +547,19 @@ impl PartialEq<Weak<View>> for Superview {
 //                            Public methods
 // =======================================================================
 
+/// Define a method forwarding calls to `HWndRef`.
+macro_rules! forward_hwnd {
+    () => {};
+    ( pub fn $name:ident(&self $(, $i:ident : $t:ty )* ) $(-> $ret:ty)?; $($rest:tt)* ) => {
+        /// See [`HWndRef`].
+        pub fn $name(&self $(, $i : $t)*) $(-> $ret)? {
+            HWndRef::from(self).$name($($i),*)
+        }
+
+        forward_hwnd! { $($rest)* }
+    };
+}
+
 impl HWnd {
     /// Construct a window object and return a handle to it.
     pub fn new(wm: Wm) -> Self {
@@ -553,7 +579,7 @@ impl HWnd {
             .borrow_mut() = Superview::Window(Rc::downgrade(&hwnd.wnd));
 
         // `tcw3_images` wants to know DPI scale values.
-        images::handle_new_wnd(&hwnd);
+        images::handle_new_wnd(hwnd.as_ref());
 
         trace!("HWnd::new -> {:?}", hwnd);
 
@@ -567,22 +593,61 @@ impl HWnd {
         }
     }
 
-    pub(crate) fn wm(&self) -> Wm {
+    pub fn as_ref(&self) -> HWndRef<'_> {
+        HWndRef::from(self)
+    }
+
+    forward_hwnd! {
+        pub fn close(&self);
+        pub fn dpi_scale(&self) -> f32;
+        pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub;
+        pub fn is_focused(&self) -> bool;
+        pub fn subscribe_focus(&self, cb: WndCb) -> Sub;
+        pub fn content_view(&self) -> HView;
+        pub fn set_content_view(&self, view: HView);
+        pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>);
+        pub fn set_visibility(&self, visible: bool);
+        pub fn visibility(&self) -> bool;
+        pub fn set_caption(&self, caption: impl Into<String>);
+        pub fn caption(&self) -> String;
+        pub fn set_style_flags(&self, flags: WndStyleFlags);
+        pub fn style_flags(&self) -> WndStyleFlags;
+        pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static);
+    }
+}
+
+impl<'a> From<&'a HWnd> for HWndRef<'a> {
+    fn from(x: &'a HWnd) -> Self {
+        Self {
+            wnd: RcBorrow::from(&x.wnd),
+        }
+    }
+}
+
+impl HWndRef<'_> {
+    pub(crate) fn wm(self) -> Wm {
         self.wnd.wm
+    }
+
+    /// Convert this borrowed handle into an owned handle.
+    pub fn upgrade(self) -> HWnd {
+        HWnd {
+            wnd: RcBorrow::upgrade(self.wnd),
+        }
     }
 
     /// Close a window.
     ///
     /// Closing a window ensures that all operating system resources associated
     /// with the window are released.
-    pub fn close(&self) {
+    pub fn close(self) {
         self.wnd.close();
     }
 
     /// Get the DPI scaling factor for a window.
     ///
     /// This function returns `1.0` if the window is not materialized yet.
-    pub fn dpi_scale(&self) -> f32 {
+    pub fn dpi_scale(self) -> f32 {
         if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
             self.wnd.wm.get_wnd_dpi_scale(pal_wnd)
         } else {
@@ -594,7 +659,7 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {
+    pub fn subscribe_dpi_scale_changed(self, cb: WndCb) -> Sub {
         self.wnd
             .dpi_scale_changed_handlers
             .borrow_mut()
@@ -605,7 +670,7 @@ impl HWnd {
     /// Get a flag indicating whether the window has focus or not.
     ///
     /// This function returns `false` if the window is not materialized yet.
-    pub fn is_focused(&self) -> bool {
+    pub fn is_focused(self) -> bool {
         if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
             self.wnd.wm.is_wnd_focused(pal_wnd)
         } else {
@@ -618,12 +683,12 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_focus(&self, cb: WndCb) -> Sub {
+    pub fn subscribe_focus(self, cb: WndCb) -> Sub {
         self.wnd.focus_handlers.borrow_mut().insert(cb).untype()
     }
 
     /// Get the content view of a window.
-    pub fn content_view(&self) -> HView {
+    pub fn content_view(self) -> HView {
         self.wnd.content_view.borrow().clone().unwrap()
     }
 
@@ -632,7 +697,7 @@ impl HWnd {
     /// `view` must have [`ViewFlags::LAYER_GROUP`].
     /// `view.listener.borrow().update` ([`ViewListener::update`]) must return
     /// *exactly one layer* as the view's associated layer.
-    pub fn set_content_view(&self, view: HView) {
+    pub fn set_content_view(self, view: HView) {
         assert!(
             view.view.flags.get().contains(ViewFlags::LAYER_GROUP),
             "the view must have LAYER_GROUP"
@@ -675,7 +740,7 @@ impl HWnd {
 
     /// Set the window listener.
     #[momo]
-    pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>) {
+    pub fn set_listener(self, listener: impl Into<Box<dyn WndListener>>) {
         *self.wnd.listener.borrow_mut() = listener.into();
     }
 
@@ -683,7 +748,7 @@ impl HWnd {
     ///
     /// The default value is `false`. Note that hiding a window doesn't release
     /// resources associated with it.
-    pub fn set_visibility(&self, visible: bool) {
+    pub fn set_visibility(self, visible: bool) {
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.visible == visible {
             return;
@@ -695,7 +760,7 @@ impl HWnd {
     }
 
     /// Get the visibility of a window.
-    pub fn visibility(&self) -> bool {
+    pub fn visibility(self) -> bool {
         self.wnd.style_attrs.borrow().visible
     }
 
@@ -703,7 +768,7 @@ impl HWnd {
     ///
     /// The default value is `false`.
     #[momo]
-    pub fn set_caption(&self, caption: impl Into<String>) {
+    pub fn set_caption(self, caption: impl Into<String>) {
         let caption = caption.into();
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.caption == caption {
@@ -716,14 +781,14 @@ impl HWnd {
     }
 
     /// Get the caption of a window.
-    pub fn caption(&self) -> String {
+    pub fn caption(self) -> String {
         self.wnd.style_attrs.borrow().caption.clone()
     }
 
     /// Set the style flags of a window.
     ///
     /// The default value is `false`.
-    pub fn set_style_flags(&self, flags: WndStyleFlags) {
+    pub fn set_style_flags(self, flags: WndStyleFlags) {
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.flags == flags {
             return;
@@ -734,7 +799,7 @@ impl HWnd {
     }
 
     /// Get the style flags of a window.
-    pub fn style_flags(&self) -> WndStyleFlags {
+    pub fn style_flags(self) -> WndStyleFlags {
         self.wnd.style_attrs.borrow().flags
     }
 
@@ -742,7 +807,7 @@ impl HWnd {
     /// when the system is ready to accept a new displayed frame.
     ///
     /// This is the equivalent of JavaScript's `requestAnimationFrame`.
-    pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, &HWnd) + 'static) {
+    pub fn invoke_on_next_frame(self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static) {
         self.invoke_on_next_frame_inner(Node::pin(AssertUnpin::new(f)));
     }
 }
@@ -1110,7 +1175,7 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
                 DESCENDANT_SIZE_TRAITS | DESCENDANT_SUBVIEWS_FRAME
             }]) {
                 wnd.set_dirty_flags(window::WndDirtyFlags::CONTENTS);
-                HWnd { wnd }.pend_update();
+                HWndRef { wnd: (&wnd).into() }.pend_update();
             }
         }
     }

@@ -10,7 +10,7 @@ use tcw3::{
     ui::layouts::{FillLayout, TableLayout},
     ui::theming::{self, ClassSet},
     ui::AlignFlags,
-    uicore::{HWnd, WndListener, WndStyleFlags},
+    uicore::{HWnd, HWndRef, WndListener, WndStyleFlags},
 };
 
 use crate::{
@@ -198,7 +198,7 @@ struct WndViewWndListener {
 }
 
 impl WndListener for WndViewWndListener {
-    fn close(&self, _: pal::Wm, _: &HWnd) {
+    fn close(&self, _: pal::Wm, _: HWndRef<'_>) {
         if let Some(owner) = self.owner.upgrade() {
             owner.quit.borrow()();
         }

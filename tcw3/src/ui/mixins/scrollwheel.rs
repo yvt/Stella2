@@ -11,7 +11,7 @@ use std::{cell::Cell, rc::Rc};
 use crate::{
     pal,
     prelude::*,
-    uicore::{HView, HWnd, ScrollDelta, ScrollListener},
+    uicore::{HView, HWndRef, ScrollDelta, ScrollListener},
 };
 
 /// A view listener mix-in that facilitates scrolling and provides a consistent
@@ -361,7 +361,7 @@ impl Inner {
 
         let position = Cell::new(0.0);
 
-        start_transition(&hwnd, BOUNCE_TIME, move |_, progress| {
+        start_transition(hwnd.as_ref(), BOUNCE_TIME, move |_, progress| {
             if token != this.token.get() {
                 return false;
             }
@@ -429,7 +429,7 @@ impl Inner {
         let goal = model.bounds().limit_point(&pos) - pos;
         drop(model);
 
-        start_transition(&hwnd, RELAXATION_TIME, move |_, progress| {
+        start_transition(hwnd.as_ref(), RELAXATION_TIME, move |_, progress| {
             if token != this.token.get() {
                 return false;
             }
@@ -687,7 +687,11 @@ fn inverse_smooth_clamp_twoside(y: f64, range: std::ops::Range<f64>) -> f64 {
     }
 }
 
-fn start_transition(hwnd: &HWnd, duration: f32, mut f: impl FnMut(pal::Wm, f32) -> bool + 'static) {
+fn start_transition(
+    hwnd: HWndRef,
+    duration: f32,
+    mut f: impl FnMut(pal::Wm, f32) -> bool + 'static,
+) {
     use std::time::Instant;
     let start = Instant::now();
 
@@ -702,11 +706,11 @@ fn start_transition(hwnd: &HWnd, duration: f32, mut f: impl FnMut(pal::Wm, f32) 
 //       like a utility module.
 /// Call the given function each frame until it returns `false`. `hwnd` is used
 /// to decide the display refresh rate to synchronize.
-fn start_animation_timer(hwnd: &HWnd, f: impl FnMut(pal::Wm) -> bool + 'static) {
+fn start_animation_timer(hwnd: HWndRef, f: impl FnMut(pal::Wm) -> bool + 'static) {
     struct TimerState<T: ?Sized>(T);
 
     impl<T: ?Sized + FnMut(pal::Wm) -> bool + 'static> TimerState<T> {
-        fn enqueue(hwnd: &HWnd, mut this: Box<Self>) {
+        fn enqueue(hwnd: HWndRef, mut this: Box<Self>) {
             hwnd.invoke_on_next_frame(move |wm, hwnd| {
                 let keep_running = (this.0)(wm);
 
@@ -769,7 +773,10 @@ mod tests {
     use quickcheck_macros::quickcheck;
 
     use super::*;
-    use crate::testing::{prelude::*, use_testing_wm};
+    use crate::{
+        testing::{prelude::*, use_testing_wm},
+        uicore::HWnd,
+    };
 
     #[quickcheck]
     fn solve_newton_convergence(y1: f32, y: f32) -> bool {

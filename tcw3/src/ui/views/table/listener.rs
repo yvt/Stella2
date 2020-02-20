@@ -4,7 +4,7 @@ use super::Inner;
 use crate::{
     pal,
     pal::prelude::*,
-    uicore::{HView, HWnd, UpdateCtx, ViewListener},
+    uicore::{HView, HWndRef, UpdateCtx, ViewListener},
 };
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ impl TableViewListener {
 }
 
 impl ViewListener for TableViewListener {
-    fn mount(&self, wm: pal::Wm, _: &HView, _: &HWnd) {
+    fn mount(&self, wm: pal::Wm, _: &HView, _: HWndRef<'_>) {
         let layer = wm.new_layer(pal::LayerAttrs {
             flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
             ..Default::default()
