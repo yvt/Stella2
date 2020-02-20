@@ -225,7 +225,7 @@ impl Split {
 }
 
 impl Widget for Split {
-    fn view(&self) -> HViewRef<'_> {
+    fn view_ref(&self) -> HViewRef<'_> {
         self.view()
     }
 

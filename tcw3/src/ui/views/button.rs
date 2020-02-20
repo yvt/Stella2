@@ -116,8 +116,8 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn view(&self) -> HViewRef<'_> {
-        self.view()
+    fn view_ref(&self) -> HViewRef<'_> {
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {

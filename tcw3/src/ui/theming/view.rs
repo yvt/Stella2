@@ -265,7 +265,7 @@ impl StyledBox {
 }
 
 impl Widget for StyledBox {
-    fn view(&self) -> HViewRef<'_> {
+    fn view_ref(&self) -> HViewRef<'_> {
         self.view()
     }
 
