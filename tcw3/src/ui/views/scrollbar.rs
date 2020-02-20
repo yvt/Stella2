@@ -2,6 +2,7 @@
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::Point2;
+use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -138,7 +139,7 @@ impl Scrollbar {
             layout_state: Cell::new(LayoutState::default()),
         });
 
-        Shared::update_sb_override(&shared);
+        Shared::update_sb_override((&shared).into());
 
         shared.wrapper.set_listener(SbViewListener {
             shared: Rc::clone(&shared),
@@ -181,7 +182,7 @@ impl Scrollbar {
         }
 
         self.shared.value.set(new_value);
-        Shared::update_sb_override(&self.shared);
+        Shared::update_sb_override((&self.shared).into());
     }
 
     /// Get the page step size.
@@ -195,7 +196,7 @@ impl Scrollbar {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
 
         self.shared.page_step.set(new_value);
-        Shared::update_sb_override(&self.shared);
+        Shared::update_sb_override((&self.shared).into());
     }
 
     /// Set the factory function for gesture event handlers used when the user
@@ -239,11 +240,11 @@ impl Widget for Scrollbar {
 }
 
 impl Shared {
-    fn update_sb_override(this: &Rc<Shared>) {
+    fn update_sb_override(this: RcBorrow<'_, Shared>) {
         this.frame.set_override(SbStyledBoxOverride {
             value: this.value.get(),
             page_step: this.page_step.get(),
-            shared: Rc::clone(this),
+            shared: RcBorrow::upgrade(this),
         })
     }
 
