@@ -673,6 +673,14 @@ impl HWnd {
     }
 }
 
+impl<'a> From<HWndRef<'a>> for HWnd {
+    fn from(x: HWndRef<'a>) -> Self {
+        Self {
+            wnd: RcBorrow::upgrade(x.wnd),
+        }
+    }
+}
+
 impl<'a> From<&'a HWnd> for HWndRef<'a> {
     fn from(x: &'a HWnd) -> Self {
         Self {
@@ -688,9 +696,7 @@ impl HWndRef<'_> {
 
     /// Convert this borrowed handle into an owned handle.
     pub fn upgrade(self) -> HWnd {
-        HWnd {
-            wnd: RcBorrow::upgrade(self.wnd),
-        }
+        self.into()
     }
 
     /// Close a window.
@@ -936,6 +942,14 @@ impl HView {
     }
 }
 
+impl<'a> From<HViewRef<'a>> for HView {
+    fn from(x: HViewRef<'a>) -> Self {
+        Self {
+            view: RcBorrow::upgrade(x.view),
+        }
+    }
+}
+
 impl<'a> From<&'a HView> for HViewRef<'a> {
     fn from(x: &'a HView) -> Self {
         Self {
@@ -947,9 +961,7 @@ impl<'a> From<&'a HView> for HViewRef<'a> {
 impl<'a> HViewRef<'a> {
     /// Convert this borrowed handle into an owned handle.
     pub fn upgrade(self) -> HView {
-        HView {
-            view: RcBorrow::upgrade(self.view),
-        }
+        self.into()
     }
 
     /// Set a new [`ViewListener`].
