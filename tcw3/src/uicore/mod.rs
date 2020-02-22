@@ -563,12 +563,13 @@ impl PartialEq<Weak<View>> for Superview {
 macro_rules! forward {
     {
         $ref_ty:ty;
+        #[$m:meta]
         $(
             pub fn $name:ident(&self $(, $i:ident : $t:ty )* ) $(-> $ret:ty)?;
         )*
     } => {
         $(
-            /// See [`$ref_ty`].
+            #[$m]
             pub fn $name(&self $(, $i : $t)*) $(-> $ret)? {
                 <$ref_ty>::from(self).$name($($i),*)
             }
@@ -615,6 +616,7 @@ impl HWnd {
 
     forward! {
         HWndRef;
+        /// See the documentation of [`HWndRef`].
         pub fn close(&self);
         pub fn dpi_scale(&self) -> f32;
         pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub;
@@ -876,6 +878,7 @@ impl HView {
 
     forward! {
         HViewRef;
+        /// See the documentation of [`HViewRef`].
         pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>);
         pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_;
         pub fn take_listener(&self) -> Box<dyn ViewListener>;
