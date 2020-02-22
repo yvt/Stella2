@@ -863,11 +863,6 @@ impl HView {
         this
     }
 
-    /// Borrow the current [`ViewListener`].
-    pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_ {
-        owning_ref::OwningRef::new(self.view.listener.borrow()).map(|r| &**r)
-    }
-
     /// Construct a weak handle.
     pub fn downgrade(&self) -> WeakHView {
         WeakHView {
@@ -882,6 +877,7 @@ impl HView {
     forward! {
         HViewRef;
         pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>);
+        pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_;
         pub fn take_listener(&self) -> Box<dyn ViewListener>;
         pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>);
         pub fn set_flags(&self, value: ViewFlags);
@@ -922,6 +918,11 @@ impl<'a> HViewRef<'a> {
     #[momo]
     pub fn set_listener(self, listener: impl Into<Box<dyn ViewListener>>) {
         *self.view.listener.borrow_mut() = listener.into();
+    }
+
+    /// Borrow the current [`ViewListener`].
+    pub fn borrow_listener(self) -> impl std::ops::Deref<Target = dyn ViewListener> + 'a {
+        owning_ref::OwningRef::new(RcBorrow::downgrade(self.view).listener.borrow()).map(|r| &**r)
     }
 
     /// Take the current [`ViewListener`].
