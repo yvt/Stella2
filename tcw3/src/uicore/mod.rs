@@ -1,5 +1,42 @@
 //! Provides the core UI service.
 //!
+//! # Handle types
+//!
+//! [`HWnd`] and [`HView`] represent a strong reference to a *window* or a
+//! *view*, respectively.
+//!
+//! [`HWndRef`]`<'a>` and [`HViewRef`]`<'a>` are the borrowed version of `HWnd`
+//! and `HViewRef`. `HWndRef<'a>` is semantically equivalent to `&'a HWnd`, but
+//! doesn't have an extra indirection, so in general we should prefer this to
+//! `HWnd`.
+//!
+//! [`WeakHWnd`] and [`WeakHView`] represent [a weak reference]. They can be
+//! converted to their respective strong reference types by calling the
+//! `upgrade` methods, which may fail and return `None` if their referents are
+//! no longer existent.
+//!
+//! [a weak reference]: https://en.wikipedia.org/wiki/Weak_reference
+//!
+//! The following diagram summarizes the possible conversions between these
+//! types:
+//!
+//! ```text
+//!                     HViewRef<'_>
+//!                        | ^
+//!    [!] view.upgrade()  | |  view.as_ref() or (&view).into()
+//!                        | |  or HViewRef::from(&view)
+//!                        v |
+//!                       HView
+//!                        | ^
+//!  [!] view.downgrade()  | |  [!] view.upgrade().unwrap()
+//!                        | |
+//!                        v |
+//!                     WeakHView
+//!
+//! Costly operations are marked with [!].
+//! ```
+//!
+//!
 //! # Layouting
 //!
 //! TCW3 implements a two-phase layouting algorithm. The algoritm consists of
