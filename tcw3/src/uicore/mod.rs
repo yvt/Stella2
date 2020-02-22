@@ -570,6 +570,7 @@ macro_rules! forward {
     } => {
         $(
             #[$m]
+            #[inline]
             pub fn $name(&self $(, $i : $t)*) $(-> $ret)? {
                 <$ref_ty>::from(self).$name($($i),*)
             }
