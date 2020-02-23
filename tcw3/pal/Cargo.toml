@@ -24,7 +24,7 @@ cgmath = "0.17.0"
 checked = "0.5.0"
 derive_more = "0.99.1"
 flags-macro = "0.1.3"
-fragile = "0.3.0"
+fragile = "1.0.0"
 futures = "0.3"
 iterpool = { path = "../../support/iterpool" }
 itertools = "0.8.0"
@@ -50,7 +50,7 @@ cocoa = "0.20.0"
 core-foundation = "0.7"
 core-graphics = "0.19.0"
 core-text = "15.0.0"
-dispatch = "0.1.4"
+dispatch = "0.2.0"
 objc = "0.2.3"
 
 # `windows` backend
@@ -78,7 +78,7 @@ features = [
 
 # `gtk` backend
 [target.'cfg(not(any(target_os = "macos", target_os = "windows")))'.dependencies]
-gio = "0.7.0"
+gio = "0.8.1"
 gdk = "0.12.0"
 gdk-sys = "0.9.1"
 glib = "0.9.0"
@@ -100,7 +100,7 @@ pkg-config = "0.3.7"
 demotools = { path = "../../support/demotools" }
 env_logger = "0.7.0"
 quickcheck = "0.9"
-quickcheck_macros = "0.8"
+quickcheck_macros = "0.9"
 structopt = "0.3.0"
 arg_enum_proc_macro = "0.3.0"
 
