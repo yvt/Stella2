@@ -27,17 +27,15 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         class_set = elem_id::TOOLBAR,
         subview_generic = HView::new! {
             layout = TableLayout::stack_horz(
-                [
-                    (Some(get!(toggle_sidebar_button.view)), AlignFlags::JUSTIFY),
-                    (Some(get!(spacer1.view)), AlignFlags::HORZ_JUSTIFY),
-                    (Some(get!(go_back_button.view)), AlignFlags::JUSTIFY),
-                    (Some(get!(spacer2.view)), AlignFlags::HORZ_JUSTIFY),
-                    (Some(get!(go_forward_button.view)), AlignFlags::JUSTIFY),
-                    (Some(get!(spacer3.view)), AlignFlags::CENTER),
-                    (Some(get!(search_bar.view)), AlignFlags::RIGHT),
-                ]
-                    .iter_mut()
-                    .map(|(view, align)| (view.take().unwrap(), *align))
+                ArrayVec::from([
+                    (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
+                    (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(go_back_button.view), AlignFlags::JUSTIFY),
+                    (get!(spacer2.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(go_forward_button.view), AlignFlags::JUSTIFY),
+                    (get!(spacer3.view), AlignFlags::CENTER),
+                    (get!(search_bar.view), AlignFlags::RIGHT),
+                ])
             ),
         },
     };

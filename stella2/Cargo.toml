@@ -10,6 +10,7 @@ license = "GPL-3.0-or-later"
 default-run = "stella2"
 
 [dependencies]
+arrayvec = "0.5"
 cfg-if = "0.1.7"
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"

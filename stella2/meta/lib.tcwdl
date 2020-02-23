@@ -50,9 +50,9 @@ comp crate::view::MainView {
 
     pub const view = HView::new! {
         layout = TableLayout::stack_vert(
-            [get!(&toolbar.view), get!(&split_side.view)]
-                .iter()
-                .map(|&view| (view.clone(), AlignFlags::JUSTIFY))
+            ArrayVec::from([get!(toolbar.view), get!(split_side.view)])
+                .into_iter()
+                .map(|view| (view, AlignFlags::JUSTIFY))
         ),
     };
 
@@ -138,13 +138,11 @@ comp crate::view::MainView {
     };
     const editor_view = HView::new! {
         layout = TableLayout::stack_horz(
-            [
-                (get!(&editor_field.view), AlignFlags::JUSTIFY),
-                (get!(&spacer1.view), AlignFlags::HORZ_JUSTIFY),
-                (get!(&send_button.view), AlignFlags::HORZ_JUSTIFY | AlignFlags::TOP),
-            ]
-                .iter()
-                .map(|&(view, align)| (view.clone(), align))
+            ArrayVec::from([
+                (get!(editor_field.view), AlignFlags::JUSTIFY),
+                (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
+                (get!(send_button.view), AlignFlags::HORZ_JUSTIFY | AlignFlags::TOP),
+            ])
         ),
     };
 

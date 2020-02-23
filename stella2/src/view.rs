@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use harmony::Elem;
 use log::trace;
 use std::{
