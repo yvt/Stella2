@@ -23,7 +23,7 @@ use crate::{
         theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
         views::Scrollbar,
     },
-    uicore::{HView, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
 };
 
 /// Wraps [`Table`] to support scrolling.
@@ -52,7 +52,7 @@ impl ScrollableTable {
             Scrollbar::new(style_manager, true),
         ];
 
-        styled_box.set_subview(Role::Generic, Some(table.view().clone()));
+        styled_box.set_subview(Role::Generic, Some(table.view()));
         styled_box.set_child(Role::HorizontalScrollbar, Some(&scrollbars[0]));
         styled_box.set_child(Role::VerticalScrollbar, Some(&scrollbars[1]));
 
@@ -60,7 +60,7 @@ impl ScrollableTable {
 
         // Create a view for receiving scroll wheel events
         let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
-        wrapper.set_layout(FillLayout::new(styled_box.view().clone()));
+        wrapper.set_layout(FillLayout::new(styled_box.view()));
 
         let this = Self {
             inner: Rc::new(Inner {
@@ -144,9 +144,14 @@ impl ScrollableTable {
         this
     }
 
-    /// Get a handle to the view representing the widget.
-    pub fn view(&self) -> &HView {
-        &self.inner.wrapper
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.inner.wrapper.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
+        self.inner.wrapper.as_ref()
     }
 
     /// Get the styling element representing the widget.
@@ -199,8 +204,8 @@ impl ScrollableTable {
 }
 
 impl Widget for ScrollableTable {
-    fn view(&self) -> &HView {
-        self.view()
+    fn view_ref(&self) -> HViewRef<'_> {
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {
@@ -275,7 +280,7 @@ impl WrapperViewListener {
 }
 
 impl ViewListener for WrapperViewListener {
-    fn scroll_motion(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, delta: &ScrollDelta) {
+    fn scroll_motion(&self, wm: pal::Wm, _: HViewRef<'_>, _loc: Point2<f32>, delta: &ScrollDelta) {
         if let Some(inner) = self.inner.upgrade() {
             // Do not allow scrolling in two ways at the same time
             if inner.drag_active.iter().any(|x| x.get()) {
@@ -288,7 +293,12 @@ impl ViewListener for WrapperViewListener {
         }
     }
 
-    fn scroll_gesture(&self, _: pal::Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
+    fn scroll_gesture(
+        &self,
+        _: pal::Wm,
+        _: HViewRef<'_>,
+        _loc: Point2<f32>,
+    ) -> Box<dyn ScrollListener> {
         if let Some(inner) = self.inner.upgrade() {
             // Do not allow scrolling in two ways at the same time
             if inner.drag_active.iter().any(|x| x.get()) {
@@ -322,8 +332,7 @@ mod tests {
         let table = Rc::new(ScrollableTable::new(style_manager));
 
         let wnd = HWnd::new(wm);
-        wnd.content_view()
-            .set_layout(FillLayout::new(table.view().clone()));
+        wnd.content_view().set_layout(FillLayout::new(table.view()));
         wnd.set_visibility(true);
 
         twm.step_unsend();

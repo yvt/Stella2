@@ -2,6 +2,7 @@
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::Point2;
+use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -18,7 +19,7 @@ use crate::{
             StyledBoxOverride, Widget,
         },
     },
-    uicore::{HView, MouseDragListener, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, MouseDragListener, ViewFlags, ViewListener},
 };
 
 /// A scrollbar widget.
@@ -124,7 +125,7 @@ impl Scrollbar {
         let wrapper = HView::new(
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
         );
-        wrapper.set_layout(FillLayout::new(frame.view().clone()));
+        wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
             vertical,
@@ -138,7 +139,7 @@ impl Scrollbar {
             layout_state: Cell::new(LayoutState::default()),
         });
 
-        Shared::update_sb_override(&shared);
+        Shared::update_sb_override((&shared).into());
 
         shared.wrapper.set_listener(SbViewListener {
             shared: Rc::clone(&shared),
@@ -181,7 +182,7 @@ impl Scrollbar {
         }
 
         self.shared.value.set(new_value);
-        Shared::update_sb_override(&self.shared);
+        Shared::update_sb_override((&self.shared).into());
     }
 
     /// Get the page step size.
@@ -195,7 +196,7 @@ impl Scrollbar {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
 
         self.shared.page_step.set(new_value);
-        Shared::update_sb_override(&self.shared);
+        Shared::update_sb_override((&self.shared).into());
     }
 
     /// Set the factory function for gesture event handlers used when the user
@@ -217,9 +218,14 @@ impl Scrollbar {
         *self.shared.on_page_step.borrow_mut() = Box::new(handler);
     }
 
-    /// Get the view representing the widget.
-    pub fn view(&self) -> &HView {
-        &self.shared.wrapper
+    /// Get an owned handle to the view representing the widget.
+    pub fn view(&self) -> HView {
+        self.shared.wrapper.clone()
+    }
+
+    /// Borrow the handle to the view representing the widget.
+    pub fn view_ref(&self) -> HViewRef<'_> {
+        self.shared.wrapper.as_ref()
     }
 
     /// Get the styling element representing the widget.
@@ -229,8 +235,8 @@ impl Scrollbar {
 }
 
 impl Widget for Scrollbar {
-    fn view(&self) -> &HView {
-        self.view()
+    fn view_ref(&self) -> HViewRef<'_> {
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {
@@ -239,11 +245,11 @@ impl Widget for Scrollbar {
 }
 
 impl Shared {
-    fn update_sb_override(this: &Rc<Shared>) {
+    fn update_sb_override(this: RcBorrow<'_, Shared>) {
         this.frame.set_override(SbStyledBoxOverride {
             value: this.value.get(),
             page_step: this.page_step.get(),
-            shared: Rc::clone(this),
+            shared: RcBorrow::upgrade(this),
         })
     }
 
@@ -327,7 +333,7 @@ struct SbViewListener {
 }
 
 impl ViewListener for SbViewListener {
-    fn mouse_enter(&self, wm: pal::Wm, _: &HView) {
+    fn mouse_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let shared = Rc::clone(&self.shared);
         wm.invoke_on_update(move |_| {
             let frame = &shared.frame;
@@ -335,7 +341,7 @@ impl ViewListener for SbViewListener {
         })
     }
 
-    fn mouse_leave(&self, wm: pal::Wm, _: &HView) {
+    fn mouse_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let shared = Rc::clone(&self.shared);
         wm.invoke_on_update(move |_| {
             let frame = &shared.frame;
@@ -346,7 +352,7 @@ impl ViewListener for SbViewListener {
     fn mouse_drag(
         &self,
         _: pal::Wm,
-        _: &HView,
+        _: HViewRef<'_>,
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
@@ -366,7 +372,7 @@ struct SbMouseDragListener {
 }
 
 impl MouseDragListener for SbMouseDragListener {
-    fn mouse_motion(&self, wm: pal::Wm, _: &HView, loc: Point2<f32>) {
+    fn mouse_motion(&self, wm: pal::Wm, _: HViewRef<'_>, loc: Point2<f32>) {
         if let Some((init_pos, init_value)) = self.drag_start.get() {
             let pri = self.shared.vertical as usize;
             let clearance = self.shared.layout_state.get().clearance;
@@ -385,7 +391,7 @@ impl MouseDragListener for SbMouseDragListener {
             }
         }
     }
-    fn mouse_down(&self, wm: pal::Wm, view: &HView, loc: Point2<f32>, button: u8) {
+    fn mouse_down(&self, wm: pal::Wm, view: HViewRef<'_>, loc: Point2<f32>, button: u8) {
         if button == 0 {
             let pri = self.shared.vertical as usize;
             let loc = loc[pri];
@@ -425,13 +431,13 @@ impl MouseDragListener for SbMouseDragListener {
             }
         }
     }
-    fn mouse_up(&self, wm: pal::Wm, _: &HView, _loc: Point2<f32>, button: u8) {
+    fn mouse_up(&self, wm: pal::Wm, _: HViewRef<'_>, _loc: Point2<f32>, button: u8) {
         if button == 0 && self.drag_start.take().is_some() {
             self.shared.set_active(false);
             self.listener.borrow().as_ref().unwrap().up(wm);
         }
     }
-    fn cancel(&self, wm: pal::Wm, _: &HView) {
+    fn cancel(&self, wm: pal::Wm, _: HViewRef<'_>) {
         if self.drag_start.take().is_some() {
             self.shared.set_active(false);
         }
@@ -560,8 +566,7 @@ mod tests {
         let sb = Rc::new(Scrollbar::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
-        wnd.content_view()
-            .set_layout(FillLayout::new(sb.view().clone()));
+        wnd.content_view().set_layout(FillLayout::new(sb.view()));
         wnd.set_visibility(true);
 
         twm.step_unsend();

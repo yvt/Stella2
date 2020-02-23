@@ -1,12 +1,13 @@
 use bitflags::bitflags;
 use flags_macro::flags;
+use rc_borrow::RcBorrow;
 
-use super::{HView, HWnd, ViewDirtyFlags, ViewFlags};
+use super::{HView, HViewRef, HWndRef, ViewDirtyFlags, ViewFlags};
 use crate::pal::{self, Wm};
 
-impl HView {
-    pub(super) fn view_with_containing_layer(&self) -> Option<HView> {
-        let mut view_or_not = Some(self.view.clone());
+impl HViewRef<'_> {
+    pub(super) fn view_with_containing_layer(self) -> Option<HView> {
+        let mut view_or_not = Some(RcBorrow::upgrade(self.view));
         while let Some(view) = view_or_not {
             if view.flags.get().contains(ViewFlags::LAYER_GROUP) {
                 return Some(HView { view });
@@ -18,13 +19,13 @@ impl HView {
         None
     }
 
-    fn enum_sublayers(&self, cb: &mut impl FnMut(&pal::HLayer)) {
+    fn enum_sublayers(self, cb: &mut impl FnMut(&pal::HLayer)) {
         for layer in self.view.layers.borrow().iter() {
             cb(layer);
         }
         if !self.view.flags.get().contains(ViewFlags::LAYER_GROUP) {
             for subview in self.view.layout.borrow().subviews().iter() {
-                subview.enum_sublayers(&mut *cb);
+                subview.as_ref().enum_sublayers(&mut *cb);
             }
         }
     }
@@ -33,7 +34,7 @@ impl HView {
     ///
     /// Returns `true` if `layers` has changed. The return value is used to
     /// implement a recursive algorithm of `update_layers` itself.
-    pub(super) fn update_layers(&self, wm: Wm, hwnd: &HWnd) -> bool {
+    pub(super) fn update_layers(self, wm: Wm, hwnd: HWndRef<'_>) -> bool {
         let dirty = &self.view.dirty;
 
         let mut layers_changed = false;
@@ -46,7 +47,7 @@ impl HView {
             dirty.set(dirty.get() - desc_flags);
 
             for subview in self.view.layout.borrow().subviews().iter() {
-                layers_changed |= subview.update_layers(wm, hwnd);
+                layers_changed |= subview.as_ref().update_layers(wm, hwnd);
             }
         }
 
@@ -81,7 +82,9 @@ impl HView {
                 let mut sublayers = Vec::new();
 
                 for subview in self.view.layout.borrow().subviews().iter() {
-                    subview.enum_sublayers(&mut |layer| sublayers.push(layer.clone()));
+                    subview
+                        .as_ref()
+                        .enum_sublayers(&mut |layer| sublayers.push(layer.clone()));
                 }
 
                 ctx.sublayers = Some(sublayers);
@@ -108,12 +111,12 @@ pub struct UpdateCtx<'a> {
     sublayers: Option<Vec<pal::HLayer>>,
     layers: &'a mut Vec<pal::HLayer>,
     layers_updated: bool,
-    hwnd: &'a HWnd,
+    hwnd: HWndRef<'a>,
 }
 
 impl<'a> UpdateCtx<'a> {
     /// Get the window the view belongs to.
-    pub fn hwnd(&self) -> &HWnd {
+    pub fn hwnd(&self) -> HWndRef<'_> {
         self.hwnd
     }
 

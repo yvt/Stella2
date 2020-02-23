@@ -762,6 +762,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "erasable"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978fcbc4d0397003efe85f5b37b7271bb903e68c3b3066aadf9b9293619227ec"
+dependencies = [
+ "autocfg 1.0.0",
+ "scopeguard",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2182,6 +2192,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rc-borrow"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03ae564812e0042cfa0619647374f7c23339ed64dca2b25ce40a1d04b93c20a4"
+dependencies = [
+ "autocfg 1.0.0",
+ "erasable",
+]
+
+[[package]]
 name = "rctree"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2712,6 +2732,7 @@ dependencies = [
  "owning_ref",
  "quickcheck",
  "quickcheck_macros",
+ "rc-borrow",
  "rope",
  "sorted_diff",
  "structopt",

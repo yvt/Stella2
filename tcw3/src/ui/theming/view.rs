@@ -18,7 +18,10 @@ use super::{
 use crate::{
     pal,
     pal::prelude::*,
-    uicore::{HView, HWnd, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{
+        HView, HViewRef, HWndRef, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags,
+        ViewListener,
+    },
 };
 
 /// A box styled based on styling properties.
@@ -197,7 +200,7 @@ impl StyledBox {
     /// Set a child widget using `set_subview` and `set_subelement`.
     pub fn set_child(&self, role: Role, widget: Option<&dyn Widget>) {
         if let Some(widget) = widget {
-            self.set_subview(role, Some(widget.view().clone()));
+            self.set_subview(role, Some(widget.view_ref().cloned()));
             self.set_subelement(role, widget.style_elem());
         } else {
             self.set_subview(role, None);
@@ -234,9 +237,14 @@ impl StyledBox {
         self.shared.set_dirty(dirty_flags);
     }
 
-    /// Get the view representing the styled box.
-    pub fn view(&self) -> &HView {
-        &self.view
+    /// Get an owned handle to the view representing the styled box.
+    pub fn view(&self) -> HView {
+        self.view.clone()
+    }
+
+    /// Borrow the handle to the view representing the styled box.
+    pub fn view_ref(&self) -> HViewRef<'_> {
+        self.view.as_ref()
     }
 
     /// Get the styling element representing the styled box.
@@ -262,8 +270,8 @@ impl StyledBox {
 }
 
 impl Widget for StyledBox {
-    fn view(&self) -> &HView {
-        self.view()
+    fn view_ref(&self) -> HViewRef<'_> {
+        self.view_ref()
     }
 
     fn style_elem(&self) -> Option<HElem> {
@@ -346,7 +354,7 @@ impl Layout for SbLayout {
 
         for ((_, metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let margin = &metrics.margin;
-            let mut sv_traits = ctx.subview_size_traits(sv);
+            let mut sv_traits = ctx.subview_size_traits(sv.as_ref());
 
             if !metrics.size.x.is_nan() {
                 sv_traits.min.x = metrics.size.x;
@@ -394,7 +402,7 @@ impl Layout for SbLayout {
 
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         for (&(role, ref metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
-            let sv_traits = ctx.subview_size_traits(sv);
+            let sv_traits = ctx.subview_size_traits(sv.as_ref());
             let container = box2! {top_left: [0.0, 0.0], size: size};
 
             let mut frame = metrics.arrange(container, sv_traits.preferred);
@@ -406,7 +414,7 @@ impl Layout for SbLayout {
                 size_traits: &sv_traits,
             });
 
-            ctx.set_subview_frame(sv, frame);
+            ctx.set_subview_frame(sv.as_ref(), frame);
         }
     }
 
@@ -443,7 +451,7 @@ impl SbListener {
 }
 
 impl ViewListener for SbListener {
-    fn mount(&self, wm: pal::Wm, _: &HView, wnd: &HWnd) {
+    fn mount(&self, wm: pal::Wm, _: HViewRef<'_>, wnd: HWndRef<'_>) {
         let mut layers = self.layers.borrow_mut();
         assert!(layers.is_none());
 
@@ -483,7 +491,7 @@ impl ViewListener for SbListener {
         }
     }
 
-    fn unmount(&self, wm: pal::Wm, _: &HView) {
+    fn unmount(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let layers = self.layers.borrow_mut().take().unwrap();
 
         if let Some(layer) = layers.clip {
@@ -498,13 +506,13 @@ impl ViewListener for SbListener {
         }
     }
 
-    fn position(&self, _: pal::Wm, _: &HView) {
+    fn position(&self, _: pal::Wm, _: HViewRef<'_>) {
         if let Some(shared) = self.shared.upgrade() {
             shared.set_dirty(PropKindFlags::LAYER_BOUNDS);
         }
     }
 
-    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         let shared;
         if let Some(shared_rc) = self.shared.upgrade() {
             shared = shared_rc;

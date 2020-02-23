@@ -21,7 +21,7 @@ use crate::{
         lineset::{DispCb, Index, LinesetModel, Size},
         tableremap::shuffle2d,
     },
-    uicore::{HView, Layout, LayoutCtx, SizeTraits},
+    uicore::{HView, HViewRef, Layout, LayoutCtx, SizeTraits},
 };
 
 impl Inner {
@@ -181,10 +181,10 @@ impl Inner {
         true
     }
 
-    pub(super) fn update_layout_if_needed(this: &Rc<Inner>, state: &State, view: &HView) {
+    pub(super) fn update_layout_if_needed(this: &Rc<Inner>, state: &State, view: HViewRef<'_>) {
         // Return if `LAYOUT` is not set.
         // `LAYOUTING` menas we are currently in `TableLayout::arrange`, so we
-        // can't call `HView::set_layout`.
+        // can't call `HViewRef::set_layout`.
         if !this.dirty.get().contains(DirtyFlags::LAYOUT)
             || this.dirty.get().contains(DirtyFlags::LAYOUTING)
         {
@@ -388,7 +388,7 @@ impl Layout for TableLayout {
                 max[ty.i()] = self.pos_lists[ty.i()][cell[ty.i()] + 1];
             }
 
-            ctx.set_subview_frame(view, Box2::new(min, max));
+            ctx.set_subview_frame(view.as_ref(), Box2::new(min, max));
         }
     }
 

@@ -5,7 +5,7 @@ use std::cmp::max;
 use crate::{
     pal,
     pal::prelude::*,
-    uicore::{HView, HWnd, Sub, UpdateCtx},
+    uicore::{HViewRef, HWndRef, Sub, UpdateCtx},
 };
 
 /// A view listener mix-in that allows the client to add `Canvas`-based 2D
@@ -60,7 +60,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::mount`].
     ///
     /// [`ViewListener::mount`]: crate::uicore::ViewListener::mount
-    pub fn mount(&mut self, wm: pal::Wm, view: &HView, wnd: &HWnd) {
+    pub fn mount(&mut self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
         assert!(self.state.is_none());
 
         let layer = wm.new_layer(pal::LayerAttrs {
@@ -68,7 +68,7 @@ impl CanvasMixin {
         });
 
         let sub = {
-            let view = view.clone();
+            let view = view.cloned();
             wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
                 view.pend_update();
             }))
@@ -86,7 +86,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::unmount`].
     ///
     /// [`ViewListener::unmount`]: crate::uicore::ViewListener::unmount
-    pub fn unmount(&mut self, wm: pal::Wm, _: &HView) {
+    pub fn unmount(&mut self, wm: pal::Wm, _: HViewRef<'_>) {
         let state = self.state.take().expect("not mounted");
         wm.remove_layer(&state.layer);
         state.sub.unsubscribe().unwrap();
@@ -95,7 +95,7 @@ impl CanvasMixin {
     /// Implements [`ViewListener::position`].
     ///
     /// [`ViewListener::position`]: crate::uicore::ViewListener::position
-    pub fn position(&mut self, _: pal::Wm, view: &HView) {
+    pub fn position(&mut self, _: pal::Wm, view: HViewRef<'_>) {
         assert!(self.state.is_some(), "not mounted");
         view.pend_update();
     }
@@ -115,8 +115,8 @@ impl CanvasMixin {
     pub fn update_layer(
         &mut self,
         wm: pal::Wm,
-        view: &HView,
-        wnd: &HWnd,
+        view: HViewRef<'_>,
+        wnd: HWndRef,
         visual_bounds: Box2<f32>,
         paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
@@ -207,8 +207,8 @@ impl CanvasMixin {
     pub fn update_layer_border(
         &mut self,
         wm: pal::Wm,
-        view: &HView,
-        wnd: &HWnd,
+        view: HViewRef<'_>,
+        wnd: HWndRef,
         radius: f32,
         paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
@@ -288,7 +288,7 @@ impl CanvasMixin {
     pub fn update(
         &mut self,
         wm: pal::Wm,
-        view: &HView,
+        view: HViewRef<'_>,
         ctx: &mut UpdateCtx<'_>,
         paint: impl FnOnce(&mut PaintContext<'_>),
     ) {
@@ -303,12 +303,12 @@ impl CanvasMixin {
 
     /// Pend a redraw.
     ///
-    /// This method updates an internal flag and calls [`HView::pend_update`].
+    /// This method updates an internal flag and calls [`HViewRef::pend_update`].
     /// As a result, a caller-supplied paint function will be used to update
     /// the layer contents when `update` is called for the next time.
     ///
-    /// [`HView::pend_update`]: crate::uicore::HView::pend_update
-    pub fn pend_draw(&mut self, view: &HView) {
+    /// [`HViewRef::pend_update`]: crate::uicore::HViewRef::pend_update
+    pub fn pend_draw(&mut self, view: HViewRef<'_>) {
         if let Some(state) = &mut self.state {
             state.last_phys_vis_bounds = None;
             view.pend_update();

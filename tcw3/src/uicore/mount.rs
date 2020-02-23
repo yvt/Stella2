@@ -1,9 +1,9 @@
-use super::{HView, HWnd, ViewDirtyFlags};
+use super::{HViewRef, HWndRef, ViewDirtyFlags};
 use crate::pal::Wm;
 
-impl HView {
+impl HViewRef<'_> {
     /// Call `ViewListener::mount` as necessary.
-    pub(super) fn call_pending_mount_if_dirty(&self, wm: Wm, hwnd: &HWnd) {
+    pub(super) fn call_pending_mount_if_dirty(self, wm: Wm, hwnd: HWndRef<'_>) {
         let dirty = &self.view.dirty;
 
         if dirty.get().contains(ViewDirtyFlags::MOUNTED) {
@@ -14,7 +14,7 @@ impl HView {
 
             // This view is mounted, but some of the subviews might not be.
             for subview in self.view.layout.borrow().subviews().iter() {
-                subview.call_pending_mount_if_dirty(wm, hwnd);
+                subview.as_ref().call_pending_mount_if_dirty(wm, hwnd);
             }
         } else {
             // This view is not mounted yet. So are the subviews.
@@ -23,7 +23,7 @@ impl HView {
     }
 
     /// Call `ViewListener::mount` as necessary. It ignores the `MOUNT` dirty bit.
-    fn call_pending_mount(&self, wm: Wm, hwnd: &HWnd) {
+    fn call_pending_mount(self, wm: Wm, hwnd: HWndRef<'_>) {
         let dirty = &self.view.dirty;
         dirty.set(dirty.get() - ViewDirtyFlags::MOUNT);
 
@@ -34,12 +34,12 @@ impl HView {
         }
 
         for subview in self.view.layout.borrow().subviews().iter() {
-            subview.call_pending_mount(wm, hwnd);
+            subview.as_ref().call_pending_mount(wm, hwnd);
         }
     }
 
     /// Unmount this view and its all subviews.
-    pub(super) fn call_unmount(&self, wm: Wm) {
+    pub(super) fn call_unmount(self, wm: Wm) {
         let dirty = &self.view.dirty;
 
         if !dirty.get().contains(ViewDirtyFlags::MOUNTED) {
@@ -52,7 +52,7 @@ impl HView {
         self.view.layers.borrow_mut().clear();
 
         for subview in self.view.layout.borrow().subviews().iter() {
-            subview.call_unmount(wm);
+            subview.as_ref().call_unmount(wm);
         }
     }
 }

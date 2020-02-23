@@ -15,7 +15,7 @@ pub(crate) comp crate::view::channellist::ChannelListView {
     const wm: pal::Wm { pub set; }
     const style_manager: &Manager { pub set; get clone; }
 
-    const view: HView { pub get; } = get!(table.view);
+    const view: HView { pub get clone; } = get!(table.view);
     const style_elem: theming::HElem { pub get; } = get!(&elem).helem();
 
     const elem: Rc<theming::Elem> =

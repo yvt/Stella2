@@ -18,7 +18,7 @@ pub(crate) comp crate::view::logview::LogView {
     const wm: pal::Wm { pub set; }
     const style_manager: &Manager { pub set; get clone; }
 
-    const view: HView { pub get; } = get!(dpi_scale_watcher.view);
+    const view: HView { pub get clone; } = get!(dpi_scale_watcher.view);
 
     const table = ScrollableTable::new! {
         style_manager,

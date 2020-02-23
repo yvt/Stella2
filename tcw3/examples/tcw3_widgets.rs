@@ -8,13 +8,13 @@ use tcw3::{
         views::{scrollbar::ScrollbarDragListener, Label, Scrollbar},
         AlignFlags,
     },
-    uicore::{HWnd, WndListener},
+    uicore::{HWnd, HWndRef, WndListener},
 };
 
 struct MyWndListener;
 
 impl WndListener for MyWndListener {
-    fn close(&self, wm: pal::Wm, _: &HWnd) {
+    fn close(&self, wm: pal::Wm, _: HWndRef<'_>) {
         wm.terminate();
     }
 }
@@ -52,8 +52,8 @@ fn main() {
     }
 
     let cells = vec![
-        (label.view().clone(), [0, 0], AlignFlags::JUSTIFY),
-        (scrollbar.view().clone(), [0, 1], AlignFlags::JUSTIFY),
+        (label.view(), [0, 0], AlignFlags::JUSTIFY),
+        (scrollbar.view(), [0, 1], AlignFlags::JUSTIFY),
     ];
 
     wnd.content_view()

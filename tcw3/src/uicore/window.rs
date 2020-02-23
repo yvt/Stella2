@@ -4,6 +4,7 @@ use cggeom::box2;
 use cgmath::Point2;
 use flags_macro::flags;
 use neo_linked_list::{linked_list::Node, AssertUnpin};
+use rc_borrow::RcBorrow;
 use std::{
     cell::RefCell,
     cmp::{max, min},
@@ -12,17 +13,18 @@ use std::{
 };
 
 use super::{
-    invocation::process_pending_invocations, CursorShape, HView, HWnd, Superview, SuperviewStrong,
-    UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd, WndStyleFlags,
+    invocation::process_pending_invocations, CursorShape, HView, HViewRef, HWnd, HWndRef,
+    Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd,
+    WndStyleFlags,
 };
 use crate::pal::{self, prelude::Wm as _, Wm};
 
-impl HView {
+impl HViewRef<'_> {
     /// Get the containing window for a view.
-    pub fn containing_wnd(&self) -> Option<HWnd> {
+    pub fn containing_wnd(self) -> Option<HWnd> {
         match self.view.superview.borrow().upgrade() {
             None => None,
-            Some(SuperviewStrong::View(sv)) => HView { view: sv }.containing_wnd(),
+            Some(SuperviewStrong::View(sv)) => HView { view: sv }.as_ref().containing_wnd(),
             Some(SuperviewStrong::Window(wnd)) => Some(HWnd { wnd }),
         }
     }
@@ -36,8 +38,8 @@ struct RootSizeReq {
     max_size: Option<[u32; 2]>,
 }
 
-impl HWnd {
-    fn ensure_materialized(&self) {
+impl HWndRef<'_> {
+    fn ensure_materialized(self) {
         assert!(!self.wnd.closed.get(), "the window has been already closed");
 
         let mut pal_wnd_cell = self.wnd.pal_wnd.borrow_mut();
@@ -71,7 +73,7 @@ impl HWnd {
             pal_wnd_cell.as_ref().unwrap(),
             pal::WndAttrs {
                 listener: Some(Box::new(PalWndListener {
-                    wnd: Rc::downgrade(&self.wnd),
+                    wnd: Rc::downgrade(&RcBorrow::upgrade(self.wnd)),
                 })),
                 ..Default::default()
             },
@@ -87,7 +89,7 @@ impl HWnd {
     }
 
     /// Pend an update.
-    pub(super) fn pend_update(&self) {
+    pub(super) fn pend_update(self) {
         if self.wnd.closed.get() {
             return;
         }
@@ -102,17 +104,17 @@ impl HWnd {
         if let Some(ref pal_wnd) = *self.wnd.pal_wnd.borrow() {
             self.wnd.wm.request_update_ready_wnd(pal_wnd);
         } else {
-            let hwnd: HWnd = self.clone();
+            let hwnd: HWnd = self.cloned();
             self.wnd.wm.invoke(move |_| {
-                hwnd.update();
+                hwnd.as_ref().update();
             });
         }
     }
 
     #[allow(clippy::type_complexity)]
     pub(super) fn invoke_on_next_frame_inner(
-        &self,
-        f: Pin<Box<Node<AssertUnpin<dyn FnOnce(pal::Wm, &HWnd)>>>>,
+        self,
+        f: Pin<Box<Node<AssertUnpin<dyn FnOnce(pal::Wm, HWndRef<'_>)>>>>,
     ) {
         if self.wnd.closed.get() {
             return;
@@ -131,7 +133,7 @@ impl HWnd {
 
     /// This is basically the handler of `update_ready` event and where layers
     /// are layouted and rendered. Also, the update process clears `Wnd::dirty`.
-    fn update(&self) {
+    fn update(self) {
         if self.wnd.closed.get() {
             return;
         }
@@ -234,7 +236,7 @@ impl HWnd {
 
     /// Perform pending updates. Also, returns a new, min, and max window size
     /// based on the `SizeTraits` of the root view.
-    fn update_views(&self) -> RootSizeReq {
+    fn update_views(self) -> RootSizeReq {
         let pal_wnd = self.wnd.pal_wnd.borrow();
         let pal_wnd = pal_wnd.as_ref().unwrap();
 
@@ -258,10 +260,10 @@ impl HWnd {
                 };
             }
 
-            view.call_pending_mount_if_dirty(self.wnd.wm, self);
+            view.as_ref().call_pending_mount_if_dirty(self.wnd.wm, self);
 
             // Layout: down phase
-            view.update_size_traits();
+            view.as_ref().update_size_traits();
 
             // Constrain the window size
             let size_traits = view.view.size_traits.get();
@@ -316,11 +318,12 @@ impl HWnd {
             if new_frame != view.view.frame.get() {
                 view.view.frame.set(new_frame);
                 view.view.global_frame.set(new_frame);
-                view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+                view.as_ref()
+                    .set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
             // Layout: up phase
-            view.update_subview_frames();
+            view.as_ref().update_subview_frames();
 
             if view
                 .view
@@ -334,10 +337,10 @@ impl HWnd {
             }
 
             // Position views
-            view.flush_position_event(self.wnd.wm);
+            view.as_ref().flush_position_event(self.wnd.wm);
 
             // Update visual
-            view.update_layers(self.wnd.wm, self);
+            view.as_ref().update_layers(self.wnd.wm, self);
         }
 
         panic!("Window update did not converge");
@@ -372,8 +375,8 @@ impl Wnd {
 
             *view.view.superview.borrow_mut() = Superview::empty();
 
-            view.cancel_mouse_gestures_of_subviews(self);
-            view.call_unmount(self.wm);
+            view.as_ref().cancel_mouse_gestures_of_subviews(self);
+            view.as_ref().call_unmount(self.wm);
         }
 
         if let Some(hwnd) = self.pal_wnd.borrow_mut().take() {
@@ -439,10 +442,11 @@ impl PalWndListener {
 impl pal::iface::WndListener<Wm> for PalWndListener {
     fn close_requested(&self, wm: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
+            let hwnd = hwnd.as_ref();
             let listener = hwnd.wnd.listener.borrow();
-            let should_close = listener.close_requested(wm, &hwnd);
+            let should_close = listener.close_requested(wm, hwnd);
             if should_close {
-                listener.close(wm, &hwnd);
+                listener.close(wm, hwnd);
                 hwnd.close();
             }
         }
@@ -450,12 +454,14 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
 
     fn update_ready(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
-            hwnd.update();
+            hwnd.as_ref().update();
         }
     }
 
     fn resize(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
+            let hwnd = hwnd.as_ref();
+
             if hwnd.wnd.updating.get() {
                 // Prevent recursion
                 return;
@@ -465,7 +471,8 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
                 let view = hwnd.wnd.content_view.borrow();
                 let view = view.as_ref().unwrap();
 
-                view.set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
+                view.as_ref()
+                    .set_dirty_flags(ViewDirtyFlags::SUBVIEWS_FRAME);
             }
 
             hwnd.wnd.set_dirty_flags(WndDirtyFlags::CONTENTS);
@@ -478,9 +485,10 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
 
     fn dpi_scale_changed(&self, _: Wm, _: &pal::HWnd) {
         if let Some(hwnd) = self.hwnd() {
+            let hwnd = hwnd.as_ref();
             let handlers = hwnd.wnd.dpi_scale_changed_handlers.borrow();
             for handler in handlers.iter() {
-                handler(hwnd.wnd.wm, &hwnd);
+                handler(hwnd.wnd.wm, hwnd);
             }
         }
     }
@@ -489,9 +497,10 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
         // This handler can be called from `set_wnd_attrs`, which might conflict
         // with a mutable borrow for `style_attrs`
         self.invoke_later_with_hwnd(wm, |hwnd| {
+            let hwnd = hwnd.as_ref();
             let handlers = hwnd.wnd.focus_handlers.borrow();
             for handler in handlers.iter() {
-                handler(hwnd.wnd.wm, &hwnd);
+                handler(hwnd.wnd.wm, hwnd);
             }
         });
     }
@@ -561,7 +570,7 @@ impl RootViewListener {
 }
 
 impl ViewListener for RootViewListener {
-    fn mount(&self, wm: Wm, _: &HView, _: &HWnd) {
+    fn mount(&self, wm: Wm, _: HViewRef<'_>, _: HWndRef<'_>) {
         *self.layer.borrow_mut() = Some(wm.new_layer(pal::LayerAttrs {
             // `bounds` mustn't be empty, so...
             bounds: Some(box2! { min: [0.0, 0.0], max: [1.0, 1.0] }),
@@ -569,13 +578,13 @@ impl ViewListener for RootViewListener {
         }));
     }
 
-    fn unmount(&self, wm: Wm, _: &HView) {
+    fn unmount(&self, wm: Wm, _: HViewRef<'_>) {
         if let Some(hlayer) = self.layer.borrow_mut().take() {
             wm.remove_layer(&hlayer);
         }
     }
 
-    fn update(&self, wm: Wm, _: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: Wm, _: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.borrow();
         let layer = layer.as_ref().unwrap();
 

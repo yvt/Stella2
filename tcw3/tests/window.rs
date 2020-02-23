@@ -6,7 +6,7 @@ use tcw3::{
     pal,
     prelude::*,
     testing::{prelude::*, use_testing_wm},
-    uicore::HWnd,
+    uicore::{HWnd, HWndRef},
 };
 
 #[use_testing_wm]
@@ -76,7 +76,7 @@ fn invoke_on_next_frame(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
 
     let count = Rc::new(Cell::new(0));
-    fn incr_count(wnd: &HWnd, count: Rc<Cell<u32>>) {
+    fn incr_count(wnd: HWndRef, count: Rc<Cell<u32>>) {
         if count.get() < 3 {
             count.set(count.get() + 1);
             wnd.invoke_on_next_frame(move |_, wnd| incr_count(wnd, count));

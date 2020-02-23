@@ -187,7 +187,7 @@ impl Layout for TableLayout {
         }
 
         for (view, item) in self.subviews.iter().zip(self.items.iter()) {
-            let st = ctx.subview_size_traits(&view);
+            let st = ctx.subview_size_traits(view.as_ref());
 
             // Some `AlignFlags` relaxes the size traits
             let st = item.align.containing_size_traits(st);
@@ -271,11 +271,11 @@ impl Layout for TableLayout {
                 Point2::new(state.columns[cell[0]].pos, state.rows[cell[1]].pos),
             );
 
-            let st = ctx.subview_size_traits(&view);
+            let st = ctx.subview_size_traits(view.as_ref());
 
             let subview_frame = item.align.arrange_child(&cell_box, &st);
 
-            ctx.set_subview_frame(view, subview_frame);
+            ctx.set_subview_frame(view.as_ref(), subview_frame);
         }
     }
 

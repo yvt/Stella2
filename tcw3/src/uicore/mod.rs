@@ -1,5 +1,46 @@
 //! Provides the core UI service.
 //!
+//! # Handle types
+//!
+//! [`HWnd`] and [`HView`] represent a strong reference to a *window* or a
+//! *view*, respectively.
+//!
+//! [`HWndRef`]`<'a>` and [`HViewRef`]`<'a>` are the borrowed version of `HWnd`
+//! and `HViewRef`. `HWndRef<'a>` is semantically equivalent to `&'a HWnd`, but
+//! doesn't have an extra indirection, so in general we should prefer this to
+//! `HWnd`.
+//!
+//! [`WeakHWnd`] and [`WeakHView`] represent [a weak reference]. They can be
+//! converted to their respective strong reference types by calling the
+//! `cloned` methods¹, which may fail and return `None` if their referents are
+//! no longer existent.
+//!
+//! ¹ They are called `cloned` by analogy with `Option<&Rc<_>>::cloned`. They do
+//! not clone the underlying object, but rather clone the strong reference,
+//! increasing the referenced object's reference count.
+//!
+//! [a weak reference]: https://en.wikipedia.org/wiki/Weak_reference
+//!
+//! The following diagram summarizes the possible conversions between these
+//! types:
+//!
+//! ```text
+//!                              HViewRef<'_>
+//!                                 | ^
+//!    view.cloned(), view.into(),  | |  view.as_ref(), (&view).into(),
+//!       [!] or HView::from(view)  | |  or HViewRef::from(&view)
+//!                                 v |
+//!                                HView
+//!                                 | ^
+//!           [!] view.downgrade()  | |  [!] view.upgrade().unwrap()
+//!                                 | |
+//!                                 v |
+//!                              WeakHView
+//!
+//! Costly operations are marked with [!].
+//! ```
+//!
+//!
 //! # Layouting
 //!
 //! TCW3 implements a two-phase layouting algorithm. The algoritm consists of
@@ -21,6 +62,7 @@ use flags_macro::flags;
 use log::trace;
 use momo::momo;
 use neo_linked_list::{linked_list::Node, AssertUnpin, LinkedListCell};
+use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
@@ -84,7 +126,19 @@ pub struct WeakHWnd {
     wnd: Weak<Wnd>,
 }
 
+/// Borrowed version of [`HWnd`].
+#[derive(Copy, Clone)]
+pub struct HWndRef<'a> {
+    wnd: RcBorrow<'a, Wnd>,
+}
+
 impl fmt::Debug for HWnd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        HWndRef::from(self).fmt(f)
+    }
+}
+
+impl fmt::Debug for HWndRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if f.alternate() {
             return f.debug_tuple("HWnd").field(&self.wnd).finish();
@@ -106,7 +160,7 @@ impl fmt::Debug for HWnd {
 pub trait WndListener {
     /// The user has attempted to close a window. Returns `true` if the window
     /// can be closed.
-    fn close_requested(&self, _: Wm, _: &HWnd) -> bool {
+    fn close_requested(&self, _: Wm, _: HWndRef<'_>) -> bool {
         true
     }
 
@@ -114,7 +168,7 @@ pub trait WndListener {
     ///
     /// This will not be called if the window was closed programatically (via
     /// `HWnd::close`).
-    fn close(&self, _: Wm, _: &HWnd) {}
+    fn close(&self, _: Wm, _: HWndRef<'_>) {}
 }
 
 /// A no-op implementation of `WndListener`.
@@ -127,7 +181,7 @@ impl<T: WndListener + 'static> From<T> for Box<dyn WndListener> {
 }
 
 /// The boxed function type for window callbacks with no extra parameters.
-pub type WndCb = Box<dyn Fn(Wm, &HWnd)>;
+pub type WndCb = Box<dyn Fn(Wm, HWndRef<'_>)>;
 
 /// Represents an event subscription.
 ///
@@ -145,9 +199,9 @@ pub type Sub = UntypedSubscription;
 ///    `HWnd` take less code to call.
 ///  - Windows being destructed do not have `HWnd`. Even in such situations,
 ///    `Wnd::drop` has to call `Wnd::close`.
-///  - Functions accepting `&Wnd` are more generic than those accepting `&HWnd`.
-///    However, the implementation of those accepting `&Wnd` can't retain
-///    a reference to the provided `Wnd`.
+///  - Functions accepting `&Wnd` are more generic than those accepting
+///    `HWndRef`. However, the implementation of those accepting `&Wnd` can't
+///    retain a reference to the provided `Wnd`.
 ///
 struct Wnd {
     wm: Wm,
@@ -161,7 +215,7 @@ struct Wnd {
     style_attrs: RefCell<window::WndStyleAttrs>,
     updating: Cell<bool>,
     dpi_scale_changed_handlers: RefCell<SubscriberList<WndCb>>,
-    frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, &HWnd)>>,
+    frame_handlers: LinkedListCell<AssertUnpin<dyn FnOnce(Wm, HWndRef<'_>)>>,
     focus_handlers: RefCell<SubscriberList<WndCb>>,
 
     // Mouse inputs
@@ -196,7 +250,7 @@ impl Wnd {
         let content_view = window::new_root_content_view();
 
         // Pend mount
-        content_view.set_dirty_flags(ViewDirtyFlags::MOUNT);
+        content_view.as_ref().set_dirty_flags(ViewDirtyFlags::MOUNT);
 
         Self {
             wm,
@@ -232,7 +286,19 @@ pub struct WeakHView {
     view: Weak<View>,
 }
 
+/// Borrowed version of [`HView`].
+#[derive(Copy, Clone)]
+pub struct HViewRef<'a> {
+    view: RcBorrow<'a, View>,
+}
+
 impl fmt::Debug for HView {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        HViewRef::from(self).fmt(f)
+    }
+}
+
+impl fmt::Debug for HViewRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if f.alternate() {
             return f.debug_tuple("HView").field(&self.view).finish();
@@ -246,7 +312,7 @@ impl fmt::Debug for HView {
         )?;
 
         // Display the path
-        let mut view = Rc::clone(&self.view);
+        let mut view: Rc<View> = RcBorrow::upgrade(self.view);
         loop {
             if let Some(sv) = { view }.superview.borrow().upgrade() {
                 match sv {
@@ -322,19 +388,19 @@ pub trait ViewListener {
     ///
     /// If the view has one or more associated layers, they should be created
     /// here. Also, it's advised to insert a call to [`HView::pend_update`] here.
-    fn mount(&self, _: Wm, _: &HView, _: &HWnd) {}
+    fn mount(&self, _: Wm, _: HViewRef<'_>, _: HWndRef<'_>) {}
 
     /// A view was removed from a window.
     ///
     /// The implementation should remove any associated layers.
-    fn unmount(&self, _: Wm, _: &HView) {}
+    fn unmount(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
     /// updated.
     ///
     /// If the view has an associated layer, it's advised to insert a call to
     /// [`HView::pend_update`] here.
-    fn position(&self, _: Wm, _: &HView) {}
+    fn position(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// A view should be updated.
     ///
@@ -347,7 +413,7 @@ pub trait ViewListener {
     /// associated layers (if any).
     ///
     /// [`Wm::update_wnd`]: crate::pal::iface::Wm::update_wnd
-    fn update(&self, _: Wm, _: &HView, _: &mut UpdateCtx<'_>) {}
+    fn update(&self, _: Wm, _: HViewRef<'_>, _: &mut UpdateCtx<'_>) {}
 
     /// Get event handlers for handling the mouse drag gesture initiated by
     /// a mouse down event described by `loc` and `button`.
@@ -361,7 +427,7 @@ pub trait ViewListener {
     fn mouse_drag(
         &self,
         _: Wm,
-        _: &HView,
+        _: HViewRef<'_>,
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
@@ -369,20 +435,20 @@ pub trait ViewListener {
     }
 
     /// `mouse_over` is called for this view or its descendants.
-    fn mouse_enter(&self, _: Wm, _: &HView) {}
+    fn mouse_enter(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// `mouse_out` is called for this view or its descendants.
-    fn mouse_leave(&self, _: Wm, _: &HView) {}
+    fn mouse_leave(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The mouse pointer entered the view's region.
     ///
     /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
-    fn mouse_over(&self, _: Wm, _: &HView) {}
+    fn mouse_over(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The mouse pointer left the view's region.
     ///
     /// You must set [`ViewFlags::ACCEPT_MOUSE_OVER`] for this to be called.
-    fn mouse_out(&self, _: Wm, _: &HView) {}
+    fn mouse_out(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// The mouse's scroll wheel was moved to scroll the view's contents
     /// underneath the mouse pointer.
@@ -395,13 +461,13 @@ pub trait ViewListener {
     /// `scroll_motion` is never called when there is an active scroll gesture.
     ///
     /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
-    fn scroll_motion(&self, _: Wm, _: &HView, _loc: Point2<f32>, _delta: &ScrollDelta) {}
+    fn scroll_motion(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>, _delta: &ScrollDelta) {}
 
     /// Get event handlers for handling the scroll gesture that started right
     /// now.
     ///
     /// You must set [`ViewFlags::ACCEPT_SCROLL`] for this to be called.
-    fn scroll_gesture(&self, _: Wm, _: &HView, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
+    fn scroll_gesture(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
         Box::new(())
     }
 }
@@ -534,6 +600,25 @@ impl PartialEq<Weak<View>> for Superview {
 //                            Public methods
 // =======================================================================
 
+/// Define a method forwarding calls to `$ref_ty`.
+macro_rules! forward {
+    {
+        $ref_ty:ty;
+        #[$m:meta]
+        $(
+            pub fn $name:ident(&self $(, $i:ident : $t:ty )* ) $(-> $ret:ty)?;
+        )*
+    } => {
+        $(
+            #[$m]
+            #[inline]
+            pub fn $name(&self $(, $i : $t)*) $(-> $ret)? {
+                <$ref_ty>::from(self).$name($($i),*)
+            }
+        )*
+    };
+}
+
 impl HWnd {
     /// Construct a window object and return a handle to it.
     pub fn new(wm: Wm) -> Self {
@@ -553,7 +638,7 @@ impl HWnd {
             .borrow_mut() = Superview::Window(Rc::downgrade(&hwnd.wnd));
 
         // `tcw3_images` wants to know DPI scale values.
-        images::handle_new_wnd(&hwnd);
+        images::handle_new_wnd(hwnd.as_ref());
 
         trace!("HWnd::new -> {:?}", hwnd);
 
@@ -567,22 +652,69 @@ impl HWnd {
         }
     }
 
-    pub(crate) fn wm(&self) -> Wm {
+    pub fn as_ref(&self) -> HWndRef<'_> {
+        HWndRef::from(self)
+    }
+
+    forward! {
+        HWndRef;
+        /// See the documentation of [`HWndRef`].
+        pub fn close(&self);
+        pub fn dpi_scale(&self) -> f32;
+        pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub;
+        pub fn is_focused(&self) -> bool;
+        pub fn subscribe_focus(&self, cb: WndCb) -> Sub;
+        pub fn content_view(&self) -> HView;
+        pub fn set_content_view(&self, view: HView);
+        pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>);
+        pub fn set_visibility(&self, visible: bool);
+        pub fn visibility(&self) -> bool;
+        pub fn set_caption(&self, caption: impl Into<String>);
+        pub fn caption(&self) -> String;
+        pub fn set_style_flags(&self, flags: WndStyleFlags);
+        pub fn style_flags(&self) -> WndStyleFlags;
+        pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static);
+    }
+}
+
+impl<'a> From<HWndRef<'a>> for HWnd {
+    fn from(x: HWndRef<'a>) -> Self {
+        Self {
+            wnd: RcBorrow::upgrade(x.wnd),
+        }
+    }
+}
+
+impl<'a> From<&'a HWnd> for HWndRef<'a> {
+    fn from(x: &'a HWnd) -> Self {
+        Self {
+            wnd: RcBorrow::from(&x.wnd),
+        }
+    }
+}
+
+impl HWndRef<'_> {
+    pub(crate) fn wm(self) -> Wm {
         self.wnd.wm
+    }
+
+    /// Convert this borrowed handle into an owned handle.
+    pub fn cloned(self) -> HWnd {
+        self.into()
     }
 
     /// Close a window.
     ///
     /// Closing a window ensures that all operating system resources associated
     /// with the window are released.
-    pub fn close(&self) {
+    pub fn close(self) {
         self.wnd.close();
     }
 
     /// Get the DPI scaling factor for a window.
     ///
     /// This function returns `1.0` if the window is not materialized yet.
-    pub fn dpi_scale(&self) -> f32 {
+    pub fn dpi_scale(self) -> f32 {
         if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
             self.wnd.wm.get_wnd_dpi_scale(pal_wnd)
         } else {
@@ -594,7 +726,7 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub {
+    pub fn subscribe_dpi_scale_changed(self, cb: WndCb) -> Sub {
         self.wnd
             .dpi_scale_changed_handlers
             .borrow_mut()
@@ -605,7 +737,7 @@ impl HWnd {
     /// Get a flag indicating whether the window has focus or not.
     ///
     /// This function returns `false` if the window is not materialized yet.
-    pub fn is_focused(&self) -> bool {
+    pub fn is_focused(self) -> bool {
         if let Some(ref pal_wnd) = &*self.wnd.pal_wnd.borrow() {
             self.wnd.wm.is_wnd_focused(pal_wnd)
         } else {
@@ -618,12 +750,12 @@ impl HWnd {
     ///
     /// Returns a [`subscriber_list::UntypedSubscription`], which can be used to
     /// unregister the function.
-    pub fn subscribe_focus(&self, cb: WndCb) -> Sub {
+    pub fn subscribe_focus(self, cb: WndCb) -> Sub {
         self.wnd.focus_handlers.borrow_mut().insert(cb).untype()
     }
 
     /// Get the content view of a window.
-    pub fn content_view(&self) -> HView {
+    pub fn content_view(self) -> HView {
         self.wnd.content_view.borrow().clone().unwrap()
     }
 
@@ -632,7 +764,7 @@ impl HWnd {
     /// `view` must have [`ViewFlags::LAYER_GROUP`].
     /// `view.listener.borrow().update` ([`ViewListener::update`]) must return
     /// *exactly one layer* as the view's associated layer.
-    pub fn set_content_view(&self, view: HView) {
+    pub fn set_content_view(self, view: HView) {
         assert!(
             view.view.flags.get().contains(ViewFlags::LAYER_GROUP),
             "the view must have LAYER_GROUP"
@@ -667,15 +799,17 @@ impl HWnd {
 
         // Unmount the old content view
         let old_content_view = old_content_view.unwrap();
-        old_content_view.cancel_mouse_gestures_of_subviews(&self.wnd);
-        old_content_view.call_unmount(self.wnd.wm);
+        old_content_view
+            .as_ref()
+            .cancel_mouse_gestures_of_subviews(&self.wnd);
+        old_content_view.as_ref().call_unmount(self.wnd.wm);
 
         self.pend_update();
     }
 
     /// Set the window listener.
     #[momo]
-    pub fn set_listener(&self, listener: impl Into<Box<dyn WndListener>>) {
+    pub fn set_listener(self, listener: impl Into<Box<dyn WndListener>>) {
         *self.wnd.listener.borrow_mut() = listener.into();
     }
 
@@ -683,7 +817,7 @@ impl HWnd {
     ///
     /// The default value is `false`. Note that hiding a window doesn't release
     /// resources associated with it.
-    pub fn set_visibility(&self, visible: bool) {
+    pub fn set_visibility(self, visible: bool) {
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.visible == visible {
             return;
@@ -695,7 +829,7 @@ impl HWnd {
     }
 
     /// Get the visibility of a window.
-    pub fn visibility(&self) -> bool {
+    pub fn visibility(self) -> bool {
         self.wnd.style_attrs.borrow().visible
     }
 
@@ -703,7 +837,7 @@ impl HWnd {
     ///
     /// The default value is `false`.
     #[momo]
-    pub fn set_caption(&self, caption: impl Into<String>) {
+    pub fn set_caption(self, caption: impl Into<String>) {
         let caption = caption.into();
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.caption == caption {
@@ -716,14 +850,14 @@ impl HWnd {
     }
 
     /// Get the caption of a window.
-    pub fn caption(&self) -> String {
+    pub fn caption(self) -> String {
         self.wnd.style_attrs.borrow().caption.clone()
     }
 
     /// Set the style flags of a window.
     ///
     /// The default value is `false`.
-    pub fn set_style_flags(&self, flags: WndStyleFlags) {
+    pub fn set_style_flags(self, flags: WndStyleFlags) {
         let mut style_attrs = self.wnd.style_attrs.borrow_mut();
         if style_attrs.flags == flags {
             return;
@@ -734,7 +868,7 @@ impl HWnd {
     }
 
     /// Get the style flags of a window.
-    pub fn style_flags(&self) -> WndStyleFlags {
+    pub fn style_flags(self) -> WndStyleFlags {
         self.wnd.style_attrs.borrow().flags
     }
 
@@ -742,7 +876,7 @@ impl HWnd {
     /// when the system is ready to accept a new displayed frame.
     ///
     /// This is the equivalent of JavaScript's `requestAnimationFrame`.
-    pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, &HWnd) + 'static) {
+    pub fn invoke_on_next_frame(self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static) {
         self.invoke_on_next_frame_inner(Node::pin(AssertUnpin::new(f)));
     }
 }
@@ -786,25 +920,73 @@ impl HView {
         }
     }
 
+    pub fn as_ref(&self) -> HViewRef<'_> {
+        HViewRef::from(self)
+    }
+
+    forward! {
+        HViewRef;
+        /// See the documentation of [`HViewRef`].
+        pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>);
+        pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_;
+        pub fn take_listener(&self) -> Box<dyn ViewListener>;
+        pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>);
+        pub fn set_flags(&self, value: ViewFlags);
+        pub fn flags(&self) -> ViewFlags;
+        pub fn set_cursor_shape(&self, shape: Option<CursorShape>);
+        pub fn cursor_shape(&self) -> Option<CursorShape>;
+        pub fn pend_update(&self);
+
+        // `layout.rs`
+        pub fn frame(&self) -> Box2<f32>;
+        pub fn global_frame(&self) -> Box2<f32>;
+
+        // `window.rs`
+        pub fn containing_wnd(&self) -> Option<HWnd>;
+    }
+}
+
+impl<'a> From<HViewRef<'a>> for HView {
+    fn from(x: HViewRef<'a>) -> Self {
+        Self {
+            view: RcBorrow::upgrade(x.view),
+        }
+    }
+}
+
+impl<'a> From<&'a HView> for HViewRef<'a> {
+    fn from(x: &'a HView) -> Self {
+        Self {
+            view: RcBorrow::from(&x.view),
+        }
+    }
+}
+
+impl<'a> HViewRef<'a> {
+    /// Convert this borrowed handle into an owned handle.
+    pub fn cloned(self) -> HView {
+        self.into()
+    }
+
     /// Set a new [`ViewListener`].
     ///
     /// It's not allowed to call this method from `ViewListener`'s methods or
     /// when the `ViewListener` is currently borrowed.
     #[momo]
-    pub fn set_listener(&self, listener: impl Into<Box<dyn ViewListener>>) {
+    pub fn set_listener(self, listener: impl Into<Box<dyn ViewListener>>) {
         *self.view.listener.borrow_mut() = listener.into();
     }
 
     /// Borrow the current [`ViewListener`].
-    pub fn borrow_listener(&self) -> impl std::ops::Deref<Target = dyn ViewListener> + '_ {
-        owning_ref::OwningRef::new(self.view.listener.borrow()).map(|r| &**r)
+    pub fn borrow_listener(self) -> impl std::ops::Deref<Target = dyn ViewListener> + 'a {
+        owning_ref::OwningRef::new(RcBorrow::downgrade(self.view).listener.borrow()).map(|r| &**r)
     }
 
     /// Take the current [`ViewListener`].
     ///
     /// It's not allowed to call this method from `ViewListener`'s methods or
     /// when the `ViewListener` is currently borrowed
-    pub fn take_listener(&self) -> Box<dyn ViewListener> {
+    pub fn take_listener(self) -> Box<dyn ViewListener> {
         std::mem::replace(&mut *self.view.listener.borrow_mut(), Box::new(()))
     }
 
@@ -815,7 +997,7 @@ impl HView {
     /// It's not allowed to call this method from `Layout`'s method. You should
     /// use [`LayoutCtx::set_layout`] instead.
     #[momo]
-    pub fn set_layout(&self, layout: impl Into<Box<dyn Layout>>) {
+    pub fn set_layout(self, layout: impl Into<Box<dyn Layout>>) {
         let layout = layout.into();
         let mut cur_layout = self.view.layout.borrow_mut();
         let subviews_changed = !layout.has_same_subviews(&**cur_layout);
@@ -828,7 +1010,7 @@ impl HView {
                 let mut sup_view = hview_sub.view.superview.borrow_mut();
                 debug_assert_eq!(
                     *sup_view,
-                    Rc::downgrade(&self.view),
+                    Rc::downgrade(&RcBorrow::upgrade(self.view)),
                     "existing subview's superview is invalid"
                 );
                 *sup_view = Superview::empty();
@@ -841,7 +1023,7 @@ impl HView {
                     sup_view.is_empty(),
                     "cannot add a subview already added to another view"
                 );
-                *sup_view = Rc::downgrade(&self.view).into();
+                *sup_view = Rc::downgrade(&RcBorrow::upgrade(self.view)).into();
 
                 // Propagate dirty flags
                 new_flags |= hview_sub.view.dirty.get();
@@ -859,8 +1041,9 @@ impl HView {
 
             // Pend the update of the containing layer's sublayer set
             if let Some(vwcl) = self.view_with_containing_layer() {
-                vwcl.set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
-                vwcl.set_dirty_flags_on_superviews(ViewDirtyFlags::DESCENDANT_SUBLAYERS);
+                vwcl.as_ref().set_dirty_flags(ViewDirtyFlags::SUBLAYERS);
+                vwcl.as_ref()
+                    .set_dirty_flags_on_superviews(ViewDirtyFlags::DESCENDANT_SUBLAYERS);
             }
         }
 
@@ -881,8 +1064,10 @@ impl HView {
             // Check for disconnected views
             for hview_sub in old_layout.subviews().iter() {
                 if hview_sub.view.superview.borrow().is_empty() {
-                    hview_sub.cancel_mouse_gestures_of_subviews(&hwnd.wnd);
-                    hview_sub.call_unmount(hwnd.wnd.wm);
+                    hview_sub
+                        .as_ref()
+                        .cancel_mouse_gestures_of_subviews(&hwnd.wnd);
+                    hview_sub.as_ref().call_unmount(hwnd.wnd.wm);
                 }
             }
         }
@@ -893,7 +1078,7 @@ impl HView {
     /// Some flags cannot be added or removed once a view is created. Such flags
     /// only can be specified via [`HView::new`]. See [`ViewFlags`] for the list
     /// of immutable flags.
-    pub fn set_flags(&self, value: ViewFlags) {
+    pub fn set_flags(self, value: ViewFlags) {
         let changed = value ^ self.view.flags.get();
 
         debug_assert_eq!(
@@ -923,7 +1108,7 @@ impl HView {
     }
 
     /// Get the flags of a view.
-    pub fn flags(&self) -> ViewFlags {
+    pub fn flags(self) -> ViewFlags {
         self.view.flags.get()
     }
 
@@ -933,7 +1118,7 @@ impl HView {
     /// `ViewFlags::ACCEPT_MOUSE_OVER` the mouse cursor is currently on). A path
     /// from the root view to the hot view is calculated, and the highest view
     /// with a non-`None` cursor shape is chosen for the final cursor shpae.
-    pub fn set_cursor_shape(&self, shape: Option<CursorShape>) {
+    pub fn set_cursor_shape(self, shape: Option<CursorShape>) {
         self.view.cursor_shape.set(shape);
 
         if let Some(hwnd) = self.containing_wnd() {
@@ -942,12 +1127,12 @@ impl HView {
     }
 
     /// Get the desired apperance of the mouse cursoor for a given view.
-    pub fn cursor_shape(&self) -> Option<CursorShape> {
+    pub fn cursor_shape(self) -> Option<CursorShape> {
         self.view.cursor_shape.get()
     }
 
     /// Pend a call to [`ViewListener::update`].
-    pub fn pend_update(&self) {
+    pub fn pend_update(self) {
         self.set_dirty_flags(ViewDirtyFlags::UPDATE_EVENT);
         self.set_dirty_flags_on_superviews(ViewDirtyFlags::DESCENDANT_UPDATE_EVENT);
     }
@@ -955,11 +1140,19 @@ impl HView {
 
 impl PartialEq for HView {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.view, &other.view)
+        self.as_ref() == other.as_ref()
     }
 }
 
 impl Eq for HView {}
+
+impl<'a, 'b> PartialEq<HViewRef<'b>> for HViewRef<'a> {
+    fn eq(&self, other: &HViewRef<'b>) -> bool {
+        std::ptr::eq(&*self.view, &*other.view)
+    }
+}
+
+impl Eq for HViewRef<'_> {}
 
 impl WeakHView {
     /// Construct a `WeakHView` that doesn't reference any view.
@@ -1078,15 +1271,15 @@ impl ViewDirtyFlags {
     }
 }
 
-impl HView {
+impl HViewRef<'_> {
     /// Set dirty flags on a view.
-    fn set_dirty_flags(&self, new_flags: ViewDirtyFlags) {
+    fn set_dirty_flags(self, new_flags: ViewDirtyFlags) {
         let dirty = &self.view.dirty;
         dirty.set(dirty.get() | new_flags);
     }
 
     /// Set dirty flags on a view's superviews.
-    fn set_dirty_flags_on_superviews(&self, new_flags: ViewDirtyFlags) {
+    fn set_dirty_flags_on_superviews(self, new_flags: ViewDirtyFlags) {
         view_set_dirty_flags_on_superviews(&self.view, new_flags);
     }
 }
@@ -1110,7 +1303,7 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
                 DESCENDANT_SIZE_TRAITS | DESCENDANT_SUBVIEWS_FRAME
             }]) {
                 wnd.set_dirty_flags(window::WndDirtyFlags::CONTENTS);
-                HWnd { wnd }.pend_update();
+                HWndRef { wnd: (&wnd).into() }.pend_update();
             }
         }
     }
@@ -1120,12 +1313,12 @@ fn view_set_dirty_flags_on_superviews(this: &View, new_flags: ViewDirtyFlags) {
 //                            Helper methods
 // =======================================================================
 
-impl HView {
+impl HViewRef<'_> {
     /// Return `true` if `self` is an improper subview of `of_view`.
     ///
     /// The word "improper" means `x.is_improper_subview_of(x)` returns `true`.
-    fn is_improper_subview_of(&self, of_view: &HView) -> bool {
-        if Rc::ptr_eq(&self.view, &of_view.view) {
+    fn is_improper_subview_of(self, of_view: HViewRef<'_>) -> bool {
+        if std::ptr::eq(&*self.view, &*of_view.view) {
             true
         } else if let Some(sv) = self
             .view
@@ -1134,14 +1327,14 @@ impl HView {
             .view()
             .and_then(|weak| weak.upgrade())
         {
-            HView { view: sv }.is_improper_subview_of(of_view)
+            HView { view: sv }.as_ref().is_improper_subview_of(of_view)
         } else {
             false
         }
     }
 
-    fn for_each_ancestor(&self, mut f: impl FnMut(HView)) {
-        let mut cur: Rc<View> = Rc::clone(&self.view);
+    fn for_each_ancestor(self, mut f: impl FnMut(HView)) {
+        let mut cur: Rc<View> = RcBorrow::upgrade(self.view);
         loop {
             let next = match &*cur.superview.borrow() {
                 Superview::View(view) => view.upgrade(),

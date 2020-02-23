@@ -78,7 +78,7 @@ impl table::TableModelQuery for TableModelQuery {
             None
         };
 
-        (wrap.view().clone(), Box::new(((wrap, button),)))
+        (wrap.view(), Box::new(((wrap, button),)))
     }
 
     fn range_size(&mut self, line_ty: LineTy, range: Range<u64>, _approx: bool) -> f64 {

@@ -9,7 +9,7 @@ use tcw3::{
         prelude::*,
         views::{table, table::LineTy},
     },
-    uicore::{HView, HWnd, SizeTraits, UpdateCtx, ViewListener},
+    uicore::{HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewListener},
 };
 
 stella2_meta::designer_impl! {
@@ -141,7 +141,7 @@ impl RowViewListener {
 }
 
 impl ViewListener for RowViewListener {
-    fn mount(&self, wm: pal::Wm, hview: &HView, _: &HWnd) {
+    fn mount(&self, wm: pal::Wm, hview: HViewRef<'_>, _: HWndRef<'_>) {
         self.layer.set(Some(wm.new_layer(pal::LayerAttrs {
             contents: Some(Some(self.row_visual.bmp.clone())),
             ..Default::default()
@@ -150,17 +150,17 @@ impl ViewListener for RowViewListener {
         hview.pend_update();
     }
 
-    fn unmount(&self, wm: pal::Wm, _: &HView) {
+    fn unmount(&self, wm: pal::Wm, _: HViewRef<'_>) {
         if let Some(hlayer) = self.layer.take() {
             wm.remove_layer(&hlayer);
         }
     }
 
-    fn position(&self, _: pal::Wm, view: &HView) {
+    fn position(&self, _: pal::Wm, view: HViewRef<'_>) {
         view.pend_update();
     }
 
-    fn update(&self, wm: pal::Wm, view: &HView, ctx: &mut UpdateCtx<'_>) {
+    fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
         let layer = self.layer.take().unwrap();
 
         let view_frame = view.global_frame();
