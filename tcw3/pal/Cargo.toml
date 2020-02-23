@@ -78,7 +78,7 @@ features = [
 
 # `gtk` backend
 [target.'cfg(not(any(target_os = "macos", target_os = "windows")))'.dependencies]
-gio = "0.7.0"
+gio = "0.8.1"
 gdk = "0.12.0"
 gdk-sys = "0.9.1"
 glib = "0.9.0"

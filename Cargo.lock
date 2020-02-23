@@ -118,7 +118,7 @@ checksum = "444daefa55f229af145ea58d77efd23725024ee1f6f3102743709aa6b18c663e"
 dependencies = [
  "atk-sys",
  "bitflags",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "libc",
@@ -267,7 +267,7 @@ checksum = "157049ba9618aa3a61c39d5d785102c04d3b1f40632a706c621a9aedc21e6084"
 dependencies = [
  "bitflags",
  "cairo-sys-rs",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "libc",
@@ -814,12 +814,6 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
 name = "fragile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05f8140122fa0d5dcb9fc8627cfce2b37cc1500f752636d46ea28bc26785c2f9"
-
-[[package]]
-name = "fragile"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69a039c3498dc930fe810151a34ba0c1c70b02b8625035592e74432f678591f2"
@@ -952,9 +946,9 @@ dependencies = [
  "cairo-sys-rs",
  "gdk-pixbuf",
  "gdk-sys",
- "gio 0.8.1",
+ "gio",
  "gio-sys",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "libc",
@@ -968,9 +962,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e248220c46b329b097d4b158d2717f8c688f16dd76d0399ace82b3e98062bdd7"
 dependencies = [
  "gdk-pixbuf-sys",
- "gio 0.8.1",
+ "gio",
  "gio-sys",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "libc",
@@ -1028,22 +1022,6 @@ dependencies = [
 
 [[package]]
 name = "gio"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6261b5d34c30c2d59f879e643704cf54cb44731f3a2038000b68790c03e360e3"
-dependencies = [
- "bitflags",
- "fragile 0.3.0",
- "gio-sys",
- "glib 0.8.2",
- "glib-sys",
- "gobject-sys",
- "lazy_static",
- "libc",
-]
-
-[[package]]
-name = "gio"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cd10f9415cce39b53f8024bf39a21f84f8157afa52da53837b102e585a296a5"
@@ -1054,7 +1032,7 @@ dependencies = [
  "futures-io",
  "futures-util",
  "gio-sys",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "lazy_static",
@@ -1071,19 +1049,6 @@ dependencies = [
  "gobject-sys",
  "libc",
  "pkg-config",
-]
-
-[[package]]
-name = "glib"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be27232841baa43e0fd5ae003f7941925735b2f733a336dc75f07b9eff415e7b"
-dependencies = [
- "bitflags",
- "glib-sys",
- "gobject-sys",
- "lazy_static",
- "libc",
 ]
 
 [[package]]
@@ -1140,9 +1105,9 @@ dependencies = [
  "gdk-pixbuf",
  "gdk-pixbuf-sys",
  "gdk-sys",
- "gio 0.8.1",
+ "gio",
  "gio-sys",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "gtk-sys",
@@ -1714,7 +1679,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e9c6b728f1be8edb5f9f981420b651d5ea30bdb9de89f1f1262d0084a020577"
 dependencies = [
  "bitflags",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "lazy_static",
@@ -1743,7 +1708,7 @@ dependencies = [
  "bitflags",
  "cairo-rs",
  "cairo-sys-rs",
- "glib 0.9.3",
+ "glib",
  "glib-sys",
  "gobject-sys",
  "libc",
@@ -2839,12 +2804,12 @@ dependencies = [
  "dxgi",
  "env_logger",
  "flags-macro",
- "fragile 1.0.0",
+ "fragile",
  "futures",
  "gdk",
  "gdk-sys",
- "gio 0.7.0",
- "glib 0.9.3",
+ "gio",
+ "glib",
  "glib-sys",
  "gtk",
  "gtk-sys",
