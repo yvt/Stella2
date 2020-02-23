@@ -56,7 +56,7 @@ impl iface::Wm for Wm {
     }
 
     fn invoke_on_main_thread(f: impl FnOnce(Wm) + Send + 'static) {
-        dispatch::Queue::main().r#async(|| f(unsafe { Self::global_unchecked() }));
+        dispatch::Queue::main().exec_async(|| f(unsafe { Self::global_unchecked() }));
     }
 
     fn invoke(self, f: impl FnOnce(Self) + 'static) {

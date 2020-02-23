@@ -695,12 +695,6 @@ dependencies = [
 
 [[package]]
 name = "dispatch"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04e93ca78226c51902d7aa8c12c988338aadd9e85ed9c6be8aaac39192ff3605"
-
-[[package]]
-name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
@@ -1506,7 +1500,7 @@ name = "nativedispatch"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "dispatch 0.2.0",
+ "dispatch",
  "glib-sys",
  "lazy_static",
  "winapi",
@@ -2835,7 +2829,7 @@ dependencies = [
  "derive_more",
  "direct2d",
  "directwrite",
- "dispatch 0.1.4",
+ "dispatch",
  "dxgi",
  "env_logger",
  "flags-macro",
