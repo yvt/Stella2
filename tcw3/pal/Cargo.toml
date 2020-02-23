@@ -100,7 +100,7 @@ pkg-config = "0.3.7"
 demotools = { path = "../../support/demotools" }
 env_logger = "0.7.0"
 quickcheck = "0.9"
-quickcheck_macros = "0.8"
+quickcheck_macros = "0.9"
 structopt = "0.3.0"
 arg_enum_proc_macro = "0.3.0"
 
