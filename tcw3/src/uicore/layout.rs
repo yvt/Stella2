@@ -374,7 +374,7 @@ impl HViewRef<'_> {
         }
 
         if hit_local && flags.intersects(accept_flag) {
-            Some(self.upgrade())
+            Some(self.cloned())
         } else {
             None
         }

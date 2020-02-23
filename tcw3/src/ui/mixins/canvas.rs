@@ -68,7 +68,7 @@ impl CanvasMixin {
         });
 
         let sub = {
-            let view = view.upgrade();
+            let view = view.cloned();
             wnd.subscribe_dpi_scale_changed(Box::new(move |_, _| {
                 view.pend_update();
             }))

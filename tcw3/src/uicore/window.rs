@@ -104,7 +104,7 @@ impl HWndRef<'_> {
         if let Some(ref pal_wnd) = *self.wnd.pal_wnd.borrow() {
             self.wnd.wm.request_update_ready_wnd(pal_wnd);
         } else {
-            let hwnd: HWnd = self.upgrade();
+            let hwnd: HWnd = self.cloned();
             self.wnd.wm.invoke(move |_| {
                 hwnd.as_ref().update();
             });

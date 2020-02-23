@@ -556,7 +556,7 @@ impl ScrollListener for ScrollListenerImpl {
             self.inner.flush_enqueued.set(true);
 
             let this = self.clone();
-            let hview = hview.upgrade();
+            let hview = hview.cloned();
 
             wm.invoke_on_update(move |_| {
                 let inner = &this.inner;

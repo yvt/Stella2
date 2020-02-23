@@ -12,8 +12,12 @@
 //!
 //! [`WeakHWnd`] and [`WeakHView`] represent [a weak reference]. They can be
 //! converted to their respective strong reference types by calling the
-//! `upgrade` methods, which may fail and return `None` if their referents are
+//! `cloned` methods¹, which may fail and return `None` if their referents are
 //! no longer existent.
+//!
+//! ¹ They are called `cloned` by analogy with `Option<&Rc<_>>::cloned`. They do
+//! not clone the underlying object, but rather clone the strong reference,
+//! increasing the referenced object's reference count.
 //!
 //! [a weak reference]: https://en.wikipedia.org/wiki/Weak_reference
 //!
@@ -23,7 +27,7 @@
 //! ```text
 //!                     HViewRef<'_>
 //!                        | ^
-//!    [!] view.upgrade()  | |  view.as_ref() or (&view).into()
+//!     [!] view.cloned()  | |  view.as_ref() or (&view).into()
 //!                        | |  or HViewRef::from(&view)
 //!                        v |
 //!                       HView
@@ -695,7 +699,7 @@ impl HWndRef<'_> {
     }
 
     /// Convert this borrowed handle into an owned handle.
-    pub fn upgrade(self) -> HWnd {
+    pub fn cloned(self) -> HWnd {
         self.into()
     }
 
@@ -960,7 +964,7 @@ impl<'a> From<&'a HView> for HViewRef<'a> {
 
 impl<'a> HViewRef<'a> {
     /// Convert this borrowed handle into an owned handle.
-    pub fn upgrade(self) -> HView {
+    pub fn cloned(self) -> HView {
         self.into()
     }
 

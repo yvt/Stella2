@@ -200,7 +200,7 @@ impl StyledBox {
     /// Set a child widget using `set_subview` and `set_subelement`.
     pub fn set_child(&self, role: Role, widget: Option<&dyn Widget>) {
         if let Some(widget) = widget {
-            self.set_subview(role, Some(widget.view_ref().upgrade()));
+            self.set_subview(role, Some(widget.view_ref().cloned()));
             self.set_subelement(role, widget.style_elem());
         } else {
             self.set_subview(role, None);
