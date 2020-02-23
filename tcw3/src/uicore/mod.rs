@@ -25,17 +25,17 @@
 //! types:
 //!
 //! ```text
-//!                     HViewRef<'_>
-//!                        | ^
-//!     [!] view.cloned()  | |  view.as_ref() or (&view).into()
-//!                        | |  or HViewRef::from(&view)
-//!                        v |
-//!                       HView
-//!                        | ^
-//!  [!] view.downgrade()  | |  [!] view.upgrade().unwrap()
-//!                        | |
-//!                        v |
-//!                     WeakHView
+//!                              HViewRef<'_>
+//!                                 | ^
+//!    view.cloned(), view.into(),  | |  view.as_ref(), (&view).into(),
+//!       [!] or HView::from(view)  | |  or HViewRef::from(&view)
+//!                                 v |
+//!                                HView
+//!                                 | ^
+//!           [!] view.downgrade()  | |  [!] view.upgrade().unwrap()
+//!                                 | |
+//!                                 v |
+//!                              WeakHView
 //!
 //! Costly operations are marked with [!].
 //! ```
