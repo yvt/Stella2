@@ -819,6 +819,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f8140122fa0d5dcb9fc8627cfce2b37cc1500f752636d46ea28bc26785c2f9"
 
 [[package]]
+name = "fragile"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69a039c3498dc930fe810151a34ba0c1c70b02b8625035592e74432f678591f2"
+
+[[package]]
 name = "freetype"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1027,7 +1033,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6261b5d34c30c2d59f879e643704cf54cb44731f3a2038000b68790c03e360e3"
 dependencies = [
  "bitflags",
- "fragile",
+ "fragile 0.3.0",
  "gio-sys",
  "glib 0.8.2",
  "glib-sys",
@@ -2833,7 +2839,7 @@ dependencies = [
  "dxgi",
  "env_logger",
  "flags-macro",
- "fragile",
+ "fragile 1.0.0",
  "futures",
  "gdk",
  "gdk-sys",
