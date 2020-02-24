@@ -883,11 +883,19 @@ impl HWndRef<'_> {
 
 impl PartialEq for HWnd {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.wnd, &other.wnd)
+        self.as_ref() == other.as_ref()
     }
 }
 
 impl Eq for HWnd {}
+
+impl<'a, 'b> PartialEq<HWndRef<'b>> for HWndRef<'a> {
+    fn eq(&self, other: &HWndRef<'b>) -> bool {
+        std::ptr::eq(&*self.wnd, &*other.wnd)
+    }
+}
+
+impl Eq for HWndRef<'_> {}
 
 impl WeakHWnd {
     /// Construct a `WeakHWnd` that doesn't reference any window.
