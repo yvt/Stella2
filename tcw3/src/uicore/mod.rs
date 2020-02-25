@@ -54,6 +54,38 @@
 //!  - *Down phase*: The final frame (a bounding rectangle in the superview
 //!    coordinate space) is calculated for each view in a bottom-up manner.
 //!
+//! # Tab order
+//!
+//! The default tab order follows the pre-order of the view hierarchy. The order
+//! for sibling views are defined by [`Layout::subviews`].
+//!
+//! The default order can be overridden by [`HViewRef::override_focus_sibling`]
+//! and [`HViewRef::override_focus_child`]. These methods define a completely
+//! independent subtree that determines the tab order. The clients are
+//! responsible for linking nodes correctly.
+//!
+//! ## Example
+//!
+//! ```
+//! use tcw3::uicore::{HView, TabOrderSibling};
+//!
+//! // root
+//! //  ├─ v1
+//! //  └─ v2
+//! let root = HView::new(Default::default());
+//! let v1 = HView::new(Default::default());
+//! let v2 = HView::new(Default::default());
+//!
+//! root.override_tab_order_child(Some([v1.clone(), v2.clone()]));
+//! v1.override_tab_order_sibling(
+//!     TabOrderSibling::Parent(root.downgrade()),
+//!     TabOrderSibling::Sibling(v2.downgrade()),
+//! );
+//! v2.override_tab_order_sibling(
+//!     TabOrderSibling::Sibling(v1.downgrade()),
+//!     TabOrderSibling::Parent(root.downgrade()),
+//! );
+//! ```
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
@@ -79,11 +111,13 @@ mod layer;
 mod layout;
 mod mount;
 mod mouse;
+mod taborder;
 mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
 pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::{MouseDragListener, ScrollListener};
+pub use self::taborder::TabOrderSibling;
 
 pub use crate::pal::{CursorShape, ScrollDelta, WndFlags as WndStyleFlags};
 
@@ -526,6 +560,11 @@ struct View {
 
     // Layers
     layers: RefCell<Vec<pal::HLayer>>,
+
+    // Focus management
+    /// Overrides the tab order. `Box` is used because most views are not
+    /// expected to have this.
+    focus_link_override: RefCell<Option<Box<taborder::TabOrderLink>>>,
 }
 
 impl fmt::Debug for View {
@@ -543,6 +582,7 @@ impl fmt::Debug for View {
             .field("frame", &self.frame)
             .field("global_frame", &self.global_frame)
             .field("layers", &self.layers)
+            .field("focus_link_override", &self.focus_link_override)
             .finish()
     }
 }
@@ -566,6 +606,7 @@ impl View {
             global_frame: Cell::new(Box2::zero()),
             layers: RefCell::new(Vec::new()),
             cursor_shape: Cell::new(None),
+            focus_link_override: RefCell::new(None),
         }
     }
 }
@@ -987,6 +1028,14 @@ impl HView {
 
         // `keybd.rs`
         pub fn focus(&self);
+
+        // `taborder.rs`
+        pub fn override_tab_order_sibling(&self, prev: TabOrderSibling, next: TabOrderSibling);
+        pub fn override_tab_order_child(&self, first_last: Option<[HView; 2]>);
+        pub fn tab_order_first_view(&self) -> Option<HView>;
+        pub fn tab_order_last_view(&self) -> Option<HView>;
+        pub fn tab_order_next_view(&self) -> Option<HView>;
+        pub fn tab_order_prev_view(&self) -> Option<HView>;
     }
 }
 

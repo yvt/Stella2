@@ -30,6 +30,7 @@ rope = { path = "../support/rope" }
 sorted_diff = { path = "../support/sorted_diff" }
 subscriber_list = { path = "../support/subscriber_list" }
 svgbobdoc = "0.2"
+try_match = "0.2.1"
 
 tcw3_designer_runtime = { path = "designer_runtime" }
 tcw3_images = { path = "images" }
@@ -48,4 +49,3 @@ lipsum = "0.6.0"
 quickcheck = "0.9"
 quickcheck_macros = "0.9"
 structopt = "0.3.0"
-try_match = { version = "0.2.1", default-features = false, features = ["std"] }
