@@ -1,5 +1,4 @@
 use std::{cell::RefCell, mem::replace, rc::Rc};
-use try_match::try_match;
 
 use tcw3::{
     pal,
@@ -37,6 +36,23 @@ fn new_layout(views: impl IntoIterator<Item = HView>) -> TableLayout {
     TableLayout::stack_horz(views.into_iter().map(|v| (v, AlignFlags::JUSTIFY)))
 }
 
+macro_rules! new_view_tree {
+    {
+        let $view:ident = $init:expr;
+        $({
+            $(
+                let $child:ident = $child_init:expr; $({ $($grandchildren:tt)* })?
+            )*
+        })?
+    } => {
+        $($( new_view_tree! { let $child = $child_init; $({ $($grandchildren)* })? } )*)?
+        let $view = $init;
+        $view.set_layout(new_layout(vec![
+            $($( $child.clone() ),*)?
+        ]));
+    };
+}
+
 #[use_testing_wm]
 #[test]
 fn focus_evts(twm: &dyn TestingWm) {
@@ -52,22 +68,26 @@ fn focus_evts(twm: &dyn TestingWm) {
         };
     }
 
-    let view0 = HView::new(ViewFlags::default());
-    let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
-    let view2 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
-    let view3 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
-    let view4 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+    new_view_tree! {
+        let view0 = HView::new(ViewFlags::default());
+        {
+            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            {
+                let view2 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            }
+
+            let view3 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            {
+                let view4 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            }
+        }
+    }
 
     view0.set_listener(RecordingViewListener(0, events.clone()));
     view1.set_listener(RecordingViewListener(1, events.clone()));
     view2.set_listener(RecordingViewListener(2, events.clone()));
     view3.set_listener(RecordingViewListener(3, events.clone()));
     view4.set_listener(RecordingViewListener(4, events.clone()));
-
-    view1.set_layout(new_layout(Some(view2.clone())));
-    view3.set_layout(new_layout(Some(view4.clone())));
-
-    view0.set_layout(new_layout(vec![view1.clone(), view3.clone()]));
 
     wnd.content_view()
         .set_layout(new_layout(Some(view0.clone())));
@@ -129,17 +149,15 @@ fn has_focus(twm: &dyn TestingWm) {
     let wm = twm.wm();
     let wnd = HWnd::new(wm);
 
-    let events = Rc::new(RefCell::new(Vec::new()));
-
-    let view0 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
-    let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
-
-    view0.set_listener(RecordingViewListener(0, events.clone()));
-    view1.set_listener(RecordingViewListener(1, events.clone()));
+    new_view_tree! {
+        let view0 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        {
+            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        }
+    }
 
     wnd.content_view()
         .set_layout(new_layout(Some(view0.clone())));
-    view0.set_layout(new_layout(Some(view1.clone())));
 
     wnd.set_visibility(true);
     twm.step_unsend();
@@ -193,15 +211,18 @@ fn view_removal(twm: &dyn TestingWm) {
         };
     }
 
-    let view0 = HView::new(ViewFlags::default());
-    let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+    new_view_tree! {
+        let view0 = HView::new(ViewFlags::default());
+        {
+            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        }
+    }
 
     view0.set_listener(RecordingViewListener(0, events.clone()));
     view1.set_listener(RecordingViewListener(1, events.clone()));
 
     wnd.content_view()
         .set_layout(new_layout(Some(view0.clone())));
-    view0.set_layout(new_layout(Some(view1.clone())));
 
     wnd.set_visibility(true);
     twm.step_unsend();
