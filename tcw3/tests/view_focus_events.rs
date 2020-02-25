@@ -177,3 +177,60 @@ fn has_focus(twm: &dyn TestingWm) {
         [true, true]
     );
 }
+
+#[use_testing_wm]
+#[test]
+fn view_removal(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+
+    macro_rules! flush_and_assert_events {
+        ($expected:expr) => {
+            twm.step_unsend();
+            assert_eq!(replace(&mut *events.borrow_mut(), Vec::new()), $expected);
+        };
+    }
+
+    let view0 = HView::new(ViewFlags::default());
+    let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+
+    view0.set_listener(RecordingViewListener(0, events.clone()));
+    view1.set_listener(RecordingViewListener(1, events.clone()));
+
+    wnd.content_view()
+        .set_layout(new_layout(Some(view0.clone())));
+    view0.set_layout(new_layout(Some(view1.clone())));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    flush_and_assert_events!([]);
+
+    view1.focus();
+    flush_and_assert_events!([
+        (0, Event::FocusEnter),
+        (1, Event::FocusEnter),
+        (1, Event::FocusGot),
+    ]);
+
+    // Remove the views from the window
+    wnd.content_view().set_layout(new_layout(None));
+
+    // Should not generate any focus events
+    flush_and_assert_events!([]);
+
+    // `has_focus` should return `false`
+    assert_eq!([view0.has_focus(), view1.has_focus()], [false, false]);
+    assert_eq!(
+        [
+            view0.improper_subview_has_focus(),
+            view1.improper_subview_has_focus()
+        ],
+        [false, false]
+    );
+
+    // `focused_view` should return `None`
+    assert_eq!(wnd.focused_view(), None);
+}
