@@ -75,9 +75,6 @@ fn focus_evts(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
-    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
-        .expect("could not get a single window");
-
     flush_and_assert_events!([]);
 
     // `view0` does not have `TAB_STOP`, so it won't accept a keyboard focus
