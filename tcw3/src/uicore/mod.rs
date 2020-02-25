@@ -412,6 +412,9 @@ bitflags! {
         /// This flag also enables the standard behavior regarding keyboard
         /// focus management such as focusing the next widget when the
         /// <kbd>Tab</kbd> key is pressed.
+        ///
+        /// When this flag is cleared, the view automatically gives up the
+        /// keyboard focus if it has one.
         const TAB_STOP = 1 << 6;
     }
 }
@@ -1088,6 +1091,10 @@ impl<'a> HViewRef<'a> {
     ///
     /// It's not allowed to call this method from `Layout`'s method. You should
     /// use [`LayoutCtx::set_layout`] instead.
+    ///
+    /// When a focused view is removed by this method, focus lost/leave events
+    /// are not raised for its ancestor views. This is a limitation in the
+    /// current implementation and may be changed in the future.
     #[momo]
     pub fn set_layout(self, layout: impl Into<Box<dyn Layout>>) {
         let layout = layout.into();
@@ -1159,7 +1166,15 @@ impl<'a> HViewRef<'a> {
                     hview_sub
                         .as_ref()
                         .cancel_mouse_gestures_of_subviews(&hwnd.wnd);
-                    hview_sub.as_ref().defocus_subviews(&hwnd.wnd, true);
+
+                    // `defocus_subviews` shouldn't raise focus lost events here
+                    // (the `raise_events` parameter = `false`) because
+                    // `hview_sub` is disconnected from `self` at this point,
+                    // and cannot call `focus_leave` for all of its former
+                    // ancestors.  (It would nice to fix this, but is it really
+                    // worth the extra code overhead?)
+                    hview_sub.as_ref().defocus_subviews(&hwnd.wnd, true, false);
+
                     hview_sub.as_ref().call_unmount(hwnd.wnd.wm);
                 }
             }
@@ -1201,7 +1216,7 @@ impl<'a> HViewRef<'a> {
             // The view is no longer allowed to have a keyboard focus so
             // cancel it if it has one
             if let Some(hwnd) = self.containing_wnd() {
-                self.defocus_subviews(&hwnd.wnd, false);
+                self.defocus_subviews(&hwnd.wnd, false, true);
             }
         }
 

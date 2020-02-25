@@ -125,25 +125,46 @@ impl HViewRef<'_> {
         }
     }
 
-    /// Steal a keyboard focus from the specified view. Does *not* call
-    /// `focus_(leave|lost)`.
+    /// Steal a keyboard focus from the specified view.
     ///
     /// If `subview` is `true`, the subviews of `view` are also affected.
-    pub(super) fn defocus_subviews(self, wnd: &Wnd, subview: bool) {
+    pub(super) fn defocus_subviews(self, wnd: &Wnd, subview: bool, raise_events: bool) {
         let mut focused_view_cell = wnd.focused_view.borrow_mut();
 
-        let cancel_drag = if let Some(view) = &*focused_view_cell {
-            if subview {
+        if let Some(view) = &*focused_view_cell {
+            let cancel_drag = if subview {
                 view.as_ref().is_improper_subview_of(self)
             } else {
                 view.as_ref() == self
-            }
-        } else {
-            false
-        };
+            };
 
-        if cancel_drag {
-            *focused_view_cell = None;
+            if cancel_drag {
+                let view = std::mem::replace(&mut *focused_view_cell, None).unwrap();
+
+                // Unborrow `focused_view`
+                drop(focused_view_cell);
+
+                if raise_events {
+                    // TODO: This section is based on `set_focused_view`. De-duplicate.
+                    use super::MAX_VIEW_DEPTH;
+                    let mut path = ArrayVec::<[HView; MAX_VIEW_DEPTH]>::new();
+
+                    view.as_ref().for_each_ancestor(|hview| path.push(hview));
+
+                    view.view
+                        .listener
+                        .borrow()
+                        .focus_lost(wnd.wm, view.as_ref());
+
+                    for hview in path.iter() {
+                        hview
+                            .view
+                            .listener
+                            .borrow()
+                            .focus_leave(wnd.wm, hview.as_ref());
+                    }
+                }
+            }
         }
     }
 }
