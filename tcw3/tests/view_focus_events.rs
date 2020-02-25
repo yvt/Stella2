@@ -82,7 +82,6 @@ fn focus_evts(twm: &dyn TestingWm) {
 
     // `view0` does not have `TAB_STOP`, so it won't accept a keyboard focus
     view0.focus();
-    twm.raise_mouse_motion(&pal_hwnd, [0.0; 2].into());
     flush_and_assert_events!([]);
 
     // `view2` has a keyboard focus, which is a child of `view1`.
