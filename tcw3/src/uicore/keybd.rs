@@ -1,23 +1,11 @@
 //! Keyboard events
 use arrayvec::ArrayVec;
 
-use super::{HView, HViewRef, HWndRef, ViewFlags, WmExt, Wnd};
+use super::{HView, HViewRef, HWndRef, ViewFlags, Wnd};
 
 impl HWndRef<'_> {
     /// Focus the specified view.
-    pub fn set_focused_view(self, view: Option<HView>) {
-        // Assign `view` to `new_focused_view`. If it was empty, register an
-        // update handler to call `flush_focused_view` later.
-        if self.wnd.new_focused_view.replace(Some(view)).is_none() {
-            let hwnd = self.cloned();
-            self.wnd.wm.invoke_on_update(move |_| {
-                hwnd.as_ref().flush_focused_view();
-            });
-        }
-    }
-
-    fn flush_focused_view(self) {
-        let new_focused_view = self.wnd.new_focused_view.take().unwrap();
+    pub fn set_focused_view(self, new_focused_view: Option<HView>) {
         let mut focused_view_cell = self.wnd.focused_view.borrow_mut();
 
         if new_focused_view == *focused_view_cell {

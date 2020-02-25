@@ -259,7 +259,6 @@ struct Wnd {
 
     // Keyboard inputs
     focused_view: RefCell<Option<HView>>,
-    new_focused_view: Cell<Option<Option<HView>>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -281,7 +280,6 @@ impl fmt::Debug for Wnd {
             .field("mouse_state", &self.mouse_state)
             .field("focus_handlers", &())
             .field("focused_view", &self.focused_view)
-            .field("new_focused_view", &())
             .finish()
     }
 }
@@ -308,7 +306,6 @@ impl Wnd {
             cursor_shape: Cell::new(CursorShape::default()),
             focus_handlers: RefCell::new(SubscriberList::new()),
             focused_view: RefCell::new(None),
-            new_focused_view: Cell::new(None),
         }
     }
 }
