@@ -74,6 +74,7 @@ use crate::pal::{self, prelude::Wm as _, Wm};
 
 mod images;
 mod invocation;
+mod keybd;
 mod layer;
 mod layout;
 mod mount;
@@ -221,6 +222,10 @@ struct Wnd {
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
     cursor_shape: Cell<CursorShape>,
+
+    // Keyboard inputs
+    focused_view: RefCell<Option<HView>>,
+    new_focused_view: Cell<Option<Option<HView>>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -241,6 +246,8 @@ impl fmt::Debug for Wnd {
             .field("frame_handlers", &())
             .field("mouse_state", &self.mouse_state)
             .field("focus_handlers", &())
+            .field("focused_view", &self.focused_view)
+            .field("new_focused_view", &())
             .finish()
     }
 }
@@ -266,13 +273,14 @@ impl Wnd {
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
             focus_handlers: RefCell::new(SubscriberList::new()),
+            focused_view: RefCell::new(None),
+            new_focused_view: Cell::new(None),
         }
     }
 }
 
 // TODO: mouse motion events
 // TODO: keyboard events
-// TODO: keyboard focus management
 
 /// A view handle type.
 #[derive(Clone)]
@@ -364,6 +372,16 @@ bitflags! {
 
         /// The view accepts scroll events.
         const ACCEPT_SCROLL = 1 << 5;
+
+        /// The view participates in a tab (keyboard focus) order.
+        ///
+        /// When looking for a next element to focus, the framework will
+        /// automatically skip the views without this flag.
+        ///
+        /// This flag also enables the standard behavior regarding keyboard
+        /// focus management such as focusing the next widget when the
+        /// <kbd>Tab</kbd> key is pressed.
+        const TAB_STOP = 1 << 6;
     }
 }
 
@@ -375,7 +393,8 @@ impl Default for ViewFlags {
 
 impl ViewFlags {
     fn mutable_flags() -> Self {
-        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG}]
+        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG |
+            TAB_STOP}]
     }
 }
 
@@ -470,6 +489,16 @@ pub trait ViewListener {
     fn scroll_gesture(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
         Box::new(())
     }
+
+    /// `focus_got` is called for this view or its descendants.
+    fn focus_enter(&self, _: Wm, _: HViewRef<'_>) {}
+    /// `focus_lost` is called for this view or its descendants.
+    fn focus_leave(&self, _: Wm, _: HViewRef<'_>) {}
+
+    /// The view got a keyboard focus.
+    fn focus_got(&self, _: Wm, _: HViewRef<'_>) {}
+    /// The view lost a keyboard focus.
+    fn focus_lost(&self, _: Wm, _: HViewRef<'_>) {}
 }
 
 /// A no-op implementation of `ViewListener`.
@@ -674,6 +703,10 @@ impl HWnd {
         pub fn set_style_flags(&self, flags: WndStyleFlags);
         pub fn style_flags(&self) -> WndStyleFlags;
         pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static);
+
+        // `keybd.rs`
+        pub fn set_focused_view(&self, view: Option<HView>);
+        pub fn focused_view(&self) -> Option<HView>;
     }
 }
 
@@ -951,6 +984,9 @@ impl HView {
 
         // `window.rs`
         pub fn containing_wnd(&self) -> Option<HWnd>;
+
+        // `keybd.rs`
+        pub fn focus(&self);
     }
 }
 
@@ -1075,6 +1111,7 @@ impl<'a> HViewRef<'a> {
                     hview_sub
                         .as_ref()
                         .cancel_mouse_gestures_of_subviews(&hwnd.wnd);
+                    hview_sub.as_ref().defocus_subviews(&hwnd.wnd, true);
                     hview_sub.as_ref().call_unmount(hwnd.wnd.wm);
                 }
             }
@@ -1109,6 +1146,14 @@ impl<'a> HViewRef<'a> {
             // cancel it if it has one
             if let Some(hwnd) = self.containing_wnd() {
                 self.cancel_mouse_drag_gestures(&hwnd.wnd);
+            }
+        }
+
+        if (!value & changed).contains(ViewFlags::TAB_STOP) {
+            // The view is no longer allowed to have a keyboard focus so
+            // cancel it if it has one
+            if let Some(hwnd) = self.containing_wnd() {
+                self.defocus_subviews(&hwnd.wnd, false);
             }
         }
 
