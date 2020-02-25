@@ -138,3 +138,58 @@ fn focus_evts(twm: &dyn TestingWm) {
     wnd.set_focused_view(None);
     flush_and_assert_events!(events, []);
 }
+
+#[use_testing_wm]
+#[test]
+fn has_focus(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+
+    let view0 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+    let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+
+    view0.set_listener(RecordingViewListener(0, events.clone()));
+    view1.set_listener(RecordingViewListener(1, events.clone()));
+
+    wnd.content_view()
+        .set_layout(new_layout(Some(view0.clone())));
+    view0.set_layout(new_layout(Some(view1.clone())));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    assert_eq!([view0.has_focus(), view1.has_focus()], [false, false]);
+    assert_eq!(
+        [
+            view0.improper_subview_has_focus(),
+            view1.improper_subview_has_focus()
+        ],
+        [false, false]
+    );
+
+    view0.focus();
+    twm.step_unsend();
+
+    assert_eq!([view0.has_focus(), view1.has_focus()], [true, false]);
+    assert_eq!(
+        [
+            view0.improper_subview_has_focus(),
+            view1.improper_subview_has_focus()
+        ],
+        [true, false]
+    );
+
+    view1.focus();
+    twm.step_unsend();
+
+    assert_eq!([view0.has_focus(), view1.has_focus()], [false, true]);
+    assert_eq!(
+        [
+            view0.improper_subview_has_focus(),
+            view1.improper_subview_has_focus()
+        ],
+        [true, true]
+    );
+}
