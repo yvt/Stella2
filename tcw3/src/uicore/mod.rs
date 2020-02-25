@@ -59,8 +59,8 @@
 //! The default tab order follows the pre-order of the view hierarchy. The order
 //! for sibling views are defined by [`Layout::subviews`].
 //!
-//! The default order can be overridden by [`HViewRef::override_focus_sibling`]
-//! and [`HViewRef::override_focus_child`]. These methods define a completely
+//! The default order can be overridden by [`HViewRef::override_tab_order_sibling`]
+//! and [`HViewRef::override_tab_order_child`]. These methods define a completely
 //! independent subtree that determines the tab order. The clients are
 //! responsible for linking nodes correctly.
 //!
