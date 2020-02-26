@@ -81,10 +81,7 @@ impl HWndRef<'_> {
 
         // Raise `got_focus` if needed
         if self.wnd.wm.is_wnd_focused(pal_wnd_cell.as_ref().unwrap()) {
-            let handlers = self.wnd.focus_handlers.borrow();
-            for handler in handlers.iter() {
-                handler(self.wnd.wm, self);
-            }
+            self.invoke_focus_handlers();
         }
     }
 
@@ -345,6 +342,13 @@ impl HWndRef<'_> {
 
         panic!("Window update did not converge");
     }
+
+    fn invoke_focus_handlers(self) {
+        let handlers = self.wnd.focus_handlers.borrow();
+        for handler in handlers.iter() {
+            handler(self.wnd.wm, self);
+        }
+    }
 }
 
 impl Wnd {
@@ -497,11 +501,7 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
         // This handler can be called from `set_wnd_attrs`, which might conflict
         // with a mutable borrow for `style_attrs`
         self.invoke_later_with_hwnd(wm, |hwnd| {
-            let hwnd = hwnd.as_ref();
-            let handlers = hwnd.wnd.focus_handlers.borrow();
-            for handler in handlers.iter() {
-                handler(hwnd.wnd.wm, hwnd);
-            }
+            hwnd.as_ref().invoke_focus_handlers();
         });
     }
 
