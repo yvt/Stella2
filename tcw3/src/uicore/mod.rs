@@ -1029,8 +1029,8 @@ impl HView {
 
         // `keybd.rs`
         pub fn focus(&self);
-        pub fn has_focus(&self) -> bool;
-        pub fn improper_subview_has_focus(&self) -> bool;
+        pub fn is_focused(&self) -> bool;
+        pub fn improper_subview_is_focused(&self) -> bool;
 
         // `taborder.rs`
         pub fn override_tab_order_sibling(&self, prev: TabOrderSibling, next: TabOrderSibling);

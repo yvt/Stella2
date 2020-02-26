@@ -145,7 +145,7 @@ fn focus_evts(twm: &dyn TestingWm) {
 
 #[use_testing_wm]
 #[test]
-fn has_focus(twm: &dyn TestingWm) {
+fn is_focused(twm: &dyn TestingWm) {
     let wm = twm.wm();
     let wnd = HWnd::new(wm);
 
@@ -162,11 +162,11 @@ fn has_focus(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
-    assert_eq!([view0.has_focus(), view1.has_focus()], [false, false]);
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
     assert_eq!(
         [
-            view0.improper_subview_has_focus(),
-            view1.improper_subview_has_focus()
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
         ],
         [false, false]
     );
@@ -174,11 +174,11 @@ fn has_focus(twm: &dyn TestingWm) {
     view0.focus();
     twm.step_unsend();
 
-    assert_eq!([view0.has_focus(), view1.has_focus()], [true, false]);
+    assert_eq!([view0.is_focused(), view1.is_focused()], [true, false]);
     assert_eq!(
         [
-            view0.improper_subview_has_focus(),
-            view1.improper_subview_has_focus()
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
         ],
         [true, false]
     );
@@ -186,11 +186,11 @@ fn has_focus(twm: &dyn TestingWm) {
     view1.focus();
     twm.step_unsend();
 
-    assert_eq!([view0.has_focus(), view1.has_focus()], [false, true]);
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, true]);
     assert_eq!(
         [
-            view0.improper_subview_has_focus(),
-            view1.improper_subview_has_focus()
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
         ],
         [true, true]
     );
@@ -242,12 +242,12 @@ fn view_removal(twm: &dyn TestingWm) {
     // Should not generate any focus events
     flush_and_assert_events!([]);
 
-    // `has_focus` should return `false`
-    assert_eq!([view0.has_focus(), view1.has_focus()], [false, false]);
+    // `is_focused` should return `false`
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
     assert_eq!(
         [
-            view0.improper_subview_has_focus(),
-            view1.improper_subview_has_focus()
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
         ],
         [false, false]
     );
@@ -306,12 +306,12 @@ fn clear_tab_stop(twm: &dyn TestingWm) {
         (0, Event::FocusLeave),
     ]);
 
-    // `has_focus` should return `false`
-    assert_eq!([view0.has_focus(), view1.has_focus()], [false, false]);
+    // `is_focused` should return `false`
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
     assert_eq!(
         [
-            view0.improper_subview_has_focus(),
-            view1.improper_subview_has_focus()
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
         ],
         [false, false]
     );

@@ -89,7 +89,7 @@ impl HViewRef<'_> {
     }
 
     /// Get a flag indicating whether the view is currently focused or not.
-    pub fn has_focus(self) -> bool {
+    pub fn is_focused(self) -> bool {
         if let Some(hwnd) = self.containing_wnd() {
             if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
                 view.as_ref() == self
@@ -103,7 +103,7 @@ impl HViewRef<'_> {
 
     /// Get a flag indicating whether the view or a subview of the view is
     /// currently focused or not.
-    pub fn improper_subview_has_focus(self) -> bool {
+    pub fn improper_subview_is_focused(self) -> bool {
         if let Some(hwnd) = self.containing_wnd() {
             if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
                 view.as_ref().is_improper_subview_of(self)
