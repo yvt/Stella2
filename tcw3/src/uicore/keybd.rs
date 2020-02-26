@@ -20,21 +20,11 @@ impl HWndRef<'_> {
             );
         }
 
-        // TODO: This section was copied from `mouse.rs`. De-duplicate.
-        use super::MAX_VIEW_DEPTH;
         let mut path1 = ArrayVec::new();
         let mut path2 = ArrayVec::new();
 
-        get_path(&focused_view_cell, &mut path1);
-        get_path(&new_focused_view, &mut path2);
-
-        fn get_path(hview: &Option<HView>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
-            if let Some(hview) = hview {
-                hview
-                    .as_ref()
-                    .for_each_ancestor(|hview| out_path.push(hview));
-            }
-        }
+        HViewRef::get_path_if_some(focused_view_cell.as_ref().map(|hw| hw.as_ref()), &mut path1);
+        HViewRef::get_path_if_some(new_focused_view.as_ref().map(|hw| hw.as_ref()), &mut path2);
 
         // Find the lowest common ancestor
         use itertools::izip;
@@ -145,11 +135,8 @@ impl HViewRef<'_> {
                 drop(focused_view_cell);
 
                 if raise_events {
-                    // TODO: This section is based on `set_focused_view`. De-duplicate.
-                    use super::MAX_VIEW_DEPTH;
-                    let mut path = ArrayVec::<[HView; MAX_VIEW_DEPTH]>::new();
-
-                    view.as_ref().for_each_ancestor(|hview| path.push(hview));
+                    let mut path = ArrayVec::new();
+                    view.as_ref().get_path(&mut path);
 
                     view.view
                         .listener

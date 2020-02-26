@@ -136,20 +136,11 @@ impl HWnd {
             return;
         }
 
-        use super::MAX_VIEW_DEPTH;
         let mut path1 = ArrayVec::new();
         let mut path2 = ArrayVec::new();
 
-        get_path(&st.hover_view, &mut path1);
-        get_path(&new_hover_view, &mut path2);
-
-        fn get_path(hview: &Option<HView>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
-            if let Some(hview) = hview {
-                hview
-                    .as_ref()
-                    .for_each_ancestor(|hview| out_path.push(hview));
-            }
-        }
+        HViewRef::get_path_if_some(st.hover_view.as_ref().map(|hv| hv.as_ref()), &mut path1);
+        HViewRef::get_path_if_some(new_hover_view.as_ref().map(|hv| hv.as_ref()), &mut path2);
 
         // Find the lowest common ancestor
         use itertools::izip;

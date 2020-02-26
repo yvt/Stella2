@@ -86,6 +86,7 @@
 //!     TabOrderSibling::Parent(root.downgrade()),
 //! );
 //! ```
+use arrayvec::ArrayVec;
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
@@ -1463,5 +1464,19 @@ impl HViewRef<'_> {
                 break;
             }
         }
+    }
+
+    /// Get a path from `this` to the farthest ancestor and add the views in
+    /// the path to `out_path`. Does nothing if `this` is `None`.
+    fn get_path_if_some(this: Option<Self>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
+        if let Some(hview) = this {
+            hview.get_path(out_path);
+        }
+    }
+
+    /// Get a path from `self` to the farthest ancestor and add the views in
+    /// the path to `out_path`.
+    fn get_path(self, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
+        self.for_each_ancestor(|hview| out_path.push(hview));
     }
 }
