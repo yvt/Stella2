@@ -235,6 +235,9 @@ impl HWnd {
         );
 
         if let Some(hit_view) = hit_view {
+            // Focus the view (if it accepts a keyboard focus)
+            hit_view.focus();
+
             // Call the view's drag event handler
             let view_drag_listener = {
                 let listener = hit_view.view.listener.borrow();

@@ -410,9 +410,10 @@ bitflags! {
         /// When looking for a next element to focus, the framework will
         /// automatically skip the views without this flag.
         ///
-        /// This flag also enables the standard behavior regarding keyboard
-        /// focus management such as focusing the next widget when the
-        /// <kbd>Tab</kbd> key is pressed.
+        /// This flag also enables the standard behaviors regarding keyboard
+        /// focus management including:
+        ///  - Focusing the next widget when the <kbd>Tab</kbd> key is pressed;
+        ///  - Focusing a widget when clicked.
         ///
         /// When this flag is cleared, the view automatically gives up the
         /// keyboard focus if it has one.
