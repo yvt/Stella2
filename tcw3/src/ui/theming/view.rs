@@ -74,6 +74,8 @@ pub struct ModifyArrangementArgs<'a> {
 struct Shared {
     view: HView,
 
+    auto_class_set: Cell<ClassSet>,
+
     style_elem: Elem,
     dirty: Cell<PropKindFlags>,
 
@@ -89,6 +91,7 @@ impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Shared")
             .field("view", &self.view)
+            .field("auto_class_set", &self.auto_class_set)
             .field("style_elem", &self.style_elem)
             .field("dirty", &self.dirty)
             .field("subviews", &self.subviews)
@@ -116,6 +119,7 @@ impl StyledBox {
 
         let shared = Rc::new(Shared {
             view: view.clone(),
+            auto_class_set: Cell::new(ClassSet::empty()),
             subviews: RefCell::new(subviews),
             subelems: Default::default(),
             overrider: RefCell::new(overrider),
@@ -146,9 +150,14 @@ impl StyledBox {
 
     /// Set the class set of the styled element.
     pub fn set_class_set(&self, class_set: ClassSet) {
-        if class_set == self.shared.style_elem.class_set() {
+        let old_class_set = self.shared.style_elem.class_set();
+        if class_set == old_class_set {
             return;
         }
+
+        // Ignore changes to the auto class set
+        let auto_class_set = self.shared.auto_class_set.get();
+        let class_set = (class_set - auto_class_set) | (old_class_set & auto_class_set);
 
         trace!(
             "Updating the class set of {:?} from {:?} to {:?}",
@@ -235,6 +244,21 @@ impl StyledBox {
         drop(override_cell);
 
         self.shared.set_dirty(dirty_flags);
+    }
+
+    /// Set the auto class set.
+    ///
+    /// The auto class set is a set of styling classes controlled by
+    /// `StyledBox`. The following classes are supported: `HOVER` and `FOCUS`.
+    ////
+    /// The auto class set defaults to empty.
+    pub fn set_auto_class_set(&self, class_set: ClassSet) {
+        self.shared.auto_class_set.set(class_set);
+    }
+
+    /// Get the auto class set.
+    pub fn auto_class_set(&self) -> ClassSet {
+        self.shared.auto_class_set.get()
     }
 
     /// Get an owned handle to the view representing the styled box.
@@ -448,6 +472,39 @@ impl SbListener {
             layers: RefCell::new(None),
         }
     }
+
+    fn toggle_auto_class(&self, andn_mask: ClassSet, or_mask: ClassSet) {
+        if let Some(shared) = self.shared.upgrade() {
+            if shared.auto_class_set.get().contains(andn_mask) {
+                trace!(
+                    "Toggling the auto class {:?} of {:?} with OR mask {:?}",
+                    andn_mask,
+                    shared.view,
+                    or_mask,
+                );
+                let elem = &shared.style_elem;
+                elem.set_class_set((elem.class_set() - andn_mask) | or_mask);
+            } else {
+                trace!(
+                    "Not toggling the auto class {:?} of {:?} because it's not in `auto_class_set`",
+                    andn_mask,
+                    shared.view,
+                );
+            }
+        }
+    }
+
+    /// Add `class_set` if it's included in `auto_class_set`.
+    #[inline]
+    fn add_auto_class(&self, class_set: ClassSet) {
+        self.toggle_auto_class(class_set, class_set);
+    }
+
+    /// Remove `class_set` if it's included in `auto_class_set`.
+    #[inline]
+    fn remove_auto_class(&self, class_set: ClassSet) {
+        self.toggle_auto_class(class_set, ClassSet::empty());
+    }
 }
 
 impl ViewListener for SbListener {
@@ -504,6 +561,22 @@ impl ViewListener for SbListener {
         if let Some(sub) = layers.sub {
             sub.unsubscribe().unwrap();
         }
+    }
+
+    fn mouse_enter(&self, _: pal::Wm, _: HViewRef<'_>) {
+        self.add_auto_class(ClassSet::HOVER);
+    }
+
+    fn mouse_leave(&self, _: pal::Wm, _: HViewRef<'_>) {
+        self.remove_auto_class(ClassSet::HOVER);
+    }
+
+    fn focus_enter(&self, _: pal::Wm, _: HViewRef<'_>) {
+        self.add_auto_class(ClassSet::FOCUS);
+    }
+
+    fn focus_leave(&self, _: pal::Wm, _: HViewRef<'_>) {
+        self.remove_auto_class(ClassSet::FOCUS);
     }
 
     fn position(&self, _: pal::Wm, _: HViewRef<'_>) {

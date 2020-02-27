@@ -112,19 +112,21 @@ impl<T: ScrollbarDragListener + 'static> From<T> for Box<dyn ScrollbarDragListen
 
 impl Scrollbar {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
-        let frame = StyledBox::new(style_manager, ViewFlags::default());
+        let frame = StyledBox::new(
+            style_manager,
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER,
+        );
         frame.set_class_set(if vertical {
             ClassSet::SCROLLBAR | ClassSet::VERTICAL
         } else {
             ClassSet::SCROLLBAR
         });
+        frame.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
         frame.set_child(Role::Generic, Some(&thumb));
 
-        let wrapper = HView::new(
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
-        );
+        let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
         wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
@@ -333,22 +335,6 @@ struct SbViewListener {
 }
 
 impl ViewListener for SbViewListener {
-    fn mouse_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        let shared = Rc::clone(&self.shared);
-        wm.invoke_on_update(move |_| {
-            let frame = &shared.frame;
-            frame.set_class_set(frame.class_set() | ClassSet::HOVER);
-        })
-    }
-
-    fn mouse_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        let shared = Rc::clone(&self.shared);
-        wm.invoke_on_update(move |_| {
-            let frame = &shared.frame;
-            frame.set_class_set(frame.class_set() - ClassSet::HOVER);
-        })
-    }
-
     fn mouse_drag(
         &self,
         _: pal::Wm,

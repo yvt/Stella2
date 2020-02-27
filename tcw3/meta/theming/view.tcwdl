@@ -11,6 +11,7 @@ pub comp crate::ui::theming::StyledBox {
     const view_flags: ViewFlags { pub set; } = Default::default();
 
     prop class_set: ClassSet { pub set; pub get; } = unreachable!();
+    prop auto_class_set: ClassSet { pub set; pub get; } = unreachable!();
     prop r#override: Box<dyn StyledBoxOverride> { pub set; } = unreachable!();
 
     // Work-around for the lack of indexed prop support. Props of

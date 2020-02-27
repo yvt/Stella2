@@ -43,13 +43,15 @@ impl Button {
     pub fn new(style_manager: &'static Manager) -> Self {
         let label = Label::new(style_manager);
 
-        let styled_box = StyledBox::new(style_manager, ViewFlags::default());
+        let styled_box = StyledBox::new(
+            style_manager,
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER,
+        );
         styled_box.set_child(Role::Generic, Some(&label));
         styled_box.set_class_set(ClassSet::BUTTON);
+        styled_box.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
-        let view = HView::new(
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
-        );
+        let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
 
         view.set_layout(FillLayout::new(styled_box.view()));
 
@@ -135,22 +137,6 @@ struct ButtonViewListener {
 }
 
 impl ViewListener for ButtonViewListener {
-    fn mouse_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |_| {
-            let styled_box = &inner.styled_box;
-            styled_box.set_class_set(styled_box.class_set() | ClassSet::HOVER);
-        })
-    }
-
-    fn mouse_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |_| {
-            let styled_box = &inner.styled_box;
-            styled_box.set_class_set(styled_box.class_set() - ClassSet::HOVER);
-        })
-    }
-
     fn mouse_drag(
         &self,
         _: pal::Wm,
