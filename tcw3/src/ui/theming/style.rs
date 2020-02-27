@@ -6,31 +6,33 @@ use crate::pal::{LayerFlags, SysFontType, RGBAF32};
 
 bitflags! {
     /// A set of styling classes.
+    ///
+    /// Note that they are all normal styling classes. For example, `HOVER`
+    /// does not get applied automatically like CSS's `:hover` pseudo
+    /// selector.
     pub struct ClassSet: u32 {
         /// The mouse pointer inside the element.
-        ///
-        /// Be aware that this is a normal styling class like other ones. This
-        /// does not get applied automatically like CSS's `:hover` pseudo
-        /// selector.
         const HOVER = 1;
         /// The element is active, e.g., a button is being pressed down.
         const ACTIVE = 1 << 1;
+        /// The element is focused.
+        const FOCUS = 1 << 2;
         /// The element is a button's border.
-        const BUTTON = 1 << 2;
+        const BUTTON = 1 << 3;
         /// The element is a label.
-        const LABEL = 1 << 3;
+        const LABEL = 1 << 4;
         /// The element is a scrollbar.
-        const SCROLLBAR = 1 << 4;
+        const SCROLLBAR = 1 << 5;
         /// The element is vertical.
-        const VERTICAL = 1 << 5;
+        const VERTICAL = 1 << 6;
         /// The element is a scrollable container.
-        const SCROLL_CONTAINER = 1 << 6;
+        const SCROLL_CONTAINER = 1 << 7;
         /// The scrollable container has a horizontal scrollbar.
-        const HAS_HORIZONTAL_SCROLLBAR = 1 << 7;
+        const HAS_HORIZONTAL_SCROLLBAR = 1 << 8;
         /// The scrollable container has a vertical scrollbar.
-        const HAS_VERTICAL_SCROLLBAR = 1 << 8;
+        const HAS_VERTICAL_SCROLLBAR = 1 << 9;
         /// The element is a splitter.
-        const SPLITTER = 1 << 9;
+        const SPLITTER = 1 << 10;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;
