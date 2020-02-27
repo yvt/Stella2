@@ -391,7 +391,9 @@ impl wmapi::TestingWm for Wm {
 
     fn set_wnd_focused(&self, hwnd: &HWnd, focused: bool) {
         let hwnd = hwnd.testing_hwnd_ref().unwrap();
-        SCREEN.get_with_wm(*self).set_wnd_focused(*self, hwnd, focused)
+        SCREEN
+            .get_with_wm(*self)
+            .set_wnd_focused(*self, hwnd, focused)
     }
 
     fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut wmapi::WndSnapshot) {
