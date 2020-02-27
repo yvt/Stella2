@@ -7,7 +7,7 @@ use crate::pal::Wm;
 impl HWndRef<'_> {
     /// Focus the specified view.
     pub fn set_focused_view(self, new_focused_view: Option<HView>) {
-        let mut focused_view_cell = self.wnd.focused_view.borrow_mut();
+        let focused_view_cell = self.wnd.focused_view.borrow();
 
         if new_focused_view == *focused_view_cell {
             return;
@@ -22,6 +22,9 @@ impl HWndRef<'_> {
         }
 
         if !self.is_focused() {
+            drop(focused_view_cell);
+            let mut focused_view_cell = self.wnd.focused_view.borrow_mut();
+
             *focused_view_cell = new_focused_view;
             return;
         }
@@ -73,6 +76,9 @@ impl HWndRef<'_> {
                 .borrow()
                 .focus_got(self.wnd.wm, hview.as_ref());
         }
+
+        drop(focused_view_cell);
+        let mut focused_view_cell = self.wnd.focused_view.borrow_mut();
 
         *focused_view_cell = new_focused_view;
     }

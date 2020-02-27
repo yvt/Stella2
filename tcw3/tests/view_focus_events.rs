@@ -439,3 +439,43 @@ fn wnd_defocus(twm: &dyn TestingWm) {
 
     assert_eq!(wnd.focused_view(), Some(view1.clone()));
 }
+
+#[use_testing_wm]
+#[test]
+fn access_focus_state_in_handler(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    new_view_tree! {
+        let view0 = HView::new(ViewFlags::default());
+        {
+            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        }
+    }
+
+    struct MyViewListener;
+    impl ViewListener for MyViewListener {
+        fn focus_enter(&self, _: pal::Wm, view: HViewRef<'_>) {
+            // Reading the focus state must succeed (should not panic)
+            let _ = view.is_focused();
+        }
+    }
+
+    view0.set_listener(MyViewListener);
+    view1.set_listener(MyViewListener);
+
+    wnd.content_view()
+        .set_layout(new_layout(Some(view0.clone())));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
+    view1.focus();
+    twm.step_unsend();
+}
