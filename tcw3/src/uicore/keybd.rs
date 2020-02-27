@@ -6,19 +6,39 @@ use crate::pal::Wm;
 
 impl HWndRef<'_> {
     /// Focus the specified view.
-    pub fn set_focused_view(self, new_focused_view: Option<HView>) {
+    ///
+    /// If `new_focused_view` does not have `TAB_STOP`, the method searches for
+    /// a closest view with `TAB_STOP` from `new_focused_view`'s ancestors. If
+    /// there isn't such a view, this method does nothing.
+    pub fn set_focused_view(self, mut new_focused_view: Option<HView>) {
         let focused_view_cell = self.wnd.focused_view.borrow();
 
         if new_focused_view == *focused_view_cell {
             return;
         }
 
-        if let Some(view) = &new_focused_view {
+        if let Some(view) = &mut new_focused_view {
             debug_assert_eq!(
                 view.containing_wnd().as_ref().map(|hw| hw.as_ref()),
                 Some(self),
                 "the window does not contain `new_focused_view`"
             );
+
+            // Find the closest view with `TAB_STOP`
+            loop {
+                if view.view.flags.get().contains(ViewFlags::TAB_STOP) {
+                    break;
+                }
+
+                let maybe_superview = (view.view.superview.borrow())
+                    .view()
+                    .and_then(|weak| weak.upgrade());
+                if let Some(superview) = maybe_superview {
+                    *view = HView { view: superview };
+                } else {
+                    return;
+                }
+            }
         }
 
         if !self.is_focused() {
@@ -111,10 +131,6 @@ impl HWndRef<'_> {
 impl HViewRef<'_> {
     /// Focus the view.
     pub fn focus(self) {
-        if !self.view.flags.get().contains(ViewFlags::TAB_STOP) {
-            return;
-        }
-
         if let Some(wnd) = self.containing_wnd() {
             wnd.as_ref().set_focused_view(Some(self.cloned()));
         }

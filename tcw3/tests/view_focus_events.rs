@@ -75,6 +75,9 @@ fn focus_evts(twm: &dyn TestingWm) {
             let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
             {
                 let view2 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+                {
+                    let view5 = HView::new(ViewFlags::default());
+                }
             }
 
             let view3 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
@@ -89,6 +92,7 @@ fn focus_evts(twm: &dyn TestingWm) {
     view2.set_listener(RecordingViewListener(2, events.clone()));
     view3.set_listener(RecordingViewListener(3, events.clone()));
     view4.set_listener(RecordingViewListener(4, events.clone()));
+    view5.set_listener(RecordingViewListener(5, events.clone()));
 
     wnd.content_view()
         .set_layout(new_layout(Some(view0.clone())));
@@ -108,10 +112,11 @@ fn focus_evts(twm: &dyn TestingWm) {
     view0.focus();
     flush_and_assert_events!([]);
 
-    // `view2` has a keyboard focus, which is a child of `view1`.
-    // `view0` receives `mouse_enter` because of its subview receiving
-    // `mouse_over`.
-    view2.focus();
+    // `view5` doesn't have `TAB_STOP`, so `view2` instead receives a keyboard
+    // focus. `view2` has a keyboard focus, which is a child of `view1`.
+    // `view0` receives `focus_enter` because of its subview receiving
+    // `focus_enter`.
+    view5.focus();
     flush_and_assert_events!([
         (0, Event::FocusEnter),
         (1, Event::FocusEnter),
