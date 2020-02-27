@@ -2,6 +2,7 @@
 use arrayvec::ArrayVec;
 
 use super::{HView, HViewRef, HWndRef, ViewFlags, Wnd};
+use crate::pal::Wm;
 
 impl HWndRef<'_> {
     /// Focus the specified view.
@@ -18,6 +19,11 @@ impl HWndRef<'_> {
                 Some(self),
                 "the window does not contain `new_focused_view`"
             );
+        }
+
+        if !self.is_focused() {
+            *focused_view_cell = new_focused_view;
+            return;
         }
 
         let mut path1 = ArrayVec::new();
@@ -71,8 +77,28 @@ impl HWndRef<'_> {
         *focused_view_cell = new_focused_view;
     }
 
+    /// Get the currently focused view in the window.
+    ///
+    /// If the window is currently not focused, this method will return the view
+    /// to be focused when the window receives a focus again.
     pub fn focused_view(self) -> Option<HView> {
         self.wnd.focused_view.borrow().clone()
+    }
+
+    /// Raise `focus_(lost|leave|enter|got)` events as response to a change in
+    /// the window's focus state.
+    pub(super) fn raise_view_focus_events_for_wnd_focus_state_change(self) {
+        let focused_view_cell = self.wnd.focused_view.borrow();
+
+        if let Some(hview) = &*focused_view_cell {
+            let hview = hview.as_ref();
+
+            if self.is_focused() {
+                hview.invoke_focus_got_enter_for_ancestors(self.wnd.wm);
+            } else {
+                hview.invoke_focus_lost_leave_for_ancestors(self.wnd.wm);
+            }
+        }
     }
 }
 
@@ -89,9 +115,13 @@ impl HViewRef<'_> {
     }
 
     /// Get a flag indicating whether the view is currently focused or not.
+    ///
+    /// If the containing window is not focused, this method returns `false`.
     pub fn is_focused(self) -> bool {
         if let Some(hwnd) = self.containing_wnd() {
-            if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
+            if !hwnd.is_focused() {
+                false
+            } else if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
                 view.as_ref() == self
             } else {
                 false
@@ -103,9 +133,13 @@ impl HViewRef<'_> {
 
     /// Get a flag indicating whether the view or a subview of the view is
     /// currently focused or not.
+    ///
+    /// If the containing window is not focused, this method returns `false`.
     pub fn improper_subview_is_focused(self) -> bool {
         if let Some(hwnd) = self.containing_wnd() {
-            if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
+            if !hwnd.is_focused() {
+                false
+            } else if let Some(view) = &*hwnd.wnd.focused_view.borrow() {
                 view.as_ref().is_improper_subview_of(self)
             } else {
                 false
@@ -135,23 +169,31 @@ impl HViewRef<'_> {
                 drop(focused_view_cell);
 
                 if raise_events {
-                    let mut path = ArrayVec::new();
-                    view.as_ref().get_path(&mut path);
-
-                    view.view
-                        .listener
-                        .borrow()
-                        .focus_lost(wnd.wm, view.as_ref());
-
-                    for hview in path.iter() {
-                        hview
-                            .view
-                            .listener
-                            .borrow()
-                            .focus_leave(wnd.wm, hview.as_ref());
-                    }
+                    view.as_ref().invoke_focus_lost_leave_for_ancestors(wnd.wm);
                 }
             }
         }
+    }
+
+    fn invoke_focus_lost_leave_for_ancestors(self, wm: Wm) {
+        let mut path = ArrayVec::new();
+        self.get_path(&mut path);
+
+        self.view.listener.borrow().focus_lost(wm, self);
+
+        for hview in path.iter() {
+            hview.view.listener.borrow().focus_leave(wm, hview.as_ref());
+        }
+    }
+
+    fn invoke_focus_got_enter_for_ancestors(self, wm: Wm) {
+        let mut path = ArrayVec::new();
+        self.get_path(&mut path);
+
+        for hview in path.iter().rev() {
+            hview.view.listener.borrow().focus_enter(wm, hview.as_ref());
+        }
+
+        self.view.listener.borrow().focus_got(wm, self);
     }
 }

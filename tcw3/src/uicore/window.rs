@@ -348,6 +348,9 @@ impl HWndRef<'_> {
         for handler in handlers.iter() {
             handler(self.wnd.wm, self);
         }
+
+        // Raise `ViewListener::focus_(lost|leave|enter|got)` events
+        self.raise_view_focus_events_for_wnd_focus_state_change();
     }
 }
 

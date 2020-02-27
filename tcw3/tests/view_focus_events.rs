@@ -1,4 +1,5 @@
 use std::{cell::RefCell, mem::replace, rc::Rc};
+use try_match::try_match;
 
 use tcw3::{
     pal,
@@ -95,6 +96,12 @@ fn focus_evts(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
     flush_and_assert_events!([]);
 
     // `view0` does not have `TAB_STOP`, so it won't accept a keyboard focus
@@ -162,6 +169,12 @@ fn is_focused(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
     assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
     assert_eq!(
         [
@@ -227,6 +240,12 @@ fn view_removal(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
     flush_and_assert_events!([]);
 
     view1.focus();
@@ -287,6 +306,12 @@ fn clear_tab_stop(twm: &dyn TestingWm) {
     wnd.set_visibility(true);
     twm.step_unsend();
 
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
     flush_and_assert_events!([]);
 
     view1.focus();
@@ -318,4 +343,99 @@ fn clear_tab_stop(twm: &dyn TestingWm) {
 
     // `focused_view` should return `None`
     assert_eq!(wnd.focused_view(), None);
+}
+
+#[use_testing_wm]
+#[test]
+fn wnd_defocus(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+
+    macro_rules! flush_and_assert_events {
+        ($expected:expr) => {
+            twm.step_unsend();
+            assert_eq!(replace(&mut *events.borrow_mut(), Vec::new()), $expected);
+        };
+    }
+
+    new_view_tree! {
+        let view0 = HView::new(ViewFlags::default());
+        {
+            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        }
+    }
+
+    view0.set_listener(RecordingViewListener(0, events.clone()));
+    view1.set_listener(RecordingViewListener(1, events.clone()));
+
+    wnd.content_view()
+        .set_layout(new_layout(Some(view0.clone())));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    flush_and_assert_events!([]);
+
+    // Set the focus. However, the events will not be raised because the window
+    // is inactive.
+    view1.focus();
+    flush_and_assert_events!([]);
+
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
+    assert_eq!(
+        [
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
+        ],
+        [false, false]
+    );
+
+    assert_eq!(wnd.focused_view(), Some(view1.clone()));
+
+    // Focus the window
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
+    flush_and_assert_events!([
+        (0, Event::FocusEnter),
+        (1, Event::FocusEnter),
+        (1, Event::FocusGot),
+    ]);
+
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, true]);
+    assert_eq!(
+        [
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
+        ],
+        [true, true]
+    );
+
+    assert_eq!(wnd.focused_view(), Some(view1.clone()));
+
+    // Unfocus the window
+    twm.set_wnd_focused(&pal_hwnd, false);
+    twm.step_unsend();
+
+    flush_and_assert_events!([
+        (1, Event::FocusLost),
+        (1, Event::FocusLeave),
+        (0, Event::FocusLeave),
+    ]);
+
+    assert_eq!([view0.is_focused(), view1.is_focused()], [false, false]);
+    assert_eq!(
+        [
+            view0.improper_subview_is_focused(),
+            view1.improper_subview_is_focused()
+        ],
+        [false, false]
+    );
+
+    assert_eq!(wnd.focused_view(), Some(view1.clone()));
 }
