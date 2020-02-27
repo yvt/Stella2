@@ -389,6 +389,11 @@ impl wmapi::TestingWm for Wm {
         SCREEN.get_with_wm(*self).set_wnd_size(*self, hwnd, size)
     }
 
+    fn set_wnd_focused(&self, hwnd: &HWnd, focused: bool) {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN.get_with_wm(*self).set_wnd_focused(*self, hwnd, focused)
+    }
+
     fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut wmapi::WndSnapshot) {
         let hwnd = hwnd.testing_hwnd_ref().unwrap();
         SCREEN.get_with_wm(*self).read_wnd_snapshot(hwnd, out)

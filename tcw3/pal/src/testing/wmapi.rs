@@ -47,6 +47,9 @@ pub trait TestingWm: 'static {
     /// `size` is not automatically clipped by `min_size` or `max_size`.
     fn set_wnd_size(&self, hwnd: &HWnd, size: [u32; 2]);
 
+    /// Set the focus state of a given window and trigger `WndListener::focus`.
+    fn set_wnd_focused(&self, hwnd: &HWnd, focused: bool);
+
     /// Render the content of a given window and update `out` with it.
     fn read_wnd_snapshot(&self, hwnd: &HWnd, out: &mut WndSnapshot);
 

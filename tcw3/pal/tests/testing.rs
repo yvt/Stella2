@@ -828,3 +828,35 @@ fn wnd_mouse_events() {
         drop(scroll);
     });
 }
+
+#[test]
+fn wnd_focus_event() {
+    init_logger();
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn focus(&self, wm: pal::Wm, hwnd: &pal::HWnd) {
+                assert_eq!(self.0.get(), wm.is_wnd_focused(hwnd) as u8);
+                self.0.set(self.0.get() + 2);
+            }
+        }
+
+        let state = Rc::new(Cell::new(1));
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        twm.set_wnd_focused(&hwnd, true);
+        assert_eq!(state.get(), 3);
+
+        state.set(0);
+        twm.set_wnd_focused(&hwnd, false);
+        assert_eq!(state.get(), 2);
+    });
+}

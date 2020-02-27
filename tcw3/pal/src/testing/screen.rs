@@ -51,6 +51,7 @@ pub struct Wnd {
     sr_wnd: swrast::HWnd,
 
     dpi_scale: f32,
+    focused: bool,
     attrs: wmapi::WndAttrs,
     listener: Rc<dyn iface::WndListener<Wm>>,
 
@@ -92,6 +93,7 @@ impl Screen {
         let wnd = Wnd {
             sr_wnd: state.sr_scrn.new_wnd(),
             dpi_scale: 1.0, // TODO
+            focused: false,
             dirty_rect: None,
             attrs: wmapi::WndAttrs {
                 size: attrs.size.unwrap_or([100, 100]),
@@ -178,7 +180,8 @@ impl Screen {
         state.wnds[hwnd.ptr].dpi_scale
     }
     pub(super) fn is_wnd_focused(&self, hwnd: &HWnd) -> bool {
-        true // TODO
+        let state = self.state.borrow();
+        state.wnds[hwnd.ptr].focused
     }
 
     pub(super) fn new_layer(&self, attrs: LayerAttrs) -> HLayer {
@@ -261,6 +264,16 @@ impl Screen {
 
         let listener = self.wnd_listener(hwnd).unwrap();
         listener.resize(wm, &hwnd.into());
+    }
+
+    /// Implements `TestingWm::set_wnd_focused`.
+    pub(super) fn set_wnd_focused(&self, wm: Wm, hwnd: &HWnd, focused: bool) {
+        let mut state = self.state.borrow_mut();
+        state.wnds[hwnd.ptr].focused = focused;
+        drop(state);
+
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.focus(wm, &hwnd.into());
     }
 
     /// Implements `TestingWm::read_wnd_snapshot`.
