@@ -54,6 +54,39 @@
 //!  - *Down phase*: The final frame (a bounding rectangle in the superview
 //!    coordinate space) is calculated for each view in a bottom-up manner.
 //!
+//! # Tab order
+//!
+//! The default tab order follows the pre-order of the view hierarchy. The order
+//! for sibling views are defined by [`Layout::subviews`].
+//!
+//! The default order can be overridden by [`HViewRef::override_tab_order_sibling`]
+//! and [`HViewRef::override_tab_order_child`]. These methods define a completely
+//! independent subtree that determines the tab order. The clients are
+//! responsible for linking nodes correctly.
+//!
+//! ## Example
+//!
+//! ```
+//! use tcw3::uicore::{HView, TabOrderSibling};
+//!
+//! // root
+//! //  ├─ v1
+//! //  └─ v2
+//! let root = HView::new(Default::default());
+//! let v1 = HView::new(Default::default());
+//! let v2 = HView::new(Default::default());
+//!
+//! root.override_tab_order_child(Some([v1.clone(), v2.clone()]));
+//! v1.override_tab_order_sibling(
+//!     TabOrderSibling::Parent(root.downgrade()),
+//!     TabOrderSibling::Sibling(v2.downgrade()),
+//! );
+//! v2.override_tab_order_sibling(
+//!     TabOrderSibling::Sibling(v1.downgrade()),
+//!     TabOrderSibling::Parent(root.downgrade()),
+//! );
+//! ```
+use arrayvec::ArrayVec;
 use bitflags::bitflags;
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
@@ -74,15 +107,18 @@ use crate::pal::{self, prelude::Wm as _, Wm};
 
 mod images;
 mod invocation;
+mod keybd;
 mod layer;
 mod layout;
 mod mount;
 mod mouse;
+mod taborder;
 mod window;
 
 pub use self::layer::{UpdateCtx, UpdateReason};
 pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::{MouseDragListener, ScrollListener};
+pub use self::taborder::TabOrderSibling;
 
 pub use crate::pal::{CursorShape, ScrollDelta, WndFlags as WndStyleFlags};
 
@@ -221,6 +257,9 @@ struct Wnd {
     // Mouse inputs
     mouse_state: RefCell<mouse::WndMouseState>,
     cursor_shape: Cell<CursorShape>,
+
+    // Keyboard inputs
+    focused_view: RefCell<Option<HView>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -241,6 +280,7 @@ impl fmt::Debug for Wnd {
             .field("frame_handlers", &())
             .field("mouse_state", &self.mouse_state)
             .field("focus_handlers", &())
+            .field("focused_view", &self.focused_view)
             .finish()
     }
 }
@@ -266,13 +306,13 @@ impl Wnd {
             mouse_state: RefCell::new(mouse::WndMouseState::new()),
             cursor_shape: Cell::new(CursorShape::default()),
             focus_handlers: RefCell::new(SubscriberList::new()),
+            focused_view: RefCell::new(None),
         }
     }
 }
 
 // TODO: mouse motion events
 // TODO: keyboard events
-// TODO: keyboard focus management
 
 /// A view handle type.
 #[derive(Clone)]
@@ -364,6 +404,20 @@ bitflags! {
 
         /// The view accepts scroll events.
         const ACCEPT_SCROLL = 1 << 5;
+
+        /// The view participates in a tab (keyboard focus) order.
+        ///
+        /// When looking for a next element to focus, the framework will
+        /// automatically skip the views without this flag.
+        ///
+        /// This flag also enables the standard behaviors regarding keyboard
+        /// focus management including:
+        ///  - Focusing the next widget when the <kbd>Tab</kbd> key is pressed;
+        ///  - Focusing a widget when clicked.
+        ///
+        /// When this flag is cleared, the view automatically gives up the
+        /// keyboard focus if it has one.
+        const TAB_STOP = 1 << 6;
     }
 }
 
@@ -375,7 +429,8 @@ impl Default for ViewFlags {
 
 impl ViewFlags {
     fn mutable_flags() -> Self {
-        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG}]
+        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG |
+            TAB_STOP}]
     }
 }
 
@@ -470,6 +525,16 @@ pub trait ViewListener {
     fn scroll_gesture(&self, _: Wm, _: HViewRef<'_>, _loc: Point2<f32>) -> Box<dyn ScrollListener> {
         Box::new(())
     }
+
+    /// `focus_got` is called for this view or its descendants.
+    fn focus_enter(&self, _: Wm, _: HViewRef<'_>) {}
+    /// `focus_lost` is called for this view or its descendants.
+    fn focus_leave(&self, _: Wm, _: HViewRef<'_>) {}
+
+    /// The view got a keyboard focus.
+    fn focus_got(&self, _: Wm, _: HViewRef<'_>) {}
+    /// The view lost a keyboard focus.
+    fn focus_lost(&self, _: Wm, _: HViewRef<'_>) {}
 }
 
 /// A no-op implementation of `ViewListener`.
@@ -497,6 +562,11 @@ struct View {
 
     // Layers
     layers: RefCell<Vec<pal::HLayer>>,
+
+    // Focus management
+    /// Overrides the tab order. `Box` is used because most views are not
+    /// expected to have this.
+    focus_link_override: RefCell<Option<Box<taborder::TabOrderLink>>>,
 }
 
 impl fmt::Debug for View {
@@ -514,6 +584,7 @@ impl fmt::Debug for View {
             .field("frame", &self.frame)
             .field("global_frame", &self.global_frame)
             .field("layers", &self.layers)
+            .field("focus_link_override", &self.focus_link_override)
             .finish()
     }
 }
@@ -537,6 +608,7 @@ impl View {
             global_frame: Cell::new(Box2::zero()),
             layers: RefCell::new(Vec::new()),
             cursor_shape: Cell::new(None),
+            focus_link_override: RefCell::new(None),
         }
     }
 }
@@ -674,6 +746,10 @@ impl HWnd {
         pub fn set_style_flags(&self, flags: WndStyleFlags);
         pub fn style_flags(&self) -> WndStyleFlags;
         pub fn invoke_on_next_frame(&self, f: impl FnOnce(pal::Wm, HWndRef<'_>) + 'static);
+
+        // `keybd.rs`
+        pub fn set_focused_view(&self, view: Option<HView>);
+        pub fn focused_view(&self) -> Option<HView>;
     }
 }
 
@@ -883,11 +959,19 @@ impl HWndRef<'_> {
 
 impl PartialEq for HWnd {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.wnd, &other.wnd)
+        self.as_ref() == other.as_ref()
     }
 }
 
 impl Eq for HWnd {}
+
+impl<'a, 'b> PartialEq<HWndRef<'b>> for HWndRef<'a> {
+    fn eq(&self, other: &HWndRef<'b>) -> bool {
+        std::ptr::eq(&*self.wnd, &*other.wnd)
+    }
+}
+
+impl Eq for HWndRef<'_> {}
 
 impl WeakHWnd {
     /// Construct a `WeakHWnd` that doesn't reference any window.
@@ -943,6 +1027,19 @@ impl HView {
 
         // `window.rs`
         pub fn containing_wnd(&self) -> Option<HWnd>;
+
+        // `keybd.rs`
+        pub fn focus(&self);
+        pub fn is_focused(&self) -> bool;
+        pub fn improper_subview_is_focused(&self) -> bool;
+
+        // `taborder.rs`
+        pub fn override_tab_order_sibling(&self, prev: TabOrderSibling, next: TabOrderSibling);
+        pub fn override_tab_order_child(&self, first_last: Option<[HView; 2]>);
+        pub fn tab_order_first_view(&self) -> Option<HView>;
+        pub fn tab_order_last_view(&self) -> Option<HView>;
+        pub fn tab_order_next_view(&self) -> Option<HView>;
+        pub fn tab_order_prev_view(&self) -> Option<HView>;
     }
 }
 
@@ -996,6 +1093,10 @@ impl<'a> HViewRef<'a> {
     ///
     /// It's not allowed to call this method from `Layout`'s method. You should
     /// use [`LayoutCtx::set_layout`] instead.
+    ///
+    /// When a focused view is removed by this method, focus lost/leave events
+    /// are not raised for its ancestor views. This is a limitation in the
+    /// current implementation and may be changed in the future.
     #[momo]
     pub fn set_layout(self, layout: impl Into<Box<dyn Layout>>) {
         let layout = layout.into();
@@ -1067,6 +1168,15 @@ impl<'a> HViewRef<'a> {
                     hview_sub
                         .as_ref()
                         .cancel_mouse_gestures_of_subviews(&hwnd.wnd);
+
+                    // `defocus_subviews` shouldn't raise focus lost events here
+                    // (the `raise_events` parameter = `false`) because
+                    // `hview_sub` is disconnected from `self` at this point,
+                    // and cannot call `focus_leave` for all of its former
+                    // ancestors.  (It would nice to fix this, but is it really
+                    // worth the extra code overhead?)
+                    hview_sub.as_ref().defocus_subviews(&hwnd.wnd, true, false);
+
                     hview_sub.as_ref().call_unmount(hwnd.wnd.wm);
                 }
             }
@@ -1101,6 +1211,14 @@ impl<'a> HViewRef<'a> {
             // cancel it if it has one
             if let Some(hwnd) = self.containing_wnd() {
                 self.cancel_mouse_drag_gestures(&hwnd.wnd);
+            }
+        }
+
+        if (!value & changed).contains(ViewFlags::TAB_STOP) {
+            // The view is no longer allowed to have a keyboard focus so
+            // cancel it if it has one
+            if let Some(hwnd) = self.containing_wnd() {
+                self.defocus_subviews(&hwnd.wnd, false, true);
             }
         }
 
@@ -1347,5 +1465,19 @@ impl HViewRef<'_> {
                 break;
             }
         }
+    }
+
+    /// Get a path from `this` to the farthest ancestor and add the views in
+    /// the path to `out_path`. Does nothing if `this` is `None`.
+    fn get_path_if_some(this: Option<Self>, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
+        if let Some(hview) = this {
+            hview.get_path(out_path);
+        }
+    }
+
+    /// Get a path from `self` to the farthest ancestor and add the views in
+    /// the path to `out_path`.
+    fn get_path(self, out_path: &mut ArrayVec<[HView; MAX_VIEW_DEPTH]>) {
+        self.for_each_ancestor(|hview| out_path.push(hview));
     }
 }
