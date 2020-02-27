@@ -1,5 +1,6 @@
 //! Keyboard events
 use arrayvec::ArrayVec;
+use log::trace;
 
 use super::{HView, HViewRef, HWndRef, ViewFlags, Wnd};
 use crate::pal::Wm;
@@ -16,6 +17,8 @@ impl HWndRef<'_> {
         if new_focused_view == *focused_view_cell {
             return;
         }
+
+        trace!("{:?}: set_focused_view({:?})", self, new_focused_view);
 
         if let Some(view) = &mut new_focused_view {
             debug_assert_eq!(
@@ -36,12 +39,22 @@ impl HWndRef<'_> {
                 if let Some(superview) = maybe_superview {
                     *view = HView { view: superview };
                 } else {
+                    trace!(
+                        "{:?}: Rejecting `set_focused_view` because the view \
+                        doesn't have a focusable ancestor",
+                        self
+                    );
                     return;
                 }
             }
         }
 
         if !self.is_focused() {
+            trace!(
+                "{:?}: The window is inactive, not raising view focus events",
+                self
+            );
+
             drop(focused_view_cell);
             let mut focused_view_cell = self.wnd.focused_view.borrow_mut();
 
@@ -120,8 +133,20 @@ impl HWndRef<'_> {
             let hview = hview.as_ref();
 
             if self.is_focused() {
+                trace!(
+                    "{:?}: Raising `focus_(got|enter)` for the ancestors of {:?} \
+                    because the window became active",
+                    self,
+                    hview,
+                );
                 hview.invoke_focus_got_enter_for_ancestors(self.wnd.wm);
             } else {
+                trace!(
+                    "{:?}: Raising `focus_(lost|leave)` for the ancestors of {:?} \
+                    because the window became inactive",
+                    self,
+                    hview,
+                );
                 hview.invoke_focus_lost_leave_for_ancestors(self.wnd.wm);
             }
         }
