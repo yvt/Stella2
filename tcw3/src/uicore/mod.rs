@@ -413,11 +413,15 @@ bitflags! {
         /// This flag also enables the standard behaviors regarding keyboard
         /// focus management including:
         ///  - Focusing the next widget when the <kbd>Tab</kbd> key is pressed;
-        ///  - Focusing a widget when clicked.
+        ///  - Focusing a widget when clicked. (This can be disabled by setting
+        ///   `NO_FOCUS_ON_CLICK` on subviews with `ACCEPT_MOUSE_DRAG`)
         ///
         /// When this flag is cleared, the view automatically gives up the
         /// keyboard focus if it has one.
         const TAB_STOP = 1 << 6;
+
+        /// Prevents the focus-on-click behavior.
+        const NO_FOCUS_ON_CLICK = 1 << 7;
     }
 }
 

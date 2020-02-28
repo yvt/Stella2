@@ -235,8 +235,10 @@ impl HWnd {
         );
 
         if let Some(hit_view) = hit_view {
-            // Focus the view (if it accepts a keyboard focus)
-            hit_view.focus();
+            if !(hit_view.view.flags.get()).contains(ViewFlags::NO_FOCUS_ON_CLICK) {
+                // Focus the view (if it or its superview accepts a keyboard focus)
+                hit_view.focus();
+            }
 
             // Call the view's drag event handler
             let view_drag_listener = {
