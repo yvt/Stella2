@@ -74,11 +74,13 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     const search_bar = StyledBox::new! {
         style_manager,
         view_flags = {
-            // Make `set_cursor_shape` work
+            // `ACCEPT_MOUSE_OVER`: Make `set_cursor_shape` work
             use tcw3::uicore::ViewFlags;
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER |
+                ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP
         },
         class_set = elem_id::SEARCH_FIELD,
+        auto_class_set = theming::ClassSet::FOCUS,
         child_generic = get!(&search_bar_placeholder),
     };
     on (init) {

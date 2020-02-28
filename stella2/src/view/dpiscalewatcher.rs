@@ -7,7 +7,7 @@ use subscriber_list::SubscriberList;
 use tcw3::{
     pal,
     ui::layouts::FillLayout,
-    uicore::{HView, HViewRef, HWndRef, Sub, ViewListener, WndCb},
+    uicore::{HView, HViewRef, HWndRef, Sub, ViewFlags, ViewListener, WndCb},
 };
 
 pub struct DpiScaleWatcher {
@@ -20,12 +20,12 @@ struct Shared {
 }
 
 impl DpiScaleWatcher {
-    pub fn new(subview: HView) -> Self {
+    pub fn new(subview: HView, view_flags: ViewFlags) -> Self {
         let shared = Rc::new(Shared {
             handlers: RefCell::new(SubscriberList::new()),
         });
 
-        let view = HView::new(Default::default());
+        let view = HView::new(view_flags);
         view.set_layout(FillLayout::new(subview));
         view.set_listener(DpiScaleWatcherViewListener {
             shared: Rc::clone(&shared),

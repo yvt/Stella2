@@ -152,15 +152,28 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         // Toolbar elements
         ([#SEARCH_FIELD]) (priority = 10000) {
-            num_layers: 2,
+            num_layers: 3,
 
+            // Focus ring
             layer_img[0]: Some(
-                himg_from_rounded_rect([0.0, 0.0, 0.0, 0.2].into(), [[3.0; 2]; 4])
+                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[5.0; 2]; 4])
             ),
             layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.0,
+            layer_metrics[0]: Metrics {
+                margin: [-2.0; 4],
+                ..Default::default()
+            },
 
-            layer_img[1]: Some(himg_from_stvg(assets::SEARCH)),
-            layer_metrics[1]: Metrics {
+            // Background
+            layer_img[1]: Some(
+                himg_from_rounded_rect([0.0, 0.0, 0.0, 0.2].into(), [[3.0; 2]; 4])
+            ),
+            layer_center[1]: box2! { point: [0.5, 0.5] },
+
+            // Icon
+            layer_img[2]: Some(himg_from_stvg(assets::SEARCH)),
+            layer_metrics[2]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: [16.0, 16.0].into(),
             },
@@ -172,23 +185,49 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 ..Default::default()
             },
         },
+        ([#SEARCH_FIELD.FOCUS]) (priority = 10000) {
+            // Display the focus ring
+            layer_opacity[0]: 0.5,
+
+            // Make the background opaque so that the focus ring actually
+            // renders as a ring
+            layer_img[1]: Some(
+                himg_from_rounded_rect([0.3, 0.3, 0.3, 1.0].into(), [[3.0; 2]; 4])
+            ),
+        },
         ([.LABEL] < [#SEARCH_FIELD]) (priority = 10000) {
             fg_color: [1.0, 1.0, 1.0, 0.6].into(),
         },
 
         // Composing area
         ([#EDITOR_FIELD]) (priority = 10000) {
-            num_layers: 1,
+            num_layers: 2,
 
+            // Focus ring
             layer_img[0]: Some(
-                himg_from_rounded_rect([1.0; 4].into(), [[3.0; 2]; 4])
+                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[5.0; 2]; 4])
             ),
             layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.0,
+            layer_metrics[0]: Metrics {
+                margin: [-2.0; 4],
+                ..Default::default()
+            },
+
+            // Background
+            layer_img[1]: Some(
+                himg_from_rounded_rect([1.0; 4].into(), [[3.0; 2]; 4])
+            ),
+            layer_center[1]: box2! { point: [0.5, 0.5] },
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [3.0; 4],
                 ..Default::default()
             },
+        },
+        ([#EDITOR_FIELD.FOCUS]) (priority = 10500) {
+            // Focus ring
+            layer_opacity[0]: 0.5,
         },
         ([.LABEL] < [#EDITOR_FIELD]) (priority = 10000) {
             fg_color: [0.0, 0.0, 0.0, 0.4].into(),
@@ -242,9 +281,12 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.3].into(),
+            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.25].into(),
         },
         ([#SIDEBAR_ITEM.ACTIVE] .. [#WND.ACTIVE]) (priority = 10500) {
+            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.5].into(),
+        },
+        ([#SIDEBAR_ITEM.ACTIVE] .. [.FOCUS]) (priority = 11000) {
             layer_bg_color[0]: [0.1, 0.3, 0.6, 0.9].into(),
         },
         ([.LABEL] < [#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
@@ -273,20 +315,29 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
         },
 
         ([#SEARCH_FIELD]) (priority = 20000) {
-            num_layers: 3,
+            num_layers: 4,
 
-            layer_img[0]: None,
-            layer_bg_color[0]: [0.0, 0.0, 0.0, 0.2].into(),
+            // Focus ring
+            layer_img[0]: Some(
+                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[2.0; 2]; 4])
+            ),
+
+            // Border
             layer_img[1]: None,
-            layer_bg_color[1]: [1.0; 4].into(),
-            layer_metrics[1]: Metrics {
+            layer_bg_color[1]: [0.0, 0.0, 0.0, 0.2].into(),
+
+            // Background fill
+            layer_img[2]: None,
+            layer_bg_color[2]: [1.0; 4].into(),
+            layer_metrics[2]: Metrics {
                 margin: [1.0, 1.0, 1.0, 1.0],
                 ..Default::default()
             },
-            layer_center[1]: box2! { point: [0.5, 0.5] },
+            layer_center[2]: box2! { point: [0.5, 0.5] },
 
-            layer_img[2]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
-            layer_metrics[2]: Metrics {
+            // Icon
+            layer_img[3]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
+            layer_metrics[3]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: [16.0, 16.0].into(),
             },

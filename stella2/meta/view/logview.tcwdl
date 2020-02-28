@@ -32,7 +32,10 @@ pub(crate) comp crate::view::logview::LogView {
         },
     };
 
-    const dpi_scale_watcher = DpiScaleWatcher::new! { subview = get!(table.view) };
+    const dpi_scale_watcher = DpiScaleWatcher::new! {
+        subview = get!(table.view),
+        view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP,
+    };
 
     on (init) get!(&this).init();
 

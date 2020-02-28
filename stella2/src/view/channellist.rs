@@ -6,7 +6,7 @@ use tcw3::{
         theming,
         views::{table, table::LineTy, Button, Label},
     },
-    uicore::{HView, SizeTraits},
+    uicore::{HView, SizeTraits, ViewFlags},
 };
 
 use crate::stylesheet::elem_id;

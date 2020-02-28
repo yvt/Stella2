@@ -85,13 +85,14 @@ comp crate::view::MainView {
     const sidebar_view_wrap = StyledBox::new! {
         style_manager,
         class_set = elem_id::SIDEBAR,
+        auto_class_set = ClassSet::FOCUS,
         subview_generic = get!(sidebar_view.view),
+        subelement_generic = get!(sidebar_view.style_elem),
     };
     const sidebar_view = ChannelListView::new! { wm, style_manager };
 
     on (init) {
         get!(&style_elem).insert_child(get!(sidebar_view_wrap.style_elem));
-        get!(&style_elem).insert_child(get!(sidebar_view.style_elem));
     }
 
     // The main area
@@ -153,11 +154,13 @@ comp crate::view::MainView {
     const editor_field = StyledBox::new! {
         style_manager,
         view_flags = {
-            // Make `set_cursor_shape` work
+            // `ACCEPT_MOUSE_OVER`: Make `set_cursor_shape` work
             use tcw3::uicore::ViewFlags;
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER |
+                ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP
         },
         class_set = elem_id::EDITOR_FIELD,
+        auto_class_set = ClassSet::FOCUS,
         subview_generic = HView::new! {
             // Align the text to the upper-left corner
             layout = TableLayout::stack_horz(

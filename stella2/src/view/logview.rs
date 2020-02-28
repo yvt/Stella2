@@ -9,7 +9,7 @@ use tcw3::{
         prelude::*,
         views::{table, table::LineTy},
     },
-    uicore::{HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewListener},
+    uicore::{HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
 };
 
 stella2_meta::designer_impl! {
