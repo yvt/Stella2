@@ -546,6 +546,9 @@ impl ViewListener for SbListener {
         } else {
             *layers = Some(Layers::default());
         }
+
+        self.remove_auto_class(ClassSet::HOVER);
+        self.remove_auto_class(ClassSet::FOCUS);
     }
 
     fn unmount(&self, wm: pal::Wm, _: HViewRef<'_>) {
