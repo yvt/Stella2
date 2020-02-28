@@ -126,7 +126,9 @@ impl Scrollbar {
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
         frame.set_child(Role::Generic, Some(&thumb));
 
-        let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+        let wrapper = HView::new(
+            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::NO_FOCUS_ON_CLICK,
+        );
         wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
