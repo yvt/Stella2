@@ -33,6 +33,8 @@ bitflags! {
         const HAS_VERTICAL_SCROLLBAR = 1 << 9;
         /// The element is a splitter.
         const SPLITTER = 1 << 10;
+        /// The element is a text entry widget.
+        const ENTRY = 1 << 11;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;

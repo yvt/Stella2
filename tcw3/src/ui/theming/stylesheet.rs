@@ -509,6 +509,8 @@ const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
 const SCROLLBAR_MARGIN: f32 = 6.0;
 const SCROLLBAR_LEN_MIN: f32 = 20.0;
 
+const FIELD_HEIGHT: f32 = 20.0;
+
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
@@ -538,6 +540,40 @@ lazy_static! {
         ([] < [.BUTTON.ACTIVE]) (priority = 200) {
             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
+
+        // Entry wrapper
+        ([.ENTRY]) (priority = 100) {
+            num_layers: 2,
+
+            // Focus ring
+            layer_img[0]: Some(
+                himg_from_rounded_rect([0.2, 0.4, 0.9, 1.0].into(), [[5.0; 2]; 4])
+            ),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.0,
+            layer_metrics[0]: Metrics {
+                margin: [-2.0; 4],
+                ..Default::default()
+            },
+
+            // Background
+            layer_img[1]: Some(himg_from_rounded_rect(
+                RGBAF32::new(1.0, 1.0, 1.0, 1.0), [[3.0; 2]; 4]
+            )),
+            layer_center[1]: box2! { point: [0.5, 0.5] },
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [0.0; 4],
+                size: [NAN, FIELD_HEIGHT].into(),
+            },
+        },
+        ([.ENTRY.FOCUS]) (priority = 200) {
+            layer_opacity[0]: 0.5,
+        },
+        // Entry text
+        ([] < [.ENTRY]) (priority = 100) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+        },
+
         // Scrollbar
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,

@@ -17,6 +17,7 @@ pub mod mixins {
 
 pub mod views {
     mod button;
+    mod entry;
     mod label;
     pub mod scrollbar;
     mod spacer;
@@ -24,6 +25,7 @@ pub mod views {
     pub mod table;
     pub use self::{
         button::Button,
+        entry::{Entry, EntryCore},
         label::Label,
         scrollbar::Scrollbar,
         spacer::{new_spacer, Spacer},
