@@ -51,7 +51,11 @@ impl ClassSet {
     /// function creates a bit pattern representing an ID value using a subset
     /// of `ID_MASK`.
     ///
-    /// How ID values are assigned is completely up to the application.
+    /// How ID values are assigned is completely up to the application. However,
+    /// the application should use values smaller than
+    /// [`elem_id::SYS_START_VALUE`] to prevent collision.
+    ///
+    /// [`elem_id::SYS_START_VALUE`]: self::elem_id::SYS_START_VALUE
     ///
     /// # Examples
     ///
@@ -72,6 +76,12 @@ impl ClassSet {
     pub const fn id(id: u16) -> Self {
         Self::from_bits_truncate((id as u32) << 16)
     }
+}
+
+/// Styling IDs ([`ClassSet::id`]) reserved for the system.
+pub mod elem_id {
+    /// The smallest styling ID allocated for the system.
+    pub const SYS_START_VALUE: u16 = 0xff80;
 }
 
 /// `ClassSet` of an element and its descendants.
