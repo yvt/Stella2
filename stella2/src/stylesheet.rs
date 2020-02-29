@@ -16,7 +16,7 @@ pub mod elem_id {
     use tcw3::ui::theming::ClassSet;
 
     iota::iota! {
-        pub const GO_BACK: ClassSet = ClassSet::id(iota + 1);
+        pub const GO_BACK: ClassSet = ClassSet::id(iota);
                 , GO_FORWARD
                 , SIDEBAR_SHOW
                 , SIDEBAR_HIDE

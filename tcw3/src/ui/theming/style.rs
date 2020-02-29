@@ -73,8 +73,16 @@ impl ClassSet {
     /// // Don't do this - the resulting bit pattern does not make sense:
     /// let bad = ClassSet::BUTTON | GO_BACK | GO_FORWARD;
     /// ```
+    ///
+    /// Not entire the representable range of `u16` can be used as an ID value:
+    ///
+    /// ```compile_fail
+    /// # use tcw3::ui::theming::ClassSet;
+    /// const INVALID: ClassSet = ClassSet::id(0xffff);
+    /// ```
     pub const fn id(id: u16) -> Self {
-        Self::from_bits_truncate((id as u32) << 16)
+        // Use multiplication to detect overflow at compile time
+        Self::from_bits_truncate((id as u32 + 1) * (1u32 << 16))
     }
 }
 
