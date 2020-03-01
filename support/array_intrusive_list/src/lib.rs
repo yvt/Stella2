@@ -31,54 +31,58 @@ impl<Index> ListHead<Index> {
         self.first.is_none()
     }
 
-    pub fn accessor<'a, P, F, T>(&'a self, pool: &'a P, field: F) -> ListAccessor<'a, Index, P, F>
+    pub fn accessor<'a, Pool, MapLink, Element>(
+        &'a self,
+        pool: &'a Pool,
+        map_link: MapLink,
+    ) -> ListAccessor<'a, Index, Pool, MapLink>
     where
-        P: 'a + ops::Index<Index, Output = T>,
-        F: Fn(&T) -> &Option<Link<Index>>,
+        Pool: 'a + ops::Index<Index, Output = Element>,
+        MapLink: Fn(&Element) -> &Option<Link<Index>>,
     {
         ListAccessor {
             head: self,
             pool,
-            field,
+            map_link,
         }
     }
 
-    pub fn accessor_mut<'a, P, F, T>(
+    pub fn accessor_mut<'a, Pool, MapLink, Element>(
         &'a mut self,
-        pool: &'a mut P,
-        field: F,
-    ) -> ListAccessorMut<'a, Index, P, F>
+        pool: &'a mut Pool,
+        map_link: MapLink,
+    ) -> ListAccessorMut<'a, Index, Pool, MapLink>
     where
-        P: 'a + ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-        F: FnMut(&mut T) -> &mut Option<Link<Index>>,
+        Pool: 'a + ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+        MapLink: FnMut(&mut Element) -> &mut Option<Link<Index>>,
     {
         ListAccessorMut {
             head: self,
             pool,
-            field,
+            map_link,
         }
     }
 }
 
 /// Accessor to a linked list.
 #[derive(Debug)]
-pub struct ListAccessor<'a, Index, P, F> {
+pub struct ListAccessor<'a, Index, Pool, MapLink> {
     head: &'a ListHead<Index>,
-    pool: &'a P,
-    field: F,
+    pool: &'a Pool,
+    map_link: MapLink,
 }
 
-impl<'a, Index, P, F, T> ListAccessor<'a, Index, P, F>
+impl<'a, Index, Pool, MapLink, Element> ListAccessor<'a, Index, Pool, MapLink>
 where
-    P: ops::Index<Index, Output = T>,
-    F: Fn(&T) -> &Option<Link<Index>>,
+    Pool: ops::Index<Index, Output = Element>,
+    MapLink: Fn(&Element) -> &Option<Link<Index>>,
     Index: PartialEq + Clone,
 {
     pub fn head(&self) -> &ListHead<Index> {
         self.head
     }
 
-    pub fn pool(&self) -> &P {
+    pub fn pool(&self) -> &Pool {
         self.pool
     }
 
@@ -91,13 +95,16 @@ where
     }
 
     pub fn back(&self) -> Option<Index> {
-        self.head
-            .first
-            .clone()
-            .map(|p| (self.field)(&self.pool[p]).as_ref().unwrap().prev.clone())
+        self.head.first.clone().map(|p| {
+            (self.map_link)(&self.pool[p])
+                .as_ref()
+                .unwrap()
+                .prev
+                .clone()
+        })
     }
 
-    pub fn front_data(&self) -> Option<&T> {
+    pub fn front_data(&self) -> Option<&Element> {
         if let Some(p) = self.front() {
             Some(&self.pool[p])
         } else {
@@ -105,7 +112,7 @@ where
         }
     }
 
-    pub fn back_data(&self) -> Option<&T> {
+    pub fn back_data(&self) -> Option<&Element> {
         if let Some(p) = self.back() {
             Some(&self.pool[p])
         } else {
@@ -121,8 +128,8 @@ where
     }
 }
 
-impl<'a, Index, P: 'a, F> ops::Deref for ListAccessor<'a, Index, P, F> {
-    type Target = P;
+impl<'a, Index, Pool: 'a, MapLink> ops::Deref for ListAccessor<'a, Index, Pool, MapLink> {
+    type Target = Pool;
 
     fn deref(&self) -> &Self::Target {
         &self.pool
@@ -131,16 +138,16 @@ impl<'a, Index, P: 'a, F> ops::Deref for ListAccessor<'a, Index, P, F> {
 
 /// Mutable accessor to a linked list.
 #[derive(Debug)]
-pub struct ListAccessorMut<'a, Index, P, F> {
+pub struct ListAccessorMut<'a, Index, Pool, MapLink> {
     head: &'a mut ListHead<Index>,
-    pool: &'a mut P,
-    field: F,
+    pool: &'a mut Pool,
+    map_link: MapLink,
 }
 
-impl<'a, Index, P, F, T> ListAccessorMut<'a, Index, P, F>
+impl<'a, Index, Pool, MapLink, Element> ListAccessorMut<'a, Index, Pool, MapLink>
 where
-    P: ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: FnMut(&mut T) -> &mut Option<Link<Index>>,
+    Pool: ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: FnMut(&mut Element) -> &mut Option<Link<Index>>,
     Index: PartialEq + Clone,
 {
     pub fn head(&self) -> &ListHead<Index> {
@@ -151,11 +158,11 @@ where
         self.head
     }
 
-    pub fn pool(&self) -> &P {
+    pub fn pool(&self) -> &Pool {
         self.pool
     }
 
-    pub fn pool_mut(&mut self) -> &mut P {
+    pub fn pool_mut(&mut self) -> &mut Pool {
         self.pool
     }
 
@@ -169,7 +176,7 @@ where
 
     pub fn back(&mut self) -> Option<Index> {
         self.head.first.clone().map(|p| {
-            (self.field)(&mut self.pool[p])
+            (self.map_link)(&mut self.pool[p])
                 .as_ref()
                 .unwrap()
                 .prev
@@ -177,7 +184,7 @@ where
         })
     }
 
-    pub fn front_data(&mut self) -> Option<&mut T> {
+    pub fn front_data(&mut self) -> Option<&mut Element> {
         if let Some(p) = self.front() {
             Some(&mut self.pool[p])
         } else {
@@ -185,7 +192,7 @@ where
         }
     }
 
-    pub fn back_data(&mut self) -> Option<&mut T> {
+    pub fn back_data(&mut self) -> Option<&mut Element> {
         if let Some(p) = self.back() {
             Some(&mut self.pool[p])
         } else {
@@ -199,7 +206,7 @@ where
         #[allow(clippy::debug_assert_with_mut_call)]
         {
             debug_assert!(
-                (self.field)(&mut self.pool[item.clone()]).is_none(),
+                (self.map_link)(&mut self.pool[item.clone()]).is_none(),
                 "item is already linked"
             );
         }
@@ -212,20 +219,20 @@ where
                 (first, false)
             };
 
-            let prev = (self.field)(&mut self.pool[next.clone()])
+            let prev = (self.map_link)(&mut self.pool[next.clone()])
                 .as_mut()
                 .unwrap()
                 .prev
                 .clone();
-            (self.field)(&mut self.pool[prev.clone()])
+            (self.map_link)(&mut self.pool[prev.clone()])
                 .as_mut()
                 .unwrap()
                 .next = item.clone();
-            (self.field)(&mut self.pool[next.clone()])
+            (self.map_link)(&mut self.pool[next.clone()])
                 .as_mut()
                 .unwrap()
                 .prev = item.clone();
-            *(self.field)(&mut self.pool[item.clone()]) = Some(Link { prev, next });
+            *(self.map_link)(&mut self.pool[item.clone()]) = Some(Link { prev, next });
 
             if update_first {
                 self.head.first = Some(item);
@@ -233,7 +240,7 @@ where
         } else {
             debug_assert!(at.is_none());
 
-            let link = (self.field)(&mut self.pool[item.clone()]);
+            let link = (self.map_link)(&mut self.pool[item.clone()]);
             self.head.first = Some(item.clone());
             *link = Some(Link {
                 prev: item.clone(),
@@ -256,13 +263,13 @@ where
         #[allow(clippy::debug_assert_with_mut_call)]
         {
             debug_assert!(
-                (self.field)(&mut self.pool[item.clone()]).is_some(),
+                (self.map_link)(&mut self.pool[item.clone()]).is_some(),
                 "item is not linked"
             );
         }
 
         let link: Link<Index> = {
-            let link_ref = (self.field)(&mut self.pool[item.clone()]);
+            let link_ref = (self.map_link)(&mut self.pool[item.clone()]);
             if self.head.first.as_ref() == Some(&item) {
                 let next = link_ref.as_ref().unwrap().next.clone();
                 if next == item {
@@ -279,15 +286,15 @@ where
             link_ref.clone().unwrap()
         };
 
-        (self.field)(&mut self.pool[link.prev.clone()])
+        (self.map_link)(&mut self.pool[link.prev.clone()])
             .as_mut()
             .unwrap()
             .next = link.next.clone();
-        (self.field)(&mut self.pool[link.next.clone()])
+        (self.map_link)(&mut self.pool[link.next.clone()])
             .as_mut()
             .unwrap()
             .prev = link.prev;
-        *(self.field)(&mut self.pool[item.clone()]) = None;
+        *(self.map_link)(&mut self.pool[item.clone()]) = None;
 
         item
     }
@@ -319,29 +326,29 @@ where
     ///
     /// If the link structure is corrupt, it may return a mutable reference to
     /// the same element more than once, which is an undefined behavior.
-    pub unsafe fn drain<'b>(&'b mut self) -> Drain<'a, 'b, Index, P, F, T> {
+    pub unsafe fn drain<'b>(&'b mut self) -> Drain<'a, 'b, Index, Pool, MapLink, Element> {
         Drain { accessor: self }
     }
 }
 
-impl<'a, Index, P: 'a, F> ops::Deref for ListAccessorMut<'a, Index, P, F> {
-    type Target = P;
+impl<'a, Index, Pool: 'a, MapLink> ops::Deref for ListAccessorMut<'a, Index, Pool, MapLink> {
+    type Target = Pool;
 
     fn deref(&self) -> &Self::Target {
         &self.pool
     }
 }
 
-impl<'a, Index, P: 'a, F> ops::DerefMut for ListAccessorMut<'a, Index, P, F> {
+impl<'a, Index, Pool: 'a, MapLink> ops::DerefMut for ListAccessorMut<'a, Index, Pool, MapLink> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.pool
     }
 }
 
-impl<'a, Index, P, F, T> Extend<Index> for ListAccessorMut<'a, Index, P, F>
+impl<'a, Index, Pool, MapLink, Element> Extend<Index> for ListAccessorMut<'a, Index, Pool, MapLink>
 where
-    P: 'a + ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: FnMut(&mut T) -> &mut Option<Link<Index>>,
+    Pool: 'a + ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: FnMut(&mut Element) -> &mut Option<Link<Index>>,
     Index: PartialEq + Clone,
 {
     fn extend<I: IntoIterator<Item = Index>>(&mut self, iter: I) {
@@ -367,8 +374,8 @@ pub trait CellLike {
     }
 }
 
-impl<T: Copy> CellLike for std::cell::Cell<T> {
-    type Target = T;
+impl<Element: Copy> CellLike for std::cell::Cell<Element> {
+    type Target = Element;
 
     fn get(&self) -> Self::Target {
         self.get()
@@ -378,8 +385,8 @@ impl<T: Copy> CellLike for std::cell::Cell<T> {
     }
 }
 
-impl<T: CellLike> CellLike for &T {
-    type Target = T::Target;
+impl<Element: CellLike> CellLike for &Element {
+    type Target = Element::Target;
 
     fn get(&self) -> Self::Target {
         (*self).get()
@@ -391,22 +398,26 @@ impl<T: CellLike> CellLike for &T {
 
 /// `Cell`-based accessor to a linked list.
 #[derive(Debug)]
-pub struct ListAccessorCell<'a, H, P, F> {
+pub struct ListAccessorCell<'a, H, Pool, MapLink> {
     head: H,
-    pool: &'a P,
-    field: F,
+    pool: &'a Pool,
+    map_link: MapLink,
 }
 
-impl<'a, H, Index, P, F, T, L> ListAccessorCell<'a, H, P, F>
+impl<'a, H, Index, Pool, MapLink, Element, L> ListAccessorCell<'a, H, Pool, MapLink>
 where
     H: CellLike<Target = ListHead<Index>>,
-    P: ops::Index<Index, Output = T>,
-    F: Fn(&T) -> &L,
+    Pool: ops::Index<Index, Output = Element>,
+    MapLink: Fn(&Element) -> &L,
     L: CellLike<Target = Option<Link<Index>>>,
     Index: PartialEq + Clone,
 {
-    pub fn new(head: H, pool: &'a P, field: F) -> Self {
-        ListAccessorCell { head, pool, field }
+    pub fn new(head: H, pool: &'a Pool, map_link: MapLink) -> Self {
+        ListAccessorCell {
+            head,
+            pool,
+            map_link,
+        }
     }
 
     pub fn head_cell(&self) -> &H {
@@ -421,7 +432,7 @@ where
         self.head.set(head);
     }
 
-    pub fn pool(&self) -> &P {
+    pub fn pool(&self) -> &Pool {
         self.pool
     }
 
@@ -436,10 +447,10 @@ where
     pub fn back(&self) -> Option<Index> {
         self.head()
             .first
-            .map(|p| (self.field)(&self.pool[p]).get().unwrap().prev)
+            .map(|p| (self.map_link)(&self.pool[p]).get().unwrap().prev)
     }
 
-    pub fn front_data(&self) -> Option<&T> {
+    pub fn front_data(&self) -> Option<&Element> {
         if let Some(p) = self.front() {
             Some(&self.pool[p])
         } else {
@@ -447,7 +458,7 @@ where
         }
     }
 
-    pub fn back_data(&self) -> Option<&T> {
+    pub fn back_data(&self) -> Option<&Element> {
         if let Some(p) = self.back() {
             Some(&self.pool[p])
         } else {
@@ -459,7 +470,7 @@ where
     /// the list's back (if `at` is `None`).
     pub fn insert(&self, item: Index, at: Option<Index>) {
         debug_assert!(
-            (self.field)(&self.pool[item.clone()]).get().is_none(),
+            (self.map_link)(&self.pool[item.clone()]).get().is_none(),
             "item is already linked"
         );
 
@@ -473,12 +484,15 @@ where
                 (first, false)
             };
 
-            let prev = (self.field)(&self.pool[next.clone()]).get().unwrap().prev;
-            (self.field)(&self.pool[prev.clone()])
+            let prev = (self.map_link)(&self.pool[next.clone()])
+                .get()
+                .unwrap()
+                .prev;
+            (self.map_link)(&self.pool[prev.clone()])
                 .modify(|l| l.as_mut().unwrap().next = item.clone());
-            (self.field)(&self.pool[next.clone()])
+            (self.map_link)(&self.pool[next.clone()])
                 .modify(|l| l.as_mut().unwrap().prev = item.clone());
-            (self.field)(&self.pool[item.clone()]).set(Some(Link { prev, next }));
+            (self.map_link)(&self.pool[item.clone()]).set(Some(Link { prev, next }));
 
             if update_first {
                 head.first = Some(item);
@@ -487,7 +501,7 @@ where
         } else {
             debug_assert!(at.is_none());
 
-            let link = (self.field)(&self.pool[item.clone()]);
+            let link = (self.map_link)(&self.pool[item.clone()]);
             link.set(Some(Link {
                 prev: item.clone(),
                 next: item.clone(),
@@ -510,12 +524,12 @@ where
     /// Remove `item` from the list. Returns `item`.
     pub fn remove(&self, item: Index) -> Index {
         debug_assert!(
-            (self.field)(&self.pool[item.clone()]).get().is_some(),
+            (self.map_link)(&self.pool[item.clone()]).get().is_some(),
             "item is not linked"
         );
 
         let link: Link<Index> = {
-            let link_ref = (self.field)(&self.pool[item.clone()]);
+            let link_ref = (self.map_link)(&self.pool[item.clone()]);
             let mut head = self.head();
             if head.first.as_ref() == Some(&item) {
                 let next = link_ref.get().unwrap().next;
@@ -536,11 +550,11 @@ where
             link_ref.get().unwrap()
         };
 
-        (self.field)(&self.pool[link.prev.clone()])
+        (self.map_link)(&self.pool[link.prev.clone()])
             .modify(|l| l.as_mut().unwrap().next = link.next.clone());
-        (self.field)(&self.pool[link.next.clone()])
+        (self.map_link)(&self.pool[link.next.clone()])
             .modify(|l| l.as_mut().unwrap().prev = link.prev.clone());
-        (self.field)(&self.pool[item.clone()]).set(None);
+        (self.map_link)(&self.pool[item.clone()]).set(None);
 
         item
     }
@@ -562,25 +576,26 @@ where
 
     pub fn clear(&self) {
         for (_, el) in self.iter() {
-            (self.field)(el).set(None);
+            (self.map_link)(el).set(None);
         }
         self.set_head(ListHead::new());
     }
 }
 
-impl<'a, H, P, F> ops::Deref for ListAccessorCell<'a, H, P, F> {
-    type Target = P;
+impl<'a, H, Pool, MapLink> ops::Deref for ListAccessorCell<'a, H, Pool, MapLink> {
+    type Target = Pool;
 
     fn deref(&self) -> &Self::Target {
         self.pool
     }
 }
 
-impl<'a, H, Index, P, F, T, L> Extend<Index> for ListAccessorCell<'a, H, P, F>
+impl<'a, H, Index, Pool, MapLink, Element, L> Extend<Index>
+    for ListAccessorCell<'a, H, Pool, MapLink>
 where
     H: CellLike<Target = ListHead<Index>>,
-    P: ops::Index<Index, Output = T>,
-    F: Fn(&T) -> &L,
+    Pool: ops::Index<Index, Output = Element>,
+    MapLink: Fn(&Element) -> &L,
     L: CellLike<Target = Option<Link<Index>>>,
     Index: PartialEq + Clone,
 {
@@ -594,23 +609,24 @@ where
 /// An iterator over the elements of `ListAccessor`, `ListAccessorMut`, or
 /// `ListAccessorCell`.
 #[derive(Debug)]
-pub struct Iter<T, Index> {
-    accessor: T,
+pub struct Iter<Element, Index> {
+    accessor: Element,
     next: Option<Index>,
 }
 
-impl<'a, 'b, Index, P, F, T> Iterator for Iter<&'b ListAccessor<'a, Index, P, F>, Index>
+impl<'a, 'b, Index, Pool, MapLink, Element> Iterator
+    for Iter<&'b ListAccessor<'a, Index, Pool, MapLink>, Index>
 where
-    P: ops::Index<Index, Output = T>,
-    F: 'a + Fn(&T) -> &Option<Link<Index>>,
-    T: 'a,
+    Pool: ops::Index<Index, Output = Element>,
+    MapLink: 'a + Fn(&Element) -> &Option<Link<Index>>,
+    Element: 'a,
     Index: PartialEq + Clone,
 {
-    type Item = (Index, &'a T);
+    type Item = (Index, &'a Element);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.next.take() {
-            let new_next = (self.accessor.field)(&self.accessor.pool[next.clone()])
+            let new_next = (self.accessor.map_link)(&self.accessor.pool[next.clone()])
                 .as_ref()
                 .unwrap()
                 .next
@@ -627,18 +643,19 @@ where
     }
 }
 
-impl<'a, 'b, Index, P, F, T> Iterator for Iter<&'b mut ListAccessorMut<'a, Index, P, F>, Index>
+impl<'a, 'b, Index, Pool, MapLink, Element> Iterator
+    for Iter<&'b mut ListAccessorMut<'a, Index, Pool, MapLink>, Index>
 where
-    P: ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: 'a + FnMut(&mut T) -> &mut Option<Link<Index>>,
-    T: 'a + 'b,
+    Pool: ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: 'a + FnMut(&mut Element) -> &mut Option<Link<Index>>,
+    Element: 'a + 'b,
     Index: PartialEq + Clone,
 {
-    type Item = (Index, &'a mut T);
+    type Item = (Index, &'a mut Element);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.next.take() {
-            let new_next = (self.accessor.field)(&mut self.accessor.pool[next.clone()])
+            let new_next = (self.accessor.map_link)(&mut self.accessor.pool[next.clone()])
                 .as_ref()
                 .unwrap()
                 .next
@@ -657,20 +674,21 @@ where
     }
 }
 
-impl<'a, 'b, H, Index, P, F, T, L> Iterator for Iter<&'b ListAccessorCell<'a, H, P, F>, Index>
+impl<'a, 'b, H, Index, Pool, MapLink, Element, L> Iterator
+    for Iter<&'b ListAccessorCell<'a, H, Pool, MapLink>, Index>
 where
     H: CellLike<Target = ListHead<Index>>,
-    P: ops::Index<Index, Output = T>,
-    F: 'a + Fn(&T) -> &L,
-    T: 'a + 'b,
+    Pool: ops::Index<Index, Output = Element>,
+    MapLink: 'a + Fn(&Element) -> &L,
+    Element: 'a + 'b,
     L: CellLike<Target = Option<Link<Index>>>,
     Index: PartialEq + Clone,
 {
-    type Item = (Index, &'a T);
+    type Item = (Index, &'a Element);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.next.take() {
-            let new_next = (self.accessor.field)(&self.accessor.pool[next.clone()])
+            let new_next = (self.accessor.map_link)(&self.accessor.pool[next.clone()])
                 .get()
                 .unwrap()
                 .next;
@@ -687,24 +705,25 @@ where
 }
 
 #[derive(Debug)]
-pub struct Drain<'a, 'b, Index, P, F, T>
+pub struct Drain<'a, 'b, Index, Pool, MapLink, Element>
 where
-    P: ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: 'a + FnMut(&mut T) -> &mut Option<Link<Index>>,
-    T: 'a + 'b,
+    Pool: ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: 'a + FnMut(&mut Element) -> &mut Option<Link<Index>>,
+    Element: 'a + 'b,
     Index: PartialEq + Clone,
 {
-    accessor: &'b mut ListAccessorMut<'a, Index, P, F>,
+    accessor: &'b mut ListAccessorMut<'a, Index, Pool, MapLink>,
 }
 
-impl<'a, 'b, Index, P, F, T> Iterator for Drain<'a, 'b, Index, P, F, T>
+impl<'a, 'b, Index, Pool, MapLink, Element> Iterator
+    for Drain<'a, 'b, Index, Pool, MapLink, Element>
 where
-    P: ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: 'a + FnMut(&mut T) -> &mut Option<Link<Index>>,
-    T: 'a + 'b,
+    Pool: ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: 'a + FnMut(&mut Element) -> &mut Option<Link<Index>>,
+    Element: 'a + 'b,
     Index: PartialEq + Clone,
 {
-    type Item = (Index, &'a mut T);
+    type Item = (Index, &'a mut Element);
 
     fn next(&mut self) -> Option<Self::Item> {
         let ptr = self.accessor.pop_front();
@@ -716,11 +735,11 @@ where
     }
 }
 
-impl<'a, 'b, Index, P, F, T> Drop for Drain<'a, 'b, Index, P, F, T>
+impl<'a, 'b, Index, Pool, MapLink, Element> Drop for Drain<'a, 'b, Index, Pool, MapLink, Element>
 where
-    P: ops::Index<Index, Output = T> + ops::IndexMut<Index>,
-    F: 'a + FnMut(&mut T) -> &mut Option<Link<Index>>,
-    T: 'a + 'b,
+    Pool: ops::Index<Index, Output = Element> + ops::IndexMut<Index>,
+    MapLink: 'a + FnMut(&mut Element) -> &mut Option<Link<Index>>,
+    Element: 'a + 'b,
     Index: PartialEq + Clone,
 {
     fn drop(&mut self) {
@@ -729,7 +748,7 @@ where
 }
 
 #[cfg(test)]
-fn push<T>(this: &mut Vec<T>, x: T) -> usize {
+fn push<Element>(this: &mut Vec<Element>, x: Element) -> usize {
     let i = this.len();
     this.push(x);
     i
