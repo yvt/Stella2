@@ -86,6 +86,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf27051ee75000297d5afad639a434ad6d3d7d3136ccaab75a1b7c439b9afa11"
 
 [[package]]
+name = "array_intrusive_list"
+version = "0.1.0"
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1208,6 +1212,9 @@ checksum = "3c6015bb2d300661a0014e29025374a32a68e8ef7e4effe547baa00eef38b8e3"
 [[package]]
 name = "iterpool"
 version = "0.1.0"
+dependencies = [
+ "array_intrusive_list",
+]
 
 [[package]]
 name = "itertools"

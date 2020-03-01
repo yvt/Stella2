@@ -17,6 +17,7 @@ members = [
     "stvg/macro/impl",
     "stvg/tcw3",
     "support/alt_fp",
+    "support/array_intrusive_list",
     "support/as_any",
     "support/atom2",
     "support/cggeom",

@@ -6,3 +6,4 @@ license = "MIT/Apache-2.0"
 edition = "2018"
 
 [dependencies]
+array_intrusive_list = { path = "../array_intrusive_list" }
