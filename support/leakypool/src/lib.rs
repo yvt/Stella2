@@ -8,7 +8,7 @@
 //! assuming only a predetermined number of `LeakyPool` are created and used
 //! throughout the program's lifetime. `LeakyPool` leaks memory only when
 //! `LeakyPool` is dropped.
-use std::{hint::unreachable_unchecked, marker::PhantomData, ops};
+use std::{fmt, hint::unreachable_unchecked, marker::PhantomData, ops};
 use tokenlock::TokenLock;
 use try_match::try_match;
 
@@ -25,8 +25,24 @@ pub struct LeakyPool<Element: 'static, TokenStoreTy: TokenStore = LazyToken<Leak
     first_free: Option<PoolPtr<Element, TokenStoreTy::TokenId>>,
 }
 
+impl<Element: 'static, TokenStoreTy: TokenStore + fmt::Debug> fmt::Debug
+    for LeakyPool<Element, TokenStoreTy>
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("LeakyPool")
+            .field("token_store", &self.token_store)
+            .finish()
+    }
+}
+
 pub struct PoolPtr<Element: 'static, TokenId: 'static = LeakyTokenId> {
     entry: &'static Entry<Element, TokenId>,
+}
+
+impl<Element: 'static, TokenId: 'static + fmt::Debug> fmt::Debug for PoolPtr<Element, TokenId> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("PoolPtr").field(&self.entry.lock).finish()
+    }
 }
 
 impl<Element: 'static, TokenId: 'static> Clone for PoolPtr<Element, TokenId> {
