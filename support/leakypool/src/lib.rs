@@ -8,7 +8,7 @@
 //! assuming only a predetermined number of `LeakyPool` are created and used
 //! throughout the program's lifetime. `LeakyPool` leaks memory only when
 //! `LeakyPool` is dropped.
-use std::{fmt, hint::unreachable_unchecked, marker::PhantomData, ops};
+use std::{fmt, hash, hint::unreachable_unchecked, marker::PhantomData, ops};
 use tokenlock::TokenLock;
 use try_match::try_match;
 
@@ -60,6 +60,12 @@ impl<Element: 'static, TokenId: 'static> PartialEq for PoolPtr<Element, TokenId>
 }
 
 impl<Element: 'static, TokenId: 'static> Eq for PoolPtr<Element, TokenId> {}
+
+impl<Element: 'static, TokenId: 'static> hash::Hash for PoolPtr<Element, TokenId> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        (self.entry as *const Entry<Element, TokenId>).hash(state);
+    }
+}
 
 struct Entry<Element: 'static, TokenId: 'static> {
     lock: TokenLock<EntryState<Element, TokenId>, TokenId>,
