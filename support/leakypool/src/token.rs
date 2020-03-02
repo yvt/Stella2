@@ -155,3 +155,39 @@ where
         self.inner.get_or_insert_with(Self::new_inner).id()
     }
 }
+
+/// An implementation of [`TokenStore`] that does not perform runtime checks.
+#[derive(Debug)]
+pub struct UncheckedToken {
+    _ctor_is_unsafe: (),
+}
+
+impl UncheckedToken {
+    /// Construct an `UncheckedToken`.
+    pub const unsafe fn new() -> Self {
+        Self {
+            _ctor_is_unsafe: (),
+        }
+    }
+}
+
+unsafe impl tokenlock::Token<()> for UncheckedToken {
+    fn eq_id(&self, _: &()) -> bool {
+        true
+    }
+}
+
+unsafe impl TokenStore for UncheckedToken {
+    type Token = Self;
+    type TokenId = ();
+
+    fn token_ref(&self) -> &Self::Token {
+        self
+    }
+    fn token_mut(&mut self) -> &mut Self::Token {
+        self
+    }
+    fn id(&mut self) -> Self::TokenId {
+        ()
+    }
+}
