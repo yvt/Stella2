@@ -2695,9 +2695,10 @@ version = "0.1.0"
 dependencies = [
  "alt_fp",
  "array",
+ "array_intrusive_list",
  "cggeom",
  "cgmath",
- "iterpool",
+ "leakypool",
  "quick-error",
  "tcw3_pal",
 ]

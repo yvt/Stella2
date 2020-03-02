@@ -7,10 +7,11 @@ license = "MIT"
 
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
+array_intrusive_list = { path = "../../support/array_intrusive_list" }
 array = "0.0.1"
 cggeom = { path = "../../support/cggeom" }
 cgmath = "0.17.0"
-iterpool = { path = "../../support/iterpool" }
+leakypool = { path = "../../support/leakypool" }
 quick-error = "1.2.3"
 
 tcw3_pal = { path = "../pal" }
