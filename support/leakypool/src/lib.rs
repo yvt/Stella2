@@ -53,6 +53,14 @@ impl<Element: 'static, TokenId: 'static> Clone for PoolPtr<Element, TokenId> {
 
 impl<Element: 'static, TokenId: 'static> Copy for PoolPtr<Element, TokenId> {}
 
+impl<Element: 'static, TokenId: 'static> PartialEq for PoolPtr<Element, TokenId> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.entry, other.entry)
+    }
+}
+
+impl<Element: 'static, TokenId: 'static> Eq for PoolPtr<Element, TokenId> {}
+
 struct Entry<Element: 'static, TokenId: 'static> {
     lock: TokenLock<EntryState<Element, TokenId>, TokenId>,
 }
