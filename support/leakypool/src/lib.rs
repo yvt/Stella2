@@ -92,6 +92,21 @@ where
     }
 }
 
+impl<Element> LeakyPool<Element, UncheckedToken> {
+    /// Construct a `LeakyPool<Element, UncheckedToken>`.
+    ///
+    /// This will be superseded by `with_token_store` when `const fn` with
+    /// trait bounds on type parameters is stabilized.
+    pub const unsafe fn new_unchecked() -> Self {
+        // TODO: Delegate to `with_token_store` when it's `const fn`
+        Self {
+            token_store: UncheckedToken::new(),
+            _elements_phantom: PhantomData,
+            first_free: None,
+        }
+    }
+}
+
 impl<Element, TokenStoreTy> LeakyPool<Element, TokenStoreTy>
 where
     TokenStoreTy: TokenStore,
