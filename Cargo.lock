@@ -2751,6 +2751,7 @@ dependencies = [
  "iterpool",
  "itertools",
  "lazy_static",
+ "leakypool",
  "log",
  "neo_linked_list",
  "objc",
