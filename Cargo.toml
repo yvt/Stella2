@@ -23,6 +23,7 @@ members = [
     "support/cggeom",
     "support/demotools",
     "support/iterpool",
+    "support/leakypool",
     "support/minisort",
     "support/nativedispatch",
     "support/neo_linked_list",

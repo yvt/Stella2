@@ -1,0 +1,9 @@
+[package]
+name = "leakypool"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+tokenlock = "0.2.2"
+try_match = "0.2.1"
