@@ -39,6 +39,11 @@ pub struct PoolPtr<Element: 'static, TokenId: 'static = LeakyTokenId> {
     entry: &'static Entry<Element, TokenId>,
 }
 
+// `PoolPtr` is logicaly an index into a collection of `Element`, so these are
+// safe
+unsafe impl<Element: 'static, TokenId: 'static> Send for PoolPtr<Element, TokenId> {}
+unsafe impl<Element: 'static, TokenId: 'static> Sync for PoolPtr<Element, TokenId> {}
+
 impl<Element: 'static, TokenId: 'static + fmt::Debug> fmt::Debug for PoolPtr<Element, TokenId> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("PoolPtr").field(&self.entry.lock).finish()
