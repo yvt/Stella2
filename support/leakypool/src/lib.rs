@@ -35,6 +35,10 @@ impl<Element: 'static, TokenStoreTy: TokenStore + fmt::Debug> fmt::Debug
     }
 }
 
+/// A pointer to an element in [`LeakyPool`].
+///
+/// This type is represented as `&impl Sized` and FFI-safe.
+#[repr(transparent)]
 pub struct PoolPtr<Element: 'static, TokenId: 'static = LeakyTokenId> {
     entry: &'static Entry<Element, TokenId>,
 }
