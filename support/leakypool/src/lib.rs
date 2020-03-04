@@ -279,4 +279,11 @@ mod tests {
         let ptr = pool1.allocate(1);
         assert!(pool2.get(ptr).is_none());
     }
+
+    #[test]
+    fn unchecked() {
+        let mut pool = unsafe { LeakyPool::new_unchecked() };
+        let ptr = pool.allocate(1);
+        assert_eq!(pool[ptr], 1);
+    }
 }

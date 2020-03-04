@@ -191,3 +191,17 @@ unsafe impl TokenStore for UncheckedToken {
         ()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unchecked() {
+        use tokenlock::Token;
+        let mut token = unsafe { UncheckedToken::new() };
+        let id = token.id();
+        assert!(token.token_ref().eq_id(&id));
+        assert!(token.token_mut().eq_id(&id));
+    }
+}
