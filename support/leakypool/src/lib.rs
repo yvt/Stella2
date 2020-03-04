@@ -8,7 +8,7 @@
 //! assuming only a predetermined number of `LeakyPool` are created and used
 //! throughout the program's lifetime. `LeakyPool` leaks memory only when
 //! `LeakyPool` is dropped.
-use std::{fmt, hash, hint::unreachable_unchecked, marker::PhantomData, ops};
+use std::{fmt, hash, hint::unreachable_unchecked, marker::PhantomData, ops, ptr::NonNull};
 use tokenlock::TokenLock;
 use try_match::try_match;
 
@@ -69,6 +69,18 @@ impl<Element: 'static, TokenId: 'static> Eq for PoolPtr<Element, TokenId> {}
 impl<Element: 'static, TokenId: 'static> hash::Hash for PoolPtr<Element, TokenId> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         (self.entry as *const Entry<Element, TokenId>).hash(state);
+    }
+}
+
+impl<Element: 'static, TokenId: 'static> PoolPtr<Element, TokenId> {
+    pub fn into_raw(self) -> NonNull<()> {
+        NonNull::from(self.entry).cast()
+    }
+
+    pub unsafe fn from_raw(ptr: NonNull<()>) -> Self {
+        Self {
+            entry: &*(ptr.as_ptr() as *const _),
+        }
     }
 }
 
