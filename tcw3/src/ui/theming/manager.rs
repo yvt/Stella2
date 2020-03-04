@@ -1,7 +1,7 @@
 use array_intrusive_list::{Link, ListAccessorCell, ListHead};
 use arrayvec::ArrayVec;
 use bitflags::bitflags;
-use leakypool::{LeakyPool, PoolPtr};
+use leakypool::{LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use sorted_diff::{sorted_diff, In};
 use std::{
     cell::{Cell, RefCell},
@@ -45,8 +45,10 @@ pub struct Manager {
     refresh_token: Cell<u64>,
 }
 
-type ElemPool = LeakyPool<ElemInner>;
-type ElemPtr = PoolPtr<ElemInner>;
+leakypool::singleton_tag!(struct Tag);
+
+type ElemPool = LeakyPool<ElemInner, SingletonToken<Tag>>;
+type ElemPtr = PoolPtr<ElemInner, SingletonTokenId<Tag>>;
 type ElemListHead = ListHead<ElemPtr>;
 type ElemLink = Link<ElemPtr>;
 
@@ -98,12 +100,15 @@ macro_rules! child_accessor {
 type ElemClassPathBuf = ArrayVec<[ClassSet; MAX_ELEM_DEPTH]>;
 
 impl Manager {
+    /// Consturct a `Manager`.
+    ///
+    /// This can be called only once because it uses `SingletonToken`.
     fn new(wm: pal::Wm) -> Self {
         let this = Self {
             wm,
             sheet_set: RefCell::new(SheetSet { sheets: Vec::new() }),
             new_set_handlers: RefCell::new(SubscriberList::new()),
-            elems: RefCell::new(LeakyPool::new()),
+            elems: RefCell::new(LeakyPool::with_token_store(SingletonToken::new())),
             all_elems: Cell::new(ListHead::new()),
             dirty_elems: Cell::new(ListHead::new()),
             refresh_scheduled: Cell::new(false),
