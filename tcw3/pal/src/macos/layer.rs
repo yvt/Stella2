@@ -5,7 +5,7 @@ use cocoa::{
     quartzcore::{transaction, CALayer},
 };
 use core_graphics::geometry::CGPoint;
-use leakypool::{LeakyPool, PoolPtr};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use objc::{class, msg_send, sel, sel_impl};
 use std::cell::RefCell;
 
@@ -18,13 +18,16 @@ use super::{
     LayerAttrs, MtSticky, Wm,
 };
 
-static LAYER_POOL: MtSticky<RefCell<LeakyPool<Layer>>> =
-    MtSticky::new(RefCell::new(LeakyPool::new()));
+static LAYER_POOL: MtSticky<RefCell<LayerPool>> = MtSticky::new(RefCell::new(LeakyPool::new()));
+
+leakypool::singleton_tag!(struct Tag);
+type LayerPool = LeakyPool<Layer, LazyToken<SingletonToken<Tag>>>;
+type LayerPoolPtr = PoolPtr<Layer, SingletonTokenId<Tag>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
     /// The pointer to a `Layer` in `LAYER_POOL`.
-    ptr: PoolPtr<Layer>,
+    ptr: LayerPoolPtr,
 }
 
 struct Layer {
