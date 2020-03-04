@@ -5,11 +5,12 @@ use glib::{
     translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
 };
 use gtk::prelude::*;
-use iterpool::{Pool, PoolPtr};
+use leakypool::{LeakyPool, PoolPtr};
 use std::{
     cell::{Cell, RefCell, RefMut},
-    num::{NonZeroUsize, Wrapping},
+    num::Wrapping,
     os::raw::{c_int, c_uint},
+    ptr::NonNull,
     rc::Rc,
 };
 
@@ -18,18 +19,18 @@ use crate::{iface, iface::Wm as WmTrait, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
-    ptr: PoolPtr,
+    ptr: PoolPtr<Wnd>,
 }
 
-static WNDS: MtSticky<RefCell<Pool<Wnd>>, Wm> = {
+static WNDS: MtSticky<RefCell<LeakyPool<Wnd>>, Wm> = {
     // `Wnd` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
+    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
 };
 
 pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>, Wm> =
     MtSticky::new(RefCell::new(comp::Compositor::new()));
 
-static DRAWING_WND: MtSticky<Cell<Option<PoolPtr>>, Wm> = MtSticky::new(Cell::new(None));
+static DRAWING_WND: MtSticky<Cell<Option<PoolPtr<Wnd>>>, Wm> = MtSticky::new(Cell::new(None));
 
 struct Wnd {
     gtk_wnd: gtk::Window,
@@ -119,7 +120,7 @@ impl HWnd {
 
         // Connect window events
         let wnd = &wnds[ptr];
-        wnd.gtk_widget.wnd_ptr().set(ptr.0.get());
+        wnd.gtk_widget.wnd_ptr().set(Some(ptr));
 
         wnd.gtk_wnd.connect_delete_event(move |_, _| {
             let listener = {
@@ -271,7 +272,7 @@ impl HWnd {
         }
 
         // Suppress further callbacks
-        wnd.gtk_widget.wnd_ptr().set(0);
+        wnd.gtk_widget.wnd_ptr().set(None);
 
         COMPOSITOR
             .get_with_wm(wm)
@@ -351,7 +352,7 @@ impl HWnd {
                 gtk_sys::gtk_widget_add_tick_callback(
                     wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
                     Some(Self::handle_tick_callback),
-                    self.ptr.0.get() as _,
+                    self.ptr.into_raw().as_ptr() as _,
                     None,
                 );
             }
@@ -364,7 +365,7 @@ impl HWnd {
         userdata: glib_sys::gpointer,
     ) -> glib_sys::gboolean {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(userdata as _).unwrap());
+        let ptr: PoolPtr<Wnd> = unsafe { PoolPtr::from_raw(NonNull::new_unchecked(userdata as _)) };
         let hwnd = HWnd { ptr };
 
         let listener = {
@@ -421,8 +422,8 @@ fn comp_surf_props_for_widget(w: &WndWidget) -> ([usize; 2], f32) {
 
 /// Used by `TcwWndWidget`'s callback functions. Mutably borrow `WNDS` and
 /// call the given closure with `Wnd`, `HWnd`, and `Wm`.
-fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) -> R) -> Option<R> {
-    let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+fn with_wnd_mut<R>(wm: Wm, wnd_ptr: WndPtr, f: impl FnOnce(&mut Wnd, HWnd, Wm) -> R) -> Option<R> {
+    let ptr = wnd_ptr?;
 
     let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
     let wnd = wnds.get_mut(ptr)?;
@@ -432,7 +433,7 @@ fn with_wnd_mut<R>(wm: Wm, wnd_ptr: usize, f: impl FnOnce(&mut Wnd, HWnd, Wm) ->
 /// Handles `GtkWidgetClass::draw`. `wnd_ptr` is retrieved from
 /// `TcwWndWidget::wnd_ptr`.
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_sys::cairo_t) {
+extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: WndPtr, cairo_ctx: *mut cairo_sys::cairo_t) {
     // Emit `resize` event if needed. `resize`'s event handler may call
     // `Wm::update_wnd`.
     if let Some(Some((wm, hwnd, listener))) = with_wnd_mut(
@@ -478,7 +479,7 @@ extern "C" fn tcw_wnd_widget_draw_handler(wnd_ptr: usize, cairo_ctx: *mut cairo_
 
 /// Handles `notify::scale-factor`.
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: usize) {
+extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: WndPtr) {
     if let Some((wm, hwnd, listener)) = with_wnd_mut(
         unsafe { Wm::global_unchecked() },
         wnd_ptr,
@@ -490,7 +491,7 @@ extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: usize) {
 
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_button_handler(
-    wnd_ptr: usize,
+    wnd_ptr: WndPtr,
     x: f32,
     y: f32,
     is_pressed: c_int,
@@ -499,7 +500,7 @@ extern "C" fn tcw_wnd_widget_button_handler(
     log::debug!("button{:?}", (wnd_ptr, x, y, is_pressed != 0, button));
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let loc = Point2::new(x, y);
@@ -571,10 +572,10 @@ extern "C" fn tcw_wnd_widget_button_handler(
 }
 
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: usize, x: f32, y: f32) {
+extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: WndPtr, x: f32, y: f32) {
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let loc = Point2::new(x, y);
@@ -605,11 +606,11 @@ extern "C" fn tcw_wnd_widget_motion_handler(wnd_ptr: usize, x: f32, y: f32) {
 }
 
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
+extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: WndPtr) {
     log::debug!("leave{:?}", (wnd_ptr,));
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -626,7 +627,7 @@ extern "C" fn tcw_wnd_widget_leave_handler(wnd_ptr: usize) {
 
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_discrete_scroll_handler(
-    wnd_ptr: usize,
+    wnd_ptr: WndPtr,
     x: f32,
     y: f32,
     delta_x: f32,
@@ -634,7 +635,7 @@ extern "C" fn tcw_wnd_widget_discrete_scroll_handler(
 ) {
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -709,7 +710,7 @@ impl ScrollState {
 
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_smooth_scroll_handler(
-    wnd_ptr: usize,
+    wnd_ptr: WndPtr,
     x: f32,
     y: f32,
     delta_x: f32,
@@ -718,7 +719,7 @@ extern "C" fn tcw_wnd_widget_smooth_scroll_handler(
 ) {
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let loc = Point2::new(x, y);
@@ -780,10 +781,10 @@ extern "C" fn tcw_wnd_widget_smooth_scroll_handler(
 }
 
 #[no_mangle]
-extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: usize, time: Wrapping<u32>) {
+extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: WndPtr, time: Wrapping<u32>) {
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(wnd_ptr)?);
+        let ptr = wnd_ptr?;
         let hwnd = HWnd { ptr };
 
         let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
@@ -802,7 +803,7 @@ extern "C" fn tcw_wnd_widget_smooth_scroll_stop_handler(wnd_ptr: usize, time: Wr
                 gtk_sys::gtk_widget_add_tick_callback(
                     wnd.gtk_widget.upcast_ref::<gtk::Widget>().as_ptr(),
                     Some(handle_momentum_scroll_tick_callback),
-                    ptr.0.get() as _,
+                    ptr.into_raw().as_ptr() as _,
                     None,
                 )
             };
@@ -839,7 +840,7 @@ extern "C" fn handle_momentum_scroll_tick_callback(
 ) -> glib_sys::gboolean {
     (|| {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr = PoolPtr(NonZeroUsize::new(userdata as _).unwrap());
+        let ptr = unsafe { PoolPtr::from_raw(NonNull::new(userdata as _).unwrap()) };
         let hwnd = HWnd { ptr };
 
         let frame_clock = unsafe { gdk::FrameClock::from_glib_borrow(frame_clock) };
@@ -923,7 +924,11 @@ fn eval_deceleration(t: u32) -> (f32, f32) {
 }
 
 /// Abort an ongoing scroll gesture if it's currently in the momentum phase.
-fn stop_momentum_scroll(wm: Wm, wnds: RefMut<'_, Pool<Wnd>>, hwnd: HWnd) -> RefMut<'_, Pool<Wnd>> {
+fn stop_momentum_scroll(
+    wm: Wm,
+    wnds: RefMut<'_, LeakyPool<Wnd>>,
+    hwnd: HWnd,
+) -> RefMut<'_, LeakyPool<Wnd>> {
     if let Some(wnd) = wnds.get(hwnd.ptr) {
         if let Some(scroll_state) = &wnd.scroll_state {
             if scroll_state.momentum.is_some() {
@@ -936,7 +941,11 @@ fn stop_momentum_scroll(wm: Wm, wnds: RefMut<'_, Pool<Wnd>>, hwnd: HWnd) -> RefM
 }
 
 /// Abort an ongoing scroll gesture.
-fn stop_scroll(wm: Wm, mut wnds: RefMut<'_, Pool<Wnd>>, hwnd: HWnd) -> RefMut<'_, Pool<Wnd>> {
+fn stop_scroll(
+    wm: Wm,
+    mut wnds: RefMut<'_, LeakyPool<Wnd>>,
+    hwnd: HWnd,
+) -> RefMut<'_, LeakyPool<Wnd>> {
     if let Some(wnd) = wnds.get_mut(hwnd.ptr) {
         if let Some(scroll_state) = wnd.scroll_state.take() {
             if let Some(momentum_state) = &scroll_state.momentum {
@@ -986,7 +995,7 @@ pub struct TcwWndWidget {
     parent_instance: gtk_sys::GtkDrawingArea,
     /// Stores `HWnd`. This field is only touched by a main thread, so it's safe
     /// to access through `Cell`.
-    wnd_ptr: Cell<usize>,
+    wnd_ptr: Cell<WndPtr>,
 }
 
 #[repr(C)]
@@ -995,13 +1004,15 @@ pub struct TcwWndWidgetClass {
     parent_class: gtk_sys::GtkDrawingAreaClass,
 }
 
+type WndPtr = Option<PoolPtr<Wnd>>;
+
 impl WndWidget {
     fn new(_: Wm) -> Self {
         // We have `Wm`, so we know we are on the main thread, hence this is safe
         unsafe { gtk::Widget::from_glib_none(tcw_wnd_widget_new()).unsafe_cast() }
     }
 
-    fn wnd_ptr(&self) -> &Cell<usize> {
+    fn wnd_ptr(&self) -> &Cell<WndPtr> {
         unsafe { &(*self.as_ptr()).wnd_ptr }
     }
 }

@@ -1,22 +1,22 @@
 use glib::source::SourceId;
-use iterpool::{Pool, PoolPtr};
+use leakypool::{LeakyPool, PoolPtr};
 
 pub struct TimerPool {
     // TODO: `SourceId` doesn't use `NonZero`... maybe send a PR
-    pool: Pool<(u64, Option<SourceId>)>,
+    pool: LeakyPool<(u64, Option<SourceId>)>,
     next_token: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {
-    ptr: PoolPtr,
+    ptr: PoolPtr<(u64, Option<SourceId>)>,
     token: u64,
 }
 
 impl TimerPool {
     pub const fn new() -> Self {
         Self {
-            pool: Pool::new(),
+            pool: LeakyPool::new(),
             next_token: 0,
         }
     }
