@@ -32,7 +32,7 @@ impl fmt::Debug for HWnd {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HLayer {
-    sr_layer: swrast::HLayer,
+    sr_layer: swrast::HLayer<Bitmap>,
 }
 
 impl fmt::Debug for HLayer {
@@ -48,7 +48,7 @@ struct State {
 }
 
 pub struct Wnd {
-    sr_wnd: swrast::HWnd,
+    sr_wnd: swrast::HWnd<Bitmap>,
 
     dpi_scale: f32,
     focused: bool,
@@ -399,7 +399,9 @@ struct BadHWndError;
 
 /// Convert the `LayerAttrs` of `Wm` to the `LayerAttrs` of `swrast`.
 /// Copied straight from `unix/comp.rs`.
-fn layer_attrs_to_sr_layer_attrs(attrs: LayerAttrs) -> iface::LayerAttrs<Bitmap, swrast::HLayer> {
+fn layer_attrs_to_sr_layer_attrs(
+    attrs: LayerAttrs,
+) -> iface::LayerAttrs<Bitmap, swrast::HLayer<Bitmap>> {
     iface::LayerAttrs {
         transform: attrs.transform,
         contents: attrs.contents,
