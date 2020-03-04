@@ -1,6 +1,7 @@
+use array_intrusive_list::{Link, ListAccessorCell, ListHead};
 use arrayvec::ArrayVec;
 use bitflags::bitflags;
-use iterpool::{intrusive_list, IterablePool, PoolPtr};
+use leakypool::{LeakyPool, PoolPtr};
 use sorted_diff::{sorted_diff, In};
 use std::{
     cell::{Cell, RefCell},
@@ -32,15 +33,22 @@ pub struct Manager {
     wm: pal::Wm,
     sheet_set: RefCell<SheetSet>,
     new_set_handlers: RefCell<SubscriberList<ManagerNewSheetSetCb>>,
-    elems: RefCell<IterablePool<ElemInner>>,
+    elems: RefCell<ElemPool>,
+    /// All elements in `elems`.
+    all_elems: Cell<ElemListHead>,
     /// Use `dirty_list_accessor` to interact with this linked list.
-    dirty_elems: Cell<intrusive_list::ListHead>,
+    dirty_elems: Cell<ElemListHead>,
     refresh_scheduled: Cell<bool>,
     sheet_set_invalidated: Cell<bool>,
     /// Renewed on every refresh. Used to ensure no elements are recalculated
     /// more than once per refresh.
     refresh_token: Cell<u64>,
 }
+
+type ElemPool = LeakyPool<ElemInner>;
+type ElemPtr = PoolPtr<ElemInner>;
+type ElemListHead = ListHead<ElemPtr>;
+type ElemLink = Link<ElemPtr>;
 
 impl fmt::Debug for Manager {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -50,6 +58,7 @@ impl fmt::Debug for Manager {
             .field("set_change_handlers", &())
             .field("new_set_handlers", &())
             .field("elems", &self.elems)
+            .field("all_elems", &self.all_elems)
             .field("dirty_elems", &self.dirty_elems)
             .field("refresh_scheduled", &self.refresh_scheduled)
             .field("sheet_set_invalidated", &self.sheet_set_invalidated)
@@ -63,12 +72,18 @@ mt_lazy_static! {
 }
 
 /// Construct a `ListAccessorCell` that can be used to interact with
+/// the whole list of an `Elem`.
+macro_rules! all_list_accessor {
+    ($manager:expr, $elems:expr) => {
+        ListAccessorCell::new(&$manager.all_elems, $elems, |e: &ElemInner| &e.all_link)
+    };
+}
+
+/// Construct a `ListAccessorCell` that can be used to interact with
 /// the children list of an `Elem`.
 macro_rules! dirty_list_accessor {
     ($manager:expr, $elems:expr) => {
-        intrusive_list::ListAccessorCell::new(&$manager.dirty_elems, $elems, |e: &ElemInner| {
-            &e.dirty_link
-        })
+        ListAccessorCell::new(&$manager.dirty_elems, $elems, |e: &ElemInner| &e.dirty_link)
     };
 }
 
@@ -76,7 +91,7 @@ macro_rules! dirty_list_accessor {
 /// the children list of an `Elem`.
 macro_rules! child_accessor {
     ($head:expr, $elems:expr) => {
-        intrusive_list::ListAccessorCell::new($head, $elems, |e: &ElemInner| &e.sibling)
+        ListAccessorCell::new($head, $elems, |e: &ElemInner| &e.sibling)
     };
 }
 
@@ -88,8 +103,9 @@ impl Manager {
             wm,
             sheet_set: RefCell::new(SheetSet { sheets: Vec::new() }),
             new_set_handlers: RefCell::new(SubscriberList::new()),
-            elems: RefCell::new(IterablePool::new()),
-            dirty_elems: Cell::new(intrusive_list::ListHead::new()),
+            elems: RefCell::new(LeakyPool::new()),
+            all_elems: Cell::new(ListHead::new()),
+            dirty_elems: Cell::new(ListHead::new()),
             refresh_scheduled: Cell::new(false),
             sheet_set_invalidated: Cell::new(false),
             refresh_token: Cell::new(0),
@@ -126,7 +142,7 @@ impl Manager {
 
         // All elements are to be recalculated
         let elems = self.elems.borrow();
-        for (ptr, el) in elems.ptr_iter() {
+        for (ptr, el) in all_list_accessor!(self, &*elems).iter() {
             if el.parent.get().is_some() {
                 // Children are transitively scanned when their parents have
                 // a dirty flag, so there's no point in adding the children to
@@ -208,8 +224,8 @@ impl Manager {
 
     fn refresh_traverse(
         &self,
-        elem_ptr: PoolPtr,
-        elems: &IterablePool<ElemInner>,
+        elem_ptr: ElemPtr,
+        elems: &ElemPool,
         path: &mut ElemClassPathBuf,
         sheet_set: &SheetSet,
     ) {
@@ -437,7 +453,7 @@ impl Prop {
 /// styling properties of the corresponding styled element are updated.
 pub struct Elem {
     style_manager: &'static Manager,
-    ptr: PoolPtr,
+    ptr: ElemPtr,
 }
 
 impl fmt::Debug for Elem {
@@ -451,7 +467,7 @@ impl fmt::Debug for Elem {
 /// Identifies an instance of [`Elem`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HElem {
-    ptr: PoolPtr,
+    ptr: ElemPtr,
 }
 
 pub type ElemChangeCb = Box<dyn Fn(pal::Wm, PropKindFlags)>;
@@ -462,14 +478,16 @@ struct ElemInner {
     /// The function called when property values might have changed.
     change_handler: RefCell<ElemChangeCb>,
 
-    parent: Cell<Option<PoolPtr>>,
+    parent: Cell<Option<ElemPtr>>,
     /// Use `child_accessor` to interact with this linked list.
-    children: Cell<intrusive_list::ListHead>,
+    children: Cell<ElemListHead>,
     /// Used by `child_accessor`
-    sibling: Cell<Option<intrusive_list::Link>>,
+    sibling: Cell<Option<ElemLink>>,
 
+    /// Used by `all_list_accessor`. Forms the linked list `Manager::all_elems`.
+    all_link: Cell<Option<ElemLink>>,
     /// Used by `dirty_list_accessor`
-    dirty_link: Cell<Option<intrusive_list::Link>>,
+    dirty_link: Cell<Option<ElemLink>>,
     dirty: Cell<bool>,
     refresh_token: Cell<u64>,
 }
@@ -518,6 +536,9 @@ impl Drop for Elem {
         // Remove all children
         child_accessor!(&this_el.children, &*elems).clear();
 
+        // Remov `self` from `all_elems`
+        all_list_accessor!(self.style_manager, &*elems).remove(self.ptr);
+
         // Schedule a refresh because dirty flags might have been set for some
         // elements
         self.style_manager.schedule_refresh();
@@ -537,17 +558,22 @@ impl Elem {
             change_handler: RefCell::new(Box::new(|_, _| {})),
 
             parent: Cell::new(None),
-            children: Cell::new(intrusive_list::ListHead::new()),
+            children: Cell::new(ListHead::new()),
             sibling: Cell::new(None),
 
+            all_link: Cell::new(None),
             dirty_link: Cell::new(None),
             dirty: Cell::new(false),
             refresh_token: Cell::new(0),
         };
 
-        let ptr = style_manager.elems.borrow_mut().allocate(inner);
+        let mut elems = style_manager.elems.borrow_mut();
 
-        add_elem_to_dirty_list(style_manager, ptr, &style_manager.elems.borrow());
+        let ptr = elems.allocate(inner);
+
+        all_list_accessor!(style_manager, &*elems).push_back(ptr);
+
+        add_elem_to_dirty_list(style_manager, ptr, &*elems);
         style_manager.schedule_refresh();
 
         Self { style_manager, ptr }
@@ -640,7 +666,7 @@ impl Elem {
 }
 
 /// Add `self` to the dirty element list.
-fn add_elem_to_dirty_list(style_manager: &Manager, ptr: PoolPtr, elems: &IterablePool<ElemInner>) {
+fn add_elem_to_dirty_list(style_manager: &Manager, ptr: ElemPtr, elems: &ElemPool) {
     let this_el = &elems[ptr];
     if !this_el.dirty.get() {
         this_el.dirty.set(true);
@@ -648,11 +674,7 @@ fn add_elem_to_dirty_list(style_manager: &Manager, ptr: PoolPtr, elems: &Iterabl
     }
 }
 
-fn elem_get_class_path(
-    mut ptr: PoolPtr,
-    elems: &IterablePool<ElemInner>,
-    out: &mut ElemClassPathBuf,
-) {
+fn elem_get_class_path(mut ptr: ElemPtr, elems: &ElemPool, out: &mut ElemClassPathBuf) {
     out.clear();
 
     while let Some(next) = {
