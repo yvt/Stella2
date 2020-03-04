@@ -94,6 +94,9 @@ unsafe impl TokenStore for LeakyToken {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Lazy wrapper
+
 /// An implementation of [`TokenStore`] that creates the inner token lazily.
 ///
 /// `Inner` is expected to be `TokenStore<Token = Self>`.
@@ -155,6 +158,9 @@ where
         self.inner.get_or_insert_with(Self::new_inner).id()
     }
 }
+
+// ----------------------------------------------------------------------------
+// Unchecked token
 
 /// An implementation of [`TokenStore`] that does not perform runtime checks.
 #[derive(Debug)]
