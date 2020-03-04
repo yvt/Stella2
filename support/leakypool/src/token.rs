@@ -1,6 +1,8 @@
+use quick_error::quick_error;
 use std::{
+    marker::PhantomData,
     num::NonZeroUsize,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 /// A counter-based unforgeable token used to access the contents of
@@ -195,6 +197,165 @@ unsafe impl TokenStore for UncheckedToken {
     }
     fn id(&mut self) -> Self::TokenId {
         ()
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Singleton token
+
+/// This is an implementation detail of [`singleton_tag!`].
+pub unsafe trait SingletonTag: 'static {
+    /// Get a reference to the flag variable indicating whether the token with
+    /// this tag has already been created or not.
+    #[doc(hidden)]
+    fn usage_flag() -> &'static AtomicBool;
+}
+
+/// Defines a tag type for a singleton token.
+///
+/// # Examples
+///
+///     use leakypool::{
+///         LeakyPool, PoolPtr, SingletonToken, SingletonTokenId, LazyToken,
+///     };
+///
+///     leakypool::singleton_tag!(struct Tag);
+///     type Pool<Element> = LeakyPool<Element, LazyToken<SingletonToken<Tag>>>;
+///     type Ptr<Element> = PoolPtr<Element, SingletonTokenId<Tag>>;
+///
+///     // Since `LazyToken` is used here, `SingletonToken<Tag>` is created by
+///     // `SingletonToken::<Tag>::default()` when the first element is inserted
+///     let mut pool: Pool<u32> = Pool::new();
+///     let ptr: Ptr<u32> = pool.allocate(1);
+///     assert_eq!(pool[ptr], 1);
+///
+///     // Subsequent creation will fail because there can be only one
+///     // instance of `SingletonToken<Tag>`
+///     assert!(SingletonToken::<Tag>::try_new().is_err());
+///
+#[macro_export]
+macro_rules! singleton_tag {
+    {
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident $(;)?
+    } => {
+        $(#[$meta])*
+        #[derive(Debug)]
+        $vis struct $name;
+
+        unsafe impl $crate::SingletonTag for $name {
+            fn usage_flag() -> &'static ::std::sync::atomic::AtomicBool {
+                static FLAG: ::std::sync::atomic::AtomicBool =
+                    ::std::sync::atomic::AtomicBool::new(false);
+                &FLAG
+            }
+        }
+    };
+}
+
+/// An implementation of [`TokenStore`] as a singleton object.
+///
+/// The constructor ensures there are no existing instances of the token using
+/// a global flag variable.
+///
+/// Since there can be only one instance of `SingletonToken<Tag>`, the token
+/// is zero-sized and incurs zero runtime overhead for token comparisons.
+#[derive(Debug)]
+pub struct SingletonToken<Tag> {
+    _tag: PhantomData<Tag>,
+    _ctor_is_private: (),
+}
+
+/// The `TokenId` type of [`SingletonToken`].
+#[derive(Debug)]
+pub struct SingletonTokenId<Tag> {
+    _tag: PhantomData<Tag>,
+    _ctor_is_private: (),
+}
+
+quick_error! {
+    #[derive(Debug, PartialEq, Eq, Hash)]
+    pub enum NewSingletonTokenError {
+        /// The token cannot be constructed because there is already one.
+        AlreadyInstantiated {}
+    }
+}
+
+impl<Tag: SingletonTag> Default for SingletonToken<Tag> {
+    /// Calls `Self::new`.
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Tag> SingletonToken<Tag> {
+    /// Construct an `SingletonToken` without checking the uniqueness.
+    pub unsafe fn new_unchecked() -> Self {
+        Self {
+            _tag: PhantomData,
+            _ctor_is_private: (),
+        }
+    }
+}
+
+impl<Tag: SingletonTag> SingletonToken<Tag> {
+    /// Construct an `SingletonToken`. Panics if there already is an instance
+    /// of `SingletonToken<Tag>`.
+    #[inline]
+    pub fn new() -> Self {
+        // Since this function is marked as `#[cold]`, this code will probably
+        // be compiled into `lea` + `call`
+        singleton_set_usage_flag(Tag::usage_flag());
+        unsafe { Self::new_unchecked() }
+    }
+
+    /// Construct an `SingletonToken`.
+    ///
+    /// Prefer using `new` for code size optimization.
+    pub fn try_new() -> Result<Self, NewSingletonTokenError> {
+        singleton_set_usage_flag_inner(Tag::usage_flag())?;
+        Ok(unsafe { Self::new_unchecked() })
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn singleton_set_usage_flag(flag: &AtomicBool) {
+    singleton_set_usage_flag_inner(flag).unwrap();
+}
+
+fn singleton_set_usage_flag_inner(flag: &AtomicBool) -> Result<(), NewSingletonTokenError> {
+    if flag.swap(true, Ordering::Relaxed) {
+        Err(NewSingletonTokenError::AlreadyInstantiated)
+    } else {
+        Ok(())
+    }
+}
+
+unsafe impl<Tag: 'static> tokenlock::Token<SingletonTokenId<Tag>> for SingletonToken<Tag> {
+    fn eq_id(&self, _: &SingletonTokenId<Tag>) -> bool {
+        true
+    }
+}
+
+// This is safe because for each `Tag` there is up to only one instance of
+// `SingletonToken<Tag>`.
+unsafe impl<Tag: 'static> TokenStore for SingletonToken<Tag> {
+    type Token = Self;
+    type TokenId = SingletonTokenId<Tag>;
+
+    fn token_ref(&self) -> &Self::Token {
+        self
+    }
+    fn token_mut(&mut self) -> &mut Self::Token {
+        self
+    }
+    fn id(&mut self) -> Self::TokenId {
+        SingletonTokenId {
+            _tag: PhantomData,
+            _ctor_is_private: (),
+        }
     }
 }
 
