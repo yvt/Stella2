@@ -1,5 +1,5 @@
 use array_intrusive_list::{Link, ListHead};
-use leakypool::LeakyPool;
+use leakypool::{LeakyPool, UncheckedToken};
 use quick_error::quick_error;
 use std::{cell::RefCell, fmt, sync::Arc};
 use tcw3_pal::{self as pal, iface::Wm as _, Bitmap, MtLock, MtSticky, Wm};
@@ -185,15 +185,15 @@ static CACHE: MtLock<RefCell<Cache>> = MtLock::new(RefCell::new(unsafe { Cache::
 //
 #[derive(Debug)]
 struct Cache {
-    imgs: LeakyPool<CacheImg>,
-    bmps: LeakyPool<CacheBmp>,
+    imgs: LeakyPool<CacheImg, UncheckedToken>,
+    bmps: LeakyPool<CacheBmp, UncheckedToken>,
     // Mappings from `DpiScale` to `CacheDpiScale`. Hashtables would be overkill
     // for such a small number of elements.
     dpi_scales: Vec<CacheDpiScale>,
 }
 
-type ImgPtr = leakypool::PoolPtr<CacheImg>;
-type BmpPtr = leakypool::PoolPtr<CacheBmp>;
+type ImgPtr = leakypool::PoolPtr<CacheImg, ()>;
+type BmpPtr = leakypool::PoolPtr<CacheBmp, ()>;
 
 /// A known DPI scale.
 #[derive(Debug)]
@@ -240,8 +240,8 @@ impl Cache {
     /// other instances of `Cache`.
     const unsafe fn new() -> Self {
         Self {
-            imgs: LeakyPool::new(),
-            bmps: LeakyPool::new(),
+            imgs: LeakyPool::new_unchecked(),
+            bmps: LeakyPool::new_unchecked(),
             dpi_scales: Vec::new(),
         }
     }
