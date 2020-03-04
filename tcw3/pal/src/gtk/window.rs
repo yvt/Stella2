@@ -5,7 +5,7 @@ use glib::{
     translate::{FromGlibPtrBorrow, FromGlibPtrFull, FromGlibPtrNone, ToGlibPtr},
 };
 use gtk::prelude::*;
-use leakypool::{LeakyPool, PoolPtr};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use std::{
     cell::{Cell, RefCell, RefMut},
     num::Wrapping,
@@ -19,10 +19,14 @@ use crate::{iface, iface::Wm as WmTrait, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
-    ptr: PoolPtr<Wnd>,
+    ptr: WndPoolPtr,
 }
 
-static WNDS: MtSticky<RefCell<LeakyPool<Wnd>>, Wm> = {
+leakypool::singleton_tag!(struct Tag);
+type WndPool = LeakyPool<Wnd, LazyToken<SingletonToken<Tag>>>;
+type WndPoolPtr = PoolPtr<Wnd, SingletonTokenId<Tag>>;
+
+static WNDS: MtSticky<RefCell<WndPool>, Wm> = {
     // `Wnd` is `!Send`, but there is no instance at this point, so this is safe
     unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
 };
@@ -30,7 +34,7 @@ static WNDS: MtSticky<RefCell<LeakyPool<Wnd>>, Wm> = {
 pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>, Wm> =
     MtSticky::new(RefCell::new(comp::Compositor::new()));
 
-static DRAWING_WND: MtSticky<Cell<Option<PoolPtr<Wnd>>>, Wm> = MtSticky::new(Cell::new(None));
+static DRAWING_WND: MtSticky<Cell<Option<WndPoolPtr>>, Wm> = MtSticky::new(Cell::new(None));
 
 struct Wnd {
     gtk_wnd: gtk::Window,
@@ -365,7 +369,7 @@ impl HWnd {
         userdata: glib_sys::gpointer,
     ) -> glib_sys::gboolean {
         let wm = unsafe { Wm::global_unchecked() };
-        let ptr: PoolPtr<Wnd> = unsafe { PoolPtr::from_raw(NonNull::new_unchecked(userdata as _)) };
+        let ptr: WndPoolPtr = unsafe { PoolPtr::from_raw(NonNull::new_unchecked(userdata as _)) };
         let hwnd = HWnd { ptr };
 
         let listener = {
@@ -924,11 +928,7 @@ fn eval_deceleration(t: u32) -> (f32, f32) {
 }
 
 /// Abort an ongoing scroll gesture if it's currently in the momentum phase.
-fn stop_momentum_scroll(
-    wm: Wm,
-    wnds: RefMut<'_, LeakyPool<Wnd>>,
-    hwnd: HWnd,
-) -> RefMut<'_, LeakyPool<Wnd>> {
+fn stop_momentum_scroll(wm: Wm, wnds: RefMut<'_, WndPool>, hwnd: HWnd) -> RefMut<'_, WndPool> {
     if let Some(wnd) = wnds.get(hwnd.ptr) {
         if let Some(scroll_state) = &wnd.scroll_state {
             if scroll_state.momentum.is_some() {
@@ -941,11 +941,7 @@ fn stop_momentum_scroll(
 }
 
 /// Abort an ongoing scroll gesture.
-fn stop_scroll(
-    wm: Wm,
-    mut wnds: RefMut<'_, LeakyPool<Wnd>>,
-    hwnd: HWnd,
-) -> RefMut<'_, LeakyPool<Wnd>> {
+fn stop_scroll(wm: Wm, mut wnds: RefMut<'_, WndPool>, hwnd: HWnd) -> RefMut<'_, WndPool> {
     if let Some(wnd) = wnds.get_mut(hwnd.ptr) {
         if let Some(scroll_state) = wnd.scroll_state.take() {
             if let Some(momentum_state) = &scroll_state.momentum {
@@ -1004,7 +1000,7 @@ pub struct TcwWndWidgetClass {
     parent_class: gtk_sys::GtkDrawingAreaClass,
 }
 
-type WndPtr = Option<PoolPtr<Wnd>>;
+type WndPtr = Option<WndPoolPtr>;
 
 impl WndWidget {
     fn new(_: Wm) -> Self {
