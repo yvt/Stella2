@@ -1,4 +1,4 @@
-use leakypool::{LeakyPool, PoolPtr};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use std::{
     cell::{Cell, RefCell},
     mem::MaybeUninit,
@@ -40,10 +40,14 @@ static MSG_HWND: AtomicUsize = AtomicUsize::new(0);
 /// `HANDLE`
 static MAIN_HTHREAD: AtomicUsize = AtomicUsize::new(0);
 
-static TIMERS: MtSticky<RefCell<LeakyPool<Timer>>, Wm> = {
+static TIMERS: MtSticky<RefCell<TimerPool>, Wm> = {
     // `Timer` is `!Send`, but there is no instance at this point, so this is safe
     unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
 };
+
+leakypool::singleton_tag!(struct Tag);
+type TimerPool = LeakyPool<Timer, LazyToken<SingletonToken<Tag>>>;
+type TimerPoolPtr = PoolPtr<Timer, SingletonTokenId<Tag>>;
 
 struct Timer {
     token: u64,
@@ -54,7 +58,7 @@ static NEXT_TIMER_TOKEN: MtSticky<Cell<u64>, Wm> = MtSticky::new(Cell::new(0));
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {
-    ptr: PoolPtr<Timer>,
+    ptr: TimerPoolPtr,
     token: u64,
 }
 
