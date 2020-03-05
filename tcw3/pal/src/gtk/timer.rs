@@ -1,22 +1,27 @@
 use glib::source::SourceId;
-use iterpool::{Pool, PoolPtr};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
+
+leakypool::singleton_tag!(struct Tag);
+type InvokePool = LeakyPool<(u64, Option<SourceId>), LazyToken<SingletonToken<Tag>>>;
+type InvokePoolPtr = PoolPtr<(u64, Option<SourceId>), SingletonTokenId<Tag>>;
 
 pub struct TimerPool {
     // TODO: `SourceId` doesn't use `NonZero`... maybe send a PR
-    pool: Pool<(u64, Option<SourceId>)>,
+    pool: InvokePool,
     next_token: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {
-    ptr: PoolPtr,
+    ptr: InvokePoolPtr,
     token: u64,
 }
 
 impl TimerPool {
+    /// This can be called only once because `TimerPool` uses `SingletonToken`.
     pub const fn new() -> Self {
         Self {
-            pool: Pool::new(),
+            pool: LeakyPool::new(),
             next_token: 0,
         }
     }

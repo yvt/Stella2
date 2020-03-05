@@ -10,6 +10,7 @@ testing = ["tcw3_pal/testing", "tcw3_testing/testing"]
 
 [dependencies]
 alt_fp = { path = "../support/alt_fp" }
+array_intrusive_list = { path = "../support/array_intrusive_list" }
 arrayvec = "0.5"
 as_any = { path = "../support/as_any" }
 bitflags = "1.1.0"
@@ -20,6 +21,7 @@ flags-macro = "0.1.3"
 iterpool = { path = "../support/iterpool" }
 itertools = "0.8.0"
 lazy_static = "1"
+leakypool = { path = "../support/leakypool" }
 log = "0.4"
 minisort = { path = "../support/minisort" }
 ndarray = "0.13.0"

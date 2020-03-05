@@ -1,4 +1,4 @@
-use iterpool::{Pool, PoolPtr};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use std::{
     cell::{Cell, RefCell},
     mem::MaybeUninit,
@@ -40,10 +40,14 @@ static MSG_HWND: AtomicUsize = AtomicUsize::new(0);
 /// `HANDLE`
 static MAIN_HTHREAD: AtomicUsize = AtomicUsize::new(0);
 
-static TIMERS: MtSticky<RefCell<Pool<Timer>>, Wm> = {
+static TIMERS: MtSticky<RefCell<TimerPool>, Wm> = {
     // `Timer` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
+    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
 };
+
+leakypool::singleton_tag!(struct Tag);
+type TimerPool = LeakyPool<Timer, LazyToken<SingletonToken<Tag>>>;
+type TimerPoolPtr = PoolPtr<Timer, SingletonTokenId<Tag>>;
 
 struct Timer {
     token: u64,
@@ -54,7 +58,7 @@ static NEXT_TIMER_TOKEN: MtSticky<Cell<u64>, Wm> = MtSticky::new(Cell::new(0));
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {
-    ptr: PoolPtr,
+    ptr: TimerPoolPtr,
     token: u64,
 }
 
@@ -135,8 +139,8 @@ pub fn invoke_after(wm: Wm, delay: Range<Duration>, f: Box<dyn FnOnce(Wm)>) -> H
         .allocate(Timer { token, handler: f });
 
     // Derive a timer ID from the `PoolPtr`. the timer ID must be nonzero,
-    // which is upheld by the fact that `PoolPtr` is backed by `NonZeroUsize`.
-    let timer_id = ptr.0.get();
+    // which is upheld by the fact that `PoolPtr` is backed by `std::ptr::NonZero`.
+    let timer_id = ptr.into_raw().as_ptr() as usize;
     debug_assert_ne!(timer_id, 0);
 
     // `SetCoalescableTimer` needs Win 8 or later
@@ -174,7 +178,7 @@ pub fn cancel_invoke(wm: Wm, hinvoke: &HInvoke) {
 
     // Derive a timer ID from the `PoolPtr` (must be done in the same way
     // as `invoke_after` does).
-    let timer_id = hinvoke.ptr.0.get();
+    let timer_id = hinvoke.ptr.into_raw().as_ptr() as usize;
 
     unsafe {
         KillTimer(hwnd, timer_id);
@@ -346,7 +350,7 @@ extern "system" fn msg_wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: L
             let timer_id = wparam as UINT_PTR;
 
             let mut timers = TIMERS.get_with_wm(wm).borrow_mut();
-            let ptr = PoolPtr(std::num::NonZeroUsize::new(timer_id).unwrap());
+            let ptr = unsafe { PoolPtr::from_raw(std::ptr::NonNull::new(timer_id as _).unwrap()) };
             let timer = if let Some(timer) = timers.deallocate(ptr) {
                 timer
             } else {

@@ -19,7 +19,7 @@ pub(super) struct Compositor {
 
 pub struct Wnd {
     cairo_img: Option<ImageSurface>,
-    sr_wnd: swrast::HWnd,
+    sr_wnd: swrast::HWnd<Bitmap>,
 
     surf_size: [usize; 2],
     surf_dpi_scale: f32,
@@ -29,7 +29,7 @@ pub struct Wnd {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct HLayer {
-    sr_layer: swrast::HLayer,
+    sr_layer: swrast::HLayer<Bitmap>,
 }
 
 impl Compositor {
@@ -156,7 +156,9 @@ impl Compositor {
 }
 
 /// Convert the `LayerAttrs` of `Wm` to the `LayerAttrs` of `swrast`.
-fn layer_attrs_to_sr_layer_attrs(attrs: LayerAttrs) -> iface::LayerAttrs<Bitmap, swrast::HLayer> {
+fn layer_attrs_to_sr_layer_attrs(
+    attrs: LayerAttrs,
+) -> iface::LayerAttrs<Bitmap, swrast::HLayer<Bitmap>> {
     iface::LayerAttrs {
         transform: attrs.transform,
         contents: attrs.contents,

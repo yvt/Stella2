@@ -1,12 +1,13 @@
 //! Extends `Wm` for interoperability with futures (`std::future::Future`).
 use futures::task::{FutureObj, LocalFutureObj, LocalSpawn, Spawn, SpawnError};
-use iterpool::{Pool, PoolPtr};
+use leakypool::{LeakyPool, PoolPtr};
 use std::{
     cell::{Cell, RefCell, UnsafeCell},
     fmt,
     future::Future,
     ops::Range,
     pin::Pin,
+    ptr::NonNull,
     rc::Rc,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
     time::Duration,
@@ -48,9 +49,9 @@ impl WmFuturesExt for Wm {
 
 // ============================================================================
 
-static TASKS: MtSticky<RefCell<Pool<Task>>> = {
+static TASKS: MtSticky<RefCell<LeakyPool<Task>>> = {
     // `Task` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(Pool::new())) }
+    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
 };
 
 struct Task {
@@ -87,7 +88,7 @@ impl LocalSpawn for WmSpawner {
 
 /// Progress a task. The call stack should not include another activation of
 /// `pend_task`.
-fn pend_task(wm: Wm, task_id: PoolPtr) {
+fn pend_task(wm: Wm, task_id: PoolPtr<Task>) {
     let mut future: LocalFutureObj<'static, ()>;
 
     if let Some(task) = TASKS.get_with_wm(wm).borrow_mut().get_mut(task_id) {
@@ -116,16 +117,16 @@ fn pend_task(wm: Wm, task_id: PoolPtr) {
     }
 }
 
-fn wm_waker(task_id: PoolPtr) -> Waker {
-    const fn wm_raw_waker(task_id: PoolPtr) -> RawWaker {
+fn wm_waker(task_id: PoolPtr<Task>) -> Waker {
+    fn wm_raw_waker(task_id: PoolPtr<Task>) -> RawWaker {
         let vtable: &'static RawWakerVTable =
             &RawWakerVTable::new(wm_waker_clone, wm_waker_wake, wm_waker_wake, wm_waker_drop);
 
-        RawWaker::new(task_id.0.get() as *const (), vtable)
+        RawWaker::new(task_id.into_raw().as_ptr() as *const (), vtable)
     }
 
-    unsafe fn data_to_task_id(data: *const ()) -> PoolPtr {
-        PoolPtr(std::num::NonZeroUsize::new_unchecked(data as usize))
+    unsafe fn data_to_task_id(data: *const ()) -> PoolPtr<Task> {
+        PoolPtr::from_raw(NonNull::new_unchecked(data as *mut ()))
     }
 
     unsafe fn wm_waker_clone(data: *const ()) -> RawWaker {

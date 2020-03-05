@@ -1266,6 +1266,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
+name = "leakypool"
+version = "0.1.0"
+dependencies = [
+ "quick-error",
+ "tokenlock",
+ "try_match",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2604,6 +2613,7 @@ name = "tcw3"
 version = "0.1.0"
 dependencies = [
  "alt_fp",
+ "array_intrusive_list",
  "arrayvec 0.5.1",
  "as_any",
  "bitflags",
@@ -2616,6 +2626,7 @@ dependencies = [
  "iterpool",
  "itertools",
  "lazy_static",
+ "leakypool",
  "lipsum",
  "log",
  "minisort",
@@ -2687,9 +2698,10 @@ version = "0.1.0"
 dependencies = [
  "alt_fp",
  "array",
+ "array_intrusive_list",
  "cggeom",
  "cgmath",
- "iterpool",
+ "leakypool",
  "quick-error",
  "tcw3_pal",
 ]
@@ -2742,6 +2754,7 @@ dependencies = [
  "iterpool",
  "itertools",
  "lazy_static",
+ "leakypool",
  "log",
  "neo_linked_list",
  "objc",
@@ -2830,6 +2843,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "tokenlock"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3bf66cac520f41df450d2d661bf302f3fbdf4302bd5eccc77d34c272221f669"
 
 [[package]]
 name = "try_match"
