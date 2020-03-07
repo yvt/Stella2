@@ -25,7 +25,10 @@ use objc::{msg_send, sel, sel_impl};
 
 mod timer;
 mod window;
-pub use self::{timer::HInvoke, window::HWnd};
+pub use self::{
+    timer::HInvoke,
+    window::{HTextInputCtx, HWnd},
+};
 
 use self::utils::{is_main_thread, IdRef};
 
@@ -43,6 +46,7 @@ impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
+    type HTextInputCtx = HTextInputCtx;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -140,5 +144,21 @@ impl iface::Wm for Wm {
     }
     fn remove_layer(self, layer: &Self::HLayer) {
         layer.remove(self);
+    }
+
+    fn new_text_input_ctx(
+        self,
+        _hwnd: &Self::HWnd,
+        _listener: Box<dyn iface::TextInputCtxListener<Self>>,
+    ) -> Self::HTextInputCtx {
+        HTextInputCtx {}
+    }
+
+    fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, _active: bool) {
+        // TODO
+    }
+
+    fn remove_text_input_ctx(self, _: &Self::HTextInputCtx) {
+        // TODO
     }
 }

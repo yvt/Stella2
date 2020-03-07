@@ -40,6 +40,11 @@ pub struct HWnd {
     ctrler: IdRef,
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct HTextInputCtx {
+    // TODO
+}
+
 struct WndState {
     listener: RefCell<Box<dyn iface::WndListener<Wm>>>,
     layer: Cell<Option<HLayer>>,
