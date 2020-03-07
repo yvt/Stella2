@@ -123,6 +123,7 @@ use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
 mod eventloop;
 mod logging;
 mod screen;
+mod tictxlistenershim;
 mod uniqpool;
 pub mod wmapi;
 mod wndlistenershim;
@@ -444,6 +445,7 @@ impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
+    type HTextInputCtx = HTextInputCtx;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -703,6 +705,78 @@ impl iface::Wm for Wm {
             _ => unreachable!(),
         }
     }
+
+    fn new_text_input_ctx(
+        self,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
+    ) -> Self::HTextInputCtx {
+        match (self.backend_and_wm(), &hwnd.inner) {
+            (BackendAndWm::Native { wm }, HWndInner::Native(hwnd)) => {
+                let listener = Box::new(tictxlistenershim::NativeTextInputCtxListener(listener));
+                HTextInputCtx {
+                    inner: HTextInputCtxInner::Native(wm.new_text_input_ctx(hwnd, listener)),
+                }
+            }
+            (BackendAndWm::Testing, HWndInner::Testing(_hwnd)) => {
+                debug!("new_text_input_ctx({:?})", hwnd);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        match (self.backend_and_wm(), &htictx.inner) {
+            (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
+                wm.text_input_ctx_reset(htictx)
+            }
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+                debug!("text_input_ctx_reset({:?})", htictx);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        match (self.backend_and_wm(), &htictx.inner) {
+            (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
+                wm.text_input_ctx_on_selection_change(htictx)
+            }
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+                debug!("text_input_ctx_on_selection_change({:?})", htictx);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        match (self.backend_and_wm(), &htictx.inner) {
+            (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
+                wm.text_input_ctx_set_active(htictx, active)
+            }
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+                debug!("text_input_ctx_set_active({:?}, {:?})", htictx, active);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        match (self.backend_and_wm(), &htictx.inner) {
+            (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
+                wm.remove_text_input_ctx(htictx)
+            }
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+                debug!("remove_text_input_ctx({:?})", htictx);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -817,6 +891,26 @@ impl fmt::Debug for HInvoke {
 enum HInvokeInner {
     Native(native::HInvoke),
     Testing(eventloop::HInvoke),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct HTextInputCtx {
+    inner: HTextInputCtxInner,
+}
+
+impl fmt::Debug for HTextInputCtx {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.inner {
+            HTextInputCtxInner::Native(imp) => write!(f, "{:?}", imp),
+            HTextInputCtxInner::Testing(imp) => write!(f, "{:?}", imp),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum HTextInputCtxInner {
+    Native(native::HTextInputCtx),
+    Testing(()), // TODO
 }
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
