@@ -19,9 +19,10 @@ pub use self::{
 };
 
 mod comp;
+mod textinput;
 mod timer;
 mod window;
-pub use self::{comp::HLayer, timer::HInvoke, window::HWnd};
+pub use self::{comp::HLayer, textinput::HTextInputCtx, timer::HInvoke, window::HWnd};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
@@ -35,6 +36,7 @@ impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
+    type HTextInputCtx = HTextInputCtx;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -191,6 +193,22 @@ impl iface::Wm for Wm {
             .get_with_wm(self)
             .borrow_mut()
             .remove_layer(layer)
+    }
+
+    fn new_text_input_ctx(
+        self,
+        _hwnd: &Self::HWnd,
+        _listener: Box<dyn iface::TextInputCtxListener<Self>>,
+    ) -> Self::HTextInputCtx {
+        HTextInputCtx {}
+    }
+
+    fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, _active: bool) {
+        // TODO
+    }
+
+    fn remove_text_input_ctx(self, _: &Self::HTextInputCtx) {
+        // TODO
     }
 }
 
