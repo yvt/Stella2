@@ -137,6 +137,9 @@ pub type HLayer = <Wm as iface::Wm>::HLayer;
 /// The invocation handle type of [`Wm`].
 pub type HInvoke = <Wm as iface::Wm>::HInvoke;
 
+/// The text input context handle type of [`Wm`].
+pub type HTextInputCtx = <Wm as iface::Wm>::HTextInputCtx;
+
 /// A specialization of `WndAttrs` for the default backend.
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 
