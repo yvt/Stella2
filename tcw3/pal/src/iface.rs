@@ -668,7 +668,7 @@ pub trait TextInputCtxListener<T: Wm> {
     /// The client don't have to call the methods if they are not in `flags`.
     /// It can still do this, but the system will ignore the event and may have
     /// a negative performance ramification.
-    fn set_event_mask(&self, wm: T, _: &T::HTextInputCtx, flags: TextInputCtxEventFlags);
+    fn set_event_mask(&self, _wm: T, _: &T::HTextInputCtx, _flags: TextInputCtxEventFlags) {}
 }
 
 bitflags! {
