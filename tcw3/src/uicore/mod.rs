@@ -447,11 +447,18 @@ pub trait ViewListener {
     ///
     /// If the view has one or more associated layers, they should be created
     /// here. Also, it's advised to insert a call to [`HView::pend_update`] here.
+    ///
+    /// The window is materialized at this point.
     fn mount(&self, _: Wm, _: HViewRef<'_>, _: HWndRef<'_>) {}
 
     /// A view was removed from a window.
     ///
     /// The implementation should remove any associated layers.
+    ///
+    /// If the window is still existent, the window is still materialized at
+    /// this point. Note that you can't get the window by
+    /// `HViewRef::containing_wnd` because the view already has been detached
+    /// from the window's view hierarchy.
     fn unmount(&self, _: Wm, _: HViewRef<'_>) {}
 
     /// A view was repositioned, i.e., [`HView::global_frame`]`()` has been
@@ -736,6 +743,7 @@ impl HWnd {
         HWndRef;
         /// See the documentation of [`HWndRef`].
         pub fn close(&self);
+        pub fn pal_hwnd(&self) -> Option<pal::HWnd>;
         pub fn dpi_scale(&self) -> f32;
         pub fn subscribe_dpi_scale_changed(&self, cb: WndCb) -> Sub;
         pub fn is_focused(&self) -> bool;

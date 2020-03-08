@@ -30,6 +30,10 @@ impl HViewRef<'_> {
         if !dirty.get().contains(ViewDirtyFlags::MOUNTED) {
             dirty.set(dirty.get() | ViewDirtyFlags::MOUNTED);
 
+            // `mount`'s precondition requires that the window is materialized
+            // at this point
+            debug_assert!(hwnd.pal_hwnd().is_some());
+
             self.view.listener.borrow().mount(wm, self, hwnd);
         }
 
@@ -46,6 +50,13 @@ impl HViewRef<'_> {
             return;
         }
         dirty.set(dirty.get() - ViewDirtyFlags::MOUNTED);
+
+        // `unmount`'s precondition requires that, if the window is existent, the
+        // window is still materialized at this point. However, it's costly to
+        // assert that here because to do that `View` would have to have
+        // another weak reference to the window. As asserted below, `superview`
+        // no longer leads to the window:
+        debug_assert!(self.containing_wnd().is_none());
 
         self.view.listener.borrow().unmount(wm, self);
 

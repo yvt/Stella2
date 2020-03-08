@@ -39,6 +39,15 @@ struct RootSizeReq {
 }
 
 impl HWndRef<'_> {
+    /// Get the PAL window handle of the window.
+    ///
+    /// Returns `None` if the window hasn't been materialized yet or the window
+    /// has already been closed. Materialization takes place before the window
+    /// is updated and the subviews are mounted for the first time.
+    pub fn pal_hwnd(self) -> Option<pal::HWnd> {
+        self.wnd.pal_wnd.borrow().clone()
+    }
+
     fn ensure_materialized(self) {
         assert!(!self.wnd.closed.get(), "the window has been already closed");
 
