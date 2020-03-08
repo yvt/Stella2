@@ -41,7 +41,7 @@ impl iface::TextInputCtxListener<native::Wm> for NativeTextInputCtxListener {
         wm: native::Wm,
         htictx: &native::HTextInputCtx,
         mutating: bool,
-    ) -> Box<dyn iface::TextInputCtxEdit<native::Wm>> {
+    ) -> Box<dyn iface::TextInputCtxEdit<native::Wm> + '_> {
         let edit = forward!(self.0, edit, [wm: wm], [htictx: htictx], mutating);
 
         Box::new(NativeTextInputCtxEdit(edit))
@@ -58,9 +58,9 @@ impl iface::TextInputCtxListener<native::Wm> for NativeTextInputCtxListener {
 }
 
 /// Wraps `TextInputCtxEdit<Wm>` to create a `TextInputCtxEdit<native::Wm>`.
-struct NativeTextInputCtxEdit(Box<dyn iface::TextInputCtxEdit<Wm>>);
+struct NativeTextInputCtxEdit<'a>(Box<dyn iface::TextInputCtxEdit<Wm> + 'a>);
 
-impl iface::TextInputCtxEdit<native::Wm> for NativeTextInputCtxEdit {
+impl iface::TextInputCtxEdit<native::Wm> for NativeTextInputCtxEdit<'_> {
     fn selected_range(&mut self) -> Range<usize> {
         forward!(self.0, selected_range)
     }

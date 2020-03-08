@@ -658,7 +658,12 @@ pub trait TextInputCtxListener<T: Wm> {
     ///
     /// This method is called from the top level of a main event loop and is
     /// expected to be able to acquire a lock immediately.
-    fn edit(&self, wm: T, _: &T::HTextInputCtx, mutating: bool) -> Box<dyn TextInputCtxEdit<T>>;
+    fn edit(
+        &self,
+        wm: T,
+        _: &T::HTextInputCtx,
+        mutating: bool,
+    ) -> Box<dyn TextInputCtxEdit<T> + '_>;
 
     /// Indicate the set of events recognized by the system.
     ///
