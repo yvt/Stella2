@@ -1,6 +1,10 @@
 use cggeom::{prelude::*, Box2};
 use cgmath::Point2;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell, RefMut},
+    ops::Range,
+    rc::Rc,
+};
 
 use crate::{
     pal,
@@ -12,6 +16,7 @@ use crate::{
     },
     uicore::{
         CursorShape, HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener,
+        WeakHView,
     },
 };
 
@@ -88,8 +93,10 @@ pub struct EntryCore {
 
 #[derive(Debug)]
 struct Inner {
+    view: WeakHView,
     state: RefCell<State>,
     style_elem: theming::Elem,
+    tictx_event_mask: Cell<pal::TextInputCtxEventFlags>,
 }
 
 #[derive(Debug)]
@@ -97,6 +104,8 @@ struct State {
     text: String,
     text_layout_info: Option<TextLayoutInfo>,
     canvas: CanvasMixin,
+    tictx: Option<pal::HTextInputCtx>,
+    sel_range: [usize; 2],
 }
 
 #[derive(Debug)]
@@ -109,20 +118,27 @@ impl EntryCore {
     pub fn new(style_manager: &'static theming::Manager) -> Self {
         let style_elem = theming::Elem::new(style_manager);
 
+        let view = HView::new(
+            ViewFlags::default()
+                | ViewFlags::ACCEPT_MOUSE_OVER
+                | ViewFlags::ACCEPT_MOUSE_DRAG
+                | ViewFlags::TAB_STOP,
+        );
+        let weak_view = view.downgrade();
+
         let this = Self {
-            view: HView::new(
-                ViewFlags::default()
-                    | ViewFlags::ACCEPT_MOUSE_OVER
-                    | ViewFlags::ACCEPT_MOUSE_DRAG
-                    | ViewFlags::TAB_STOP,
-            ),
+            view,
             inner: Rc::new(Inner {
+                view: weak_view,
                 state: RefCell::new(State {
                     text: String::new(),
                     text_layout_info: None,
                     canvas: CanvasMixin::new(),
+                    tictx: None,
+                    sel_range: [0; 2],
                 }),
                 style_elem,
+                tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
             }),
         };
 
@@ -218,7 +234,8 @@ fn reapply_style(inner: &Rc<Inner>, view: HViewRef<'_>, kind_flags: PropKindFlag
     }
 }
 
-/// Implements `ViewListener`.
+/// Implements `ViewListener` and `TextInputCtxListener`.
+#[derive(Clone)]
 struct EntryCoreListener {
     inner: Rc<Inner>,
 }
@@ -232,10 +249,32 @@ impl EntryCoreListener {
 impl ViewListener for EntryCoreListener {
     fn mount(&self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
         self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
+
+        // TODO: Does `new_text_input_ctx` get a document lock? This should be
+        //       documented
+        let tictx = wm.new_text_input_ctx(&wnd.pal_hwnd().unwrap(), Box::new(self.clone()));
+
+        self.inner.state.borrow_mut().tictx = Some(tictx);
     }
 
     fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.unmount(wm, view);
+
+        if let Some(tictx) = self.inner.state.borrow_mut().tictx.take() {
+            wm.remove_text_input_ctx(&tictx);
+        }
+    }
+
+    fn focus_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
+        if let Some(tictx) = &self.inner.state.borrow().tictx {
+            wm.text_input_ctx_set_active(tictx, true);
+        }
+    }
+
+    fn focus_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
+        if let Some(tictx) = &self.inner.state.borrow().tictx {
+            wm.text_input_ctx_set_active(tictx, false);
+        }
     }
 
     fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
@@ -265,8 +304,102 @@ impl ViewListener for EntryCoreListener {
                 c.draw_text(&text_layout_info.text_layout, Point2::new(0.0, 0.0), color);
             });
 
+        // TODO: Display selection and caret
+
         if ctx.layers().len() != 1 {
             ctx.set_layers(vec![state.canvas.layer().unwrap().clone()]);
         }
+    }
+}
+
+impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
+    fn edit(
+        &self,
+        _: pal::Wm,
+        _: &pal::HTextInputCtx,
+        _mutating: bool,
+    ) -> Box<dyn pal::iface::TextInputCtxEdit<pal::Wm> + '_> {
+        Box::new(Edit {
+            state: self.inner.state.borrow_mut(),
+            view: self.inner.view.upgrade().unwrap(),
+        })
+    }
+
+    fn set_event_mask(
+        &self,
+        _: pal::Wm,
+        _: &pal::HTextInputCtx,
+        flags: pal::TextInputCtxEventFlags,
+    ) {
+        self.inner.tictx_event_mask.set(flags);
+    }
+}
+
+/// Implements `TextInputCtxEdit`.
+struct Edit<'a> {
+    state: RefMut<'a, State>,
+    view: HView,
+}
+
+impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
+    fn selected_range(&mut self) -> Range<usize> {
+        let [i1, i2] = self.state.sel_range;
+        i1..i2
+    }
+
+    fn set_selected_range(&mut self, range: Range<usize>) {
+        self.state.sel_range = [range.start, range.end];
+        self.view.pend_update();
+    }
+
+    fn set_composition_range(&mut self, range: Option<Range<usize>>) {
+        // TODO
+        log::warn!("set_composition_range({:?}): stub!", range);
+    }
+
+    fn replace(&mut self, range: Range<usize>, text: &str) {
+        use std::cmp::min;
+        let len = self.state.text.len();
+        let range = min(range.start, len)..min(range.end, len);
+
+        for i in self.state.sel_range.iter_mut() {
+            if *i >= range.end {
+                *i = *i - range.len() + text.len();
+            } else if *i >= range.start {
+                *i = range.start;
+            }
+        }
+
+        self.state.text.replace_range(range, text);
+
+        self.state.invalidate_text_layout();
+        self.state.canvas.pend_draw(self.view.as_ref());
+    }
+
+    fn slice(&mut self, range: Range<usize>) -> String {
+        self.state.text[range].to_owned()
+    }
+
+    fn len(&mut self) -> usize {
+        self.state.text.len()
+    }
+
+    fn index_from_point(
+        &mut self,
+        point: Point2<f32>,
+        flags: pal::IndexFromPointFlags,
+    ) -> Option<usize> {
+        log::warn!("index_from_point{:?}: stub!", (point, flags));
+        None
+    }
+
+    fn frame(&mut self) -> Box2<f32> {
+        self.view.global_frame()
+    }
+
+    fn slice_bounds(&mut self, range: Range<usize>) -> (Box2<f32>, usize) {
+        // TODO
+        log::warn!("slice_bounds({:?}): stub!", range);
+        (self.frame(), 0)
     }
 }
