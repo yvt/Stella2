@@ -30,6 +30,7 @@ members = [
     "support/rope",
     "support/subscriber_list",
     "support/sorted_diff",
+    "support/utf16count",
     "res/mkmacosbundle",
     "res/windres",
 ]
