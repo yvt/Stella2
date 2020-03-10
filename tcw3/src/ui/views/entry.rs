@@ -341,6 +341,18 @@ struct Edit<'a> {
     view: HView,
 }
 
+impl Edit<'_> {
+    fn check_range(&self, range: &Range<usize>) {
+        let len = self.state.text.len();
+        debug_assert!(
+            range.start <= len && range.end <= len,
+            "{:?} is out of range (len=({:?})",
+            range,
+            len
+        );
+    }
+}
+
 impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     fn selected_range(&mut self) -> Range<usize> {
         let [i1, i2] = self.state.sel_range;
@@ -348,19 +360,21 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 
     fn set_selected_range(&mut self, range: Range<usize>) {
+        self.check_range(&range);
+
         self.state.sel_range = [range.start, range.end];
         self.view.pend_update();
     }
 
     fn set_composition_range(&mut self, range: Option<Range<usize>>) {
+        range.as_ref().map(|r| self.check_range(r));
+
         // TODO
         log::warn!("set_composition_range({:?}): stub!", range);
     }
 
     fn replace(&mut self, range: Range<usize>, text: &str) {
-        use std::cmp::min;
-        let len = self.state.text.len();
-        let range = min(range.start, len)..min(range.end, len);
+        self.check_range(&range);
 
         for i in self.state.sel_range.iter_mut() {
             if *i >= range.end {
@@ -376,8 +390,17 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.state.canvas.pend_draw(self.view.as_ref());
     }
 
-    fn slice(&mut self, range: Range<usize>) -> String {
-        self.state.text[range].to_owned()
+    fn slice(&mut self, mut range: Range<usize>) -> String {
+        self.check_range(&range);
+
+        // “`range.end` might not lie on a UTF-8 character boundary. In this case,
+        // it should be rounded to the previous boundary.”
+        let text = &self.state.text[..];
+        while range.end < text.len() && (text.as_bytes()[range.end] & 0xc0) == 0x80 {
+            range.end -= 1;
+        }
+
+        text[range].to_owned()
     }
 
     fn len(&mut self) -> usize {
@@ -398,8 +421,10 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 
     fn slice_bounds(&mut self, range: Range<usize>) -> (Box2<f32>, usize) {
+        self.check_range(&range);
+
         // TODO
         log::warn!("slice_bounds({:?}): stub!", range);
-        (self.frame(), 0)
+        (self.frame(), range.end)
     }
 }

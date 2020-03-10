@@ -687,11 +687,15 @@ bitflags! {
 
 /// Trait for objects representing a lock acquired by
 /// [`TextInputCtxListener::edit`].
+///
+/// All given ranges are subsets of `0..self.len()`.
 pub trait TextInputCtxEdit<T: Wm> {
     /// Get the current selection.
     ///
     /// This method roughly corresponds to: `ITextStoreACP::GetSelection`,
     /// `[NSTextInputClient selectedRange]`
+    ///
+    /// `start` and `end` can be in any order.
     fn selected_range(&mut self) -> Range<usize>;
 
     /// Set the current selection.
@@ -727,6 +731,9 @@ pub trait TextInputCtxEdit<T: Wm> {
 
     /// Read a portion of the text document.
     ///
+    /// `range.end` might not lie on a UTF-8 character boundary. In this case,
+    /// it should be rounded to the previous boundary.
+    ///
     /// This method roughly corresponds to: `ITextStoreACP::GetText`,
     /// `[NSTextInputClient attributedSubstringForProposedRange:actualRange:]`
     fn slice(&mut self, range: Range<usize>) -> String;
@@ -758,7 +765,8 @@ pub trait TextInputCtxEdit<T: Wm> {
     /// Returns `(bounds, i)`. An invalid `Box2` (`bounds.is_valid() == false`)
     /// means the text document is currently invisible. `i` indicates the end
     /// index of the range enclosed by `bounds` and must be in range
-    /// `range.start + 1 ..= range.end`.
+    /// `range.start + 1 ..= range.end` if `range.start < range.end` or
+    /// must be equal to `range.start` if `range.start == range.end`.
     ///
     /// This method roughly corresponds to: `ITextStoreACP::GetTextExt`,
     /// `[NSTextInputClient firstRectForCharacterRange:actualRange:]`
