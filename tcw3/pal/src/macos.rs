@@ -148,17 +148,21 @@ impl iface::Wm for Wm {
 
     fn new_text_input_ctx(
         self,
-        _hwnd: &Self::HWnd,
-        _listener: Box<dyn iface::TextInputCtxListener<Self>>,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
     ) -> Self::HTextInputCtx {
-        HTextInputCtx {}
+        HTextInputCtx::new(hwnd.clone(), listener)
     }
 
-    fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, _active: bool) {
-        // TODO
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        htictx.reset();
     }
 
-    fn remove_text_input_ctx(self, _: &Self::HTextInputCtx) {
-        // TODO
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        htictx.set_active(active);
+    }
+
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        self.text_input_ctx_set_active(htictx, false)
     }
 }

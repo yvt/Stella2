@@ -1,7 +1,10 @@
 use super::super::RGBAF32;
 use cggeom::{prelude::*, Box2};
 use cgmath::{Matrix3, Matrix4, Point2, Vector2};
-use cocoa::{foundation::NSPoint, quartzcore::CATransform3D};
+use cocoa::{
+    foundation::{NSPoint, NSRect, NSSize},
+    quartzcore::CATransform3D,
+};
 use core_foundation::base::TCFType;
 use core_graphics::{
     base::CGFloat,
@@ -40,7 +43,18 @@ pub fn cg_size_from_vec2(p: Vector2<f64>) -> CGSize {
     CGSize::new(p.x, p.y)
 }
 
-#[allow(dead_code)]
+pub fn ns_rect_from_box2(bx: Box2<f64>) -> NSRect {
+    NSRect::new(ns_point_from_point2(bx.min), ns_size_from_vec2(bx.size()))
+}
+
+fn ns_point_from_point2(p: Point2<f64>) -> NSPoint {
+    NSPoint::new(p.x, p.y)
+}
+
+fn ns_size_from_vec2(p: Vector2<f64>) -> NSSize {
+    NSSize::new(p.x, p.y)
+}
+
 pub fn point2_from_ns_point(p: NSPoint) -> Point2<f64> {
     Point2::new(p.x, p.y)
 }

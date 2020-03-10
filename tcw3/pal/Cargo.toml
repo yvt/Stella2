@@ -37,6 +37,7 @@ owning_ref = "0.4.0"
 packed_simd = "0.3.0"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
+utf16count = { path = "../../support/utf16count" }
 zerocopy = "0.2.8"
 
 # testing backend (borrows some implementation from `unix`)

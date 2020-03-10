@@ -18,6 +18,17 @@ typedef struct _TCWScrollEvent {
     double deltaY;
 } TCWScrollEvent;
 
+/** Takes `NSAttributedString` or `NSString` and coalesces it into `NSString`.
+ */
+static NSString *coalesceString(id string) {
+    if ([string isKindOfClass:[NSAttributedString class]]) {
+        return ((NSAttributedString *)string).string;
+    } else {
+        NSCAssert([string isKindOfClass:[NSString class]], @"bad string type");
+        return (NSString *)string;
+    }
+}
+
 @implementation TCWGestureHandlerView {
     TCWWindowController __weak *controller;
 
@@ -330,6 +341,140 @@ typedef struct _TCWScrollEvent {
         tcw_scrolllistener_cancel(self->scrollListener);
         tcw_scrolllistener_release(self->scrollListener);
     }
+}
+
+/// Overrides `NSResponder`'s method.
+- (void)keyDown:(NSEvent *)event {
+    if (!self->controller) {
+        return;
+    }
+
+    if (tcw_wnd_has_text_input_ctx(self->controller.listenerUserData)) {
+        // Forward the event to the system input manager for interpretation as
+        // a text input command.
+        [self interpretKeyEvents:@[ event ]];
+    }
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if (!self->controller) {
+        return;
+    }
+
+    NSString *theString = coalesceString(string);
+
+    tcw_wnd_insert_text(self->controller.listenerUserData, theString.UTF8String,
+                        (size_t)replacementRange.location,
+                        (size_t)replacementRange.length);
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (void)doCommandBySelector:(SEL)selector {
+    (void)selector;
+    NSLog(@"doCommandBySelector:%s TODO!", sel_getName(selector));
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (void)setMarkedText:(id)string
+        selectedRange:(NSRange)selectedRange
+     replacementRange:(NSRange)replacementRange {
+    if (!self->controller) {
+        return;
+    }
+
+    NSString *theString = coalesceString(string);
+
+    tcw_wnd_set_marked_text(
+        self->controller.listenerUserData, theString.UTF8String,
+        (size_t)selectedRange.location, (size_t)selectedRange.length,
+        (size_t)replacementRange.location, (size_t)replacementRange.length);
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (void)unmarkText {
+    if (!self->controller) {
+        return;
+    }
+
+    tcw_wnd_unmark_text(self->controller.listenerUserData);
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (NSRange)selectedRange {
+    if (!self->controller) {
+        return NSMakeRange(NSNotFound, 0);
+    }
+
+    return tcw_wnd_get_selected_range(self->controller.listenerUserData);
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (NSRange)markedRange {
+    if (!self->controller) {
+        return NSMakeRange(NSNotFound, 0);
+    }
+
+    return tcw_wnd_get_marked_range(self->controller.listenerUserData);
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (BOOL)hasMarkedText {
+    return self.markedRange.location != NSNotFound;
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (nullable NSAttributedString *)
+    attributedSubstringForProposedRange:(NSRange)range
+                            actualRange:(nullable NSRangePointer)actualRange {
+    if (!self->controller) {
+        if (actualRange) {
+            *actualRange = NSMakeRange(0, 0);
+        }
+        return [[NSAttributedString alloc] initWithString:@""];
+    }
+
+    NSString *string = tcw_wnd_get_text(self->controller.listenerUserData,
+                                        (size_t)range.location,
+                                        (size_t)range.length, actualRange);
+
+    return [[NSAttributedString alloc] initWithString:string];
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {
+    return @[];
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (NSRect)firstRectForCharacterRange:(NSRange)range
+                         actualRange:(nullable NSRangePointer)actualRange {
+    if (!self->controller) {
+        if (actualRange) {
+            *actualRange = NSMakeRange(0, 0);
+        }
+        return NSMakeRect(0, 0, 0, 0);
+    }
+
+    NSRect bounds = tcw_wnd_get_text_rect(self->controller.listenerUserData,
+                                          (size_t)range.location,
+                                          (size_t)range.length, actualRange);
+
+    return [self.window convertRectToScreen:bounds];
+}
+
+/// Implements `NSTextInputClient`'s method.
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+    if (!self->controller) {
+        return NSNotFound;
+    }
+
+    point =
+        [self.window convertRectFromScreen:NSMakeRect(point.x, point.y, 0, 0)]
+            .origin;
+
+    return tcw_wnd_get_char_index_from_point(self->controller.listenerUserData,
+                                             point);
 }
 
 @end
