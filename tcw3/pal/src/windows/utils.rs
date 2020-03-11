@@ -5,7 +5,7 @@ use winapi::{
     Interface,
 };
 
-use super::winapiext;
+use super::{textinput::tsf, winapiext};
 
 /// Check the given `HRESULT` and panic if it's not `S_OK`.
 pub fn assert_hresult_ok(result: HRESULT) -> HRESULT {
@@ -13,6 +13,15 @@ pub fn assert_hresult_ok(result: HRESULT) -> HRESULT {
         panic_hresult(result);
     } else {
         result
+    }
+}
+
+/// Discriminate `result` by whether it represents a successful code or not.
+pub fn result_from_hresult(result: HRESULT) -> Result<HRESULT, HRESULT> {
+    if result < 0 {
+        Err(result)
+    } else {
+        Ok(result)
     }
 }
 
@@ -88,6 +97,11 @@ unsafe_impl_object! {
     winapiext::ICompositorInterop,
     winapiext::ICompositionGraphicsDeviceInterop,
     winapiext::ICompositionDrawingSurfaceInterop,
+    tsf::ITfContext,
+    tsf::ITfDocumentMgr,
+    tsf::ITfThreadMgr,
+    tsf::ITfKeystrokeMgr,
+    tsf::ITfMessagePump,
 }
 
 /// Smart pointer for COM objects.
@@ -130,6 +144,10 @@ impl<T: Object> ComPtr<T> {
         Self::new(NonNull::new_unchecked(ptr))
     }
 
+    pub unsafe fn from_ptr(ptr: *mut T) -> Option<Self> {
+        NonNull::new(ptr).map(|p| Self::new(p))
+    }
+
     pub fn into_raw(self) -> NonNull<T> {
         let p = self.as_non_null();
         std::mem::forget(self);
@@ -169,5 +187,32 @@ impl ComPtr<IUnknown> {
         let p = (&*from) as *const T;
         std::mem::forget(from);
         unsafe { Self::from_ptr_unchecked(p as _) }
+    }
+}
+
+/// Extends `Option<ComPtr<T>>` with `as_ptr`.
+pub trait ComPtrAsPtr {
+    type Output;
+
+    fn as_ptr(&self) -> *mut Self::Output;
+}
+
+impl<T: Object> ComPtrAsPtr for ComPtr<T> {
+    type Output = T;
+
+    fn as_ptr(&self) -> *mut Self::Output {
+        self.as_ptr()
+    }
+}
+
+impl<T: Object> ComPtrAsPtr for Option<ComPtr<T>> {
+    type Output = T;
+
+    fn as_ptr(&self) -> *mut Self::Output {
+        if let Some(inner) = self {
+            inner.as_ptr()
+        } else {
+            std::ptr::null_mut()
+        }
     }
 }

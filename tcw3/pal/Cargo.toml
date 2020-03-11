@@ -75,7 +75,7 @@ features = [
 	"d2d1_1", "dwrite", "winbase", "winuser", "shellscalingapi", "combaseapi",
 	"synchapi", "dxgi1_3", "dcomp", "d3d11", "dwmapi", "libloaderapi",
 	"processthreadsapi", "gdiplusflat", "gdiplusinit", "stringapiset",
-	"d3d11_2", "threadpoolapiset",
+	"d3d11_2", "threadpoolapiset", "objbase",
 ]
 
 # `gtk` backend

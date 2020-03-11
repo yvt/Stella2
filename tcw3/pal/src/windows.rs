@@ -78,7 +78,7 @@ impl iface::Wm for Wm {
     }
 
     fn enter_main_loop(self) -> ! {
-        eventloop::enter_main_loop();
+        eventloop::enter_main_loop(self);
         std::process::exit(0);
     }
 
@@ -130,18 +130,18 @@ impl iface::Wm for Wm {
 
     fn new_text_input_ctx(
         self,
-        _hwnd: &Self::HWnd,
-        _listener: Box<dyn iface::TextInputCtxListener<Self>>,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
     ) -> Self::HTextInputCtx {
-        HTextInputCtx {}
+        textinput::new_text_input_ctx(self, hwnd, listener)
     }
 
-    fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, _active: bool) {
-        // TODO
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        textinput::text_input_ctx_set_active(self, htictx, active);
     }
 
-    fn remove_text_input_ctx(self, _: &Self::HTextInputCtx) {
-        // TODO
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        textinput::remove_text_input_ctx(self, htictx);
     }
 }
 

@@ -144,6 +144,11 @@ pub struct TF_SELECTION {
     pub style: TF_SELECTIONSTYLE,
 }
 
+extern "C" {
+    // `msctf.h`
+    pub static CLSID_TF_ThreadMgr: CLSID;
+}
+
 macro_rules! todo_interface {
     (interface $name:ident) => {
         pub struct $name {
@@ -241,6 +246,8 @@ interface ITfThreadMgrEventSink(ITfThreadMgrEventSinkVtbl):
         /* [in] */ pic: *mut ITfContext,
     ) -> HRESULT,
 }}
+
+pub const TF_POPF_ALL: DWORD = 1;
 
 // `msctf.h`
 RIDL! {#[uuid(0xaa80e7f4, 0x2021, 0x11d2, 0x93, 0xe0, 0x00, 0x60, 0xb0, 0x67, 0xb8, 0x6e)]

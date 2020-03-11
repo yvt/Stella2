@@ -18,18 +18,20 @@ use winapi::{
     um::{
         handleapi::{CompareObjectHandles, DuplicateHandle},
         libloaderapi::GetModuleHandleW,
+        objbase::CoInitialize,
         processthreadsapi::{GetCurrentProcess, GetCurrentThread},
         winnt::DUPLICATE_SAME_ACCESS,
         winuser::{
-            CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer,
-            PostMessageW, PostQuitMessage, RegisterClassW, SetCoalescableTimer, TranslateMessage,
-            CW_USEDEFAULT, TIMERV_NO_COALESCING, WM_TIMER, WM_USER, WNDCLASSW,
+            CreateWindowExW, DefWindowProcW, DispatchMessageW, KillTimer, PostMessageW,
+            PostQuitMessage, RegisterClassW, SetCoalescableTimer, TranslateMessage, CW_USEDEFAULT,
+            TIMERV_NO_COALESCING, WM_TIMER, WM_USER, WNDCLASSW,
         },
     },
 };
 
 use super::{
-    utils::{assert_win32_nonnull, assert_win32_ok},
+    textinput,
+    utils::{assert_hresult_ok, assert_win32_nonnull, assert_win32_ok},
     window, Wm,
 };
 use crate::{iface::Wm as WmTrait, MtSticky};
@@ -204,32 +206,24 @@ pub fn cancel_invoke(wm: Wm, hinvoke: &HInvoke) {
     // won't cause a serious problem.
 }
 
-pub fn enter_main_loop() {
-    // Make sure the main thread is initialized
+pub fn enter_main_loop(wm: Wm) {
+    // Make sure the main thread is initialized in case this `wm` was constructed
+    // by `Wm::global_unchecked`
     is_main_thread();
 
-    // The check is optional as far as memory safety is concerned
-    debug_assert!(is_main_thread());
+    let msg_pump = textinput::MessagePump::new(wm);
 
     loop {
         let mut msg = MaybeUninit::uninit();
 
-        match unsafe { GetMessageW(msg.as_mut_ptr(), null_mut(), 0, 0) } {
-            0 => {
-                // Received `WM_QUIT`
-                return;
-            }
-            -1 => {
-                panic!("GetMessageW failed");
-            }
-            _ => {
-                unsafe {
-                    TranslateMessage(msg.as_ptr());
-                }
-                unsafe {
-                    DispatchMessageW(msg.as_ptr());
-                }
-            }
+        // We need to use the version of `GetMessageW` provided by TSF for
+        // pre/post-processing
+        if msg_pump.get_message(&mut msg) != 0 {
+            unsafe { TranslateMessage(msg.as_ptr()) };
+            unsafe { DispatchMessageW(msg.as_ptr()) };
+        } else {
+            // Received `WM_QUIT`
+            return;
         }
     }
 }
@@ -256,6 +250,9 @@ type InvokePayload = Box<dyn FnOnce(Wm) + Send>;
 /// a main thread.
 #[cold]
 fn init_main_thread() {
+    // Initialize the COM libary on the main thread
+    assert_hresult_ok(unsafe { CoInitialize(null_mut()) });
+
     let hinstance = unsafe { GetModuleHandleW(null_mut()) };
 
     // Create a window class for the message-only window
