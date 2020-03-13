@@ -657,7 +657,7 @@ pub trait TextInputCtxListener<T: Wm> {
     /// when such methods are called without a write lock.
     ///
     /// This method is called from the top level of a main event loop and is
-    /// expected to be able to acquire a lock immediately.
+    /// expected to be able to acquire a lock successfully.
     fn edit(
         &self,
         wm: T,
