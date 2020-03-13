@@ -1,5 +1,6 @@
 #![allow(bad_style)]
 //! Interfaces which are not (yet) provided by `winapi`
+// TODO: This should be moved inside `winapiext`
 use std::os::raw::c_int;
 use winapi::{
     shared::{
@@ -940,6 +941,13 @@ pub struct TS_ATTRVAL {
 }
 
 // `TextStor.h`
+ENUM! {enum TsLayoutCode{
+    TS_LC_CREATE    = 0,
+    TS_LC_CHANGE    = 1,
+    TS_LC_DESTROY   = 2,
+}}
+
+// `TextStor.h`
 ENUM! {enum TsRunType{
     TS_RT_PLAIN = 0,
     TS_RT_HIDDEN = 1,
@@ -993,6 +1001,14 @@ pub struct TS_SELECTION_ACP {
     pub acpEnd: LONG,
     pub style: TS_SELECTIONSTYLE,
 }
+
+// `TextStor.h`
+pub const TS_AS_TEXT_CHANGE: u32 = 0x1;
+pub const TS_AS_SEL_CHANGE: u32 = 0x2;
+pub const TS_AS_LAYOUT_CHANGE: u32 = 0x4;
+pub const TS_AS_ATTR_CHANGE: u32 = 0x8;
+pub const TS_AS_STATUS_CHANGE: u32 = 0x10;
+pub const TS_AS_ALL_SINKS: u32 = 0x1f;
 
 // `TextStor.h`
 RIDL! {#[uuid(0x28888fe3, 0xc2a0, 0x483a, 0xa3, 0xea, 0x8c, 0xb1, 0xce, 0x51, 0xff, 0x3d)]
@@ -1172,4 +1188,40 @@ interface ITextStoreACP(ITextStoreACPVtbl):
         /* [in] */ vcView: TsViewCookie,
         /* [out] */ phwnd: *mut HWND,
     ) -> HRESULT,
+}}
+
+// `TextStor.h`
+RIDL! {#[uuid(0x22d44c94, 0xa419, 0x4542, 0xa2, 0x72, 0xae, 0x26, 0x09, 0x3e, 0xce, 0xcf)]
+interface ITextStoreACPSink(ITextStoreACPSinkVtbl):
+    IUnknown(IUnknownVtbl) {
+    fn OnTextChange(
+        /* [in] */ dwFlags: DWORD,
+        /* [in] */ pChange: *const TS_TEXTCHANGE,
+    ) -> HRESULT,
+
+    fn OnSelectionChange() -> HRESULT,
+
+    fn OnLayoutChange(
+        /* [in] */ lcode: TsLayoutCode,
+        /* [in] */ vcView: TsViewCookie,
+    ) -> HRESULT,
+
+    fn OnStatusChange(
+        /* [in] */ dwFlags: DWORD,
+    ) -> HRESULT,
+
+    fn OnAttrsChange(
+        /* [in] */ acpStart: LONG,
+        /* [in] */ acpEnd: LONG,
+        /* [in] */ cAttrs: ULONG,
+        /* [size_is][in] */ paAttrs: *const TS_ATTRID,
+    ) -> HRESULT,
+
+    fn OnLockGranted(
+        /* [in] */ dwLockFlags: DWORD,
+    ) -> HRESULT,
+
+    fn OnStartEditTransaction() -> HRESULT,
+
+    fn OnEndEditTransaction() -> HRESULT,
 }}
