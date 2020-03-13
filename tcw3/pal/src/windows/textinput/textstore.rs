@@ -490,13 +490,22 @@ unsafe extern "system" fn impl_get_embedded(
 }
 
 unsafe extern "system" fn impl_query_insert_embedded(
-    this: *mut ITextStoreACP,
-    pguidService: *const GUID,
-    pFormatEtc: *const FORMATETC,
+    _this: *mut ITextStoreACP,
+    _pguidService: *const GUID,
+    _pFormatEtc: *const FORMATETC,
     pfInsertable: *mut BOOL,
 ) -> HRESULT {
-    log::warn!("impl_query_insert_embedded: todo!");
-    E_NOTIMPL
+    log::trace!("impl_query_insert_embedded");
+
+    if pfInsertable.is_null() {
+        log::debug!("... `pfInsertable` is null, returning `E_INVALIDARG`");
+        return E_INVALIDARG;
+    }
+
+    // This implementation doesn't support embedded objects
+    *pfInsertable = 0;
+
+    S_OK
 }
 
 unsafe extern "system" fn impl_insert_embedded(
@@ -553,14 +562,14 @@ unsafe extern "system" fn impl_request_supported_attrs(
 }
 
 unsafe extern "system" fn impl_request_attrs_at_position(
-    this: *mut ITextStoreACP,
-    acpPos: LONG,
-    cFilterAttrs: ULONG,
-    paFilterAttrs: *const TS_ATTRID,
-    dwFlags: DWORD,
+    _this: *mut ITextStoreACP,
+    _acpPos: LONG,
+    _cFilterAttrs: ULONG,
+    _paFilterAttrs: *const TS_ATTRID,
+    _dwFlags: DWORD,
 ) -> HRESULT {
-    log::warn!("impl_request_attrs_at_position: todo!");
-    E_NOTIMPL
+    log::trace!("impl_request_attrs_at_position");
+    S_OK
 }
 
 unsafe extern "system" fn impl_request_attrs_transitioning_at_position(
