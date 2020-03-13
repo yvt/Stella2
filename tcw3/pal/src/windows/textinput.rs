@@ -150,6 +150,7 @@ type TextInputCtxPool = LeakyPool<TextInputCtx, LazyToken<SingletonToken<Tag>>>;
 type TextInputCtxPoolPtr = PoolPtr<TextInputCtx, SingletonTokenId<Tag>>;
 
 type TextInputCtxListener = Box<dyn iface::TextInputCtxListener<Wm>>;
+type TextInputCtxEdit<'a> = Box<dyn iface::TextInputCtxEdit<Wm> + 'a>;
 
 struct TextInputCtx {
     doc_mgr: ComPtr<tsf::ITfDocumentMgr>,

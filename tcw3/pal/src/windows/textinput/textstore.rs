@@ -1,18 +1,19 @@
 #![allow(bad_style)]
 use std::{
-    cell::Cell,
-    mem::size_of,
+    cell::{Cell, RefCell},
+    mem::{size_of, MaybeUninit},
     os::raw::c_void,
     ptr::{null_mut, NonNull},
     sync::Arc,
 };
+use try_match::try_match;
 use winapi::{
     shared::{
         guiddef::{IsEqualGUID, GUID, REFGUID, REFIID},
         minwindef::{BOOL, DWORD},
         ntdef::{LONG, ULONG},
         windef::{HWND, POINT, RECT},
-        winerror::{E_INVALIDARG, E_NOTIMPL, S_OK},
+        winerror::{E_FAIL, E_INVALIDARG, E_NOTIMPL, E_UNEXPECTED, S_OK},
     },
     um::{
         objidl::{IDataObject, FORMATETC},
@@ -28,7 +29,7 @@ use super::tsf::{
     ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie,
     TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTION_ACP, TS_STATUS, TS_TEXTCHANGE,
 };
-use super::{HTextInputCtx, TextInputCtxListener, Wm};
+use super::{HTextInputCtx, TextInputCtxEdit, TextInputCtxListener, Wm};
 use crate::iface;
 
 pub(super) struct TextStore {
@@ -39,6 +40,16 @@ pub(super) struct TextStore {
     htictx: Cell<Option<HTextInputCtx>>,
     sink: Cell<Option<ComPtr<ITextStoreACPSink>>>,
     sink_id: Cell<*mut IUnknown>,
+    /// This references `TextStore::listener`
+    edit: RefCell<Option<(TextInputCtxEdit<'static>, bool)>>,
+    pending_lock_upgrade: Cell<bool>,
+}
+
+impl Drop for TextStore {
+    fn drop(&mut self) {
+        // Whatever happens, make sure `edit` is dropped before `listener`
+        *self.edit.get_mut() = None;
+    }
 }
 
 static TEXT_STORE_VTBL1: ITextStoreACPVtbl = ITextStoreACPVtbl {
@@ -101,6 +112,8 @@ impl TextStore {
             htictx: Cell::new(None),
             sink: Cell::new(None),
             sink_id: Cell::new(null_mut()),
+            edit: RefCell::new(None),
+            pending_lock_upgrade: Cell::new(false),
         });
 
         (
@@ -130,6 +143,41 @@ impl TextStore {
 
         self.listener
             .set_event_mask(self.wm, &self.expect_htictx(), event_mask);
+    }
+
+    /// Borrow `TextInputCtxEdit`. Return `Err(TS_E_NOLOCK)` if we don't have
+    /// a lock with sufficient capability. Return `Err(E_UNEXPECTED)` if it's
+    /// already borrowed (we don't support reentrancy).
+    fn expect_edit(
+        &self,
+        write: bool,
+    ) -> Result<impl std::ops::Deref<Target = TextInputCtxEdit<'static>> + '_, HRESULT> {
+        let borrowed = self.edit.try_borrow_mut().map_err(|_| {
+            // This is probably a bug in somewhere else
+            log::warn!("The edit state is unexpectedly already borrowed");
+            E_UNEXPECTED
+        })?;
+
+        match (write, &*borrowed) {
+            (_, None) => {
+                log::trace!(
+                    "expect_edit: The text store is not locked. \
+                     Returning `TS_E_NOLOCK`"
+                );
+                return Err(tsf::TS_E_NOLOCK);
+            }
+            (true, Some((_, false))) => {
+                log::trace!(
+                    "expect_edit: Aread/write lock is required for this \
+                     operation, but we only have a read-only lock. Returning `TS_E_NOLOCK`"
+                );
+                return Err(tsf::TS_E_NOLOCK);
+            }
+            _ => {}
+        }
+
+        Ok(owning_ref::OwningRefMut::new(borrowed)
+            .map_mut(|x| try_match!(Some((edit, _)) = x).ok().unwrap()))
     }
 }
 
@@ -232,8 +280,90 @@ unsafe extern "system" fn impl_request_lock(
     dwLockFlags: DWORD,
     phrSession: *mut HRESULT,
 ) -> HRESULT {
-    log::warn!("impl_request_lock: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_request_lock({:08x})", dwLockFlags);
+
+        if phrSession.is_null() {
+            log::debug!("`phrSession` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let sink: ComPtr<ITextStoreACPSink> = cell_get_by_clone(&this.sink).ok_or_else(|| {
+            log::debug!("Refusing to get a lock without a sink");
+            E_UNEXPECTED
+        })?;
+
+        let mut edit_state = this.edit.try_borrow_mut().map_err(|_| {
+            // This is probably a bug in somewhere else
+            log::warn!("The edit state is unexpectedly already borrowed");
+            E_UNEXPECTED
+        })?;
+
+        let wants_rw_lock = (dwLockFlags & tsf::TS_LF_READWRITE) == tsf::TS_LF_READWRITE;
+
+        if let Some((_, has_write_lock)) = *edit_state {
+            if (dwLockFlags & tsf::TS_LF_SYNC) != 0 {
+                // The caller wants an immediate lock, but this cannot be
+                // granted because the document is already locked.
+                log::debug!("The document is already locked. Returning `TS_E_SYNCHRONOUS`");
+                *phrSession = tsf::TS_E_SYNCHRONOUS;
+
+                return Ok(S_OK);
+            } else if !has_write_lock && wants_rw_lock {
+                // The only type of asynchronous lock request this application
+                // supports while the document is locked is to upgrade from a read
+                // lock to a read/write lock. This scenario is referred to as a lock
+                // upgrade request.
+                log::trace!("Pending a lock upgrade request");
+                this.pending_lock_upgrade.set(true);
+                *phrSession = tsf::TS_S_ASYNC;
+
+                return Ok(S_OK);
+            }
+            return Err(E_FAIL);
+        }
+
+        // `TextInputCtxListener::edit` isn't capable of reporting failure, so
+        // we assume it's lockable (i.e., there is no other agent having the
+        // lock) here.
+
+        // This is actually not `'static`. It mustn't outlive `this.listener`.
+        // This lifetime extension happens when doing `&*(this as *const TextStore)`.
+        let edit: TextInputCtxEdit<'static> =
+            this.listener
+                .edit(this.wm, &this.expect_htictx(), wants_rw_lock);
+        *edit_state = Some((edit, wants_rw_lock));
+        drop(edit_state);
+
+        // Call `OnLockGranted`
+        *phrSession = sink.OnLockGranted(dwLockFlags);
+
+        // Unlock
+        let mut edit_state = this.edit.try_borrow_mut().map_err(|_| {
+            // This is probably a bug in somewhere else
+            log::warn!("The edit state is unexpectedly already borrowed");
+            E_UNEXPECTED
+        })?;
+        *edit_state = None;
+        drop(edit_state);
+
+        // Process a pending lock upgrade request
+        if this.pending_lock_upgrade.get() {
+            this.pending_lock_upgrade.set(false);
+            log::trace!("Processing the pending lock upgrade request");
+            impl_request_lock(
+                this as *const _ as _,
+                tsf::TS_LF_READWRITE,
+                MaybeUninit::uninit().as_mut_ptr(),
+            );
+        }
+
+        // TODO: Call `OnLayoutChange` here if needed
+
+        Ok(S_OK)
+    })
 }
 
 unsafe extern "system" fn impl_get_status(
@@ -272,8 +402,14 @@ unsafe extern "system" fn impl_get_selection(
     pSelection: *mut TS_SELECTION_ACP,
     pcFetched: *mut ULONG,
 ) -> HRESULT {
-    log::warn!("impl_get_selection: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(false)?;
+
+        log::warn!("impl_get_selection: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_set_selection(
@@ -281,8 +417,14 @@ unsafe extern "system" fn impl_set_selection(
     ulCount: ULONG,
     pSelection: *const TS_SELECTION_ACP,
 ) -> HRESULT {
-    log::warn!("impl_set_selection: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(true)?;
+
+        log::warn!("impl_set_selection: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_get_text(
@@ -297,8 +439,14 @@ unsafe extern "system" fn impl_get_text(
     pcRunInfoRet: *mut ULONG,
     pacpNext: *mut LONG,
 ) -> HRESULT {
-    log::warn!("impl_get_text: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(false)?;
+
+        log::warn!("impl_get_text: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_set_text(
@@ -320,8 +468,14 @@ unsafe extern "system" fn impl_get_formatted_text(
     acpEnd: LONG,
     ppDataObject: *mut *mut IDataObject,
 ) -> HRESULT {
-    log::warn!("impl_get_formatted_text: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(false)?;
+
+        log::warn!("impl_get_formatted_text: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_get_embedded(
@@ -366,8 +520,14 @@ unsafe extern "system" fn impl_insert_text_at_selection(
     pacpEnd: *mut LONG,
     pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
-    log::warn!("impl_insert_text_at_selection: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(true)?;
+
+        log::warn!("impl_insert_text_at_selection: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_insert_embedded_at_selection(
@@ -445,8 +605,14 @@ unsafe extern "system" fn impl_retrieve_requested_attrs(
 }
 
 unsafe extern "system" fn impl_get_end_a_c_p(this: *mut ITextStoreACP, pacp: *mut LONG) -> HRESULT {
-    log::warn!("impl_get_end_a_c_p: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(false)?;
+
+        log::warn!("impl_get_end_a_c_p: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_get_active_view(
@@ -485,8 +651,14 @@ unsafe extern "system" fn impl_get_text_ext(
     prc: *mut RECT,
     pfClipped: *mut BOOL,
 ) -> HRESULT {
-    log::warn!("impl_get_text_ext: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        let _edit = this.expect_edit(false)?;
+
+        log::warn!("impl_get_text_ext: todo!");
+        Err(E_NOTIMPL)
+    })
 }
 
 unsafe extern "system" fn impl_get_screen_ext(

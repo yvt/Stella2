@@ -197,9 +197,13 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// For each window, there can be only once active text input context. When
     /// multiple contexts are activated, only one of them will be activated, but
     /// how that will be chosen is unspecified.
+    ///
+    /// [`TextInputCtxListener::edit`] may be called in this method.
     fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, active: bool);
 
     /// Delete the specified text input context.
+    ///
+    /// [`TextInputCtxListener::edit`] may be called in this method.
     fn remove_text_input_ctx(self, ctx: &Self::HTextInputCtx);
 }
 
@@ -657,7 +661,9 @@ pub trait TextInputCtxListener<T: Wm> {
     /// when such methods are called without a write lock.
     ///
     /// This method is called from the top level of a main event loop and is
-    /// expected to be able to acquire a lock successfully.
+    /// expected to be able to acquire a lock successfully. In addition to this,
+    /// there are some methods of [`Wm`] that may call this method, which are
+    /// documented separately.
     fn edit(
         &self,
         wm: T,

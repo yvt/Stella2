@@ -260,20 +260,23 @@ impl ViewListener for EntryCoreListener {
     fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.unmount(wm, view);
 
-        if let Some(tictx) = self.inner.state.borrow_mut().tictx.take() {
+        let tictx = self.inner.state.borrow_mut().tictx.take();
+        if let Some(tictx) = tictx {
             wm.remove_text_input_ctx(&tictx);
         }
     }
 
     fn focus_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        if let Some(tictx) = &self.inner.state.borrow().tictx {
-            wm.text_input_ctx_set_active(tictx, true);
+        let tictx = self.inner.state.borrow().tictx.clone();
+        if let Some(tictx) = tictx {
+            wm.text_input_ctx_set_active(&tictx, true);
         }
     }
 
     fn focus_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
-        if let Some(tictx) = &self.inner.state.borrow().tictx {
-            wm.text_input_ctx_set_active(tictx, false);
+        let tictx = self.inner.state.borrow().tictx.clone();
+        if let Some(tictx) = tictx {
+            wm.text_input_ctx_set_active(&tictx, false);
         }
     }
 
