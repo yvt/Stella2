@@ -331,7 +331,7 @@ unsafe extern "system" fn impl_get_embedded(
     riid: REFIID,
     ppunk: *mut *mut IUnknown,
 ) -> HRESULT {
-    log::warn!("impl_get_embedded: todo!");
+    log::debug!("impl_get_embedded: not supported");
     E_NOTIMPL
 }
 
@@ -353,7 +353,7 @@ unsafe extern "system" fn impl_insert_embedded(
     pDataObject: *mut IDataObject,
     pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
-    log::warn!("impl_insert_embedded: todo!");
+    log::debug!("impl_insert_embedded: not supported");
     E_NOTIMPL
 }
 
@@ -378,7 +378,7 @@ unsafe extern "system" fn impl_insert_embedded_at_selection(
     pacpEnd: *mut LONG,
     pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
-    log::warn!("impl_insert_embedded_at_selection: todo!");
+    log::debug!("impl_insert_embedded_at_selection: not supported");
     E_NOTIMPL
 }
 
@@ -410,7 +410,7 @@ unsafe extern "system" fn impl_request_attrs_transitioning_at_position(
     paFilterAttrs: *const TS_ATTRID,
     dwFlags: DWORD,
 ) -> HRESULT {
-    log::warn!("impl_request_attrs_transitioning_at_position: todo!");
+    log::debug!("impl_request_attrs_transitioning_at_position: not supported");
     E_NOTIMPL
 }
 
@@ -425,7 +425,7 @@ unsafe extern "system" fn impl_find_next_attr_transition(
     pfFound: *mut BOOL,
     plFoundOffset: *mut LONG,
 ) -> HRESULT {
-    log::warn!("impl_find_next_attr_transition: todo!");
+    log::debug!("impl_find_next_attr_transition: not supported");
     E_NOTIMPL
 }
 
@@ -469,7 +469,11 @@ unsafe extern "system" fn impl_get_a_c_p_from_point(
     dwFlags: DWORD,
     pacp: *mut LONG,
 ) -> HRESULT {
-    log::warn!("impl_get_a_c_p_from_point: todo!");
+    // This method isn't supposed to require a lock, but without a lock, we
+    // can't obtain the result. So we leave this unimplemented. The example
+    // doesn't implement this method either:
+    // <https://github.com/microsoft/Windows-classic-samples/blob/1d363ff4bd17d8e20415b92e2ee989d615cc0d91/Samples/Win7Samples/winui/tsf/tsfapp/textstor.cpp#L1041>
+    log::debug!("impl_get_a_c_p_from_point: not supported");
     E_NOTIMPL
 }
 
