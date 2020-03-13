@@ -20,6 +20,12 @@ use winapi::{
     ENUM, RIDL,
 };
 
+// `OleCtl.h`
+const CONNECT_E_FIRST: HRESULT = 0x80040200u32 as HRESULT; // MAKE_SCODE(SEVERITY_ERROR, FACILITY_ITF, 0x0200);
+
+pub const CONNECT_E_NOCONNECTION: HRESULT = CONNECT_E_FIRST + 0;
+pub const CONNECT_E_ADVISELIMIT: HRESULT = CONNECT_E_FIRST + 1;
+
 // `msctf.h`
 pub type TfEditCookie = DWORD;
 

@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, ptr::NonNull};
+use std::{cell::Cell, fmt, mem::MaybeUninit, ptr::NonNull};
 use winapi::{
     shared::ntdef::HRESULT,
     um::{errhandlingapi::GetLastError, unknwnbase::IUnknown},
@@ -23,6 +23,16 @@ pub fn result_from_hresult(result: HRESULT) -> Result<HRESULT, HRESULT> {
     } else {
         Ok(result)
     }
+}
+
+pub fn hresult_from_result_with(func: impl FnOnce() -> Result<HRESULT, HRESULT>) -> HRESULT {
+    let result = func();
+    let flattened = result.unwrap_or_else(|x| x);
+
+    // `Ok` and `Err` must represent success and failure respectively
+    debug_assert_eq!(result, result_from_hresult(flattened));
+
+    flattened
 }
 
 #[cold]
@@ -102,11 +112,17 @@ unsafe_impl_object! {
     tsf::ITfThreadMgr,
     tsf::ITfKeystrokeMgr,
     tsf::ITfMessagePump,
+    tsf::ITextStoreACPSink,
 }
 
 /// Smart pointer for COM objects.
-#[derive(Debug)]
 pub struct ComPtr<T: Object>(NonNull<T>);
+
+impl<T: Object> fmt::Debug for ComPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:p}", self.0)
+    }
+}
 
 impl<T: Object> Drop for ComPtr<T> {
     fn drop(&mut self) {
@@ -163,23 +179,21 @@ impl<T: Object> ComPtr<T> {
     }
 
     pub fn query_interface<S: Object>(&self) -> Option<ComPtr<S>> {
-        let mut out = MaybeUninit::uninit();
-        let result = unsafe {
-            self.as_iunknown()
-                .QueryInterface(&S::uuidof(), out.as_mut_ptr())
-        };
-        if result == 0 {
-            let out = unsafe { out.assume_init() };
-            debug_assert!(!out.is_null());
-            Some(unsafe { ComPtr::from_ptr_unchecked(out as _) })
-        } else {
-            None
-        }
+        unsafe { query_interface(self.as_iunknown().into()) }
     }
 
     pub fn into_winrt_comptr(self) -> winrt::ComPtr<T> {
         unsafe { winrt::ComPtr::wrap(self.into_raw().as_ptr()) }
     }
+}
+
+pub unsafe fn query_interface<S: Object>(iunk: NonNull<IUnknown>) -> Option<ComPtr<S>> {
+    let mut out = MaybeUninit::uninit();
+    result_from_hresult(iunk.as_ref().QueryInterface(&S::uuidof(), out.as_mut_ptr())).ok()?;
+    let out = out.assume_init();
+
+    debug_assert!(!out.is_null());
+    Some(ComPtr::from_ptr_unchecked(out as _))
 }
 
 impl ComPtr<IUnknown> {
@@ -215,4 +229,17 @@ impl<T: Object> ComPtrAsPtr for Option<ComPtr<T>> {
             std::ptr::null_mut()
         }
     }
+}
+
+fn cell_map<T: Default, R>(cell: &Cell<T>, map: impl FnOnce(&mut T) -> R) -> R {
+    let mut val = cell.take();
+    let ret = map(&mut val);
+    cell.set(val);
+    ret
+}
+
+// TODO: This function was copied from `macos/window.rs`. De-duplicate
+/// Clone the contents of `Cell<T>` by temporarily moving out the contents.
+pub fn cell_get_by_clone<T: Clone + Default>(cell: &Cell<T>) -> T {
+    cell_map(cell, |inner| inner.clone())
 }

@@ -156,14 +156,6 @@ struct TextInputCtx {
     text_store: Arc<textstore::TextStore>,
 }
 
-impl Drop for TextInputCtx {
-    fn drop(&mut self) {
-        // Pop all contexts from the document manager, effectively
-        // deinitializing it
-        assert_hresult_ok(unsafe { self.doc_mgr.Pop(tsf::TF_POPF_ALL) });
-    }
-}
-
 pub(super) fn new_text_input_ctx(
     wm: Wm,
     _hwnd: &HWnd,
@@ -171,7 +163,7 @@ pub(super) fn new_text_input_ctx(
 ) -> HTextInputCtx {
     let tig = TIG.get_with_wm(wm);
 
-    let (com_text_store, text_store) = textstore::TextStore::new(listener);
+    let (com_text_store, text_store) = textstore::TextStore::new(wm, listener);
 
     // Create an `ITfDocumentMgr`
     let doc_mgr = unsafe {
@@ -180,9 +172,28 @@ pub(super) fn new_text_input_ctx(
         ComPtr::from_ptr_unchecked(out.assume_init())
     };
 
+    // Create a handle before creating a context so that `TextStore`'s
+    // implementation can pass `HTextInputCtx` to the listener when its method
+    // is called (it's unknown whether this happens, though)
+    let ptr = TEXT_INPUT_CTXS
+        .get_with_wm(wm)
+        .borrow_mut()
+        .allocate(TextInputCtx {
+            doc_mgr,
+            text_store,
+        });
+
+    // Get a reference to the `TextInputCtx` we just created
+    let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+    let tictx = &pool[ptr];
+
+    tictx.text_store.set_htictx(Some(HTextInputCtx { ptr }));
+
+    let doc_mgr = &tictx.doc_mgr;
+
     // Create the primary context on the `ITfDocumentMgr` based on the
     // `TextStore` created earlier
-    let (context, edit_cookie): (ComPtr<tsf::ITfContext>, tsf::TfEditCookie) = unsafe {
+    let (context, _edit_cookie): (ComPtr<tsf::ITfContext>, tsf::TfEditCookie) = unsafe {
         let mut context = MaybeUninit::uninit();
         let mut edit_cookie = MaybeUninit::uninit();
 
@@ -201,14 +212,6 @@ pub(super) fn new_text_input_ctx(
     };
 
     assert_hresult_ok(unsafe { doc_mgr.Push(context.as_ptr()) });
-
-    let ptr = TEXT_INPUT_CTXS
-        .get_with_wm(wm)
-        .borrow_mut()
-        .allocate(TextInputCtx {
-            doc_mgr,
-            text_store,
-        });
 
     // TODO: Associate `ptr` to `hwnd` so that it can be invalidated when
     //       the window is destroyed
@@ -240,9 +243,22 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
 pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
     text_input_ctx_set_active(wm, htictx, false);
 
+    let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+    let tictx = &pool[htictx.ptr];
+
+    // Pop all contexts from the document manager, effectively
+    // deinitializing it
+    assert_hresult_ok(unsafe { tictx.doc_mgr.Pop(tsf::TF_POPF_ALL) });
+
+    // Deassociate `TextStore` with the handle
+    tictx.text_store.set_htictx(None);
+
+    drop(pool);
+
+    // Remove the `TextInputCtx` from the pool
     TEXT_INPUT_CTXS
         .get_with_wm(wm)
         .borrow_mut()
         .deallocate(htictx.ptr)
-        .expect("dangling ptr");
+        .unwrap();
 }

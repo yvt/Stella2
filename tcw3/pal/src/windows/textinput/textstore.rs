@@ -1,12 +1,18 @@
 #![allow(bad_style)]
-use std::{mem::size_of, os::raw::c_void, sync::Arc};
+use std::{
+    cell::Cell,
+    mem::size_of,
+    os::raw::c_void,
+    ptr::{null_mut, NonNull},
+    sync::Arc,
+};
 use winapi::{
     shared::{
         guiddef::{IsEqualGUID, GUID, REFGUID, REFIID},
         minwindef::{BOOL, DWORD},
         ntdef::{LONG, ULONG},
         windef::{HWND, POINT, RECT},
-        winerror::{E_NOTIMPL, S_OK},
+        winerror::{E_INVALIDARG, E_NOTIMPL, S_OK},
     },
     um::{
         objidl::{IDataObject, FORMATETC},
@@ -16,18 +22,23 @@ use winapi::{
     Interface,
 };
 
-use super::super::utils::ComPtr;
+use super::super::utils::{cell_get_by_clone, hresult_from_result_with, query_interface, ComPtr};
 use super::tsf::{
-    ITextStoreACP, ITextStoreACPVtbl, ITfCompositionView, ITfContextOwnerCompositionSink,
-    ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie, TS_ATTRID, TS_ATTRVAL, TS_RUNINFO,
-    TS_SELECTION_ACP, TS_STATUS, TS_TEXTCHANGE,
+    self, ITextStoreACP, ITextStoreACPSink, ITextStoreACPVtbl, ITfCompositionView,
+    ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie,
+    TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTION_ACP, TS_STATUS, TS_TEXTCHANGE,
 };
-use super::{TextInputCtxListener, TextInputCtxPoolPtr};
+use super::{HTextInputCtx, TextInputCtxListener, Wm};
+use crate::iface;
 
 pub(super) struct TextStore {
     _vtbl1: &'static ITextStoreACPVtbl,
     _vtbl2: &'static ITfContextOwnerCompositionSinkVtbl,
+    wm: Wm,
     listener: TextInputCtxListener,
+    htictx: Cell<Option<HTextInputCtx>>,
+    sink: Cell<Option<ComPtr<ITextStoreACPSink>>>,
+    sink_id: Cell<*mut IUnknown>,
 }
 
 static TEXT_STORE_VTBL1: ITextStoreACPVtbl = ITextStoreACPVtbl {
@@ -76,17 +87,47 @@ static TEXT_STORE_VTBL2: ITfContextOwnerCompositionSinkVtbl = ITfContextOwnerCom
 };
 
 impl TextStore {
-    pub(super) fn new(listener: TextInputCtxListener) -> (ComPtr<IUnknown>, Arc<TextStore>) {
+    pub(super) fn new(
+        wm: Wm,
+        listener: TextInputCtxListener,
+    ) -> (ComPtr<IUnknown>, Arc<TextStore>) {
         let this = Arc::new(TextStore {
             _vtbl1: &TEXT_STORE_VTBL1,
             _vtbl2: &TEXT_STORE_VTBL2,
+            wm,
             listener,
+            htictx: Cell::new(None),
+            sink: Cell::new(None),
+            sink_id: Cell::new(null_mut()),
         });
 
         (
             unsafe { ComPtr::from_ptr_unchecked(Arc::into_raw(Arc::clone(&this)) as _) },
             this,
         )
+    }
+
+    pub(super) fn set_htictx(&self, htictx: Option<HTextInputCtx>) {
+        self.htictx.set(htictx);
+    }
+
+    fn expect_htictx(&self) -> HTextInputCtx {
+        cell_get_by_clone(&self.htictx).unwrap()
+    }
+
+    fn emit_set_event_mask(&self, mask: DWORD) {
+        let mut event_mask = iface::TextInputCtxEventFlags::empty();
+
+        if (mask & tsf::TS_AS_ALL_SINKS) != 0 {
+            event_mask |= iface::TextInputCtxEventFlags::RESET;
+        }
+        if (mask & tsf::TS_AS_SEL_CHANGE) != 0 {
+            event_mask |= iface::TextInputCtxEventFlags::SELECTION_CHANGE;
+        }
+        // TODO: Support `TS_AS_LAYOUT_CHANGE`
+
+        self.listener
+            .set_event_mask(self.wm, &self.expect_htictx(), event_mask);
     }
 }
 
@@ -122,16 +163,66 @@ unsafe extern "system" fn impl_advise_sink(
     punk: *mut IUnknown,
     dwMask: DWORD,
 ) -> HRESULT {
-    log::warn!("impl_advise_sink: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_advise_sink({:?}, 0x{:08x})", punk, dwMask);
+
+        let punk = NonNull::new(punk).ok_or(E_INVALIDARG)?;
+
+        // Get the "real" `IUnknown` pointer for identity comparison.
+        let sink_id: ComPtr<IUnknown> = query_interface(punk).ok_or(E_INVALIDARG)?;
+        log::trace!("... sink_id = {:?}", sink_id);
+
+        if sink_id.as_ptr() == this.sink_id.get() {
+            // Only the mask was updated
+            // TODO
+            Ok(S_OK)
+        } else if !this.sink_id.get().is_null() {
+            // Only one advice sink is allowed at a time
+            Err(tsf::CONNECT_E_ADVISELIMIT)
+        } else if IsEqualGUID(&*riid, &ITextStoreACPSink::uuidof()) {
+            // Get the sink interface
+            let sink = sink_id.query_interface();
+
+            this.sink.set(sink);
+            this.sink_id.set(sink_id.as_ptr());
+
+            this.emit_set_event_mask(dwMask);
+
+            Ok(S_OK)
+        } else {
+            Err(E_INVALIDARG)
+        }
+    })
 }
 
 unsafe extern "system" fn impl_unadvise_sink(
     this: *mut ITextStoreACP,
     punk: *mut IUnknown,
 ) -> HRESULT {
-    log::warn!("impl_unadvise_sink: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_unadvise_sink({:?})", punk);
+
+        let punk = NonNull::new(punk).ok_or(E_INVALIDARG)?;
+
+        // Get the "real" `IUnknown` pointer for identity comparison.
+        let sink_id: ComPtr<IUnknown> = query_interface(punk).ok_or(E_INVALIDARG)?;
+        log::trace!("... sink_id = {:?}", sink_id);
+
+        if sink_id.as_ptr() == this.sink_id.get() {
+            this.sink.set(None);
+            this.sink_id.set(null_mut());
+
+            this.emit_set_event_mask(0);
+
+            Ok(S_OK)
+        } else {
+            Err(tsf::CONNECT_E_NOCONNECTION)
+        }
+    })
 }
 
 unsafe extern "system" fn impl_request_lock(
