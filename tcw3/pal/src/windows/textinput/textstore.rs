@@ -241,6 +241,10 @@ unsafe extern "system" fn impl_get_status(
     pdcs: *mut TS_STATUS,
 ) -> HRESULT {
     log::trace!("impl_get_status");
+    if pdcs.is_null() {
+        log::debug!("... `pdcs` is null, returning `E_INVALIDARG`");
+        return E_INVALIDARG;
+    }
 
     let pdcs = &mut *pdcs;
     pdcs.dwDynamicFlags = 0;
@@ -432,6 +436,10 @@ unsafe extern "system" fn impl_retrieve_requested_attrs(
     pcFetched: *mut ULONG,
 ) -> HRESULT {
     log::trace!("impl_retrieve_requested_attrs");
+    if pcFetched.is_null() {
+        log::debug!("... `pcFetched` is null, returning `E_INVALIDARG`");
+        return E_INVALIDARG;
+    }
     *pcFetched = 0;
     S_OK
 }
@@ -446,6 +454,10 @@ unsafe extern "system" fn impl_get_active_view(
     pvcView: *mut TsViewCookie,
 ) -> HRESULT {
     log::trace!("impl_get_active_view");
+    if pvcView.is_null() {
+        log::debug!("... `pvcView` is null, returning `E_INVALIDARG`");
+        return E_INVALIDARG;
+    }
     *pvcView = VIEW_COOKIE;
     S_OK
 }
