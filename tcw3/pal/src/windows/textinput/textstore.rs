@@ -86,6 +86,8 @@ static TEXT_STORE_VTBL2: ITfContextOwnerCompositionSinkVtbl = ITfContextOwnerCom
     OnEndComposition: impl2_on_end_composition,
 };
 
+const VIEW_COOKIE: tsf::TsViewCookie = 0;
+
 impl TextStore {
     pub(super) fn new(
         wm: Wm,
@@ -238,8 +240,13 @@ unsafe extern "system" fn impl_get_status(
     this: *mut ITextStoreACP,
     pdcs: *mut TS_STATUS,
 ) -> HRESULT {
-    log::warn!("impl_get_status: todo!");
-    E_NOTIMPL
+    log::trace!("impl_get_status");
+
+    let pdcs = &mut *pdcs;
+    pdcs.dwDynamicFlags = 0;
+    pdcs.dwStaticFlags = tsf::TS_SS_NOHIDDENTEXT;
+
+    S_OK
 }
 
 unsafe extern "system" fn impl_query_insert(
@@ -372,13 +379,13 @@ unsafe extern "system" fn impl_insert_embedded_at_selection(
 }
 
 unsafe extern "system" fn impl_request_supported_attrs(
-    this: *mut ITextStoreACP,
-    dwFlags: DWORD,
-    cFilterAttrs: ULONG,
-    paFilterAttrs: *const TS_ATTRID,
+    _this: *mut ITextStoreACP,
+    _dwFlags: DWORD,
+    _cFilterAttrs: ULONG,
+    _paFilterAttrs: *const TS_ATTRID,
 ) -> HRESULT {
-    log::warn!("impl_request_supported_attrs: todo!");
-    E_NOTIMPL
+    log::trace!("impl_request_supported_attrs");
+    S_OK
 }
 
 unsafe extern "system" fn impl_request_attrs_at_position(
@@ -419,13 +426,14 @@ unsafe extern "system" fn impl_find_next_attr_transition(
 }
 
 unsafe extern "system" fn impl_retrieve_requested_attrs(
-    this: *mut ITextStoreACP,
-    ulCount: ULONG,
-    paAttrVals: *mut TS_ATTRVAL,
+    _this: *mut ITextStoreACP,
+    _ulCount: ULONG,
+    _paAttrVals: *mut TS_ATTRVAL,
     pcFetched: *mut ULONG,
 ) -> HRESULT {
-    log::warn!("impl_retrieve_requested_attrs: todo!");
-    E_NOTIMPL
+    log::trace!("impl_retrieve_requested_attrs");
+    *pcFetched = 0;
+    S_OK
 }
 
 unsafe extern "system" fn impl_get_end_a_c_p(this: *mut ITextStoreACP, pacp: *mut LONG) -> HRESULT {
@@ -434,11 +442,12 @@ unsafe extern "system" fn impl_get_end_a_c_p(this: *mut ITextStoreACP, pacp: *mu
 }
 
 unsafe extern "system" fn impl_get_active_view(
-    this: *mut ITextStoreACP,
+    _this: *mut ITextStoreACP,
     pvcView: *mut TsViewCookie,
 ) -> HRESULT {
-    log::warn!("impl_get_active_view: todo!");
-    E_NOTIMPL
+    log::trace!("impl_get_active_view");
+    *pvcView = VIEW_COOKIE;
+    S_OK
 }
 
 unsafe extern "system" fn impl_get_a_c_p_from_point(

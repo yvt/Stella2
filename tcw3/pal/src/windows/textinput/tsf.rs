@@ -1017,6 +1017,9 @@ pub const TS_AS_STATUS_CHANGE: u32 = 0x10;
 pub const TS_AS_ALL_SINKS: u32 = 0x1f;
 
 // `TextStor.h`
+pub const TS_SS_NOHIDDENTEXT: u32 = 0x8;
+
+// `TextStor.h`
 RIDL! {#[uuid(0x28888fe3, 0xc2a0, 0x483a, 0xa3, 0xea, 0x8c, 0xb1, 0xce, 0x51, 0xff, 0x3d)]
 interface ITextStoreACP(ITextStoreACPVtbl):
     IUnknown(IUnknownVtbl) {
