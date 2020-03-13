@@ -479,11 +479,11 @@ unsafe extern "system" fn impl_get_formatted_text(
 }
 
 unsafe extern "system" fn impl_get_embedded(
-    this: *mut ITextStoreACP,
-    acpPos: LONG,
-    rguidService: REFGUID,
-    riid: REFIID,
-    ppunk: *mut *mut IUnknown,
+    _this: *mut ITextStoreACP,
+    _acpPos: LONG,
+    _rguidService: REFGUID,
+    _riid: REFIID,
+    _ppunk: *mut *mut IUnknown,
 ) -> HRESULT {
     log::debug!("impl_get_embedded: not supported");
     E_NOTIMPL
@@ -509,12 +509,12 @@ unsafe extern "system" fn impl_query_insert_embedded(
 }
 
 unsafe extern "system" fn impl_insert_embedded(
-    this: *mut ITextStoreACP,
-    dwFlags: DWORD,
-    acpStart: LONG,
-    acpEnd: LONG,
-    pDataObject: *mut IDataObject,
-    pChange: *mut TS_TEXTCHANGE,
+    _this: *mut ITextStoreACP,
+    _dwFlags: DWORD,
+    _acpStart: LONG,
+    _acpEnd: LONG,
+    _pDataObject: *mut IDataObject,
+    _pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
     log::debug!("impl_insert_embedded: not supported");
     E_NOTIMPL
@@ -540,12 +540,12 @@ unsafe extern "system" fn impl_insert_text_at_selection(
 }
 
 unsafe extern "system" fn impl_insert_embedded_at_selection(
-    this: *mut ITextStoreACP,
-    dwFlags: DWORD,
-    pDataObject: *mut IDataObject,
-    pacpStart: *mut LONG,
-    pacpEnd: *mut LONG,
-    pChange: *mut TS_TEXTCHANGE,
+    _this: *mut ITextStoreACP,
+    _dwFlags: DWORD,
+    _pDataObject: *mut IDataObject,
+    _pacpStart: *mut LONG,
+    _pacpEnd: *mut LONG,
+    _pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
     log::debug!("impl_insert_embedded_at_selection: not supported");
     E_NOTIMPL
@@ -573,26 +573,26 @@ unsafe extern "system" fn impl_request_attrs_at_position(
 }
 
 unsafe extern "system" fn impl_request_attrs_transitioning_at_position(
-    this: *mut ITextStoreACP,
-    acpPos: LONG,
-    cFilterAttrs: ULONG,
-    paFilterAttrs: *const TS_ATTRID,
-    dwFlags: DWORD,
+    _this: *mut ITextStoreACP,
+    _acpPos: LONG,
+    _cFilterAttrs: ULONG,
+    _paFilterAttrs: *const TS_ATTRID,
+    _dwFlags: DWORD,
 ) -> HRESULT {
     log::debug!("impl_request_attrs_transitioning_at_position: not supported");
     E_NOTIMPL
 }
 
 unsafe extern "system" fn impl_find_next_attr_transition(
-    this: *mut ITextStoreACP,
-    acpStart: LONG,
-    acpHalt: LONG,
-    cFilterAttrs: ULONG,
-    paFilterAttrs: *const TS_ATTRID,
-    dwFlags: DWORD,
-    pacpNext: *mut LONG,
-    pfFound: *mut BOOL,
-    plFoundOffset: *mut LONG,
+    _this: *mut ITextStoreACP,
+    _acpStart: LONG,
+    _acpHalt: LONG,
+    _cFilterAttrs: ULONG,
+    _paFilterAttrs: *const TS_ATTRID,
+    _dwFlags: DWORD,
+    _pacpNext: *mut LONG,
+    _pfFound: *mut BOOL,
+    _plFoundOffset: *mut LONG,
 ) -> HRESULT {
     log::debug!("impl_find_next_attr_transition: not supported");
     E_NOTIMPL
@@ -638,11 +638,11 @@ unsafe extern "system" fn impl_get_active_view(
 }
 
 unsafe extern "system" fn impl_get_a_c_p_from_point(
-    this: *mut ITextStoreACP,
-    vcView: TsViewCookie,
-    ptScreen: *const POINT,
-    dwFlags: DWORD,
-    pacp: *mut LONG,
+    _this: *mut ITextStoreACP,
+    _vcView: TsViewCookie,
+    _ptScreen: *const POINT,
+    _dwFlags: DWORD,
+    _pacp: *mut LONG,
 ) -> HRESULT {
     // This method isn't supposed to require a lock, but without a lock, we
     // can't obtain the result. So we leave this unimplemented. The example
