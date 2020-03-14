@@ -5,7 +5,7 @@ use std::{
     cmp::min,
     convert::TryInto,
     mem::{size_of, MaybeUninit},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Range},
     os::raw::c_void,
     ptr::{null_mut, NonNull},
     sync::Arc,
@@ -595,10 +595,48 @@ unsafe extern "system" fn impl_set_selection(
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        let _edit = this.expect_edit(true)?;
+        log::trace!("impl_set_selection({:?})", ulCount);
 
-        log::warn!("impl_set_selection: todo!");
-        Err(E_NOTIMPL)
+        if pSelection.is_null() {
+            log::debug!("... `pSelection` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if ulCount != 1 {
+            log::debug!("... `ulCount` is not `1`, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut edit = this.expect_edit(true)?;
+
+        // Check the range
+        let sel = &*pSelection;
+        let range_start = sel.acpStart.try_into().map_err(|_| tsf::TS_E_INVALIDPOS)?;
+        let range_end = sel.acpEnd.try_into().map_err(|_| tsf::TS_E_INVALIDPOS)?;
+        let mut range: Range<usize> = range_start..range_end;
+
+        log::trace!("range = {:?}", range);
+
+        if range.start > range.end || range.end > edit.len() {
+            log::debug!(
+                "... The range {:?} is out of range, returning `TS_E_INVALIDPOS`",
+                range
+            );
+            return Err(tsf::TS_E_INVALIDPOS);
+        }
+
+        // Round to the nearest UTF-8 boundaries
+        range.start = edit.floor_index(range.start);
+        range.end = edit.ceil_index(range.end);
+
+        log::trace!("rounded range = {:?}", range);
+
+        if sel.style.ase == tsf::TS_AE_START {
+            std::mem::swap(&mut range.start, &mut range.end);
+        }
+        edit.set_selected_range(range);
+
+        Ok(S_OK)
     })
 }
 
