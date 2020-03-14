@@ -1,4 +1,5 @@
 #![allow(bad_style)]
+use cggeom::prelude::*;
 use std::{
     cell::{Cell, RefCell},
     mem::{size_of, MaybeUninit},
@@ -24,7 +25,10 @@ use winapi::{
     Interface,
 };
 
-use super::super::utils::{cell_get_by_clone, hresult_from_result_with, query_interface, ComPtr};
+use super::super::{
+    utils::{cell_get_by_clone, hresult_from_result_with, query_interface, ComPtr},
+    window::log_client_box2_to_phy_screen_rect,
+};
 use super::tsf::{
     self, ITextStoreACP, ITextStoreACPSink, ITextStoreACPVtbl, ITfCompositionView,
     ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie,
@@ -182,6 +186,98 @@ impl TextStore {
 
         Ok(owning_ref::OwningRefMut::new(borrowed)
             .map_mut(|x| try_match!(Some((edit, _)) = x).ok().unwrap()))
+    }
+
+    /// Borrow `TextInputCtxEdit`. If we don't have a lock, get a temporary lock.
+    ///
+    /// `ITextStoreACP` has some methods that don't require a lock, whereas
+    /// implementing them requires an access to `TextInputCtxEdit`. This method
+    /// will get `TextInputCtxEdit` (as if a lock is acquired) and return a lock
+    /// guard, which automatically drops `TextInputCtxEdit` (as if a lock is
+    /// released) when dropped. If we already have a lock, it will just reuse
+    /// the `TextInputCtxEdit` we already have. In this case, the implicit
+    /// unlocking doesn't take place when the lock guard is dropped.
+    ///
+    /// This method never returns `Err(TS_E_NOLOCK)`. However, it can return
+    /// `Err(E_UNEXPECTED)`.
+    fn implicit_edit(
+        &self,
+    ) -> Result<impl Deref<Target = TextInputCtxEdit<'static>> + DerefMut + '_, HRESULT> {
+        let mut borrowed = self.edit.try_borrow_mut().map_err(|_| {
+            // This is probably a bug in somewhere else
+            log::warn!("The edit state is unexpectedly already borrowed");
+            E_UNEXPECTED
+        })?;
+
+        let unlock_on_drop = borrowed.is_none();
+
+        if unlock_on_drop {
+            // Get a read-only lock
+            let wants_rw_lock = false;
+            let edit: TextInputCtxEdit<'_> =
+                self.listener
+                    .edit(self.wm, &self.expect_htictx(), wants_rw_lock);
+
+            // Modify the lifetime parameter of `edit`. This is safe because we
+            // make sure `edit` doesn't outlive `self.listener`
+            let edit: TextInputCtxEdit<'static> = unsafe { std::mem::transmute(edit) };
+
+            *borrowed = Some((edit, wants_rw_lock));
+        }
+
+        // This is a memory safety requirement of `ImplicitEditLockGuard`
+        debug_assert!(borrowed.is_some());
+
+        use std::{cell::RefMut, hint::unreachable_unchecked};
+
+        /// Wraps the lock guard. If `unlock_on_drop` is `true`, it removes `T`
+        /// from `inner` when dropped.
+        struct ImplicitEditLockGuard<'a, T> {
+            inner: RefMut<'a, Option<T>>,
+            unlock_on_drop: bool,
+        }
+
+        impl<T> Deref for ImplicitEditLockGuard<'_, T> {
+            type Target = T;
+            fn deref(&self) -> &Self::Target {
+                // `RefMut` implements `owning_ref::StableAddress`, so this is
+                // safe
+                self.inner
+                    .as_ref()
+                    .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+            }
+        }
+
+        impl<T> DerefMut for ImplicitEditLockGuard<'_, T> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                // Ditto
+                match *self.inner {
+                    Some(ref mut x) => x,
+                    _ => unsafe { unreachable_unchecked() },
+                } /*
+                  self.inner
+                      .as_mut()
+                      .unwrap_or_else(|| unsafe { unreachable_unchecked() })*/
+            }
+        }
+
+        // This is safe because `RefMut` implements `StableAddress` and we don't
+        // replace `ImplicitEditLockGuard::inner` with something else.
+        unsafe impl<T> owning_ref::StableAddress for ImplicitEditLockGuard<'_, T> {}
+
+        impl<T> Drop for ImplicitEditLockGuard<'_, T> {
+            fn drop(&mut self) {
+                if self.unlock_on_drop {
+                    *self.inner = None;
+                }
+            }
+        }
+
+        Ok(owning_ref::OwningRefMut::new(ImplicitEditLockGuard {
+            inner: borrowed,
+            unlock_on_drop,
+        })
+        .map_mut(|(edit, _)| edit))
     }
 }
 
@@ -679,8 +775,37 @@ unsafe extern "system" fn impl_get_screen_ext(
     vcView: TsViewCookie,
     prc: *mut RECT,
 ) -> HRESULT {
-    log::warn!("impl_get_screen_ext: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_get_screen_ext({:?})", vcView);
+
+        if prc.is_null() {
+            log::debug!("... `prc` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if vcView != VIEW_COOKIE {
+            log::debug!("... `vcView` is not `VIEW_COOKIE`, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let frame = this.implicit_edit()?.frame();
+        log::trace!("... frame = {:?}", frame.display_im());
+
+        if frame.is_valid() {
+            *prc = log_client_box2_to_phy_screen_rect(this.hwnd, frame);
+        } else {
+            *prc = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+        }
+
+        Ok(S_OK)
+    })
 }
 
 unsafe extern "system" fn impl_get_wnd(

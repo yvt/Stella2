@@ -841,6 +841,38 @@ fn log_inner_to_phy_outer(hwnd: HWND, dpi: u32, size: [u32; 2]) -> [i32; 2] {
     }
 }
 
+/// Convert logical client coordinates to physical screen coordinates.
+fn log_client_to_phy_screen_with_dpi(
+    hwnd: HWND,
+    dpi: u32,
+    p: cgmath::Point2<f32>,
+) -> cgmath::Point2<LONG> {
+    let mut loc_phy = POINT {
+        x: log_to_phy_f32(p.x, dpi) as LONG,
+        y: log_to_phy_f32(p.y, dpi) as LONG,
+    };
+
+    assert_win32_ok(unsafe { winuser::ClientToScreen(hwnd, &mut loc_phy) });
+
+    [loc_phy.x, loc_phy.y].into()
+}
+
+/// Convert logical client coordinates to physical screen coordinates.
+pub(super) fn log_client_box2_to_phy_screen_rect(hwnd: HWND, p: cggeom::Box2<f32>) -> RECT {
+    let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+    assert_win32_ok(dpi);
+
+    let p1 = log_client_to_phy_screen_with_dpi(hwnd, dpi, p.min);
+    let p2 = log_client_to_phy_screen_with_dpi(hwnd, dpi, p.max);
+
+    RECT {
+        left: p1.x,
+        top: p1.y,
+        right: p2.x,
+        bottom: p2.y,
+    }
+}
+
 fn phy_to_log(x: u32, dpi: u32) -> u32 {
     // Must be rounded up so that the drawn region (which is sized according to
     // the logical size because the user only knows the logical size) completely
@@ -856,6 +888,10 @@ fn log_to_phy(x: u32, dpi: u32) -> u32 {
 
 fn phy_to_log_f32(x: f32, dpi: u32) -> f32 {
     x * (96.0 / dpi as f32)
+}
+
+fn log_to_phy_f32(x: f32, dpi: u32) -> f32 {
+    x * (dpi as f32 / 96.0)
 }
 
 #[cfg(test)]
