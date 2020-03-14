@@ -1,4 +1,5 @@
 #![allow(bad_style)]
+#![allow(dead_code)]
 //! Interfaces which are not (yet) provided by `winapi`
 // TODO: This should be moved inside `winapiext`
 use std::os::raw::c_int;

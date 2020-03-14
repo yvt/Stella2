@@ -537,7 +537,7 @@ unsafe extern "system" fn impl_request_lock(
 }
 
 unsafe extern "system" fn impl_get_status(
-    this: *mut ITextStoreACP,
+    _this: *mut ITextStoreACP,
     pdcs: *mut TS_STATUS,
 ) -> HRESULT {
     log::trace!("impl_get_status");
@@ -799,10 +799,6 @@ impl<T> ArrayOutStream<'_, T> {
 
     fn advance(&mut self, count: usize) {
         self.0 = &self.0[count..];
-    }
-
-    fn as_ptr(&self) -> *mut T {
-        self.0.as_ptr() as *mut T
     }
 }
 
