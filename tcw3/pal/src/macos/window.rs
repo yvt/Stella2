@@ -470,6 +470,7 @@ fn edit_convert_range_to_utf8_with_text(
     // Each UTF-16 unit maps to 1–3 three UTF-8-encoded bytes. Based on
     // this fact, we can find the upper bound.
     let aperture = min(end.saturating_mul(3), edit.len());
+    let aperture = edit.floor_index(aperture);
     let text = edit.slice(0..aperture);
 
     let result = find_utf16_pos(start, &text);

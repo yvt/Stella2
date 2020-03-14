@@ -694,7 +694,9 @@ bitflags! {
 /// Trait for objects representing a lock acquired by
 /// [`TextInputCtxListener::edit`].
 ///
-/// All given ranges are subsets of `0..self.len()`.
+/// All given ranges are subsets of `0..self.len()`. All endpoints are on UTF-8
+/// character boundaries. The client can use `TextInputCtxEdit::floor_index` to
+/// find the nearest boundary.
 pub trait TextInputCtxEdit<T: Wm> {
     /// Get the current selection.
     ///
@@ -737,12 +739,14 @@ pub trait TextInputCtxEdit<T: Wm> {
 
     /// Read a portion of the text document.
     ///
-    /// `range.end` might not lie on a UTF-8 character boundary. In this case,
-    /// it should be rounded to the previous boundary.
-    ///
     /// This method roughly corresponds to: `ITextStoreACP::GetText`,
     /// `[NSTextInputClient attributedSubstringForProposedRange:actualRange:]`
     fn slice(&mut self, range: Range<usize>) -> String;
+
+    /// Round `i` to the previous UTF-8 character boundary.
+    ///
+    /// The returned index must be equal to or less than `i`.
+    fn floor_index(&mut self, i: usize) -> usize;
 
     /// Get the length of the text document.
     ///

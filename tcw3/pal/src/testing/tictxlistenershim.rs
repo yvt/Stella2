@@ -81,6 +81,10 @@ impl iface::TextInputCtxEdit<native::Wm> for NativeTextInputCtxEdit<'_> {
         forward!(self.0, slice, range)
     }
 
+    fn floor_index(&mut self, i: usize) -> usize {
+        forward!(self.0, floor_index, i)
+    }
+
     fn len(&mut self) -> usize {
         forward!(self.0, len)
     }

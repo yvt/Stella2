@@ -393,17 +393,18 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.state.canvas.pend_draw(self.view.as_ref());
     }
 
-    fn slice(&mut self, mut range: Range<usize>) -> String {
+    fn slice(&mut self, range: Range<usize>) -> String {
         self.check_range(&range);
 
-        // “`range.end` might not lie on a UTF-8 character boundary. In this case,
-        // it should be rounded to the previous boundary.”
-        let text = &self.state.text[..];
-        while range.end < text.len() && (text.as_bytes()[range.end] & 0xc0) == 0x80 {
-            range.end -= 1;
-        }
+        self.state.text[range].to_owned()
+    }
 
-        text[range].to_owned()
+    fn floor_index(&mut self, mut i: usize) -> usize {
+        let text = &self.state.text[..];
+        while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
+            i -= 1;
+        }
+        i
     }
 
     fn len(&mut self) -> usize {
