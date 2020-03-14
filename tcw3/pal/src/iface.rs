@@ -748,6 +748,12 @@ pub trait TextInputCtxEdit<T: Wm> {
     /// The returned index must be equal to or less than `i`.
     fn floor_index(&mut self, i: usize) -> usize;
 
+    /// Round `i` to the next UTF-8 character boundary.
+    ///
+    /// The returned index must be equal to or greater than `i`, and must be
+    /// equal to or less than `len()`.
+    fn ceil_index(&mut self, i: usize) -> usize;
+
     /// Get the length of the text document.
     ///
     /// This method roughly corresponds to: `ITextStoreACP::GetEndACP`

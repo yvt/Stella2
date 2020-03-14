@@ -407,6 +407,14 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         i
     }
 
+    fn ceil_index(&mut self, mut i: usize) -> usize {
+        let text = &self.state.text[..];
+        while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
+            i += 1;
+        }
+        i
+    }
+
     fn len(&mut self) -> usize {
         self.state.text.len()
     }
