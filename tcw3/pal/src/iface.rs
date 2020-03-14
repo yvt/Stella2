@@ -194,9 +194,9 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
 
     /// Activate or deactivate the specified text input context.
     ///
-    /// For each window, there can be only once active text input context. When
-    /// multiple contexts are activated, only one of them will be activated, but
-    /// how that will be chosen is unspecified.
+    /// In an application process, there can be only once active text input
+    /// context. When multiple contexts are activated, only one of them will be
+    /// activated, but how that will be chosen is unspecified.
     ///
     /// [`TextInputCtxListener::edit`] may be called in this method.
     fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, active: bool);
