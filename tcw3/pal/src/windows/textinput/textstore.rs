@@ -444,8 +444,12 @@ unsafe extern "system" fn impl_request_lock(
         *edit_state = Some((edit, wants_rw_lock));
         drop(edit_state);
 
+        log::trace!("Lock granted, calling `OnLockGranted`...");
+
         // Call `OnLockGranted`
         *phrSession = sink.OnLockGranted(dwLockFlags);
+
+        log::trace!("Returned from `OnLockGranted`");
 
         // Unlock
         let mut edit_state = this.edit.try_borrow_mut().map_err(|_| {
