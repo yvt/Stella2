@@ -28,6 +28,7 @@ use winapi::{
 };
 
 use super::super::{
+    codecvt::wstr_to_str,
     utils::{
         cell_get_by_clone, hresult_from_result_with, query_interface, result_from_hresult, ComPtr,
     },
@@ -756,6 +757,8 @@ unsafe extern "system" fn impl_get_text(
         //    TSF (UTF-16):  | 0041 | 042F      | d83d de00           |
         //    TSF Run:       | [Pl] | [Pl] [Hi] | [Plain  ] [Hidden ] |
         //
+        // TODO: Do away with this idea? MS-IME for Japanese is apparently
+        //       confused
 
         // Fetch the text portion. Make sure the fetch range is on UTF-8 boundaries.
         let floor_index = edit.floor_index(acp);
@@ -1020,7 +1023,7 @@ unsafe extern "system" fn impl_insert_embedded(
 unsafe extern "system" fn impl_insert_text_at_selection(
     this: *mut ITextStoreACP,
     dwFlags: DWORD,
-    pchText: *const WCHAR,
+    mut pchText: *const WCHAR,
     cch: ULONG,
     pacpStart: *mut LONG,
     pacpEnd: *mut LONG,
@@ -1028,11 +1031,73 @@ unsafe extern "system" fn impl_insert_text_at_selection(
 ) -> HRESULT {
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
+        log::trace!("impl_insert_text_at_selection{:?}", (dwFlags, cch));
 
-        let _edit = this.expect_edit(true)?;
+        let mut edit = this.expect_edit(true)?;
 
-        log::warn!("impl_insert_text_at_selection: todo!");
-        Err(E_NOTIMPL)
+        if cch != 0 && pchText.is_null() {
+            log::debug!("... `cch != 0` but `pchText` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut unused = 0;
+        let out_acp_start = NonNull::new(pacpStart).unwrap_or(NonNull::from(&mut unused));
+        let out_acp_end = NonNull::new(pacpEnd).unwrap_or(NonNull::from(&mut unused));
+
+        let sel_range = edit.selected_range();
+        log::trace!("... sel_range = {:?}", sel_range);
+
+        let sel_range = sort_range(sel_range);
+
+        let acp_start: LONG = sel_range.start.try_into().map_err(|_| E_UNEXPECTED)?;
+        let acp_end_old: LONG = sel_range.end.try_into().map_err(|_| E_UNEXPECTED)?;
+
+        if (dwFlags & tsf::TS_IAS_QUERYONLY) != 0 {
+            *pacpStart = acp_start;
+            *pacpEnd = acp_end_old;
+            return Ok(S_OK);
+        }
+
+        if pChange.is_null() {
+            log::debug!(
+                "... `TS_IAS_QUERYONLY` is not set and `pChange` is null, returning `E_INVALIDARG`"
+            );
+            return Err(E_INVALIDARG);
+        }
+
+        // Convert `pchText[0..cch]` to UTF-8
+        if cch == 0 {
+            // The pointer passed to `from_raw_parts` mustn't be null even if
+            // the length is zero
+            pchText = NonNull::dangling().as_ptr();
+        }
+        let inserted_text = wstr_to_str(std::slice::from_raw_parts(pchText, cch as usize));
+        log::trace!("... pchText = {:?}", inserted_text);
+
+        // Calculate the range end after the insertion
+        let acp_end_new_usize: usize = sel_range
+            .start
+            .checked_add(inserted_text.len())
+            .ok_or(E_UNEXPECTED)?;
+        let acp_end_new: LONG = acp_end_new_usize.try_into().map_err(|_| E_UNEXPECTED)?;
+
+        // Insert the text
+        edit.replace(sel_range.clone(), &inserted_text);
+
+        if (dwFlags & tsf::TS_IAS_NOQUERY) == 0 {
+            *pacpStart = acp_start;
+            *pacpEnd = acp_end_new;
+        }
+
+        // Select the inserted text
+        let new_range = sel_range.start..acp_end_new_usize;
+        log::trace!(
+            "... The newly inserted text occupies the range {:?}",
+            new_range
+        );
+        edit.set_selected_range(new_range);
+
+        Ok(S_OK)
     })
 }
 
@@ -1287,4 +1352,12 @@ unsafe extern "system" fn impl2_on_end_composition(
 ) -> HRESULT {
     log::warn!("impl2_on_end_composition: todo!");
     S_OK
+}
+
+fn sort_range(r: Range<usize>) -> Range<usize> {
+    if r.end < r.start {
+        r.end..r.start
+    } else {
+        r
+    }
 }

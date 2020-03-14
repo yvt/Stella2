@@ -1043,6 +1043,7 @@ pub const TS_DEFAULT_SELECTION: DWORD = -1i32 as DWORD;
 
 // `TextStor.h`
 pub const TS_IAS_NOQUERY: DWORD = 0x1;
+pub const TS_IAS_QUERYONLY: DWORD = 0x2;
 
 // `TextStor.h`
 RIDL! {#[uuid(0x28888fe3, 0xc2a0, 0x483a, 0xa3, 0xea, 0x8c, 0xb1, 0xce, 0x51, 0xff, 0x3d)]
