@@ -2,6 +2,8 @@
 use cggeom::prelude::*;
 use std::{
     cell::{Cell, RefCell},
+    cmp::min,
+    convert::TryInto,
     mem::{size_of, MaybeUninit},
     ops::{Deref, DerefMut},
     os::raw::c_void,
@@ -32,7 +34,8 @@ use super::super::{
 use super::tsf::{
     self, ITextStoreACP, ITextStoreACPSink, ITextStoreACPVtbl, ITfCompositionView,
     ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie,
-    TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTION_ACP, TS_STATUS, TS_TEXTCHANGE,
+    TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTIONSTYLE, TS_SELECTION_ACP, TS_STATUS,
+    TS_TEXTCHANGE,
 };
 use super::{HTextInputCtx, TextInputCtxEdit, TextInputCtxListener, Wm};
 use crate::iface;
@@ -478,7 +481,7 @@ unsafe extern "system" fn impl_get_status(
 
     let pdcs = &mut *pdcs;
     pdcs.dwDynamicFlags = 0;
-    pdcs.dwStaticFlags = tsf::TS_SS_NOHIDDENTEXT;
+    pdcs.dwStaticFlags = 0;
 
     S_OK
 }
@@ -491,8 +494,41 @@ unsafe extern "system" fn impl_query_insert(
     pacpResultStart: *mut LONG,
     pacpResultEnd: *mut LONG,
 ) -> HRESULT {
-    log::warn!("impl_query_insert: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_query_insert{:?}", (acpTestStart, acpTestEnd, cch));
+
+        if pacpResultStart.is_null() {
+            log::debug!("... `pacpResultStart` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        } else if pacpResultEnd.is_null() {
+            log::debug!("... `pacpResultEnd` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut edit = this.implicit_edit()?;
+
+        let len: LONG = edit.len().try_into().map_err(|_| E_UNEXPECTED)?;
+        if acpTestStart > acpTestEnd || acpTestEnd > len {
+            return Err(E_INVALIDARG);
+        }
+
+        // The intent of this method is unclear, so I'm just rounding the
+        // endpoints to the nearest UTF-8 boundaries. In the example code and
+        // Firefox (only in Windows 8 or later), they were just copied to
+        // `pacpResultStart` and `pacpResultEnd`.
+        //
+        // Firefox's source code says "need to adjust to cluster boundary",
+        // which I'm not sure about, so as the same source code says,
+        // "[a]ssume we are given good offsets for now".
+        let start: usize = acpTestStart.try_into().unwrap_or(0);
+        let end: usize = acpTestEnd.try_into().unwrap_or(0);
+        *pacpResultStart = edit.floor_index(start) as LONG;
+        *pacpResultEnd = edit.floor_index(end) as LONG;
+
+        Ok(S_OK)
+    })
 }
 
 unsafe extern "system" fn impl_get_selection(
@@ -505,10 +541,47 @@ unsafe extern "system" fn impl_get_selection(
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        let _edit = this.expect_edit(false)?;
+        log::trace!("impl_get_selection{:?}", (ulIndex, ulCount));
 
-        log::warn!("impl_get_selection: todo!");
-        Err(E_NOTIMPL)
+        if pSelection.is_null() {
+            log::debug!("... `pSelection` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        } else if pcFetched.is_null() {
+            log::debug!("... `pcFetched` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if ulIndex != 0 && ulIndex != tsf::TS_DEFAULT_SELECTION {
+            log::debug!("... The index is too high, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut range = this.expect_edit(false)?.selected_range();
+
+        let is_reversed = range.start > range.end;
+        if is_reversed {
+            std::mem::swap(&mut range.start, &mut range.end);
+        }
+
+        *pSelection = TS_SELECTION_ACP {
+            acpStart: range.start.try_into().map_err(|_| E_UNEXPECTED)?,
+            acpEnd: range.end.try_into().map_err(|_| E_UNEXPECTED)?,
+            style: TS_SELECTIONSTYLE {
+                ase: if is_reversed {
+                    tsf::TS_AE_START
+                } else {
+                    tsf::TS_AE_END
+                },
+                // TODO: support interim character selection for now. According
+                //       to Firefox's source code, "[p]robably, this is
+                //       necessary for supporting South Asian languages.""
+                fInterimChar: 0,
+            },
+        };
+
+        *pcFetched = 1;
+
+        Ok(S_OK)
     })
 }
 
@@ -527,10 +600,35 @@ unsafe extern "system" fn impl_set_selection(
     })
 }
 
+struct ArrayOutStream<'a, T>(&'a [Cell<T>]);
+
+impl<T> ArrayOutStream<'_, T> {
+    unsafe fn from_raw_parts(ptr: *mut T, capacity: ULONG) -> Self {
+        ArrayOutStream(std::slice::from_raw_parts(ptr as _, capacity as usize))
+    }
+
+    fn remaining_len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn write(&mut self, x: T) {
+        self.0[0].set(x);
+        self.0 = &self.0[1..];
+    }
+
+    fn advance(&mut self, count: usize) {
+        self.0 = &self.0[count..];
+    }
+
+    fn as_ptr(&self) -> *mut T {
+        self.0.as_ptr() as *mut T
+    }
+}
+
 unsafe extern "system" fn impl_get_text(
     this: *mut ITextStoreACP,
     acpStart: LONG,
-    acpEnd: LONG,
+    mut acpEnd: LONG,
     pchPlain: *mut WCHAR,
     cchPlainReq: ULONG,
     pcchPlainRet: *mut ULONG,
@@ -542,10 +640,245 @@ unsafe extern "system" fn impl_get_text(
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        let _edit = this.expect_edit(false)?;
+        log::trace!(
+            "impl_get_text{:?}",
+            (acpStart, acpEnd, cchPlainReq, cRunInfoReq)
+        );
 
-        log::warn!("impl_get_text: todo!");
-        Err(E_NOTIMPL)
+        if pacpNext.is_null() {
+            log::debug!("... `pacpNext` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        // Which information does the caller want?
+        let mut text_out: Option<ArrayOutStream<WCHAR>> = if cchPlainReq > 0 {
+            if pchPlain.is_null() {
+                log::debug!(
+                    "... `cchPlainReq > 0` but `pchPlain` is null, returning `E_INVALIDARG`"
+                );
+                return Err(E_INVALIDARG);
+            } else if pcchPlainRet.is_null() {
+                log::debug!(
+                    "... `cchPlainReq > 0` but `pcchPlainRet` is null, returning `E_INVALIDARG`"
+                );
+                return Err(E_INVALIDARG);
+            }
+            Some(ArrayOutStream::from_raw_parts(pchPlain, cchPlainReq))
+        } else {
+            None
+        };
+        let mut run_out: Option<ArrayOutStream<TS_RUNINFO>> = if cRunInfoReq > 0 {
+            if prgRunInfo.is_null() {
+                log::debug!(
+                    "... `cRunInfoReq > 0` but `prgRunInfo` is null, returning `E_INVALIDARG`"
+                );
+                return Err(E_INVALIDARG);
+            } else if pcRunInfoRet.is_null() {
+                log::debug!(
+                    "... `cRunInfoReq > 0` but `pcRunInfoRet` is null, returning `E_INVALIDARG`"
+                );
+                return Err(E_INVALIDARG);
+            }
+            Some(ArrayOutStream::from_raw_parts(prgRunInfo, cRunInfoReq))
+        } else {
+            None
+        };
+
+        let mut edit = this.expect_edit(false)?;
+
+        // Check range
+        if acpEnd == -1 {
+            acpEnd = edit.len().try_into().map_err(|_| E_UNEXPECTED)?;
+        }
+        if acpStart < 0 || acpEnd < 0 {
+            return Err(tsf::TS_E_INVALIDPOS);
+        }
+
+        let len = edit.len();
+        let acp_start: usize = acpStart.try_into().map_err(|_| E_UNEXPECTED)?;
+        let acp_end: usize = acpEnd.try_into().map_err(|_| E_UNEXPECTED)?;
+        if acp_start > acp_end || acp_end > len {
+            return Err(tsf::TS_E_INVALIDPOS);
+        }
+
+        let mut acp: usize = acp_start;
+
+        // Text Services Framework API apparently assumes ACP is measured in
+        // UTF-16 unit count whereas our API uses UTF-8. We reconcile this
+        // difference by introducing hidden characters so that the ACP matches
+        // the corresponding UTF-8 offset for every UTF-8 character boundaries.
+        // For example, the string `AЯ😀` will look like the following from the
+        // client's point of view:
+        //
+        //    UTF-8 # == ACP | 0      1    2      3    4    5    6
+        //    ---------------------------------------------------------
+        //    App (UTF-8):   | 41   | d0   af   | f0   9f   98   80   |
+        //    TSF (UTF-16):  | 0041 | 042F      | d83d de00           |
+        //    TSF Run:       | [Pl] | [Pl] [Hi] | [Plain  ] [Hidden ] |
+        //
+
+        // Fetch the text portion. Make sure the fetch range is on UTF-8 boundaries.
+        let floor_index = edit.floor_index(acp);
+        log::trace!("floor_index = {:?}", floor_index);
+
+        let text = {
+            // Limit the fetch range based on the output buffer size. These
+            // are rough estimates and may be too strict, but the client is
+            // supposed to call this `GetText` repeatedly until it gets
+            // sufficient data, so this is okay as long as the resulting
+            // `fetch_len` is not zero.
+            let mut fetch_len = acp_end - floor_index;
+            if let Some(out) = &text_out {
+                // Up to 3 UTF-8 bytes per 1 UTF-16 unit
+                fetch_len = min(fetch_len, out.remaining_len().saturating_mul(3));
+            }
+            if let Some(out) = &run_out {
+                // Up to 2 UTF-8 bytes per 1 span
+                fetch_len = min(fetch_len, out.remaining_len().saturating_mul(2));
+            }
+            let fetch_range = floor_index..edit.ceil_index(floor_index + fetch_len);
+            log::trace!(
+                "Fetching the text in range {:?} (len = {:?})",
+                fetch_range,
+                fetch_len
+            );
+            edit.slice(fetch_range)
+        };
+
+        let mut chars = text.chars();
+
+        // If `acp_start` falls in the middle of the first scalar,
+        // a special handling is required.
+        if floor_index < acp {
+            let ch = chars.next().unwrap();
+
+            // `floor_index..ceil_index` is the range of this scalar
+            let ceil_index = floor_index + ch.len_utf8();
+
+            log::trace!(
+                "acp {:?} is in-between of the scalar {:?} at {:?}",
+                acp,
+                ch,
+                floor_index..ceil_index
+            );
+
+            let mut ch_u16 = [0u16; 2];
+            let ch_u16 = ch.encode_utf16(&mut ch_u16);
+
+            if ch_u16.len() == 2 && acp == floor_index + 1 {
+                // The requested range contains the second value of the surrogate
+                // pair. Imagine the range `4..6` was requested for the above
+                // example.
+                if let Some(out) = &mut text_out {
+                    out.write(ch_u16[1]);
+                }
+                if let Some(out) = &mut run_out {
+                    out.write(TS_RUNINFO {
+                        uCount: 1,
+                        r#type: tsf::TS_RT_PLAIN,
+                    });
+                }
+                acp += 1;
+            }
+
+            // `acp..ceil_index` only contains a hidden text
+            if let Some(out) = &mut run_out {
+                if out.remaining_len() > 0 {
+                    out.write(TS_RUNINFO {
+                        uCount: (ceil_index - acp) as ULONG,
+                        r#type: tsf::TS_RT_HIDDEN,
+                    });
+                    acp = ceil_index;
+                } else {
+                    // Ideally we want to directly skip the upcoming loop in
+                    // this case, but Rust doesn't have `goto`.
+                }
+            } else {
+                acp = ceil_index;
+            }
+        }
+
+        while acp < acp_end {
+            // Terminate the loop if any of the output buffers runs out
+            match (&text_out, &run_out) {
+                (Some(out), _) if out.remaining_len() == 0 => break,
+                (_, Some(out)) if out.remaining_len() == 0 => break,
+                _ => {}
+            }
+
+            // `acp` must be on a UTF-8 character boundary
+            debug_assert!(acp == edit.floor_index(acp));
+            // Also, the next element of `chars` is at `acp`, but it's hard to
+            // validate this assumption with `debug_assert!`.
+
+            let ch = chars.next().unwrap();
+
+            let mut ch_u16 = [0u16; 2];
+            let ch_u16 = ch.encode_utf16(&mut ch_u16);
+
+            let ch_u8_len = ch.len_utf8();
+            debug_assert!(ch_u8_len >= ch_u16.len());
+
+            // Emit the visible portion
+            let mut emitted_visible_len = min(ch_u16.len(), acp_end - acp);
+            debug_assert!(emitted_visible_len == 1 || emitted_visible_len == 2);
+            if let Some(out) = &mut text_out {
+                out.write(ch_u16[0]);
+                if out.remaining_len() == 0 {
+                    emitted_visible_len = 1;
+                } else if ch_u16.len() >= 2 {
+                    out.write(ch_u16[1]);
+                }
+            }
+            if let Some(out) = &mut run_out {
+                out.write(TS_RUNINFO {
+                    uCount: emitted_visible_len as ULONG,
+                    r#type: tsf::TS_RT_PLAIN,
+                });
+            }
+            acp += emitted_visible_len;
+
+            if emitted_visible_len < ch_u16.len() {
+                // `acp` didn't reach the invisible portion.
+                break;
+            }
+
+            // Emit the invisible portion
+            if ch_u8_len > ch_u16.len() {
+                if let Some(out) = &mut run_out {
+                    if out.remaining_len() == 0 {
+                        break;
+                    }
+
+                    let emitted_invisible_len = min(ch_u8_len - ch_u16.len(), acp_end - acp);
+
+                    out.write(TS_RUNINFO {
+                        uCount: emitted_invisible_len as ULONG,
+                        r#type: tsf::TS_RT_HIDDEN,
+                    });
+
+                    acp += emitted_invisible_len;
+                }
+            }
+        }
+
+        log::trace!("final acp = {:?}", acp);
+
+        debug_assert!(
+            (acp_start == acp_end || acp > acp_start) && acp >= acp_start && acp <= acp_end
+        );
+        *pacpNext = acp as LONG;
+
+        if let Some(out) = &text_out {
+            log::trace!("final text_out.remaining_len = {:?}", out.remaining_len());
+            *pcchPlainRet = cchPlainReq - out.remaining_len() as ULONG;
+        }
+        if let Some(out) = &run_out {
+            log::trace!("final run_out.remaining_len = {:?}", out.remaining_len());
+            *pcRunInfoRet = cRunInfoReq - out.remaining_len() as ULONG;
+        }
+
+        Ok(S_OK)
     })
 }
 
@@ -717,10 +1050,18 @@ unsafe extern "system" fn impl_get_end_a_c_p(this: *mut ITextStoreACP, pacp: *mu
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        let _edit = this.expect_edit(false)?;
+        log::trace!("impl_get_end_a_c_p");
 
-        log::warn!("impl_get_end_a_c_p: todo!");
-        Err(E_NOTIMPL)
+        if pacp.is_null() {
+            log::debug!("... `pacp` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut edit = this.expect_edit(false)?;
+
+        *pacp = edit.len().try_into().map_err(|_| E_UNEXPECTED)?;
+
+        Ok(S_OK)
     })
 }
 

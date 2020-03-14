@@ -1039,6 +1039,9 @@ pub const TS_LF_READ: DWORD = 0x2;
 pub const TS_LF_READWRITE: DWORD = 0x6;
 
 // `TextStor.h`
+pub const TS_DEFAULT_SELECTION: DWORD = -1i32 as DWORD;
+
+// `TextStor.h`
 RIDL! {#[uuid(0x28888fe3, 0xc2a0, 0x483a, 0xa3, 0xea, 0x8c, 0xb1, 0xce, 0x51, 0xff, 0x3d)]
 interface ITextStoreACP(ITextStoreACPVtbl):
     IUnknown(IUnknownVtbl) {
