@@ -28,7 +28,9 @@ use winapi::{
 };
 
 use super::super::{
-    utils::{cell_get_by_clone, hresult_from_result_with, query_interface, ComPtr},
+    utils::{
+        cell_get_by_clone, hresult_from_result_with, query_interface, result_from_hresult, ComPtr,
+    },
     window::log_client_box2_to_phy_screen_rect,
 };
 use super::tsf::{
@@ -891,8 +893,32 @@ unsafe extern "system" fn impl_set_text(
     cch: ULONG,
     pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
-    log::warn!("impl_set_text: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        log::trace!("impl_set_text{:?}", (dwFlags, acpStart, acpEnd, cch));
+
+        // This method is supposed to be implemented in this particular way,
+        // I think?
+        let tsa = TS_SELECTION_ACP {
+            acpStart,
+            acpEnd,
+            style: TS_SELECTIONSTYLE {
+                ase: tsf::TS_AE_START,
+                fInterimChar: 0,
+            },
+        };
+
+        result_from_hresult(impl_set_selection(this, 1, &tsa))?;
+
+        result_from_hresult(impl_insert_text_at_selection(
+            this,
+            tsf::TS_IAS_NOQUERY,
+            pchText,
+            cch,
+            null_mut(),
+            null_mut(),
+            pChange,
+        ))
+    })
 }
 
 unsafe extern "system" fn impl_get_formatted_text(
