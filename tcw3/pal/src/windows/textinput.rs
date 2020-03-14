@@ -159,12 +159,14 @@ struct TextInputCtx {
 
 pub(super) fn new_text_input_ctx(
     wm: Wm,
-    _hwnd: &HWnd,
+    hwnd: &HWnd,
     listener: TextInputCtxListener,
 ) -> HTextInputCtx {
     let tig = TIG.get_with_wm(wm);
 
-    let (com_text_store, text_store) = textstore::TextStore::new(wm, listener);
+    let sys_hwnd = hwnd.expect_hwnd();
+
+    let (com_text_store, text_store) = textstore::TextStore::new(wm, sys_hwnd, listener);
 
     // Create an `ITfDocumentMgr`
     let doc_mgr = unsafe {

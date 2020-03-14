@@ -91,7 +91,7 @@ struct MouseDragState {
 const MAX_WND_SIZE: u32 = 0x10000;
 
 impl HWnd {
-    fn expect_hwnd(&self) -> HWND {
+    pub(super) fn expect_hwnd(&self) -> HWND {
         let hwnd = self.wnd.hwnd.get();
         assert!(!hwnd.is_null(), "already destroyed");
         hwnd

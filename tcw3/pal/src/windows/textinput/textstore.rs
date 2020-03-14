@@ -38,6 +38,7 @@ pub(super) struct TextStore {
     wm: Wm,
     listener: TextInputCtxListener,
     htictx: Cell<Option<HTextInputCtx>>,
+    hwnd: HWND,
     sink: Cell<Option<ComPtr<ITextStoreACPSink>>>,
     sink_id: Cell<*mut IUnknown>,
     /// This references `TextStore::listener`
@@ -102,6 +103,7 @@ const VIEW_COOKIE: tsf::TsViewCookie = 0;
 impl TextStore {
     pub(super) fn new(
         wm: Wm,
+        hwnd: HWND,
         listener: TextInputCtxListener,
     ) -> (ComPtr<IUnknown>, Arc<TextStore>) {
         let this = Arc::new(TextStore {
@@ -109,6 +111,7 @@ impl TextStore {
             _vtbl2: &TEXT_STORE_VTBL2,
             wm,
             listener,
+            hwnd,
             htictx: Cell::new(None),
             sink: Cell::new(None),
             sink_id: Cell::new(null_mut()),
@@ -684,8 +687,25 @@ unsafe extern "system" fn impl_get_wnd(
     vcView: TsViewCookie,
     phwnd: *mut HWND,
 ) -> HRESULT {
-    log::warn!("impl_get_wnd: todo!");
-    E_NOTIMPL
+    hresult_from_result_with(|| {
+        let this = &*(this as *const TextStore);
+
+        log::trace!("impl_get_wnd({:?})", vcView);
+
+        if phwnd.is_null() {
+            log::debug!("... `phwnd` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if vcView != VIEW_COOKIE {
+            log::debug!("... `vcView` is not `VIEW_COOKIE`, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        *phwnd = this.hwnd;
+
+        Ok(S_OK)
+    })
 }
 
 fn byte_offset_by<T>(p: *mut T, offs: isize) -> *mut T {
