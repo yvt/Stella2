@@ -706,7 +706,7 @@ unsafe extern "system" fn impl_get_selection(
                 } else {
                     tsf::TS_AE_END
                 },
-                // TODO: support interim character selection for now. According
+                // TODO: support interim character selection. According
                 //       to Firefox's source code, "[p]robably, this is
                 //       necessary for supporting South Asian languages.""
                 fInterimChar: 0,
