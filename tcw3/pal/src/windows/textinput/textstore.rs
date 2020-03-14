@@ -30,6 +30,7 @@ use winapi::{
 
 use super::super::{
     codecvt::{str_to_c_wstr, wstr_to_str},
+    drawutils::union_box_f32,
     utils::{
         cell_get_by_clone, hresult_from_result_with, query_interface, result_from_hresult, ComPtr,
     },
@@ -1240,10 +1241,55 @@ unsafe extern "system" fn impl_get_text_ext(
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        let _edit = this.expect_edit(false)?;
+        log::warn!("impl_get_text_ext{:?}", (vcView, acpStart..acpEnd));
 
-        log::warn!("impl_get_text_ext: todo!");
-        Err(E_NOTIMPL)
+        if prc.is_null() {
+            log::debug!("... `prc` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if vcView != VIEW_COOKIE {
+            log::debug!("... `vcView` is not `VIEW_COOKIE`, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        let mut edit = this.expect_edit(false)?;
+
+        // Convert `acpStart..acpEnd` to UTF-8
+        let acp_start: usize = acpStart.try_into().map_err(|_| E_UNEXPECTED)?;
+        let acp_end: usize = acpEnd.try_into().map_err(|_| E_UNEXPECTED)?;
+        let range = edit_convert_range_to_utf8(&mut **edit, acp_start..acp_end).0;
+
+        // Find the union of the bounding rectangles of all characters in the range
+        let bounds = union_box_f32(
+            itertools::unfold(range.start, |i| {
+                if *i >= range.end {
+                    None
+                } else {
+                    let (bx, i_next) = edit.slice_bounds(*i..range.end);
+                    log::trace!("... slice_bounds({:?}) = {:?}", *i..range.end, (bx, i_next));
+                    debug_assert!(i_next > *i && i_next <= range.end);
+                    *i = i_next;
+                    Some(bx)
+                }
+            })
+            .filter(|bx| bx.is_valid()),
+        );
+
+        if let Some(bx) = bounds {
+            log::trace!("... bounds = {:?}", bx.display_im());
+            *prc = log_client_box2_to_phy_screen_rect(this.hwnd, bx);
+        } else {
+            log::trace!("... bounds = (none)");
+            *prc = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+        }
+
+        Ok(S_OK)
     })
 }
 

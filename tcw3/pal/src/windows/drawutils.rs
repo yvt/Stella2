@@ -1,4 +1,5 @@
 use alt_fp::FloatOrd;
+use cggeom::Box2;
 use cgmath::{Matrix3, Matrix4};
 use winrt::{
     windows::foundation::numerics::{Matrix3x2, Matrix4x4, Vector2},
@@ -67,5 +68,63 @@ pub fn winrt_color_from_rgbaf32(c: crate::iface::RGBAF32) -> Color {
         R: c.r,
         G: c.g,
         B: c.b,
+    }
+}
+
+/// Find the union of given boxes.
+///
+/// Assumes all inputs are finite.
+pub fn union_box_f32(elems: impl IntoIterator<Item = Box2<f32>>) -> Option<Box2<f32>> {
+    use packed_simd::f32x4;
+
+    let edges = elems
+        .into_iter()
+        .fold(f32x4::splat(std::f32::NAN), |edges, bx| {
+            edges.fmin(f32x4::new(bx.min.x, bx.min.y, -bx.max.x, -bx.max.y))
+        });
+
+    if edges.is_nan().any() {
+        None
+    } else {
+        Some(Box2 {
+            min: [edges.extract(0), edges.extract(1)].into(),
+            max: [-edges.extract(2), -edges.extract(3)].into(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use cggeom::{box2, prelude::*};
+    use quickcheck::TestResult;
+    use quickcheck_macros::quickcheck;
+
+    #[quickcheck]
+    fn test_union_box_f32(coords: Vec<f32>) -> TestResult {
+        let boxes = coords.chunks_exact(4).filter_map(|coords| {
+            let bx = box2! { min: [coords[0], coords[1]], max: [coords[2], coords[3]] };
+            if bx.is_empty() {
+                None
+            } else {
+                Some(bx)
+            }
+        });
+
+        let expected = boxes
+            .clone()
+            .fold(None, |x: Option<Box2<f32>>, y| match (x, y) {
+                (Some(x), y) => Some(x.union(&y)),
+                (None, y) => Some(y),
+            });
+
+        let actual = union_box_f32(boxes);
+
+        if expected != actual {
+            return TestResult::error(format!("expected = {:?}, got = {:?}", expected, actual));
+        }
+
+        TestResult::passed()
     }
 }
