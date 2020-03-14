@@ -112,6 +112,8 @@ unsafe_impl_object! {
     tsf::ITfThreadMgr,
     tsf::ITfKeystrokeMgr,
     tsf::ITfMessagePump,
+    tsf::ITfRange,
+    tsf::ITfRangeACP,
     tsf::ITextStoreACPSink,
 }
 

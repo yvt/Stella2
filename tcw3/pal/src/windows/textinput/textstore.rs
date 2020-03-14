@@ -37,9 +37,9 @@ use super::super::{
 };
 use super::tsf::{
     self, ITextStoreACP, ITextStoreACPSink, ITextStoreACPVtbl, ITfCompositionView,
-    ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, TsViewCookie,
-    TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTIONSTYLE, TS_SELECTION_ACP, TS_STATUS,
-    TS_TEXTCHANGE,
+    ITfContextOwnerCompositionSink, ITfContextOwnerCompositionSinkVtbl, ITfRange, ITfRangeACP,
+    TsViewCookie, TS_ATTRID, TS_ATTRVAL, TS_RUNINFO, TS_SELECTIONSTYLE, TS_SELECTION_ACP,
+    TS_STATUS, TS_TEXTCHANGE,
 };
 use super::{HTextInputCtx, TextInputCtxEdit, TextInputCtxListener, Wm};
 use crate::iface;
@@ -209,6 +209,7 @@ impl TextStore {
     /// `Err(E_UNEXPECTED)`.
     fn implicit_edit(
         &self,
+        write: bool,
     ) -> Result<impl Deref<Target = TextInputCtxEdit<'static>> + DerefMut + '_, HRESULT> {
         let mut borrowed = self.edit.try_borrow_mut().map_err(|_| {
             // This is probably a bug in somewhere else
@@ -216,20 +217,32 @@ impl TextStore {
             E_UNEXPECTED
         })?;
 
-        let unlock_on_drop = borrowed.is_none();
+        // Should we get a lock?
+        let unlock_on_drop = match (write, &*borrowed) {
+            (_, None) => {
+                log::trace!("implicit_edit: The document is currently not locked. Getting a lock");
+                true
+            }
+            (true, Some((_, false))) => {
+                log::trace!("implicit_edit: Upgrading the existing lock");
+                true
+            }
+            _ => {
+                log::trace!("implicit_edit: We already have a lock with sufficient capability");
+                false
+            }
+        };
 
         if unlock_on_drop {
             // Get a read-only lock
-            let wants_rw_lock = false;
             let edit: TextInputCtxEdit<'_> =
-                self.listener
-                    .edit(self.wm, &self.expect_htictx(), wants_rw_lock);
+                self.listener.edit(self.wm, &self.expect_htictx(), write);
 
             // Modify the lifetime parameter of `edit`. This is safe because we
             // make sure `edit` doesn't outlive `self.listener`
             let edit: TextInputCtxEdit<'static> = unsafe { std::mem::transmute(edit) };
 
-            *borrowed = Some((edit, wants_rw_lock));
+            *borrowed = Some((edit, write));
         }
 
         // This is a memory safety requirement of `ImplicitEditLockGuard`
@@ -296,6 +309,10 @@ unsafe extern "system" fn impl_query_interface(
     if IsEqualGUID(&*iid, &IUnknown::uuidof()) || IsEqualGUID(&*iid, &ITextStoreACP::uuidof()) {
         impl_add_ref(this);
         *ppv = this as *mut _;
+        return S_OK;
+    } else if IsEqualGUID(&*iid, &ITfContextOwnerCompositionSink::uuidof()) {
+        impl_add_ref(this);
+        *ppv = byte_offset_by(this as *mut _, size_of::<usize>() as isize);
         return S_OK;
     }
 
@@ -515,7 +532,7 @@ unsafe extern "system" fn impl_query_insert(
             return Err(E_INVALIDARG);
         }
 
-        let mut edit = this.implicit_edit()?;
+        let mut edit = this.implicit_edit(false)?;
 
         let len_u8 = edit.len();
         let len = utf16_len(&edit.slice(0..len_u8));
@@ -1253,7 +1270,7 @@ unsafe extern "system" fn impl_get_screen_ext(
             return Err(E_INVALIDARG);
         }
 
-        let frame = this.implicit_edit()?.frame();
+        let frame = this.implicit_edit(false)?.frame();
         log::trace!("... frame = {:?}", frame.display_im());
 
         if frame.is_valid() {
@@ -1321,13 +1338,75 @@ unsafe extern "system" fn impl2_release(this: *mut IUnknown) -> ULONG {
     impl_release(vtbl2_to_1(this as _) as _)
 }
 
+fn edit_range_from_composition(
+    edit: &mut dyn iface::TextInputCtxEdit<Wm>,
+    composition: &ITfCompositionView,
+) -> Result<Range<usize>, HRESULT> {
+    let tf_range: ComPtr<ITfRange> = unsafe {
+        let mut out = MaybeUninit::uninit();
+        result_from_hresult(composition.GetRange(out.as_mut_ptr()))?;
+        ComPtr::from_ptr_unchecked(out.assume_init())
+    };
+    let tf_range_acp: ComPtr<ITfRangeACP> = tf_range.query_interface().ok_or_else(|| {
+        log::debug!("... `tf_range` doesn't implement `ITfRangeACP`, returning `E_UNEXPECTED`");
+        E_UNEXPECTED
+    })?;
+
+    let acp_range = unsafe {
+        let mut start = MaybeUninit::uninit();
+        let mut len = MaybeUninit::uninit();
+        result_from_hresult(tf_range_acp.GetExtent(start.as_mut_ptr(), len.as_mut_ptr()))?;
+        start.assume_init()..start.assume_init() + len.assume_init()
+    };
+
+    log::trace!("... acp_range (UTF-16/ACP) = {:?}", acp_range);
+
+    // Convert `acp_range` to `Range<usize>`
+    let acp_range: Range<usize> = acp_range.start.try_into().map_err(|_| E_UNEXPECTED)?
+        ..acp_range.end.try_into().map_err(|_| E_UNEXPECTED)?;
+
+    // Convert `acp_range` to UTF-8
+    let range = edit_convert_range_to_utf8(edit, acp_range).0;
+    log::trace!("... range (UTF-8) = {:?}", range);
+
+    Ok(range)
+}
+
 unsafe extern "system" fn impl2_on_start_composition(
     this: *mut ITfContextOwnerCompositionSink,
     pComposition: *mut ITfCompositionView,
     pfOk: *mut BOOL,
 ) -> HRESULT {
-    log::warn!("impl2_on_start_composition: todo!");
-    S_OK
+    hresult_from_result_with(|| {
+        let this = &*vtbl2_to_1(this);
+
+        log::warn!("impl2_on_start_composition({:?}): todo!", pComposition);
+
+        if pComposition.is_null() {
+            log::debug!("... `pComposition` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        if pfOk.is_null() {
+            log::debug!("... `pfOk` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
+        // Always accept compositions
+        *pfOk = 1;
+
+        // `ITfContextOwnerCompositionSink`'s methods don't have requirements on
+        // a document lock whatsoever. In practice, it seems that a document
+        // lock is granted at this point.
+        let mut edit = this.implicit_edit(false)?;
+
+        // Access the range
+        let _range = edit_range_from_composition(&mut **edit, &*pComposition);
+
+        // TODO
+
+        Ok(S_OK)
+    })
 }
 
 unsafe extern "system" fn impl2_on_update_composition(
@@ -1335,16 +1414,39 @@ unsafe extern "system" fn impl2_on_update_composition(
     pComposition: *mut ITfCompositionView,
     pRangeNew: *mut ITfRange,
 ) -> HRESULT {
-    log::warn!("impl2_on_update_composition: todo!");
-    S_OK
+    hresult_from_result_with(|| {
+        let this = &*vtbl2_to_1(this);
+
+        log::warn!(
+            "impl2_on_update_composition{:?}: todo!",
+            (pComposition, pRangeNew)
+        );
+
+        // `ITfContextOwnerCompositionSink`'s methods don't have requirements on
+        // a document lock whatsoever. In practice, it seems that a document
+        // lock is granted at this point.
+        let mut edit = this.implicit_edit(true)?;
+
+        // Access the range
+        let _range = edit_range_from_composition(&mut **edit, &*pComposition);
+
+        // TODO
+        Ok(S_OK)
+    })
 }
 
 unsafe extern "system" fn impl2_on_end_composition(
     this: *mut ITfContextOwnerCompositionSink,
     pComposition: *mut ITfCompositionView,
 ) -> HRESULT {
-    log::warn!("impl2_on_end_composition: todo!");
-    S_OK
+    hresult_from_result_with(|| {
+        let this = &*vtbl2_to_1(this);
+        log::warn!("impl2_on_end_composition({:?}): todo!", pComposition);
+
+        let _edit = this.implicit_edit(true)?;
+
+        Ok(S_OK)
+    })
 }
 
 fn sort_range(r: Range<usize>) -> Range<usize> {
