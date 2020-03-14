@@ -1425,21 +1425,18 @@ unsafe extern "system" fn impl2_release(this: *mut IUnknown) -> ULONG {
     impl_release(vtbl2_to_1(this as _) as _)
 }
 
-fn edit_range_from_composition(
+unsafe fn edit_range_from_tf_range(
     edit: &mut dyn iface::TextInputCtxEdit<Wm>,
-    composition: &ITfCompositionView,
+    tf_range: NonNull<ITfRange>,
 ) -> Result<Range<usize>, HRESULT> {
-    let tf_range: ComPtr<ITfRange> = unsafe {
-        let mut out = MaybeUninit::uninit();
-        result_from_hresult(composition.GetRange(out.as_mut_ptr()))?;
-        ComPtr::from_ptr_unchecked(out.assume_init())
-    };
-    let tf_range_acp: ComPtr<ITfRangeACP> = tf_range.query_interface().ok_or_else(|| {
-        log::debug!("... `tf_range` doesn't implement `ITfRangeACP`, returning `E_UNEXPECTED`");
+    let tf_range_acp: ComPtr<ITfRangeACP> = query_interface(tf_range.cast()).ok_or_else(|| {
+        log::debug!(
+            "... The given `ITfRange` doesn't implement `ITfRangeACP`, returning `E_UNEXPECTED`"
+        );
         E_UNEXPECTED
     })?;
 
-    let acp_range = unsafe {
+    let acp_range = {
         let mut start = MaybeUninit::uninit();
         let mut len = MaybeUninit::uninit();
         result_from_hresult(tf_range_acp.GetExtent(start.as_mut_ptr(), len.as_mut_ptr()))?;
@@ -1467,7 +1464,7 @@ unsafe extern "system" fn impl2_on_start_composition(
     hresult_from_result_with(|| {
         let this = &*vtbl2_to_1(this);
 
-        log::warn!("impl2_on_start_composition({:?}): todo!", pComposition);
+        log::trace!("impl2_on_start_composition({:?})", pComposition);
 
         if pComposition.is_null() {
             log::debug!("... `pComposition` is null, returning `E_INVALIDARG`");
@@ -1488,9 +1485,15 @@ unsafe extern "system" fn impl2_on_start_composition(
         let mut edit = this.implicit_edit(false)?;
 
         // Access the range
-        let _range = edit_range_from_composition(&mut **edit, &*pComposition);
+        let tf_range: ComPtr<ITfRange> = {
+            let mut out = MaybeUninit::uninit();
+            result_from_hresult((*pComposition).GetRange(out.as_mut_ptr()))?;
+            ComPtr::from_ptr_unchecked(out.assume_init())
+        };
 
-        // TODO
+        let range = edit_range_from_tf_range(&mut **edit, tf_range.as_non_null())?;
+
+        edit.set_composition_range(Some(range));
 
         Ok(S_OK)
     })
@@ -1504,10 +1507,12 @@ unsafe extern "system" fn impl2_on_update_composition(
     hresult_from_result_with(|| {
         let this = &*vtbl2_to_1(this);
 
-        log::warn!(
-            "impl2_on_update_composition{:?}: todo!",
-            (pComposition, pRangeNew)
-        );
+        log::trace!("impl2_on_update_composition{:?}", (pComposition, pRangeNew));
+
+        let tf_range = NonNull::new(pRangeNew).ok_or_else(|| {
+            log::debug!("... `pRangeNew` is null, returning `E_INVALIDARG`");
+            E_INVALIDARG
+        })?;
 
         // `ITfContextOwnerCompositionSink`'s methods don't have requirements on
         // a document lock whatsoever. In practice, it seems that a document
@@ -1515,9 +1520,10 @@ unsafe extern "system" fn impl2_on_update_composition(
         let mut edit = this.implicit_edit(true)?;
 
         // Access the range
-        let _range = edit_range_from_composition(&mut **edit, &*pComposition);
+        let range = edit_range_from_tf_range(&mut **edit, tf_range)?;
 
-        // TODO
+        edit.set_composition_range(Some(range));
+
         Ok(S_OK)
     })
 }
@@ -1528,9 +1534,11 @@ unsafe extern "system" fn impl2_on_end_composition(
 ) -> HRESULT {
     hresult_from_result_with(|| {
         let this = &*vtbl2_to_1(this);
-        log::warn!("impl2_on_end_composition({:?}): todo!", pComposition);
+        log::trace!("impl2_on_end_composition({:?})", pComposition);
 
-        let _edit = this.implicit_edit(true)?;
+        let mut edit = this.implicit_edit(true)?;
+
+        edit.set_composition_range(None);
 
         Ok(S_OK)
     })
