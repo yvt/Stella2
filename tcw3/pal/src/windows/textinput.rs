@@ -10,7 +10,7 @@ use winapi::{
 
 use super::{
     utils::{assert_hresult_ok, result_from_hresult, ComPtr, ComPtrAsPtr},
-    HWnd, Wm,
+    window, HWnd, Wm,
 };
 use crate::{cells::MtLazyStatic, iface, MtSticky};
 use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
@@ -155,6 +155,7 @@ type TextInputCtxEdit<'a> = Box<dyn iface::TextInputCtxEdit<Wm> + 'a>;
 struct TextInputCtx {
     doc_mgr: ComPtr<tsf::ITfDocumentMgr>,
     text_store: Arc<textstore::TextStore>,
+    hwnd: HWnd,
 }
 
 pub(super) fn new_text_input_ctx(
@@ -184,6 +185,7 @@ pub(super) fn new_text_input_ctx(
         .allocate(TextInputCtx {
             doc_mgr,
             text_store,
+            hwnd: hwnd.clone(),
         });
 
     // Get a reference to the `TextInputCtx` we just created
@@ -230,6 +232,7 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
 
     if active {
         assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(tictx.doc_mgr.as_ptr()) });
+        window::set_wnd_char_handler(wm, &tictx.hwnd, Some(htictx.clone()));
     } else {
         let cur_focus = unsafe {
             let mut out = MaybeUninit::uninit();
@@ -239,6 +242,10 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
 
         if cur_focus.as_ptr() == tictx.doc_mgr.as_ptr() {
             assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(std::ptr::null_mut()) });
+        }
+
+        if window::wnd_char_handler(wm, &tictx.hwnd).as_ref() == Some(htictx) {
+            window::set_wnd_char_handler(wm, &tictx.hwnd, None);
         }
     }
 }
@@ -264,4 +271,14 @@ pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
         .borrow_mut()
         .deallocate(htictx.ptr)
         .unwrap();
+}
+
+pub(super) fn handle_char(wm: Wm, htictx: &HTextInputCtx, c: u32) {
+    let text_store = {
+        let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+        let tictx = &pool[htictx.ptr];
+        Arc::clone(&tictx.text_store)
+    };
+
+    text_store.handle_char(c);
 }

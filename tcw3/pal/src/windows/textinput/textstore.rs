@@ -142,6 +142,47 @@ impl TextStore {
         self.htictx.set(htictx);
     }
 
+    /// Handle a `WM_CHAR` or `WM_UNIHAR` message.
+    pub(super) fn handle_char(&self, ch: u32) {
+        let ch: char = if let Ok(ch) = ch.try_into() {
+            ch
+        } else {
+            log::warn!(
+                "handle_char: ignoring the invalid Unicode scalar value 0x{:08x}",
+                ch
+            );
+            return;
+        };
+
+        let is_locked = if let Ok(edit_state) = self.edit.try_borrow() {
+            edit_state.is_some()
+        } else {
+            true
+        };
+
+        if is_locked {
+            log::warn!(
+                "handle_char: the document is locked by another agent; can't handle the event for now"
+            );
+            return;
+        }
+
+        // Encode `ch` as UTF-8
+        let mut ch_u8 = [0u8; 4];
+        let ch_u8 = ch.encode_utf8(&mut ch_u8);
+
+        log::trace!("handle_char: inserting {:?}", ch_u8);
+
+        // Insert `ch`
+        let mut edit = self.listener.edit(self.wm, &self.expect_htictx(), true);
+        let sel_range = edit.selected_range();
+        edit.replace(sel_range.clone(), ch_u8);
+
+        // Move the cursor to the end of the inserted text
+        let i = sel_range.start + ch_u8.len();
+        edit.set_selected_range(i..i);
+    }
+
     fn expect_htictx(&self) -> HTextInputCtx {
         cell_get_by_clone(&self.htictx).unwrap()
     }

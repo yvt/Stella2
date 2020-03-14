@@ -21,7 +21,8 @@ use winapi::{
 use super::{
     codecvt::str_to_c_wstr,
     comp, frameclock,
-    utils::{assert_win32_nonnull, assert_win32_ok},
+    textinput::{handle_char, HTextInputCtx},
+    utils::{assert_win32_nonnull, assert_win32_ok, cell_get_by_clone},
     Wm, WndAttrs,
 };
 use crate::{iface, iface::Wm as WmTrait};
@@ -67,6 +68,8 @@ struct Wnd {
     update_ready_pending: Cell<bool>,
 
     drag_state: RefCell<Option<MouseDragState>>,
+
+    char_handler: Cell<Option<HTextInputCtx>>,
 }
 
 impl fmt::Debug for Wnd {
@@ -164,6 +167,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             max_size: Cell::new([MAX_WND_SIZE; 2]),
             update_ready_pending: Cell::new(false),
             drag_state: RefCell::new(None),
+            char_handler: Cell::new(None),
         }),
     };
 
@@ -429,6 +433,15 @@ pub fn is_wnd_focused(_: Wm, pal_hwnd: &HWnd) -> bool {
     hwnd == unsafe { winuser::GetForegroundWindow() }
 }
 
+/// Set the `HTextInputCtx` to be used to handle `WM_CHAR` events.
+pub fn set_wnd_char_handler(_: Wm, pal_hwnd: &HWnd, tictx: Option<HTextInputCtx>) {
+    pal_hwnd.wnd.char_handler.set(tictx);
+}
+
+pub fn wnd_char_handler(_: Wm, pal_hwnd: &HWnd) -> Option<HTextInputCtx> {
+    cell_get_by_clone(&pal_hwnd.wnd.char_handler)
+}
+
 static FRAME_CLOCK_MANAGER: frameclock::FrameClockManager<HWnd> =
     frameclock::FrameClockManager::new();
 
@@ -585,6 +598,41 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
             return 0;
         } // WM_GETMINMAXINFO
+
+        winuser::WM_CHAR => {
+            log::trace!("WM_CHAR {:?}", (wparam, lparam));
+            match wparam {
+                8 => {
+                    log::warn!("WM_CHAR: TODO: handle backspace");
+                    return 0;
+                }
+                10 => {
+                    log::trace!("WM_CHAR: Ignoring a linefeed");
+                    return 0;
+                }
+                27 => {
+                    log::warn!("WM_CHAR: TODO: handle escape");
+                    return 0;
+                }
+                _ => {}
+            }
+            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
+                handle_char(wm, &char_handler, wparam as _);
+            }
+            return 0;
+        } // WM_CHAR
+
+        winuser::WM_UNICHAR => {
+            log::trace!("WM_UNICHAR {:?}", (wparam, lparam));
+            if wparam == winuser::UNICODE_NOCHAR {
+                // We can handle `WM_UNIUSER`, so return `1`
+                return 1;
+            }
+            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
+                handle_char(wm, &char_handler, wparam as _);
+            }
+            return 0;
+        } // WM_UNICHAR
 
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
