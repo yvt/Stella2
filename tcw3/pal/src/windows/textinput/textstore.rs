@@ -392,7 +392,7 @@ unsafe extern "system" fn impl_advise_sink(
 
         if sink_id.as_ptr() == this.sink_id.get() {
             // Only the mask was updated
-            // TODO
+            this.emit_set_event_mask(dwMask);
             Ok(S_OK)
         } else if !this.sink_id.get().is_null() {
             // Only one advice sink is allowed at a time
