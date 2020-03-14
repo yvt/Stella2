@@ -683,7 +683,7 @@ unsafe extern "system" fn impl_get_text(
 
         log::trace!(
             "impl_get_text{:?}",
-            (acpStart, acpEnd, cchPlainReq, cRunInfoReq)
+            (acpStart..acpEnd, cchPlainReq, cRunInfoReq)
         );
 
         if pacpNext.is_null() {
