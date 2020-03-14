@@ -2,6 +2,7 @@
 use std::{
     cell::{Cell, RefCell},
     mem::{size_of, MaybeUninit},
+    ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{null_mut, NonNull},
     sync::Arc,
@@ -154,7 +155,7 @@ impl TextStore {
     fn expect_edit(
         &self,
         write: bool,
-    ) -> Result<impl std::ops::Deref<Target = TextInputCtxEdit<'static>> + '_, HRESULT> {
+    ) -> Result<impl Deref<Target = TextInputCtxEdit<'static>> + DerefMut + '_, HRESULT> {
         let borrowed = self.edit.try_borrow_mut().map_err(|_| {
             // This is probably a bug in somewhere else
             log::warn!("The edit state is unexpectedly already borrowed");
