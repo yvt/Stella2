@@ -11,6 +11,7 @@ use std::{
     sync::Arc,
 };
 use try_match::try_match;
+use utf16count::{find_utf16_pos, utf16_len};
 use winapi::{
     shared::{
         guiddef::{IsEqualGUID, GUID, REFGUID, REFIID},
@@ -28,7 +29,7 @@ use winapi::{
 };
 
 use super::super::{
-    codecvt::wstr_to_str,
+    codecvt::{str_to_c_wstr, wstr_to_str},
     utils::{
         cell_get_by_clone, hresult_from_result_with, query_interface, result_from_hresult, ComPtr,
     },
@@ -512,26 +513,78 @@ unsafe extern "system" fn impl_query_insert(
 
         let mut edit = this.implicit_edit()?;
 
-        let len: LONG = edit.len().try_into().map_err(|_| E_UNEXPECTED)?;
+        let len_u8 = edit.len();
+        let len = utf16_len(&edit.slice(0..len_u8));
+        let len: LONG = len.try_into().map_err(|_| E_UNEXPECTED)?;
         if acpTestStart > acpTestEnd || acpTestEnd > len {
             return Err(E_INVALIDARG);
         }
 
-        // The intent of this method is unclear, so I'm just rounding the
-        // endpoints to the nearest UTF-8 boundaries. In the example code and
-        // Firefox (only in Windows 8 or later), they were just copied to
+        // The intent of this method is unclear. In the example code and
+        // Firefox (only in Windows 8 or later), parameters are just copied to
         // `pacpResultStart` and `pacpResultEnd`.
         //
         // Firefox's source code says "need to adjust to cluster boundary",
         // which I'm not sure about, so as the same source code says,
         // "[a]ssume we are given good offsets for now".
-        let start: usize = acpTestStart.try_into().unwrap_or(0);
-        let end: usize = acpTestEnd.try_into().unwrap_or(0);
-        *pacpResultStart = edit.floor_index(start) as LONG;
-        *pacpResultEnd = edit.floor_index(end) as LONG;
+        *pacpResultStart = acpTestStart;
+        *pacpResultEnd = acpTestEnd;
 
         Ok(S_OK)
     })
+}
+
+/// Convert `range` to UTF-8. The converted back UTF-16 range will be returned as
+/// the second value. A prefix of the document containing the range will be
+/// returned as the third value.
+///
+/// If the endpoints of `range` cross a surrogate pair, they are moved to the
+/// start of the surrogate pair.
+fn edit_convert_range_to_utf8_with_text(
+    edit: &mut dyn iface::TextInputCtxEdit<Wm>,
+    range: Range<usize>,
+) -> (Range<usize>, Range<usize>, String) {
+    // TODO: Should report an error if `range` is out of bounds
+    let (start, end) = (range.start, range.end);
+
+    // Each UTF-16 unit maps to 1–3 three UTF-8-encoded bytes. Based on
+    // this fact, we can find the upper bound.
+    let aperture = min(end.saturating_mul(3), edit.len());
+    let aperture = edit.floor_index(aperture);
+    let text = edit.slice(0..aperture);
+
+    let result = find_utf16_pos(start, &text);
+    let start_u8 = result.utf8_cursor;
+    let start_actual = start - result.utf16_extra;
+
+    let result = find_utf16_pos(end - start_actual, &text[start_u8..]);
+    let end_u8 = start_u8 + result.utf8_cursor;
+    let end_actual = end - result.utf16_extra;
+
+    (start_u8..end_u8, start_actual..end_actual, text)
+}
+
+/// `edit_convert_range_to_utf8_with_text` without the third value.
+fn edit_convert_range_to_utf8(
+    edit: &mut dyn iface::TextInputCtxEdit<Wm>,
+    range: Range<usize>,
+) -> (Range<usize>, Range<usize>) {
+    let (range_u8, range_u16, _) = edit_convert_range_to_utf8_with_text(edit, range);
+    (range_u8, range_u16)
+}
+
+fn edit_convert_range_to_utf16(
+    edit: &mut dyn iface::TextInputCtxEdit<Wm>,
+    range: Range<usize>,
+) -> Range<usize> {
+    let prefix = edit.slice(0..range.end);
+
+    debug_assert_eq!(prefix.len(), range.end);
+
+    let start = utf16_len(&prefix[0..range.start]);
+    let len = utf16_len(&prefix[range.start..]);
+
+    start..start + len
 }
 
 unsafe extern "system" fn impl_get_selection(
@@ -559,16 +612,31 @@ unsafe extern "system" fn impl_get_selection(
             return Err(E_INVALIDARG);
         }
 
-        let mut range = this.expect_edit(false)?.selected_range();
+        let mut edit = this.expect_edit(false)?;
+        let mut range = edit.selected_range();
 
         let is_reversed = range.start > range.end;
         if is_reversed {
             std::mem::swap(&mut range.start, &mut range.end);
         }
 
+        // Convert `range` to UTF-16
+        let prefix = edit.slice(0..range.end);
+
+        debug_assert_eq!(prefix.len(), range.end);
+
+        let start = utf16_len(&prefix[0..range.start]);
+        let len = utf16_len(&prefix[range.start..]);
+
+        log::trace!(
+            "Returning the range {:?} (UTF-8) {:?} (UTF-16/ACP)",
+            range,
+            start..start + len
+        );
+
         *pSelection = TS_SELECTION_ACP {
-            acpStart: range.start.try_into().map_err(|_| E_UNEXPECTED)?,
-            acpEnd: range.end.try_into().map_err(|_| E_UNEXPECTED)?,
+            acpStart: start.try_into().map_err(|_| E_UNEXPECTED)?,
+            acpEnd: (start + len).try_into().map_err(|_| E_UNEXPECTED)?,
             style: TS_SELECTIONSTYLE {
                 ase: if is_reversed {
                     tsf::TS_AE_START
@@ -614,23 +682,22 @@ unsafe extern "system" fn impl_set_selection(
         let sel = &*pSelection;
         let range_start = sel.acpStart.try_into().map_err(|_| tsf::TS_E_INVALIDPOS)?;
         let range_end = sel.acpEnd.try_into().map_err(|_| tsf::TS_E_INVALIDPOS)?;
-        let mut range: Range<usize> = range_start..range_end;
+        let range: Range<usize> = range_start..range_end;
 
-        log::trace!("range = {:?}", range);
+        log::trace!("range (UTF-16) = {:?}", range);
 
-        if range.start > range.end || range.end > edit.len() {
+        if range.start > range.end {
             log::debug!(
-                "... The range {:?} is out of range, returning `TS_E_INVALIDPOS`",
+                "... The range {:?} is out of order, returning `TS_E_INVALIDPOS`",
                 range
             );
             return Err(tsf::TS_E_INVALIDPOS);
         }
 
-        // Round to the nearest UTF-8 boundaries
-        range.start = edit.floor_index(range.start);
-        range.end = edit.ceil_index(range.end);
+        // Convert `range` to UTF-8
+        let mut range = edit_convert_range_to_utf8(&mut **edit, range).0;
 
-        log::trace!("rounded range = {:?}", range);
+        log::trace!("range (UTF-8) = {:?}", range);
 
         if sel.style.ase == tsf::TS_AE_START {
             std::mem::swap(&mut range.start, &mut range.end);
@@ -657,6 +724,16 @@ impl<T> ArrayOutStream<'_, T> {
         self.0 = &self.0[1..];
     }
 
+    fn write_slice(&mut self, x: &[T])
+    where
+        T: Clone,
+    {
+        for (src, dst) in x.iter().zip(self.0.iter()) {
+            dst.set(src.clone());
+        }
+        self.advance(x.len());
+    }
+
     fn advance(&mut self, count: usize) {
         self.0 = &self.0[count..];
     }
@@ -669,7 +746,7 @@ impl<T> ArrayOutStream<'_, T> {
 unsafe extern "system" fn impl_get_text(
     this: *mut ITextStoreACP,
     acpStart: LONG,
-    mut acpEnd: LONG,
+    acpEnd: LONG,
     pchPlain: *mut WCHAR,
     cchPlainReq: ULONG,
     pcchPlainRet: *mut ULONG,
@@ -728,188 +805,78 @@ unsafe extern "system" fn impl_get_text(
         let mut edit = this.expect_edit(false)?;
 
         // Check range
-        if acpEnd == -1 {
-            acpEnd = edit.len().try_into().map_err(|_| E_UNEXPECTED)?;
-        }
-        if acpStart < 0 || acpEnd < 0 {
+        if acpStart < 0 || acpEnd < -1 {
+            log::debug!("... `acpStart` or `acpEnd` is negative, returning `E_INVALIDARG`");
             return Err(tsf::TS_E_INVALIDPOS);
         }
 
-        let len = edit.len();
         let acp_start: usize = acpStart.try_into().map_err(|_| E_UNEXPECTED)?;
-        let acp_end: usize = acpEnd.try_into().map_err(|_| E_UNEXPECTED)?;
-        if acp_start > acp_end || acp_end > len {
+        let acp_end: usize = if acpEnd == -1 {
+            usize::max_value() - 1
+        } else {
+            acpEnd.try_into().map_err(|_| E_UNEXPECTED)?
+        };
+        if acp_start > acp_end {
             return Err(tsf::TS_E_INVALIDPOS);
         }
 
-        let mut acp: usize = acp_start;
+        // TODO: Report `TS_E_INVALIDPOS` when `acpEnd` is past the end
 
-        // Text Services Framework API apparently assumes ACP is measured in
-        // UTF-16 unit count whereas our API uses UTF-8. We reconcile this
-        // difference by introducing hidden characters so that the ACP matches
-        // the corresponding UTF-8 offset for every UTF-8 character boundaries.
-        // For example, the string `AЯ😀` will look like the following from the
-        // client's point of view:
+        // Convert `acp_start..acp_end` to UTF-16/ACP.
         //
-        //    UTF-8 # == ACP | 0      1    2      3    4    5    6
-        //    ---------------------------------------------------------
-        //    App (UTF-8):   | 41   | d0   af   | f0   9f   98   80   |
-        //    TSF (UTF-16):  | 0041 | 042F      | d83d de00           |
-        //    TSF Run:       | [Pl] | [Pl] [Hi] | [Plain  ] [Hidden ] |
-        //
-        // TODO: Do away with this idea? MS-IME for Japanese is apparently
-        //       confused
+        // `edit_convert_range_to_utf8_with_text` "rounds down" the endpoints to
+        // UTF-8 boundaries, so if `acp_end` crosses a surrogate pair, the range
+        // corresponding to the pair won't be included in `range_u8`. We address
+        // this problem by setting the second endpoint to `acp_end + 1`.
+        let (range_u8, actual_range_u16, prefix) =
+            edit_convert_range_to_utf8_with_text(&mut **edit, acp_start..acp_end + 1);
 
-        // Fetch the text portion. Make sure the fetch range is on UTF-8 boundaries.
-        let floor_index = edit.floor_index(acp);
-        log::trace!("floor_index = {:?}", floor_index);
+        log::trace!(
+            "Converting {:?} (UTF-16/ACP) to UTF-8",
+            acp_start..acp_end + 1
+        );
+        log::trace!("  UTF-8: {:?}", range_u8);
+        log::trace!("  UTF-16: {:?} (converted back)", actual_range_u16);
 
-        let text = {
-            // Limit the fetch range based on the output buffer size. These
-            // are rough estimates and may be too strict, but the client is
-            // supposed to call this `GetText` repeatedly until it gets
-            // sufficient data, so this is okay as long as the resulting
-            // `fetch_len` is not zero.
-            let mut fetch_len = acp_end - floor_index;
-            if let Some(out) = &text_out {
-                // Up to 3 UTF-8 bytes per 1 UTF-16 unit
-                fetch_len = min(fetch_len, out.remaining_len().saturating_mul(3));
-            }
-            if let Some(out) = &run_out {
-                // Up to 2 UTF-8 bytes per 1 span
-                fetch_len = min(fetch_len, out.remaining_len().saturating_mul(2));
-            }
-            let fetch_range = floor_index..edit.ceil_index(floor_index + fetch_len);
-            log::trace!(
-                "Fetching the text in range {:?} (len = {:?})",
-                fetch_range,
-                fetch_len
-            );
-            edit.slice(fetch_range)
+        // Convert the text in the range to UTF-16
+        let substr_u16 = str_to_c_wstr(&prefix[range_u8.clone()]);
+
+        // Slice the part of `substr_u16` which corresponds to `acp_start..acp_end`
+        let substr_u16 = &substr_u16[acp_start - actual_range_u16.start..];
+        let substr_u16 = if acpEnd == -1 {
+            // Remove the null termination
+            &substr_u16[0..substr_u16.len() - 1]
+        } else {
+            &substr_u16[..acp_end - acp_start]
         };
 
-        let mut chars = text.chars();
-
-        // If `acp_start` falls in the middle of the first scalar,
-        // a special handling is required.
-        if floor_index < acp {
-            let ch = chars.next().unwrap();
-
-            // `floor_index..ceil_index` is the range of this scalar
-            let ceil_index = floor_index + ch.len_utf8();
-
-            log::trace!(
-                "acp {:?} is in-between of the scalar {:?} at {:?}",
-                acp,
-                ch,
-                floor_index..ceil_index
-            );
-
-            let mut ch_u16 = [0u16; 2];
-            let ch_u16 = ch.encode_utf16(&mut ch_u16);
-
-            if ch_u16.len() == 2 && acp == floor_index + 1 {
-                // The requested range contains the second value of the surrogate
-                // pair. Imagine the range `4..6` was requested for the above
-                // example.
-                if let Some(out) = &mut text_out {
-                    out.write(ch_u16[1]);
-                }
-                if let Some(out) = &mut run_out {
-                    out.write(TS_RUNINFO {
-                        uCount: 1,
-                        r#type: tsf::TS_RT_PLAIN,
-                    });
-                }
-                acp += 1;
-            }
-
-            // `acp..ceil_index` only contains a hidden text
-            if let Some(out) = &mut run_out {
-                if out.remaining_len() > 0 {
-                    out.write(TS_RUNINFO {
-                        uCount: (ceil_index - acp) as ULONG,
-                        r#type: tsf::TS_RT_HIDDEN,
-                    });
-                    acp = ceil_index;
-                } else {
-                    // Ideally we want to directly skip the upcoming loop in
-                    // this case, but Rust doesn't have `goto`.
-                }
-            } else {
-                acp = ceil_index;
-            }
+        // Write the output buffer
+        let mut emitted_len_u16 = substr_u16.len();
+        if let Some(out) = &mut text_out {
+            emitted_len_u16 = min(emitted_len_u16, out.remaining_len());
+            out.write_slice(substr_u16);
+        }
+        if let Some(out) = &mut run_out {
+            out.write(TS_RUNINFO {
+                uCount: emitted_len_u16 as _,
+                r#type: tsf::TS_RT_PLAIN,
+            });
         }
 
-        while acp < acp_end {
-            // Terminate the loop if any of the output buffers runs out
-            match (&text_out, &run_out) {
-                (Some(out), _) if out.remaining_len() == 0 => break,
-                (_, Some(out)) if out.remaining_len() == 0 => break,
-                _ => {}
-            }
+        log::trace!("emitted_len_u16 = {:?}", emitted_len_u16);
 
-            // `acp` must be on a UTF-8 character boundary
-            debug_assert!(acp == edit.floor_index(acp));
-            // Also, the next element of `chars` is at `acp`, but it's hard to
-            // validate this assumption with `debug_assert!`.
-
-            let ch = chars.next().unwrap();
-
-            let mut ch_u16 = [0u16; 2];
-            let ch_u16 = ch.encode_utf16(&mut ch_u16);
-
-            let ch_u8_len = ch.len_utf8();
-            debug_assert!(ch_u8_len >= ch_u16.len());
-
-            // Emit the visible portion
-            let mut emitted_visible_len = min(ch_u16.len(), acp_end - acp);
-            debug_assert!(emitted_visible_len == 1 || emitted_visible_len == 2);
-            if let Some(out) = &mut text_out {
-                out.write(ch_u16[0]);
-                if out.remaining_len() == 0 {
-                    emitted_visible_len = 1;
-                } else if ch_u16.len() >= 2 {
-                    out.write(ch_u16[1]);
-                }
-            }
-            if let Some(out) = &mut run_out {
-                out.write(TS_RUNINFO {
-                    uCount: emitted_visible_len as ULONG,
-                    r#type: tsf::TS_RT_PLAIN,
-                });
-            }
-            acp += emitted_visible_len;
-
-            if emitted_visible_len < ch_u16.len() {
-                // `acp` didn't reach the invisible portion.
-                break;
-            }
-
-            // Emit the invisible portion
-            if ch_u8_len > ch_u16.len() {
-                if let Some(out) = &mut run_out {
-                    if out.remaining_len() == 0 {
-                        break;
-                    }
-
-                    let emitted_invisible_len = min(ch_u8_len - ch_u16.len(), acp_end - acp);
-
-                    out.write(TS_RUNINFO {
-                        uCount: emitted_invisible_len as ULONG,
-                        r#type: tsf::TS_RT_HIDDEN,
-                    });
-
-                    acp += emitted_invisible_len;
-                }
-            }
-        }
-
+        let acp: usize = acp_start + emitted_len_u16;
         log::trace!("final acp = {:?}", acp);
 
-        debug_assert!(
-            (acp_start == acp_end || acp > acp_start) && acp >= acp_start && acp <= acp_end
-        );
+        debug_assert!(acp >= acp_start && acp <= acp_end);
+        debug_assert!({
+            if (acpEnd != -1 && acp_start != acp_end) || (acpEnd == -1 && range_u8.len() > 0) {
+                // We should make a progress
+                acp > acp_start
+            } else {
+                true
+            }
+        });
         *pacpNext = acp as LONG;
 
         if let Some(out) = &text_out {
@@ -935,7 +902,7 @@ unsafe extern "system" fn impl_set_text(
     pChange: *mut TS_TEXTCHANGE,
 ) -> HRESULT {
     hresult_from_result_with(|| {
-        log::trace!("impl_set_text{:?}", (dwFlags, acpStart, acpEnd, cch));
+        log::trace!("impl_set_text{:?}", (dwFlags, acpStart..acpEnd, cch));
 
         // This method is supposed to be implemented in this particular way,
         // I think?
@@ -1049,10 +1016,19 @@ unsafe extern "system" fn impl_insert_text_at_selection(
 
         let sel_range = sort_range(sel_range);
 
-        let acp_start: LONG = sel_range.start.try_into().map_err(|_| E_UNEXPECTED)?;
-        let acp_end_old: LONG = sel_range.end.try_into().map_err(|_| E_UNEXPECTED)?;
+        // Convert `sel_range` to UTF-16/ACP
+        let sel_range_u16 = edit_convert_range_to_utf16(&mut **edit, sel_range.clone());
+        let acp_start: LONG = sel_range_u16.start.try_into().map_err(|_| E_UNEXPECTED)?;
+        let acp_end_old: LONG = sel_range_u16.end.try_into().map_err(|_| E_UNEXPECTED)?;
+
+        log::trace!(
+            "... Replacing the text in the range {:?} (UTF-8) or {:?} (UTF-16/ACP)",
+            sel_range,
+            sel_range_u16
+        );
 
         if (dwFlags & tsf::TS_IAS_QUERYONLY) != 0 {
+            log::trace!("... `TS_IAS_QUERYONLY` was given, so not performing the replacement");
             *pacpStart = acp_start;
             *pacpEnd = acp_end_old;
             return Ok(S_OK);
@@ -1066,20 +1042,26 @@ unsafe extern "system" fn impl_insert_text_at_selection(
         }
 
         // Convert `pchText[0..cch]` to UTF-8
+        let cch_usize: usize = cch.try_into().map_err(|_| E_UNEXPECTED)?;
         if cch == 0 {
             // The pointer passed to `from_raw_parts` mustn't be null even if
             // the length is zero
             pchText = NonNull::dangling().as_ptr();
         }
-        let inserted_text = wstr_to_str(std::slice::from_raw_parts(pchText, cch as usize));
+        let inserted_text = wstr_to_str(std::slice::from_raw_parts(pchText, cch_usize));
         log::trace!("... pchText = {:?}", inserted_text);
 
         // Calculate the range end after the insertion
-        let acp_end_new_usize: usize = sel_range
+        let acp_end_new_usize: usize = sel_range_u16
+            .start
+            .checked_add(cch_usize)
+            .ok_or(E_UNEXPECTED)?;
+        let acp_end_new: LONG = acp_end_new_usize.try_into().map_err(|_| E_UNEXPECTED)?;
+
+        let sel_end_new = sel_range
             .start
             .checked_add(inserted_text.len())
             .ok_or(E_UNEXPECTED)?;
-        let acp_end_new: LONG = acp_end_new_usize.try_into().map_err(|_| E_UNEXPECTED)?;
 
         // Insert the text
         edit.replace(sel_range.clone(), &inserted_text);
@@ -1089,11 +1071,18 @@ unsafe extern "system" fn impl_insert_text_at_selection(
             *pacpEnd = acp_end_new;
         }
 
+        *pChange = TS_TEXTCHANGE {
+            acpStart: acp_start,
+            acpOldEnd: acp_end_old,
+            acpNewEnd: acp_end_new,
+        };
+
         // Select the inserted text
-        let new_range = sel_range.start..acp_end_new_usize;
+        let new_range = sel_range.start..sel_end_new;
         log::trace!(
-            "... The newly inserted text occupies the range {:?}",
-            new_range
+            "... The newly inserted text occupies the range {:?} (UTF-8) or {:?} (UTF-16/ACP)",
+            new_range,
+            acp_start..acp_end_new
         );
         edit.set_selected_range(new_range);
 
