@@ -1064,8 +1064,8 @@ unsafe extern "system" fn impl_insert_text_at_selection(
         }
 
         let mut unused = 0;
-        let out_acp_start = NonNull::new(pacpStart).unwrap_or(NonNull::from(&mut unused));
-        let out_acp_end = NonNull::new(pacpEnd).unwrap_or(NonNull::from(&mut unused));
+        let mut out_acp_start = NonNull::new(pacpStart).unwrap_or(NonNull::from(&mut unused));
+        let mut out_acp_end = NonNull::new(pacpEnd).unwrap_or(NonNull::from(&mut unused));
 
         let sel_range = edit.selected_range();
         log::trace!("... sel_range = {:?}", sel_range);
@@ -1123,8 +1123,8 @@ unsafe extern "system" fn impl_insert_text_at_selection(
         edit.replace(sel_range.clone(), &inserted_text);
 
         if (dwFlags & tsf::TS_IAS_NOQUERY) == 0 {
-            *pacpStart = acp_start;
-            *pacpEnd = acp_end_new;
+            *out_acp_start.as_mut() = acp_start;
+            *out_acp_end.as_mut() = acp_end_new;
         }
 
         *pChange = TS_TEXTCHANGE {
