@@ -1285,6 +1285,11 @@ unsafe extern "system" fn impl_get_text_ext(
             return Err(E_INVALIDARG);
         }
 
+        if pfClipped.is_null() {
+            log::debug!("... `pfClipped` is null, returning `E_INVALIDARG`");
+            return Err(E_INVALIDARG);
+        }
+
         if vcView != VIEW_COOKIE {
             log::debug!("... `vcView` is not `VIEW_COOKIE`, returning `E_INVALIDARG`");
             return Err(E_INVALIDARG);
@@ -1325,6 +1330,8 @@ unsafe extern "system" fn impl_get_text_ext(
                 bottom: 0,
             };
         }
+
+        *pfClipped = 0;
 
         Ok(S_OK)
     })
