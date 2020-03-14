@@ -951,19 +951,16 @@ unsafe extern "system" fn impl_set_text(
 }
 
 unsafe extern "system" fn impl_get_formatted_text(
-    this: *mut ITextStoreACP,
+    _this: *mut ITextStoreACP,
     acpStart: LONG,
     acpEnd: LONG,
-    ppDataObject: *mut *mut IDataObject,
+    _ppDataObject: *mut *mut IDataObject,
 ) -> HRESULT {
-    hresult_from_result_with(|| {
-        let this = &*(this as *const TextStore);
-
-        let _edit = this.expect_edit(false)?;
-
-        log::warn!("impl_get_formatted_text: todo!");
-        Err(E_NOTIMPL)
-    })
+    log::debug!(
+        "impl_get_formatted_text{:?}: not supported",
+        (acpStart, acpEnd)
+    );
+    E_NOTIMPL
 }
 
 unsafe extern "system" fn impl_get_embedded(
