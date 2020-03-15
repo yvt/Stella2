@@ -1,15 +1,20 @@
-use std::{cell::RefCell, mem::MaybeUninit, sync::Arc};
+use std::{
+    cell::{Cell, RefCell},
+    mem::MaybeUninit,
+    sync::Arc,
+};
 use winapi::{
     shared::{minwindef::BOOL, wtypesbase::CLSCTX_INPROC_SERVER},
     um::{
         combaseapi::CoCreateInstance,
+        unknwnbase::IUnknown,
         winuser::{MSG, WM_KEYDOWN, WM_KEYUP},
     },
     Interface,
 };
 
 use super::{
-    utils::{assert_hresult_ok, result_from_hresult, ComPtr, ComPtrAsPtr},
+    utils::{assert_hresult_ok, cell_get_by_clone, result_from_hresult, ComPtr, ComPtrAsPtr},
     window, HWnd, Wm,
 };
 use crate::{cells::MtLazyStatic, iface, MtSticky};
@@ -53,6 +58,41 @@ impl TextInputGlobals {
             thread_mgr,
             client_id,
         }
+    }
+
+    fn new_doc_mgr(&self) -> ComPtr<tsf::ITfDocumentMgr> {
+        unsafe {
+            let mut out = MaybeUninit::uninit();
+            assert_hresult_ok(self.thread_mgr.CreateDocumentMgr(out.as_mut_ptr()));
+            ComPtr::from_ptr_unchecked(out.assume_init())
+        }
+    }
+
+    /// Create and push a context on the given `ITfDocumentMgr`.
+    unsafe fn doc_mgr_push_text_store(
+        &self,
+        doc_mgr: &tsf::ITfDocumentMgr,
+        text_store: *mut IUnknown,
+    ) {
+        let (context, _edit_cookie): (ComPtr<tsf::ITfContext>, tsf::TfEditCookie) = {
+            let mut context = MaybeUninit::uninit();
+            let mut edit_cookie = MaybeUninit::uninit();
+
+            assert_hresult_ok(doc_mgr.CreateContext(
+                self.client_id,
+                0,
+                text_store,
+                context.as_mut_ptr(),
+                edit_cookie.as_mut_ptr(),
+            ));
+
+            (
+                ComPtr::from_ptr_unchecked(context.assume_init()),
+                edit_cookie.assume_init(),
+            )
+        };
+
+        assert_hresult_ok(doc_mgr.Push(context.as_ptr()));
     }
 }
 
@@ -153,7 +193,9 @@ type TextInputCtxListener = Box<dyn iface::TextInputCtxListener<Wm>>;
 type TextInputCtxEdit<'a> = Box<dyn iface::TextInputCtxEdit<Wm> + 'a>;
 
 struct TextInputCtx {
-    doc_mgr: ComPtr<tsf::ITfDocumentMgr>,
+    /// This uses `Option` just so `cell_get_by_clone` can be used
+    doc_mgr: Cell<Option<ComPtr<tsf::ITfDocumentMgr>>>,
+    com_text_store: ComPtr<IUnknown>,
     text_store: Arc<textstore::TextStore>,
     hwnd: HWnd,
 }
@@ -170,11 +212,7 @@ pub(super) fn new_text_input_ctx(
     let (com_text_store, text_store) = textstore::TextStore::new(wm, sys_hwnd, listener);
 
     // Create an `ITfDocumentMgr`
-    let doc_mgr = unsafe {
-        let mut out = MaybeUninit::uninit();
-        assert_hresult_ok(tig.thread_mgr.CreateDocumentMgr(out.as_mut_ptr()));
-        ComPtr::from_ptr_unchecked(out.assume_init())
-    };
+    let doc_mgr = tig.new_doc_mgr();
 
     // Create a handle before creating a context so that `TextStore`'s
     // implementation can pass `HTextInputCtx` to the listener when its method
@@ -183,7 +221,8 @@ pub(super) fn new_text_input_ctx(
         .get_with_wm(wm)
         .borrow_mut()
         .allocate(TextInputCtx {
-            doc_mgr,
+            doc_mgr: Cell::new(Some(doc_mgr.clone())),
+            com_text_store: com_text_store.clone(),
             text_store,
             hwnd: hwnd.clone(),
         });
@@ -194,29 +233,11 @@ pub(super) fn new_text_input_ctx(
 
     tictx.text_store.set_htictx(Some(HTextInputCtx { ptr }));
 
-    let doc_mgr = &tictx.doc_mgr;
-
     // Create the primary context on the `ITfDocumentMgr` based on the
     // `TextStore` created earlier
-    let (context, _edit_cookie): (ComPtr<tsf::ITfContext>, tsf::TfEditCookie) = unsafe {
-        let mut context = MaybeUninit::uninit();
-        let mut edit_cookie = MaybeUninit::uninit();
-
-        assert_hresult_ok(doc_mgr.CreateContext(
-            tig.client_id,
-            0,
-            com_text_store.as_ptr(),
-            context.as_mut_ptr(),
-            edit_cookie.as_mut_ptr(),
-        ));
-
-        (
-            ComPtr::from_ptr_unchecked(context.assume_init()),
-            edit_cookie.assume_init(),
-        )
-    };
-
-    assert_hresult_ok(unsafe { doc_mgr.Push(context.as_ptr()) });
+    unsafe {
+        tig.doc_mgr_push_text_store(&doc_mgr, com_text_store.as_ptr());
+    }
 
     // TODO: Associate `ptr` to `hwnd` so that it can be invalidated when
     //       the window is destroyed
@@ -229,9 +250,10 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
     let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
 
     let tictx = &pool[htictx.ptr];
+    let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
 
     if active {
-        assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(tictx.doc_mgr.as_ptr()) });
+        assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(doc_mgr.as_ptr()) });
         window::set_wnd_char_handler(wm, &tictx.hwnd, Some(htictx.clone()));
     } else {
         let cur_focus = unsafe {
@@ -240,7 +262,7 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
             ComPtr::from_ptr(out.assume_init())
         };
 
-        if cur_focus.as_ptr() == tictx.doc_mgr.as_ptr() {
+        if cur_focus.as_ptr() == doc_mgr.as_ptr() {
             assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(std::ptr::null_mut()) });
         }
 
@@ -258,7 +280,9 @@ pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
 
     // Pop all contexts from the document manager, effectively
     // deinitializing it
-    assert_hresult_ok(unsafe { tictx.doc_mgr.Pop(tsf::TF_POPF_ALL) });
+    let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
+    assert_hresult_ok(unsafe { doc_mgr.Pop(tsf::TF_POPF_ALL) });
+    drop(doc_mgr);
 
     // Deassociate `TextStore` with the handle
     tictx.text_store.set_htictx(None);
@@ -283,6 +307,50 @@ pub(super) fn handle_char(wm: Wm, htictx: &HTextInputCtx, c: u32) {
     text_store_from_htictx(wm, htictx).handle_char(c);
 }
 
+pub(super) fn text_input_ctx_reset(wm: Wm, htictx: &HTextInputCtx) {
+    let tig = TIG.get_with_wm(wm);
+
+    let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+    let tictx = &pool[htictx.ptr];
+
+    let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
+
+    // Check if `htictx` is active or not
+    let cur_focus = unsafe {
+        let mut out = MaybeUninit::uninit();
+        assert_hresult_ok(tig.thread_mgr.GetFocus(out.as_mut_ptr()));
+        ComPtr::from_ptr(out.assume_init())
+    };
+    let is_active = cur_focus.as_ptr() == doc_mgr.as_ptr();
+    drop(cur_focus);
+
+    // Pop all contexts from the document manager, effectively
+    // deinitializing it
+    assert_hresult_ok(unsafe { doc_mgr.Pop(tsf::TF_POPF_ALL) });
+    drop(doc_mgr);
+
+    // Create a new document manager
+    let doc_mgr = tig.new_doc_mgr();
+
+    // Create and push the primary context
+    unsafe {
+        tig.doc_mgr_push_text_store(&doc_mgr, tictx.com_text_store.as_ptr());
+    }
+
+    // Store the new document manager to `tictx.doc_mgr`.
+    let doc_mgr_ptr = doc_mgr.as_ptr();
+    tictx.doc_mgr.set(Some(doc_mgr));
+
+    // Make it active again if it was previously active.
+    if is_active {
+        assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(doc_mgr_ptr) });
+    }
+}
+
 pub(super) fn text_input_ctx_on_layout_change(wm: Wm, htictx: &HTextInputCtx) {
     text_store_from_htictx(wm, htictx).on_layout_change();
+}
+
+pub(super) fn text_input_ctx_on_selection_change(wm: Wm, htictx: &HTextInputCtx) {
+    text_store_from_htictx(wm, htictx).on_selection_change();
 }

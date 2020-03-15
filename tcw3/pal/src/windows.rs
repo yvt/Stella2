@@ -140,6 +140,16 @@ impl iface::Wm for Wm {
         textinput::text_input_ctx_set_active(self, htictx, active);
     }
 
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_reset(self, htictx);
+    }
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_on_selection_change(self, htictx);
+    }
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_on_layout_change(self, htictx);
+    }
+
     fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
         textinput::remove_text_input_ctx(self, htictx);
     }

@@ -190,6 +190,12 @@ impl TextStore {
         }
     }
 
+    pub(super) fn on_selection_change(&self) {
+        if let Some(sink) = cell_get_by_clone(&self.sink) {
+            assert_hresult_ok(unsafe { sink.OnSelectionChange() });
+        }
+    }
+
     fn expect_htictx(&self) -> HTextInputCtx {
         cell_get_by_clone(&self.htictx).unwrap()
     }
@@ -203,7 +209,9 @@ impl TextStore {
         if (mask & tsf::TS_AS_SEL_CHANGE) != 0 {
             event_mask |= iface::TextInputCtxEventFlags::SELECTION_CHANGE;
         }
-        // TODO: Support `TS_AS_LAYOUT_CHANGE`
+        if (mask & tsf::TS_AS_LAYOUT_CHANGE) != 0 {
+            event_mask |= iface::TextInputCtxEventFlags::LAYOUT;
+        }
 
         self.listener
             .set_event_mask(self.wm, &self.expect_htictx(), event_mask);
