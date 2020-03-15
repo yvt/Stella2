@@ -15,7 +15,7 @@ use winapi::{
 
 use super::{
     utils::{assert_hresult_ok, cell_get_by_clone, result_from_hresult, ComPtr, ComPtrAsPtr},
-    window, HWnd, Wm,
+    HWnd, Wm,
 };
 use crate::{cells::MtLazyStatic, iface, MtSticky};
 use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
@@ -175,6 +175,32 @@ impl MessagePump {
 
 // --------------------------------------------------------------------------
 
+pub(super) struct TextInputWindow {
+    active_ctx: Cell<Option<HTextInputCtx>>,
+}
+
+impl TextInputWindow {
+    pub(super) fn new() -> Self {
+        Self {
+            active_ctx: Cell::new(None),
+        }
+    }
+
+    pub(super) fn on_move(&self, wm: Wm) {
+        if let Some(htictx) = cell_get_by_clone(&self.active_ctx) {
+            text_input_ctx_on_layout_change(wm, &htictx);
+        }
+    }
+
+    pub(super) fn on_char(&self, wm: Wm, ch: u32) {
+        if let Some(htictx) = cell_get_by_clone(&self.active_ctx) {
+            text_store_from_htictx(wm, &htictx).handle_char(ch);
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HTextInputCtx {
     ptr: TextInputCtxPoolPtr,
@@ -251,10 +277,11 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
 
     let tictx = &pool[htictx.ptr];
     let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
+    let text_input_wnd = tictx.hwnd.text_input_wnd();
 
     if active {
         assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(doc_mgr.as_ptr()) });
-        window::set_wnd_char_handler(wm, &tictx.hwnd, Some(htictx.clone()));
+        text_input_wnd.active_ctx.set(Some(htictx.clone()));
     } else {
         let cur_focus = unsafe {
             let mut out = MaybeUninit::uninit();
@@ -266,8 +293,8 @@ pub(super) fn text_input_ctx_set_active(wm: Wm, htictx: &HTextInputCtx, active: 
             assert_hresult_ok(unsafe { tig.thread_mgr.SetFocus(std::ptr::null_mut()) });
         }
 
-        if window::wnd_char_handler(wm, &tictx.hwnd).as_ref() == Some(htictx) {
-            window::set_wnd_char_handler(wm, &tictx.hwnd, None);
+        if cell_get_by_clone(&text_input_wnd.active_ctx).as_ref() == Some(htictx) {
+            text_input_wnd.active_ctx.set(None);
         }
     }
 }
@@ -301,10 +328,6 @@ fn text_store_from_htictx(wm: Wm, htictx: &HTextInputCtx) -> Arc<textstore::Text
     let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
     let tictx = &pool[htictx.ptr];
     Arc::clone(&tictx.text_store)
-}
-
-pub(super) fn handle_char(wm: Wm, htictx: &HTextInputCtx, c: u32) {
-    text_store_from_htictx(wm, htictx).handle_char(c);
 }
 
 pub(super) fn text_input_ctx_reset(wm: Wm, htictx: &HTextInputCtx) {

@@ -21,8 +21,8 @@ use winapi::{
 use super::{
     codecvt::str_to_c_wstr,
     comp, frameclock,
-    textinput::{handle_char, text_input_ctx_on_layout_change, HTextInputCtx},
-    utils::{assert_win32_nonnull, assert_win32_ok, cell_get_by_clone},
+    textinput::TextInputWindow,
+    utils::{assert_win32_nonnull, assert_win32_ok},
     Wm, WndAttrs,
 };
 use crate::{iface, iface::Wm as WmTrait};
@@ -69,7 +69,7 @@ struct Wnd {
 
     drag_state: RefCell<Option<MouseDragState>>,
 
-    char_handler: Cell<Option<HTextInputCtx>>,
+    text_input_wnd: TextInputWindow,
 }
 
 impl fmt::Debug for Wnd {
@@ -98,6 +98,10 @@ impl HWnd {
         let hwnd = self.wnd.hwnd.get();
         assert!(!hwnd.is_null(), "already destroyed");
         hwnd
+    }
+
+    pub(super) fn text_input_wnd(&self) -> &TextInputWindow {
+        &self.wnd.text_input_wnd
     }
 }
 
@@ -167,7 +171,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             max_size: Cell::new([MAX_WND_SIZE; 2]),
             update_ready_pending: Cell::new(false),
             drag_state: RefCell::new(None),
-            char_handler: Cell::new(None),
+            text_input_wnd: TextInputWindow::new(),
         }),
     };
 
@@ -433,17 +437,6 @@ pub fn is_wnd_focused(_: Wm, pal_hwnd: &HWnd) -> bool {
     hwnd == unsafe { winuser::GetForegroundWindow() }
 }
 
-/// Set the `HTextInputCtx` to be used to handle `WM_CHAR` messages. It also
-/// handles relayout requests (e.g., to move the input candidate window of
-/// Microsoft IME) when `WM_MOVE` messages are sent to the window.
-pub fn set_wnd_char_handler(_: Wm, pal_hwnd: &HWnd, tictx: Option<HTextInputCtx>) {
-    pal_hwnd.wnd.char_handler.set(tictx);
-}
-
-pub fn wnd_char_handler(_: Wm, pal_hwnd: &HWnd) -> Option<HTextInputCtx> {
-    cell_get_by_clone(&pal_hwnd.wnd.char_handler)
-}
-
 static FRAME_CLOCK_MANAGER: frameclock::FrameClockManager<HWnd> =
     frameclock::FrameClockManager::new();
 
@@ -618,9 +611,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 }
                 _ => {}
             }
-            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
-                handle_char(wm, &char_handler, wparam as _);
-            }
+            pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
             return 0;
         } // WM_CHAR
 
@@ -630,9 +621,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 // We can handle `WM_UNIUSER`, so return `1`
                 return 1;
             }
-            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
-                handle_char(wm, &char_handler, wparam as _);
-            }
+            pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
             return 0;
         } // WM_UNICHAR
 
@@ -836,9 +825,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
         } // WM_SIZE
 
         winuser::WM_MOVE => {
-            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
-                text_input_ctx_on_layout_change(wm, &char_handler);
-            }
+            pal_hwnd.wnd.text_input_wnd.on_move(wm);
         } // WM_MOVE
 
         _ => {}
