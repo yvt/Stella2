@@ -699,7 +699,7 @@ bitflags! {
         /// The system handles [`Wm::text_input_ctx_on_selection_change`].
         const SELECTION_CHANGE = 1 << 1;
         /// The system handles [`Wm::text_input_ctx_on_layout_change`].
-        const LAYOUT = 1 << 2;
+        const LAYOUT_CHANGE = 1 << 2;
     }
 }
 

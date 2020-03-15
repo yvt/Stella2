@@ -210,7 +210,7 @@ impl TextStore {
             event_mask |= iface::TextInputCtxEventFlags::SELECTION_CHANGE;
         }
         if (mask & tsf::TS_AS_LAYOUT_CHANGE) != 0 {
-            event_mask |= iface::TextInputCtxEventFlags::LAYOUT;
+            event_mask |= iface::TextInputCtxEventFlags::LAYOUT_CHANGE;
         }
 
         self.listener

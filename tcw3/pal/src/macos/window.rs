@@ -279,7 +279,7 @@ impl HTextInputCtx {
                 self.inner.listener.set_event_mask(
                     wm,
                     self,
-                    flags![iface::TextInputCtxEventFlags::{RESET | SELECTION_CHANGE | LAYOUT}],
+                    flags![iface::TextInputCtxEventFlags::{RESET | SELECTION_CHANGE | LAYOUT_CHANGE}],
                 );
             } else {
                 // No active context
