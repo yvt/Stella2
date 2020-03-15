@@ -190,6 +190,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     ///
     /// This must not called in response to a call to `TextInputCtxEdit`'s
     /// method.
+    ///
+    /// This method may call [`TextInputCtxListener::edit`].
     fn text_input_ctx_on_selection_change(self, _: &Self::HTextInputCtx) {}
 
     /// Notify that the layout of the given text input context has changed.
@@ -206,7 +208,7 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// context. When multiple contexts are activated, only one of them will be
     /// activated, but how that will be chosen is unspecified.
     ///
-    /// [`TextInputCtxListener::edit`] may be called in this method.
+    /// This method may call [`TextInputCtxListener`]`::{edit, set_event_flag}`.
     fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, active: bool);
 
     /// Delete the specified text input context.

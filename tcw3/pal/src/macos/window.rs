@@ -19,6 +19,7 @@ use cocoa::{
     base::{id, nil},
     foundation::{NSNotFound, NSPoint, NSRange, NSRect, NSSize, NSString, NSUInteger},
 };
+use flags_macro::flags;
 use objc::{
     msg_send,
     runtime::{BOOL, NO},
@@ -235,45 +236,85 @@ impl HTextInputCtx {
     }
 
     pub(super) fn set_active(&self, active: bool) {
+        // `HWnd` only can be created in a main thread and `HTextInputCtx`
+        // contains a reference to one, so this is safe
+        let wm = unsafe { Wm::global_unchecked() };
+
         let tictx_cell = &self.inner.wnd_state.tictx;
         let wnd_ctrler = *self.inner.wnd_state.hwnd.ctrler;
         let mut cur_tictx = tictx_cell.take();
         let cur_active = option_deref_to_ptr(&cur_tictx) == (&*self.inner) as *const _;
 
-        match (cur_active, active) {
-            (false, true) => {
-                // Deactivate `cur_tictx` first
-                std::mem::forget(tictx_cell.replace(cur_tictx));
-                let () = unsafe { msg_send![wnd_ctrler, resetTextInput] };
+        if cur_active != active {
+            // Deactivate `cur_tictx` first.
+            if let Some(inner) = cur_tictx {
+                // Notify the listener that we are no longer interested in
+                // receiving events regarding `cur_tictx`. `set_event_mask`
+                // takes `&HTextInputCtx`, so we first make one from `cur_tictx`.
+                let htictx = HTextInputCtx { inner };
+                htictx.inner.listener.set_event_mask(
+                    wm,
+                    &htictx,
+                    iface::TextInputCtxEventFlags::empty(),
+                );
 
+                // After the notification is done, destruct `HTextInputCtx` and
+                // take `cur_tictx` back.
+                cur_tictx = Some(htictx.inner);
+            }
+            // Put `cur_tictx` back...
+            std::mem::forget(tictx_cell.replace(cur_tictx));
+
+            // And reset the text input. This will send clean-up events to
+            // `cur_tictx`.
+            let () = unsafe { msg_send![wnd_ctrler, resetTextInput] };
+
+            // Determine the next active context
+            if active {
                 // Activate `self`
                 cur_tictx = Some(Rc::clone(&self.inner));
-            }
-            (true, false) => {
-                // Deactivate `self`
-                std::mem::forget(tictx_cell.replace(cur_tictx));
-                let () = unsafe { msg_send![wnd_ctrler, resetTextInput] };
 
+                // Notify the listener that we are now interested in
+                // receiving events regarding `cur_tictx`.
+                self.inner.listener.set_event_mask(
+                    wm,
+                    self,
+                    flags![iface::TextInputCtxEventFlags::{RESET | SELECTION_CHANGE | LAYOUT}],
+                );
+            } else {
+                // No active context
                 cur_tictx = None;
             }
-            _ => {}
         }
 
         // Put back `cur_tictx`
         std::mem::forget(tictx_cell.replace(cur_tictx));
     }
 
-    pub(super) fn reset(&self) {
-        let is_active = cell_map(&self.inner.wnd_state.tictx, |cur_tictx| {
+    fn is_active(&self) -> bool {
+        cell_map(&self.inner.wnd_state.tictx, |cur_tictx| {
             option_deref_to_ptr(&cur_tictx) == (&*self.inner) as *const _
-        });
+        })
+    }
 
-        if is_active {
+    pub(super) fn reset(&self) {
+        if self.is_active() {
             let wnd_ctrler = *self.inner.wnd_state.hwnd.ctrler;
             let () = unsafe { msg_send![wnd_ctrler, resetTextInput] };
 
             self.inner.wnd_state.marked_range.set(None);
         }
+    }
+
+    pub(super) fn on_selection_change(&self) {
+        self.reset();
+    }
+
+    pub(super) fn on_layout_change(&self) {
+        // It's harmless to do this when we don't have to. It's up to the client
+        // to track event flags and call `on_layout_change` only when required.
+        let wnd_ctrler = *self.inner.wnd_state.hwnd.ctrler;
+        let () = unsafe { msg_send![wnd_ctrler, repositionTextInput] };
     }
 }
 
