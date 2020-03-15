@@ -752,6 +752,19 @@ impl iface::Wm for Wm {
         }
     }
 
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        match (self.backend_and_wm(), &htictx.inner) {
+            (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
+                wm.text_input_ctx_on_layout_change(htictx)
+            }
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+                debug!("text_input_ctx_on_layout_change({:?})", htictx);
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
     fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
         match (self.backend_and_wm(), &htictx.inner) {
             (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {

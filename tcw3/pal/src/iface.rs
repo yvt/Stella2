@@ -192,6 +192,15 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// method.
     fn text_input_ctx_on_selection_change(self, _: &Self::HTextInputCtx) {}
 
+    /// Notify that the layout of the given text input context has changed.
+    ///
+    /// After `TextInputCtxEdit` introduces changes to the document, the client
+    /// may need to relayout the document. This method should be called
+    /// after the relayouting. However, this *must not be called* until the
+    /// `TextInputCtxEdit` is dropped. The recommended way to handle this
+    /// situation is to call this method through `Wm::invoke`.
+    fn text_input_ctx_on_layout_change(self, _: &Self::HTextInputCtx) {}
+
     /// Activate or deactivate the specified text input context.
     ///
     /// In an application process, there can be only once active text input
@@ -688,6 +697,8 @@ bitflags! {
         const RESET = 1;
         /// The system handles [`Wm::text_input_ctx_on_selection_change`].
         const SELECTION_CHANGE = 1 << 1;
+        /// The system handles [`Wm::text_input_ctx_on_layout_change`].
+        const LAYOUT = 1 << 2;
     }
 }
 
