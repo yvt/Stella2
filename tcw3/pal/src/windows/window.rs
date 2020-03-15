@@ -389,7 +389,10 @@ fn is_mouse_in_wnd(hwnd: HWND) -> bool {
     te.dwFlags & winuser::TME_LEAVE != 0
 }
 
-pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
+pub fn remove_wnd(wm: Wm, pal_hwnd: &HWnd) {
+    // Invalidate all text input contexts associated with the window
+    pal_hwnd.wnd.text_input_wnd.invalidate(wm);
+
     let hwnd = pal_hwnd.expect_hwnd();
     unsafe {
         winuser::DestroyWindow(hwnd);

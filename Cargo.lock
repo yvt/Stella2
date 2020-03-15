@@ -2721,6 +2721,7 @@ dependencies = [
  "arg_enum_proc_macro",
  "arr_macro",
  "array",
+ "array_intrusive_list",
  "arrayvec 0.5.1",
  "atom2",
  "bitflags",

@@ -1,3 +1,4 @@
+use array_intrusive_list::{Link, ListAccessorCell, ListHead};
 use std::{
     cell::{Cell, RefCell},
     mem::MaybeUninit,
@@ -177,12 +178,24 @@ impl MessagePump {
 
 pub(super) struct TextInputWindow {
     active_ctx: Cell<Option<HTextInputCtx>>,
+    ctx_list: Cell<ListHead<TextInputCtxPoolPtr>>,
+}
+
+/// Construct a `ListAccessorCell` that can be used to interact with
+/// the list of `TextInputCtx` associated with a particular `TextInputWindow`.
+macro_rules! wnd_ctx_list_accessor {
+    ($text_input_wnd:expr, $pool:expr) => {
+        ListAccessorCell::new(&$text_input_wnd.ctx_list, $pool, |e: &TextInputCtx| {
+            &e.wnd_ctx_link
+        })
+    };
 }
 
 impl TextInputWindow {
     pub(super) fn new() -> Self {
         Self {
             active_ctx: Cell::new(None),
+            ctx_list: Cell::new(ListHead::new()),
         }
     }
 
@@ -195,6 +208,16 @@ impl TextInputWindow {
     pub(super) fn on_char(&self, wm: Wm, ch: u32) {
         if let Some(htictx) = cell_get_by_clone(&self.active_ctx) {
             text_store_from_htictx(wm, &htictx).handle_char(ch);
+        }
+    }
+
+    /// Invalidatte all text input contexts for the window. Must be called
+    /// before destroying the window.
+    pub(super) fn invalidate(&self, wm: Wm) {
+        let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+
+        while let Some(ptr) = wnd_ctx_list_accessor!(self, &*pool).pop_front() {
+            deinit_tictx(&pool[ptr]);
         }
     }
 }
@@ -219,11 +242,18 @@ type TextInputCtxListener = Box<dyn iface::TextInputCtxListener<Wm>>;
 type TextInputCtxEdit<'a> = Box<dyn iface::TextInputCtxEdit<Wm> + 'a>;
 
 struct TextInputCtx {
-    /// This uses `Option` just so `cell_get_by_clone` can be used
+    /// Usually this holds `Some(_)`, which can be replaced with `None`
+    /// (1) temporarily or (2) when the associated window is destroyed. For the
+    /// second case, accessing `doc_mgr` is usually a breach of contract by the
+    /// client and we are allowed to panic in such a case, so it's okay to
+    /// `unwrap` this.
     doc_mgr: Cell<Option<ComPtr<tsf::ITfDocumentMgr>>>,
     com_text_store: ComPtr<IUnknown>,
     text_store: Arc<textstore::TextStore>,
     hwnd: HWnd,
+
+    /// Forms a linked list headed by `TextInputWindow::ctx_list`.
+    wnd_ctx_link: Cell<Option<Link<TextInputCtxPoolPtr>>>,
 }
 
 pub(super) fn new_text_input_ctx(
@@ -251,6 +281,7 @@ pub(super) fn new_text_input_ctx(
             com_text_store: com_text_store.clone(),
             text_store,
             hwnd: hwnd.clone(),
+            wnd_ctx_link: Cell::new(None),
         });
 
     // Get a reference to the `TextInputCtx` we just created
@@ -259,14 +290,14 @@ pub(super) fn new_text_input_ctx(
 
     tictx.text_store.set_htictx(Some(HTextInputCtx { ptr }));
 
+    // Add the context to the window's `TextInputWindow::ctx_list`
+    wnd_ctx_list_accessor!(hwnd.text_input_wnd(), &*pool).push_back(ptr);
+
     // Create the primary context on the `ITfDocumentMgr` based on the
     // `TextStore` created earlier
     unsafe {
         tig.doc_mgr_push_text_store(&doc_mgr, com_text_store.as_ptr());
     }
-
-    // TODO: Associate `ptr` to `hwnd` so that it can be invalidated when
-    //       the window is destroyed
 
     HTextInputCtx { ptr }
 }
@@ -305,14 +336,13 @@ pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
     let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
     let tictx = &pool[htictx.ptr];
 
-    // Pop all contexts from the document manager, effectively
-    // deinitializing it
-    let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
-    assert_hresult_ok(unsafe { doc_mgr.Pop(tsf::TF_POPF_ALL) });
-    drop(doc_mgr);
+    // Remove the context from the window's `TextInputWindow::ctx_list`
+    if tictx.wnd_ctx_link.get().is_some() {
+        wnd_ctx_list_accessor!(tictx.hwnd.text_input_wnd(), &*pool).remove(htictx.ptr);
+    }
 
-    // Deassociate `TextStore` with the handle
-    tictx.text_store.set_htictx(None);
+    // De-initialize the document manager
+    deinit_tictx(tictx);
 
     drop(pool);
 
@@ -322,6 +352,21 @@ pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
         .borrow_mut()
         .deallocate(htictx.ptr)
         .unwrap();
+}
+
+fn deinit_tictx(tictx: &TextInputCtx) {
+    // Pop all contexts from the document manager, effectively
+    // deinitializing it.
+    //
+    // Note that `remove_text_input_ctx` is allowed even for a context
+    // invalidated by a window destruction, so we shouldn't `unwrap` `doc_mgr`
+    // here.
+    if let Some(doc_mgr) = tictx.doc_mgr.take() {
+        assert_hresult_ok(unsafe { doc_mgr.Pop(tsf::TF_POPF_ALL) });
+    }
+
+    // Deassociate `TextStore` with the handle
+    tictx.text_store.set_htictx(None);
 }
 
 fn text_store_from_htictx(wm: Wm, htictx: &HTextInputCtx) -> Arc<textstore::TextStore> {
@@ -336,7 +381,9 @@ pub(super) fn text_input_ctx_reset(wm: Wm, htictx: &HTextInputCtx) {
     let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
     let tictx = &pool[htictx.ptr];
 
-    let doc_mgr = cell_get_by_clone(&tictx.doc_mgr).unwrap();
+    // The `text_input_*` methods are not re-entrant, so it's okay to `take`
+    // the document manager.
+    let doc_mgr = tictx.doc_mgr.take().unwrap();
 
     // Check if `htictx` is active or not
     let cur_focus = unsafe {

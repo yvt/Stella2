@@ -121,6 +121,11 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// The window will be closed as soon as possible (if not immediately).
     /// `WndListener::close_requested` is not called. All system resources
     /// associated with the window will be released.
+    ///
+    /// All text input contexts (represented by `Self::HTextInputCtx`)
+    /// associated with the window will be invalidated, and the further uses of
+    /// the contexts through `Wm`'s methods except `remove_text_input_ctx` may
+    /// cause a panic.
     fn remove_wnd(self, window: &Self::HWnd);
 
     /// Update a window's contents.
@@ -663,6 +668,9 @@ impl Default for CursorShape {
 ///
 /// The receiver is immutable because event handlers may manipulate windows,
 /// which in turn might cause other event handlers to be called.
+///
+/// The implementations of these methods are not allowed to use [`Wm`]'s methods
+/// to manipulate the current text input context.
 pub trait TextInputCtxListener<T: Wm> {
     /// Acquire a lock on the text document.
     ///
@@ -709,6 +717,9 @@ bitflags! {
 /// All given ranges are subsets of `0..self.len()`. All endpoints are on UTF-8
 /// character boundaries. The client can use `TextInputCtxEdit::floor_index` to
 /// find the nearest boundary.
+///
+/// The implementations of these methods are not allowed to use [`Wm`]'s methods
+/// to manipulate the current text input context.
 pub trait TextInputCtxEdit<T: Wm> {
     /// Get the current selection.
     ///
