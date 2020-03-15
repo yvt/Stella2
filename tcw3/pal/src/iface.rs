@@ -194,11 +194,10 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
 
     /// Notify that the layout of the given text input context has changed.
     ///
-    /// After `TextInputCtxEdit` introduces changes to the document, the client
-    /// may need to relayout the document. This method should be called
-    /// after the relayouting. However, this *must not be called* until the
-    /// `TextInputCtxEdit` is dropped. The recommended way to handle this
-    /// situation is to call this method through `Wm::invoke`.
+    /// This must not called in response to a call to `TextInputCtxEdit`'s
+    /// method.
+    ///
+    /// This method may call [`TextInputCtxListener::edit`].
     fn text_input_ctx_on_layout_change(self, _: &Self::HTextInputCtx) {}
 
     /// Activate or deactivate the specified text input context.
