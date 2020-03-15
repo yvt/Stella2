@@ -21,7 +21,7 @@ use winapi::{
 use super::{
     codecvt::str_to_c_wstr,
     comp, frameclock,
-    textinput::{handle_char, HTextInputCtx},
+    textinput::{handle_char, text_input_ctx_on_layout_change, HTextInputCtx},
     utils::{assert_win32_nonnull, assert_win32_ok, cell_get_by_clone},
     Wm, WndAttrs,
 };
@@ -433,7 +433,9 @@ pub fn is_wnd_focused(_: Wm, pal_hwnd: &HWnd) -> bool {
     hwnd == unsafe { winuser::GetForegroundWindow() }
 }
 
-/// Set the `HTextInputCtx` to be used to handle `WM_CHAR` events.
+/// Set the `HTextInputCtx` to be used to handle `WM_CHAR` messages. It also
+/// handles relayout requests (e.g., to move the input candidate window of
+/// Microsoft IME) when `WM_MOVE` messages are sent to the window.
 pub fn set_wnd_char_handler(_: Wm, pal_hwnd: &HWnd, tictx: Option<HTextInputCtx>) {
     pal_hwnd.wnd.char_handler.set(tictx);
 }
@@ -832,6 +834,12 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.resize(wm, &pal_hwnd);
         } // WM_SIZE
+
+        winuser::WM_MOVE => {
+            if let Some(char_handler) = cell_get_by_clone(&pal_hwnd.wnd.char_handler) {
+                text_input_ctx_on_layout_change(wm, &char_handler);
+            }
+        } // WM_MOVE
 
         _ => {}
     }

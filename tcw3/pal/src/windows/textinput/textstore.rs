@@ -32,7 +32,8 @@ use super::super::{
     codecvt::{str_to_c_wstr, wstr_to_str},
     drawutils::union_box_f32,
     utils::{
-        cell_get_by_clone, hresult_from_result_with, query_interface, result_from_hresult, ComPtr,
+        assert_hresult_ok, cell_get_by_clone, hresult_from_result_with, query_interface,
+        result_from_hresult, ComPtr,
     },
     window::log_client_box2_to_phy_screen_rect,
 };
@@ -181,6 +182,12 @@ impl TextStore {
         // Move the cursor to the end of the inserted text
         let i = sel_range.start + ch_u8.len();
         edit.set_selected_range(i..i);
+    }
+
+    pub(super) fn on_layout_change(&self) {
+        if let Some(sink) = cell_get_by_clone(&self.sink) {
+            assert_hresult_ok(unsafe { sink.OnLayoutChange(tsf::TS_LC_CHANGE, VIEW_COOKIE) });
+        }
     }
 
     fn expect_htictx(&self) -> HTextInputCtx {

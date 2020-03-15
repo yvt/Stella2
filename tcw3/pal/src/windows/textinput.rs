@@ -273,12 +273,16 @@ pub(super) fn remove_text_input_ctx(wm: Wm, htictx: &HTextInputCtx) {
         .unwrap();
 }
 
-pub(super) fn handle_char(wm: Wm, htictx: &HTextInputCtx, c: u32) {
-    let text_store = {
-        let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
-        let tictx = &pool[htictx.ptr];
-        Arc::clone(&tictx.text_store)
-    };
+fn text_store_from_htictx(wm: Wm, htictx: &HTextInputCtx) -> Arc<textstore::TextStore> {
+    let pool = TEXT_INPUT_CTXS.get_with_wm(wm).borrow();
+    let tictx = &pool[htictx.ptr];
+    Arc::clone(&tictx.text_store)
+}
 
-    text_store.handle_char(c);
+pub(super) fn handle_char(wm: Wm, htictx: &HTextInputCtx, c: u32) {
+    text_store_from_htictx(wm, htictx).handle_char(c);
+}
+
+pub(super) fn text_input_ctx_on_layout_change(wm: Wm, htictx: &HTextInputCtx) {
+    text_store_from_htictx(wm, htictx).on_layout_change();
 }
