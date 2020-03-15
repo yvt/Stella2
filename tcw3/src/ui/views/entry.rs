@@ -282,6 +282,13 @@ impl ViewListener for EntryCoreListener {
 
     fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.position(wm, view);
+
+        if (self.inner.tictx_event_mask.get()).contains(pal::TextInputCtxEventFlags::LAYOUT) {
+            let tictx = self.inner.state.borrow().tictx.clone();
+            if let Some(tictx) = tictx {
+                wm.text_input_ctx_on_layout_change(&tictx);
+            }
+        }
     }
 
     fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
