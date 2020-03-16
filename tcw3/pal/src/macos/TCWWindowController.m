@@ -376,6 +376,18 @@ extern CGSConnection CGSDefaultConnectionForThread();
     return [self->window.contentView convertPoint:windowLoc fromView:nil];
 }
 
+/** Called by `window.rs` */
+- (void)resetTextInput {
+    NSTextInputContext *inputContext = self->gestureHandler.inputContext;
+    [inputContext discardMarkedText];
+}
+
+/** Called by `window.rs` */
+- (void)repositionTextInput {
+    NSTextInputContext *inputContext = self->gestureHandler.inputContext;
+    [inputContext invalidateCharacterCoordinates];
+}
+
 @end
 
 Class tcw_wnd_ctrler_cls() { return [TCWWindowController class]; }

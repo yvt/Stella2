@@ -24,6 +24,22 @@ extern void tcw_wndlistener_mouse_leave(TCWListenerUserData ud);
 extern TCWMouseDragListenerUserData
 tcw_wndlistener_mouse_drag(TCWListenerUserData ud, NSPoint loc, uint8_t button);
 
+extern int tcw_wnd_has_text_input_ctx(TCWListenerUserData ud);
+extern void tcw_wnd_insert_text(TCWListenerUserData ud, const char *str,
+                                size_t replace_start, size_t replace_len);
+extern void tcw_wnd_set_marked_text(TCWListenerUserData ud, const char *str,
+                                    size_t sel_start, size_t sel_len,
+                                    size_t replace_start, size_t replace_len);
+extern void tcw_wnd_unmark_text(TCWListenerUserData ud);
+extern NSRange tcw_wnd_get_selected_range(TCWListenerUserData ud);
+extern NSRange tcw_wnd_get_marked_range(TCWListenerUserData ud);
+extern NSString *tcw_wnd_get_text(TCWListenerUserData ud, size_t start,
+                                  size_t len, NSRange *actual_range);
+extern NSRect tcw_wnd_get_text_rect(TCWListenerUserData ud, size_t start,
+                                    size_t len, NSRange *actual_range);
+extern NSUInteger tcw_wnd_get_char_index_from_point(TCWListenerUserData ud,
+                                                    NSPoint loc);
+
 extern void tcw_mousedraglistener_release(TCWMouseDragListenerUserData ud);
 extern void tcw_mousedraglistener_cancel(TCWMouseDragListenerUserData ud);
 extern void tcw_mousedraglistener_mouse_motion(TCWMouseDragListenerUserData ud,

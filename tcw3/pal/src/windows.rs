@@ -16,6 +16,7 @@ mod eventloop;
 mod frameclock;
 mod surface;
 mod text;
+mod textinput;
 mod utils;
 mod winapiext;
 mod window;
@@ -25,6 +26,7 @@ pub use self::{
     comp::HLayer,
     eventloop::HInvoke,
     text::{CharStyle, CharStyleAttrs, TextLayout},
+    textinput::HTextInputCtx,
     window::{set_app_hicon, HWnd},
 };
 
@@ -44,6 +46,7 @@ impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
+    type HTextInputCtx = HTextInputCtx;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -75,7 +78,7 @@ impl iface::Wm for Wm {
     }
 
     fn enter_main_loop(self) -> ! {
-        eventloop::enter_main_loop();
+        eventloop::enter_main_loop(self);
         std::process::exit(0);
     }
 
@@ -123,6 +126,32 @@ impl iface::Wm for Wm {
     }
     fn remove_layer(self, layer: &Self::HLayer) {
         comp::remove_layer(self, layer)
+    }
+
+    fn new_text_input_ctx(
+        self,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
+    ) -> Self::HTextInputCtx {
+        textinput::new_text_input_ctx(self, hwnd, listener)
+    }
+
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        textinput::text_input_ctx_set_active(self, htictx, active);
+    }
+
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_reset(self, htictx);
+    }
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_on_selection_change(self, htictx);
+    }
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        textinput::text_input_ctx_on_layout_change(self, htictx);
+    }
+
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        textinput::remove_text_input_ctx(self, htictx);
     }
 }
 

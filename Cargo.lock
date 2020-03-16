@@ -2721,6 +2721,7 @@ dependencies = [
  "arg_enum_proc_macro",
  "arr_macro",
  "array",
+ "array_intrusive_list",
  "arrayvec 0.5.1",
  "atom2",
  "bitflags",
@@ -2749,6 +2750,7 @@ dependencies = [
  "gio",
  "glib",
  "glib-sys",
+ "gobject-sys",
  "gtk",
  "gtk-sys",
  "iterpool",
@@ -2770,6 +2772,8 @@ dependencies = [
  "rgb",
  "structopt",
  "svgbobdoc",
+ "try_match",
+ "utf16count",
  "wchar",
  "winapi",
  "winrt",
@@ -2914,6 +2918,17 @@ dependencies = [
  "siphasher",
  "svgtypes",
  "xmlwriter",
+]
+
+[[package]]
+name = "utf16count"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "log",
+ "packed_simd",
+ "quickcheck",
+ "quickcheck_macros",
 ]
 
 [[package]]

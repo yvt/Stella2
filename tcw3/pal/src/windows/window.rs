@@ -21,6 +21,7 @@ use winapi::{
 use super::{
     codecvt::str_to_c_wstr,
     comp, frameclock,
+    textinput::TextInputWindow,
     utils::{assert_win32_nonnull, assert_win32_ok},
     Wm, WndAttrs,
 };
@@ -67,6 +68,8 @@ struct Wnd {
     update_ready_pending: Cell<bool>,
 
     drag_state: RefCell<Option<MouseDragState>>,
+
+    text_input_wnd: TextInputWindow,
 }
 
 impl fmt::Debug for Wnd {
@@ -91,10 +94,14 @@ struct MouseDragState {
 const MAX_WND_SIZE: u32 = 0x10000;
 
 impl HWnd {
-    fn expect_hwnd(&self) -> HWND {
+    pub(super) fn expect_hwnd(&self) -> HWND {
         let hwnd = self.wnd.hwnd.get();
         assert!(!hwnd.is_null(), "already destroyed");
         hwnd
+    }
+
+    pub(super) fn text_input_wnd(&self) -> &TextInputWindow {
+        &self.wnd.text_input_wnd
     }
 }
 
@@ -164,6 +171,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             max_size: Cell::new([MAX_WND_SIZE; 2]),
             update_ready_pending: Cell::new(false),
             drag_state: RefCell::new(None),
+            text_input_wnd: TextInputWindow::new(),
         }),
     };
 
@@ -381,7 +389,10 @@ fn is_mouse_in_wnd(hwnd: HWND) -> bool {
     te.dwFlags & winuser::TME_LEAVE != 0
 }
 
-pub fn remove_wnd(_: Wm, pal_hwnd: &HWnd) {
+pub fn remove_wnd(wm: Wm, pal_hwnd: &HWnd) {
+    // Invalidate all text input contexts associated with the window
+    pal_hwnd.wnd.text_input_wnd.invalidate(wm);
+
     let hwnd = pal_hwnd.expect_hwnd();
     unsafe {
         winuser::DestroyWindow(hwnd);
@@ -586,6 +597,37 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             return 0;
         } // WM_GETMINMAXINFO
 
+        winuser::WM_CHAR => {
+            log::trace!("WM_CHAR {:?}", (wparam, lparam));
+            match wparam {
+                8 => {
+                    log::warn!("WM_CHAR: TODO: handle backspace");
+                    return 0;
+                }
+                10 => {
+                    log::trace!("WM_CHAR: Ignoring a linefeed");
+                    return 0;
+                }
+                27 => {
+                    log::warn!("WM_CHAR: TODO: handle escape");
+                    return 0;
+                }
+                _ => {}
+            }
+            pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
+            return 0;
+        } // WM_CHAR
+
+        winuser::WM_UNICHAR => {
+            log::trace!("WM_UNICHAR {:?}", (wparam, lparam));
+            if wparam == winuser::UNICODE_NOCHAR {
+                // We can handle `WM_UNIUSER`, so return `1`
+                return 1;
+            }
+            pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
+            return 0;
+        } // WM_UNICHAR
+
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
                 unsafe {
@@ -785,6 +827,10 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             listener.resize(wm, &pal_hwnd);
         } // WM_SIZE
 
+        winuser::WM_MOVE => {
+            pal_hwnd.wnd.text_input_wnd.on_move(wm);
+        } // WM_MOVE
+
         _ => {}
     }
 
@@ -841,6 +887,38 @@ fn log_inner_to_phy_outer(hwnd: HWND, dpi: u32, size: [u32; 2]) -> [i32; 2] {
     }
 }
 
+/// Convert logical client coordinates to physical screen coordinates.
+fn log_client_to_phy_screen_with_dpi(
+    hwnd: HWND,
+    dpi: u32,
+    p: cgmath::Point2<f32>,
+) -> cgmath::Point2<LONG> {
+    let mut loc_phy = POINT {
+        x: log_to_phy_f32(p.x, dpi) as LONG,
+        y: log_to_phy_f32(p.y, dpi) as LONG,
+    };
+
+    assert_win32_ok(unsafe { winuser::ClientToScreen(hwnd, &mut loc_phy) });
+
+    [loc_phy.x, loc_phy.y].into()
+}
+
+/// Convert logical client coordinates to physical screen coordinates.
+pub(super) fn log_client_box2_to_phy_screen_rect(hwnd: HWND, p: cggeom::Box2<f32>) -> RECT {
+    let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+    assert_win32_ok(dpi);
+
+    let p1 = log_client_to_phy_screen_with_dpi(hwnd, dpi, p.min);
+    let p2 = log_client_to_phy_screen_with_dpi(hwnd, dpi, p.max);
+
+    RECT {
+        left: p1.x,
+        top: p1.y,
+        right: p2.x,
+        bottom: p2.y,
+    }
+}
+
 fn phy_to_log(x: u32, dpi: u32) -> u32 {
     // Must be rounded up so that the drawn region (which is sized according to
     // the logical size because the user only knows the logical size) completely
@@ -856,6 +934,10 @@ fn log_to_phy(x: u32, dpi: u32) -> u32 {
 
 fn phy_to_log_f32(x: f32, dpi: u32) -> f32 {
     x * (96.0 / dpi as f32)
+}
+
+fn log_to_phy_f32(x: f32, dpi: u32) -> f32 {
+    x * (dpi as f32 / 96.0)
 }
 
 #[cfg(test)]

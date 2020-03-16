@@ -22,6 +22,7 @@ typedef struct _TcwWndWidgetClass TcwWndWidgetClass;
 struct _TcwWndWidget {
     GtkDrawingArea parent_instance;
     size_t wnd_ptr;
+    GtkIMContext *im_ctx;
 };
 
 struct _TcwWndWidgetClass {
@@ -46,6 +47,10 @@ static gboolean tcw_wnd_widget_leave_notify_event(GtkWidget *widget,
                                                   GdkEventCrossing *event);
 static gboolean tcw_wnd_widget_scroll_event(GtkWidget *widget,
                                             GdkEventScroll *event);
+static gboolean tcw_wnd_widget_key_press_event(GtkWidget *widget,
+                                               GdkEventKey *event);
+static gboolean tcw_wnd_widget_key_release_event(GtkWidget *widget,
+                                                 GdkEventKey *event);
 
 static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
@@ -55,10 +60,14 @@ static void tcw_wnd_widget_class_init(TcwWndWidgetClass *klass) {
     widget_class->motion_notify_event = tcw_wnd_widget_motion_notify_event;
     widget_class->leave_notify_event = tcw_wnd_widget_leave_notify_event;
     widget_class->scroll_event = tcw_wnd_widget_scroll_event;
+    widget_class->key_press_event = tcw_wnd_widget_key_press_event;
+    widget_class->key_release_event = tcw_wnd_widget_key_release_event;
 }
 
 static void tcw_wnd_widget_init(TcwWndWidget *self) {
     GtkWidget *widget = GTK_WIDGET(self);
+
+    self->im_ctx = NULL;
 
     g_signal_connect_object(self, "notify::scale-factor",
                             G_CALLBACK(tcw_wnd_widget_notify_scale_factor),
@@ -70,6 +79,8 @@ static void tcw_wnd_widget_init(TcwWndWidget *self) {
                     GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
                     GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK |
                     GDK_SMOOTH_SCROLL_MASK);
+
+    gtk_widget_set_can_focus(widget, TRUE);
 }
 
 static gboolean tcw_wnd_widget_draw(GtkWidget *widget, cairo_t *cr) {
@@ -155,6 +166,32 @@ static gboolean tcw_wnd_widget_scroll_event(GtkWidget *widget,
     }
 
     return TRUE;
+}
+
+static gboolean tcw_wnd_widget_key_press_event(GtkWidget *widget,
+                                               GdkEventKey *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+
+    if (wnd_widget->im_ctx &&
+        gtk_im_context_filter_keypress(wnd_widget->im_ctx, event)) {
+        return TRUE;
+    }
+
+    return GTK_WIDGET_CLASS(tcw_wnd_widget_parent_class)
+        ->key_press_event(widget, event);
+}
+
+static gboolean tcw_wnd_widget_key_release_event(GtkWidget *widget,
+                                                 GdkEventKey *event) {
+    TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
+
+    if (wnd_widget->im_ctx &&
+        gtk_im_context_filter_keypress(wnd_widget->im_ctx, event)) {
+        return TRUE;
+    }
+
+    return GTK_WIDGET_CLASS(tcw_wnd_widget_parent_class)
+        ->key_release_event(widget, event);
 }
 
 /// Called by `window.rs`.

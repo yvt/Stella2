@@ -10,7 +10,7 @@ use std::{
     cell::{Cell, RefCell, RefMut},
     num::Wrapping,
     os::raw::{c_int, c_uint},
-    ptr::NonNull,
+    ptr::{null_mut, NonNull},
     rc::Rc,
 };
 
@@ -409,6 +409,29 @@ impl HWnd {
         } else {
             glib_sys::G_SOURCE_REMOVE
         }
+    }
+
+    pub(super) fn gtk_window(&self, wm: Wm) -> gtk::Window {
+        let wnds = WNDS.get_with_wm(wm).borrow();
+        let wnd = &wnds[self.ptr];
+        wnd.gtk_wnd.clone()
+    }
+
+    pub(super) fn gdk_window(&self, wm: Wm) -> Option<gdk::Window> {
+        let wnds = WNDS.get_with_wm(wm).borrow();
+        let wnd = &wnds[self.ptr];
+        wnd.gtk_wnd.get_window()
+    }
+
+    pub(super) fn set_im_ctx_active(
+        &self,
+        wm: Wm,
+        im_ctx: &impl IsA<gtk::IMContext>,
+        active: bool,
+    ) {
+        let wnds = WNDS.get_with_wm(wm).borrow();
+        let wnd = &wnds[self.ptr];
+        wnd.gtk_widget.set_im_ctx_active(im_ctx, active);
     }
 }
 
@@ -992,6 +1015,7 @@ pub struct TcwWndWidget {
     /// Stores `HWnd`. This field is only touched by a main thread, so it's safe
     /// to access through `Cell`.
     wnd_ptr: Cell<WndPtr>,
+    im_ctx: Cell<*mut gtk_sys::GtkIMContext>,
 }
 
 #[repr(C)]
@@ -1010,5 +1034,33 @@ impl WndWidget {
 
     fn wnd_ptr(&self) -> &Cell<WndPtr> {
         unsafe { &(*self.as_ptr()).wnd_ptr }
+    }
+
+    fn set_im_ctx_active(&self, im_ctx: &impl IsA<gtk::IMContext>, active: bool) {
+        unsafe {
+            let this = &*self.as_ptr();
+
+            let cur = this.im_ctx.get();
+            let new = im_ctx.as_ptr() as *mut gtk_sys::GtkIMContext;
+
+            // - `cur == new && active`: `new` is already active, so this is
+            //   no-op
+            // - `cur == new && !active`: `new` should be deactivated
+            // - `cur != new && active`: `cur` should be deactivated and `new`
+            //   should be activated instead
+            // - `cur != new && !active`: `new` is already inactive, so this is
+            //   no-op
+            if active || cur == new {
+                this.im_ctx.set(null_mut());
+                if !cur.is_null() {
+                    gobject_sys::g_object_unref(cur as _);
+                }
+            }
+
+            if active {
+                this.im_ctx.set(new);
+                gobject_sys::g_object_ref(new as _);
+            }
+        }
     }
 }

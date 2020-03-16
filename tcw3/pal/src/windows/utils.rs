@@ -1,11 +1,11 @@
-use std::{mem::MaybeUninit, ptr::NonNull};
+use std::{cell::Cell, fmt, mem::MaybeUninit, ptr::NonNull};
 use winapi::{
     shared::ntdef::HRESULT,
     um::{errhandlingapi::GetLastError, unknwnbase::IUnknown},
     Interface,
 };
 
-use super::winapiext;
+use super::{textinput::tsf, winapiext};
 
 /// Check the given `HRESULT` and panic if it's not `S_OK`.
 pub fn assert_hresult_ok(result: HRESULT) -> HRESULT {
@@ -14,6 +14,25 @@ pub fn assert_hresult_ok(result: HRESULT) -> HRESULT {
     } else {
         result
     }
+}
+
+/// Discriminate `result` by whether it represents a successful code or not.
+pub fn result_from_hresult(result: HRESULT) -> Result<HRESULT, HRESULT> {
+    if result < 0 {
+        Err(result)
+    } else {
+        Ok(result)
+    }
+}
+
+pub fn hresult_from_result_with(func: impl FnOnce() -> Result<HRESULT, HRESULT>) -> HRESULT {
+    let result = func();
+    let flattened = result.unwrap_or_else(|x| x);
+
+    // `Ok` and `Err` must represent success and failure respectively
+    debug_assert_eq!(result, result_from_hresult(flattened));
+
+    flattened
 }
 
 #[cold]
@@ -88,11 +107,24 @@ unsafe_impl_object! {
     winapiext::ICompositorInterop,
     winapiext::ICompositionGraphicsDeviceInterop,
     winapiext::ICompositionDrawingSurfaceInterop,
+    tsf::ITfContext,
+    tsf::ITfDocumentMgr,
+    tsf::ITfThreadMgr,
+    tsf::ITfKeystrokeMgr,
+    tsf::ITfMessagePump,
+    tsf::ITfRange,
+    tsf::ITfRangeACP,
+    tsf::ITextStoreACPSink,
 }
 
 /// Smart pointer for COM objects.
-#[derive(Debug)]
 pub struct ComPtr<T: Object>(NonNull<T>);
+
+impl<T: Object> fmt::Debug for ComPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:p}", self.0)
+    }
+}
 
 impl<T: Object> Drop for ComPtr<T> {
     fn drop(&mut self) {
@@ -130,6 +162,10 @@ impl<T: Object> ComPtr<T> {
         Self::new(NonNull::new_unchecked(ptr))
     }
 
+    pub unsafe fn from_ptr(ptr: *mut T) -> Option<Self> {
+        NonNull::new(ptr).map(|p| Self::new(p))
+    }
+
     pub fn into_raw(self) -> NonNull<T> {
         let p = self.as_non_null();
         std::mem::forget(self);
@@ -145,23 +181,21 @@ impl<T: Object> ComPtr<T> {
     }
 
     pub fn query_interface<S: Object>(&self) -> Option<ComPtr<S>> {
-        let mut out = MaybeUninit::uninit();
-        let result = unsafe {
-            self.as_iunknown()
-                .QueryInterface(&S::uuidof(), out.as_mut_ptr())
-        };
-        if result == 0 {
-            let out = unsafe { out.assume_init() };
-            debug_assert!(!out.is_null());
-            Some(unsafe { ComPtr::from_ptr_unchecked(out as _) })
-        } else {
-            None
-        }
+        unsafe { query_interface(self.as_iunknown().into()) }
     }
 
     pub fn into_winrt_comptr(self) -> winrt::ComPtr<T> {
         unsafe { winrt::ComPtr::wrap(self.into_raw().as_ptr()) }
     }
+}
+
+pub unsafe fn query_interface<S: Object>(iunk: NonNull<IUnknown>) -> Option<ComPtr<S>> {
+    let mut out = MaybeUninit::uninit();
+    result_from_hresult(iunk.as_ref().QueryInterface(&S::uuidof(), out.as_mut_ptr())).ok()?;
+    let out = out.assume_init();
+
+    debug_assert!(!out.is_null());
+    Some(ComPtr::from_ptr_unchecked(out as _))
 }
 
 impl ComPtr<IUnknown> {
@@ -170,4 +204,44 @@ impl ComPtr<IUnknown> {
         std::mem::forget(from);
         unsafe { Self::from_ptr_unchecked(p as _) }
     }
+}
+
+/// Extends `Option<ComPtr<T>>` with `as_ptr`.
+pub trait ComPtrAsPtr {
+    type Output;
+
+    fn as_ptr(&self) -> *mut Self::Output;
+}
+
+impl<T: Object> ComPtrAsPtr for ComPtr<T> {
+    type Output = T;
+
+    fn as_ptr(&self) -> *mut Self::Output {
+        self.as_ptr()
+    }
+}
+
+impl<T: Object> ComPtrAsPtr for Option<ComPtr<T>> {
+    type Output = T;
+
+    fn as_ptr(&self) -> *mut Self::Output {
+        if let Some(inner) = self {
+            inner.as_ptr()
+        } else {
+            std::ptr::null_mut()
+        }
+    }
+}
+
+fn cell_map<T: Default, R>(cell: &Cell<T>, map: impl FnOnce(&mut T) -> R) -> R {
+    let mut val = cell.take();
+    let ret = map(&mut val);
+    cell.set(val);
+    ret
+}
+
+// TODO: This function was copied from `macos/window.rs`. De-duplicate
+/// Clone the contents of `Cell<T>` by temporarily moving out the contents.
+pub fn cell_get_by_clone<T: Clone + Default>(cell: &Cell<T>) -> T {
+    cell_map(cell, |inner| inner.clone())
 }

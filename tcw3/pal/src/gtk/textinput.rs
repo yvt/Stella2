@@ -1,0 +1,406 @@
+use cggeom::prelude::*;
+use gdk::prelude::*;
+use gtk::{prelude::*, IMMulticontext};
+use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
+use std::{
+    cell::{Cell, RefCell},
+    convert::{TryFrom, TryInto},
+    fmt,
+    ops::Range,
+};
+
+use super::{HWnd, Wm};
+use crate::{iface, MtSticky};
+
+type DynTextInputCtxListener = dyn iface::TextInputCtxListener<Wm>;
+type BoxTextInputCtxListener = Box<DynTextInputCtxListener>;
+
+type DynTextInputCtxEdit<'a> = dyn iface::TextInputCtxEdit<Wm> + 'a;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HTextInputCtx {
+    ptr: CtxPoolPtr,
+}
+
+leakypool::singleton_tag!(struct Tag);
+type CtxPool = LeakyPool<Ctx, LazyToken<SingletonToken<Tag>>>;
+type CtxPoolPtr = PoolPtr<Ctx, SingletonTokenId<Tag>>;
+
+static CTXS: MtSticky<RefCell<CtxPool>, Wm> = {
+    // `Ctx` is `!Send`, but there is no instance at this point, so this is safe
+    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
+};
+
+struct Ctx {
+    gtk_ctx: IMMulticontext,
+    listener: BoxTextInputCtxListener,
+    hwnd: HWnd,
+    /// The range of the preedit string embedded in the document.
+    comp_range: Cell<Option<Range<usize>>>,
+    focus_handler: Cell<Option<[glib::SignalHandlerId; 2]>>,
+}
+
+impl fmt::Debug for Ctx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ctx")
+            .field("gtk_ctx", &self.gtk_ctx)
+            .field("hwnd", &self.hwnd)
+            .field("comp_range", &cell_get_by_clone(&self.comp_range))
+            .finish()
+    }
+}
+
+/// Get a reference to `Ctx` from a given `CtxPoolPtr` `$ptr` and bind the
+/// reference as `$ctx`. If the pointer is invalid, return from the current
+/// function with a return value `$fallback`.
+macro_rules! ctx {
+    (let $ctx:ident ($wm:expr, $ptr:expr) orelse return $fallback:expr) => {
+        let pool = CTXS.get_with_wm($wm).borrow();
+        let $ctx = if let Some(ctx) = pool.get($ptr) {
+            ctx
+        } else {
+            log::warn!("Got an invalid context handle {:?}, ignoring", $ptr);
+            return $fallback;
+        };
+    };
+}
+
+impl HTextInputCtx {
+    /// Implements `Wm::new_text_input_ctx`.
+    pub fn new(wm: Wm, hwnd: &HWnd, listener: BoxTextInputCtxListener) -> Self {
+        let gtk_ctx = IMMulticontext::new();
+        log::trace!("Created IMMulticontext {:?}", gtk_ctx);
+
+        let ptr = CTXS.get_with_wm(wm).borrow_mut().allocate(Ctx {
+            gtk_ctx,
+            listener,
+            hwnd: hwnd.clone(),
+            comp_range: Cell::new(None),
+            focus_handler: Cell::new(None),
+        });
+
+        let pool = CTXS.get_with_wm(wm).borrow();
+
+        // Connect signals
+        let gtk_ctx = &pool[ptr].gtk_ctx;
+        gtk_ctx.connect_commit(move |gtk_ctx, text| {
+            log::trace!("commit{:?}", (gtk_ctx, text));
+            HTextInputCtx { ptr }.handle_commit(wm, text);
+        });
+        gtk_ctx.connect_preedit_changed(move |gtk_ctx| {
+            log::trace!("preedit-changed{:?}", (gtk_ctx,));
+            HTextInputCtx { ptr }.handle_preedit_changed(wm);
+        });
+        gtk_ctx.connect_retrieve_surrounding(move |gtk_ctx| {
+            log::trace!("retrieve-surrounding{:?}", (gtk_ctx,));
+            HTextInputCtx { ptr }.handle_retrieve_surrounding(wm)
+        });
+        gtk_ctx.connect_delete_surrounding(move |gtk_ctx, offset, n_chars| {
+            log::trace!("delete-surrounding{:?}", (gtk_ctx, offset, n_chars));
+            HTextInputCtx { ptr }.handle_delete_surrounding(wm, offset, n_chars)
+        });
+
+        HTextInputCtx { ptr }
+    }
+
+    /// Implements `Wm::remove_text_input_ctx`.
+    pub fn remove(&self, wm: Wm) {
+        self.set_active(wm, false);
+    }
+
+    /// Implements `Wm::text_input_ctx_set_active`.
+    pub fn set_active(&self, wm: Wm, active: bool) {
+        use crate::iface::TextInputCtxEventFlags;
+        use flags_macro::flags;
+
+        let pool = CTXS.get_with_wm(wm).borrow();
+        let ctx = &pool[self.ptr];
+
+        log::trace!("set_active{:?}", (self, active));
+
+        if active {
+            ctx.listener.set_event_mask(
+                wm,
+                self,
+                flags![TextInputCtxEventFlags::{RESET | SELECTION_CHANGE | LAYOUT_CHANGE}],
+            );
+
+            self.on_layout_change(wm);
+
+            let gtk_window = ctx.hwnd.gtk_window(wm);
+            if let Some(gdk_window) = gtk_window.get_window() {
+                // The `focus-(in|out)` signals correspond to `windowState::FOCUSED`,
+                // not `gtk_window.has_focus()`
+                if gdk_window.get_state().contains(gdk::WindowState::FOCUSED) {
+                    log::trace!("... Calling `focus_in` because the window has focus.");
+                    ctx.gtk_ctx.focus_in();
+                }
+            }
+
+            // Listen to the `focus-in`/`focus-out` signals generated by the
+            // window.
+            //
+            // `GtkIMContext::focus_(in|out)` are usually called when the
+            // `focus-(in|out)` signals are received. This ensures that the UI
+            // provided by an input method such as a candidate window is removed
+            // when the user drags the window's title bar.
+            //
+            // However, our `set_active` method is not called in the same way.
+            // `set_active` is likely to be called by an implementation of
+            // `WndListener::focus`, which is called by a different mechanism
+            // than `focus-(in|out)`. `set_active(false)` doesn't get called
+            // when the user moves the window, and as a result, the input method
+            // UI might remain in a wrong location.
+            //
+            // Therefore, we have to monitor the `focus-(in|out)` signals to
+            // call `focus_(in|out)` appropriately.
+            let ptr = self.ptr;
+            cell_map(&ctx.focus_handler, |focus_handler| {
+                if focus_handler.is_none() {
+                    *focus_handler = Some([
+                        gtk_window.connect_focus_in_event(move |_, _| {
+                            HTextInputCtx { ptr }.handle_focus_in(wm)
+                        }),
+                        gtk_window.connect_focus_out_event(move |_, _| {
+                            HTextInputCtx { ptr }.handle_focus_out(wm)
+                        }),
+                    ]);
+                }
+            });
+        } else {
+            ctx.gtk_ctx.focus_out();
+            ctx.listener
+                .set_event_mask(wm, self, TextInputCtxEventFlags::empty());
+
+            if let Some([id0, id1]) = ctx.focus_handler.take() {
+                let gtk_window = ctx.hwnd.gtk_window(wm);
+                gtk_window.disconnect(id0);
+                gtk_window.disconnect(id1);
+            }
+        }
+
+        // The widget needs a reference to the `GtkIMContext` to which it
+        // forwards keyboard events to
+        ctx.hwnd.set_im_ctx_active(wm, &ctx.gtk_ctx, active);
+    }
+
+    /// Implements `Wm::text_input_ctx_reset`, et cetera.
+    pub fn reset(&self, wm: Wm) {
+        let pool = CTXS.get_with_wm(wm).borrow();
+        let ctx = &pool[self.ptr];
+
+        log::trace!("reset({:?})", self);
+
+        ctx.gtk_ctx.reset();
+
+        ctx.comp_range.set(None);
+
+        self.on_layout_change(wm);
+    }
+
+    fn handle_focus_in(&self, wm: Wm) -> Inhibit {
+        ctx! { let ctx (wm, self.ptr) orelse return Inhibit(false) }
+
+        log::trace!("handle_focus_in({:?})", self);
+        ctx.gtk_ctx.focus_in();
+
+        Inhibit(false)
+    }
+
+    fn handle_focus_out(&self, wm: Wm) -> Inhibit {
+        ctx! { let ctx (wm, self.ptr) orelse return Inhibit(false) }
+
+        log::trace!("handle_focus_out({:?})", self);
+        ctx.gtk_ctx.focus_out();
+
+        Inhibit(false)
+    }
+
+    /// Implements `Wm::text_input_ctx_on_layout_change`. This is also used in
+    /// other places.
+    pub fn on_layout_change(&self, wm: Wm) {
+        ctx! { let ctx (wm, self.ptr) orelse return () }
+
+        log::trace!("on_layout_change({:?})", self);
+
+        let mut edit = ctx.listener.edit(wm, self, false);
+        let sel_i = edit.selected_range().end;
+        let (bounds, _) = edit.slice_bounds(sel_i..sel_i);
+        drop(edit);
+
+        log::trace!("... bounds = {:?}", bounds.display_im());
+
+        let gtk_rect = gtk::Rectangle {
+            x: bounds.min.x as i32,
+            y: bounds.min.y as i32,
+            width: bounds.size().x as i32,
+            height: bounds.size().y as i32,
+        };
+
+        ctx.gtk_ctx
+            .set_client_window(ctx.hwnd.gdk_window(wm).as_ref());
+
+        ctx.gtk_ctx.set_cursor_location(&gtk_rect);
+    }
+
+    fn handle_commit(&self, wm: Wm, text: &str) {
+        ctx! { let ctx (wm, self.ptr) orelse return () }
+
+        let mut edit = ctx.listener.edit(wm, self, true);
+
+        let replace_range = ctx
+            .comp_range
+            .take()
+            .unwrap_or_else(|| edit.selected_range());
+        let new_sel_i = replace_range.start + text.len();
+
+        edit.replace(replace_range, text);
+
+        edit.set_composition_range(None);
+        edit.set_selected_range(new_sel_i..new_sel_i);
+    }
+
+    fn handle_preedit_changed(&self, wm: Wm) {
+        use std::cmp::min;
+
+        ctx! { let ctx (wm, self.ptr) orelse return () }
+
+        let (preedit_string, _attr_list, cursor_pos) = ctx.gtk_ctx.get_preedit_string();
+        let preedit_string = preedit_string.as_str();
+
+        log::trace!("... preedit_string = {:?}", preedit_string);
+        log::trace!("... cursor_pos = {:?}", cursor_pos);
+
+        let mut edit = ctx.listener.edit(wm, self, true);
+
+        // TODO: use `_attr_list`
+
+        // If there's an active composition, replace that. Otherwise, replace
+        // the current selection.
+        let replace_range =
+            cell_get_by_clone(&ctx.comp_range).unwrap_or_else(|| edit.selected_range());
+
+        // The caret position is specified by `cursor_pos`.
+        let new_sel_i = replace_range.start + min(cursor_pos as usize, preedit_string.len());
+
+        // The new composition range after the replacing operation.
+        let new_comp_range = if preedit_string.len() > 0 {
+            Some(replace_range.start..replace_range.start + preedit_string.len())
+        } else {
+            None
+        };
+
+        edit.replace(replace_range, &preedit_string);
+
+        edit.set_composition_range(new_comp_range.clone());
+        edit.set_selected_range(new_sel_i..new_sel_i);
+        ctx.comp_range.set(new_comp_range);
+    }
+
+    /// The "cursor position" used for handling the `retrieve-surrounding` signal.
+    fn cursor_range(edit: &mut DynTextInputCtxEdit<'_>, ctx: &Ctx) -> Range<usize> {
+        use std::cmp::min;
+        let len = edit.len();
+        // If theere's an active composition, the preedit portion must be
+        // excluded as clearly specified by the documentation of
+        // `delete-surrounding`. But what about a selection? I suppose it should
+        // be excluded as well because it will be removed when the user types
+        // something.
+        let range = cell_get_by_clone(&ctx.comp_range).unwrap_or_else(|| edit.selected_range());
+        min(range.start, len)..min(range.end, len)
+    }
+
+    fn handle_retrieve_surrounding(&self, wm: Wm) -> bool {
+        ctx! { let ctx (wm, self.ptr) orelse return false }
+
+        let mut edit = ctx.listener.edit(wm, self, false);
+
+        // TODO: Return "up to an entire paragraph", not an entire document
+        let len = edit.len();
+
+        // Decide the range to exclude
+        let cursor_range = Self::cursor_range(&mut *edit, ctx);
+        log::trace!("... cursor_range = {:?}", cursor_range);
+
+        // Get the context string, excluding the preedit portion (`cursor_range`)
+        let text = edit.slice(0..cursor_range.start) + &edit.slice(cursor_range.end..len);
+
+        ctx.gtk_ctx.set_surrounding(
+            &text,
+            cursor_range.start.try_into().expect("index overflow"),
+        );
+
+        true
+    }
+
+    fn handle_delete_surrounding(&self, wm: Wm, offset: i32, n_chars: i32) -> bool {
+        use std::cmp::{max, min};
+
+        ctx! { let ctx (wm, self.ptr) orelse return false }
+
+        let mut edit = ctx.listener.edit(wm, self, true);
+
+        let cursor_range = Self::cursor_range(&mut *edit, ctx);
+        log::trace!("... cursor_range = {:?}", cursor_range);
+
+        // The deletion range in absolute indices
+        let del_start = isize::try_from(cursor_range.start).expect("index overflow")
+            + isize::try_from(offset).expect("index overflow");
+        let del_end = del_start
+            .checked_add(isize::try_from(n_chars).expect("index overflow"))
+            .expect("index overflow");
+
+        log::trace!("... del_range = {:?}", del_start..del_end);
+
+        let del_start = max(del_start, 0) as usize;
+        let del_end = min(max(del_end, 0) as usize, edit.len());
+
+        log::trace!("... del_range (after clamping) = {:?}", del_start..del_end);
+
+        if del_start > del_end {
+            log::warn!(
+                "Invalid deletion range {:?}, Refusing the deletion",
+                del_start..del_end
+            );
+            return false;
+        }
+
+        // Delete the part following `cursor_range.end`
+        if del_end > cursor_range.end {
+            edit.replace(max(del_start, cursor_range.end)..del_end, "");
+        }
+
+        // Delete the part preceding `cursor_range.start`
+        if del_start < cursor_range.start {
+            let range = del_start..min(del_end, cursor_range.start);
+            let count = range.len();
+
+            edit.replace(range, "");
+
+            // Adjust saved ranges
+            if let Some(mut comp_range) = ctx.comp_range.take() {
+                comp_range.start -= count;
+                comp_range.end -= count;
+                ctx.comp_range.set(Some(comp_range.clone()));
+                // `edit` is supposed to adjust the stored composition range by
+                // itself, so we don't have to call `set_composition_range`.
+                // Ditto for `set_selected_range`.
+            }
+        }
+
+        true
+    }
+}
+
+fn cell_map<T: Default, R>(cell: &Cell<T>, map: impl FnOnce(&mut T) -> R) -> R {
+    let mut val = cell.take();
+    let ret = map(&mut val);
+    cell.set(val);
+    ret
+}
+
+// TODO: This function was copied from `windows/utils.rs`. De-duplicate
+/// Clone the contents of `Cell<T>` by temporarily moving out the contents.
+fn cell_get_by_clone<T: Clone + Default>(cell: &Cell<T>) -> T {
+    cell_map(cell, |inner| inner.clone())
+}

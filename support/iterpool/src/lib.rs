@@ -179,6 +179,11 @@ impl<T> Pool<T> {
         pool
     }
 
+    pub fn clear(&mut self) {
+        self.storage.clear();
+        self.first_free = None;
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         if additional == 0 {
             return;
@@ -303,6 +308,12 @@ impl<T> IterablePool<T> {
             pool.first_free = Some(PoolPtr::new(0));
         }
         pool
+    }
+
+    pub fn clear(&mut self) {
+        self.storage.clear();
+        self.first_free = None;
+        self.first_used = None;
     }
 
     pub fn reserve(&mut self, additional: usize) {

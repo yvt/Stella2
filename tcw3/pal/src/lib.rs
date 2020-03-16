@@ -19,7 +19,7 @@ pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        ScrollListener, TextLayout, Wm, WndListener,
+        ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout, Wm, WndListener,
     };
 
     pub use super::futuresext::WmFuturesExt;
@@ -124,8 +124,8 @@ pub type TextLayout = current::TextLayout;
 // the default backend.
 
 pub use self::iface::{
-    BadThread, CursorShape, LayerFlags, LineCap, LineJoin, ScrollDelta, SysFontType,
-    TextDecorFlags, WndFlags, RGBAF32,
+    BadThread, CursorShape, IndexFromPointFlags, LayerFlags, LineCap, LineJoin, ScrollDelta,
+    SysFontType, TextDecorFlags, TextInputCtxEventFlags, WndFlags, RGBAF32,
 };
 
 /// The window handle type of [`Wm`].
@@ -136,6 +136,9 @@ pub type HLayer = <Wm as iface::Wm>::HLayer;
 
 /// The invocation handle type of [`Wm`].
 pub type HInvoke = <Wm as iface::Wm>::HInvoke;
+
+/// The text input context handle type of [`Wm`].
+pub type HTextInputCtx = <Wm as iface::Wm>::HTextInputCtx;
 
 /// A specialization of `WndAttrs` for the default backend.
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;

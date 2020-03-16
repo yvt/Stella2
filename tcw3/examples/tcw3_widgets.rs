@@ -5,7 +5,7 @@ use tcw3::{
     ui::{
         layouts::TableLayout,
         theming,
-        views::{scrollbar::ScrollbarDragListener, Label, Scrollbar},
+        views::{scrollbar::ScrollbarDragListener, Entry, Label, Scrollbar},
         AlignFlags,
     },
     uicore::{HWnd, HWndRef, WndListener},
@@ -51,9 +51,12 @@ fn main() {
         });
     }
 
+    let entry = Entry::new(style_manager);
+
     let cells = vec![
         (label.view(), [0, 0], AlignFlags::JUSTIFY),
         (scrollbar.view(), [0, 1], AlignFlags::JUSTIFY),
+        (entry.view(), [0, 2], AlignFlags::JUSTIFY),
     ];
 
     wnd.content_view()

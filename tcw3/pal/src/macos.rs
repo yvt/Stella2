@@ -25,7 +25,10 @@ use objc::{msg_send, sel, sel_impl};
 
 mod timer;
 mod window;
-pub use self::{timer::HInvoke, window::HWnd};
+pub use self::{
+    timer::HInvoke,
+    window::{HTextInputCtx, HWnd},
+};
 
 use self::utils::{is_main_thread, IdRef};
 
@@ -43,6 +46,7 @@ impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
+    type HTextInputCtx = HTextInputCtx;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -140,5 +144,33 @@ impl iface::Wm for Wm {
     }
     fn remove_layer(self, layer: &Self::HLayer) {
         layer.remove(self);
+    }
+
+    fn new_text_input_ctx(
+        self,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
+    ) -> Self::HTextInputCtx {
+        HTextInputCtx::new(hwnd.clone(), listener)
+    }
+
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        htictx.reset();
+    }
+
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        htictx.set_active(active);
+    }
+
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.on_selection_change();
+    }
+
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.on_layout_change();
+    }
+
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        self.text_input_ctx_set_active(htictx, false)
     }
 }
