@@ -162,6 +162,14 @@ impl iface::Wm for Wm {
         htictx.set_active(active);
     }
 
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.on_selection_change();
+    }
+
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.on_layout_change();
+    }
+
     fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
         self.text_input_ctx_set_active(htictx, false)
     }
