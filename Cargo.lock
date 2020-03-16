@@ -2750,6 +2750,7 @@ dependencies = [
  "gio",
  "glib",
  "glib-sys",
+ "gobject-sys",
  "gtk",
  "gtk-sys",
  "iterpool",

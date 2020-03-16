@@ -184,7 +184,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     ) -> Self::HTextInputCtx;
 
     /// Notify that the text document associated with the given text input
-    /// context was updated and discard any ongoing conversion session.
+    /// context was updated and the input service should discard any ongoing
+    /// conversion session.
     ///
     /// This must not called in response to a call to `TextInputCtxEdit`'s
     /// method.
@@ -199,7 +200,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// This method may call [`TextInputCtxListener::edit`].
     fn text_input_ctx_on_selection_change(self, _: &Self::HTextInputCtx) {}
 
-    /// Notify that the layout of the given text input context has changed.
+    /// Notify that the layout (e.g., the caret position with reference to the
+    /// window) of the given text input context has changed.
     ///
     /// This must not called in response to a call to `TextInputCtxEdit`'s
     /// method.

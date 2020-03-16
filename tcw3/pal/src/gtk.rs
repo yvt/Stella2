@@ -197,18 +197,28 @@ impl iface::Wm for Wm {
 
     fn new_text_input_ctx(
         self,
-        _hwnd: &Self::HWnd,
-        _listener: Box<dyn iface::TextInputCtxListener<Self>>,
+        hwnd: &Self::HWnd,
+        listener: Box<dyn iface::TextInputCtxListener<Self>>,
     ) -> Self::HTextInputCtx {
-        HTextInputCtx {}
+        HTextInputCtx::new(self, hwnd, listener)
     }
 
-    fn text_input_ctx_set_active(self, _: &Self::HTextInputCtx, _active: bool) {
-        // TODO
+    fn text_input_ctx_set_active(self, htictx: &Self::HTextInputCtx, active: bool) {
+        htictx.set_active(self, active);
     }
 
-    fn remove_text_input_ctx(self, _: &Self::HTextInputCtx) {
-        // TODO
+    fn text_input_ctx_reset(self, htictx: &Self::HTextInputCtx) {
+        htictx.reset(self);
+    }
+    fn text_input_ctx_on_selection_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.reset(self);
+    }
+    fn text_input_ctx_on_layout_change(self, htictx: &Self::HTextInputCtx) {
+        htictx.on_layout_change(self);
+    }
+
+    fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
+        htictx.remove(self);
     }
 }
 
