@@ -1,8 +1,9 @@
-use cggeom::{box2, prelude::*};
+use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Deg, Matrix3, Point2, Vector2};
 use log::info;
 use std::{
     cell::Cell,
+    ops::Range,
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -858,5 +859,93 @@ fn wnd_focus_event() {
         state.set(0);
         twm.set_wnd_focused(&hwnd, false);
         assert_eq!(state.get(), 2);
+    });
+}
+
+#[test]
+fn text_input_ctx() {
+    init_logger();
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl TextInputCtxListener<pal::Wm> for Listener {
+            fn edit(
+                &self,
+                _wm: pal::Wm,
+                _: &pal::HTextInputCtx,
+                _mutating: bool,
+            ) -> Box<dyn TextInputCtxEdit<pal::Wm> + '_> {
+                Box::new(self.clone())
+            }
+        }
+
+        impl TextInputCtxEdit<pal::Wm> for Listener {
+            fn selected_range(&mut self) -> Range<usize> {
+                unreachable!()
+            }
+            fn set_selected_range(&mut self, _range: Range<usize>) {
+                assert_eq!(self.0.get(), 1);
+                self.0.set(2);
+            }
+            fn set_composition_range(&mut self, _range: Option<Range<usize>>) {
+                unreachable!()
+            }
+            fn replace(&mut self, _range: Range<usize>, _text: &str) {
+                unreachable!()
+            }
+            fn slice(&mut self, _range: Range<usize>) -> String {
+                unreachable!()
+            }
+            fn floor_index(&mut self, _i: usize) -> usize {
+                unreachable!()
+            }
+            fn ceil_index(&mut self, _i: usize) -> usize {
+                unreachable!()
+            }
+            fn len(&mut self) -> usize {
+                unreachable!()
+            }
+            fn index_from_point(
+                &mut self,
+                _point: Point2<f32>,
+                _flags: pal::IndexFromPointFlags,
+            ) -> Option<usize> {
+                unreachable!()
+            }
+            fn frame(&mut self) -> Box2<f32> {
+                unreachable!()
+            }
+            fn slice_bounds(&mut self, _range: Range<usize>) -> (Box2<f32>, usize) {
+                unreachable!()
+            }
+        }
+
+        let state = Rc::new(Cell::new(1));
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            ..Default::default()
+        });
+
+        let tictx = wm.new_text_input_ctx(&hwnd, Box::new(Listener(Rc::clone(&state))));
+
+        // Test the edit event forwarding
+        {
+            let mut edit = twm.raise_edit(&tictx, false);
+            edit.set_selected_range(0..4);
+        }
+        assert_eq!(state.get(), 2);
+
+        // Test the active context management
+        assert!(twm.expect_unique_active_text_input_ctx().is_none());
+        wm.text_input_ctx_set_active(&tictx, true);
+        assert_eq!(
+            twm.expect_unique_active_text_input_ctx().as_ref(),
+            Some(&tictx)
+        );
+        wm.text_input_ctx_set_active(&tictx, false);
+        assert!(twm.expect_unique_active_text_input_ctx().is_none());
     });
 }

@@ -123,6 +123,7 @@ use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
 mod eventloop;
 mod logging;
 mod screen;
+mod textinput;
 mod tictxlistenershim;
 mod uniqpool;
 pub mod wmapi;
@@ -338,6 +339,7 @@ impl Wm {
     fn reset(self) {
         self.eradicate_events();
         SCREEN.get_with_wm(self).reset();
+        textinput::reset(self);
     }
 }
 
@@ -438,6 +440,37 @@ impl wmapi::TestingWm for Wm {
         SCREEN
             .get_with_wm(*self)
             .raise_scroll_gesture(*self, hwnd, loc)
+    }
+
+    fn active_text_input_ctxs(&self) -> Vec<HTextInputCtx> {
+        textinput::HTextInputCtx::active_ctxs(*self)
+            .into_iter()
+            .map(|h| HTextInputCtx {
+                inner: HTextInputCtxInner::Testing(h),
+            })
+            .collect()
+    }
+
+    fn expect_unique_active_text_input_ctx(&self) -> Option<HTextInputCtx> {
+        let ctxs = self.active_text_input_ctxs();
+        if ctxs.len() > 1 {
+            panic!(
+                "There are more than one active text input contexts: {:?}",
+                ctxs
+            );
+        }
+        ctxs.into_iter().next()
+    }
+
+    fn raise_edit(
+        &self,
+        htictx: &HTextInputCtx,
+        write: bool,
+    ) -> Box<dyn iface::TextInputCtxEdit<Wm>> {
+        htictx
+            .testing_htictx_ref()
+            .unwrap()
+            .raise_edit(*self, write)
     }
 }
 
@@ -720,7 +753,13 @@ impl iface::Wm for Wm {
             }
             (BackendAndWm::Testing, HWndInner::Testing(_hwnd)) => {
                 debug!("new_text_input_ctx({:?})", hwnd);
-                todo!()
+                let htictx = HTextInputCtx {
+                    inner: HTextInputCtxInner::Testing(textinput::HTextInputCtx::new(
+                        self, listener,
+                    )),
+                };
+                debug!("... -> {:?}", htictx);
+                htictx
             }
             _ => unreachable!(),
         }
@@ -733,7 +772,7 @@ impl iface::Wm for Wm {
             }
             (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
                 debug!("text_input_ctx_reset({:?})", htictx);
-                todo!()
+                // TODO: Forward this event
             }
             _ => unreachable!(),
         }
@@ -746,7 +785,7 @@ impl iface::Wm for Wm {
             }
             (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
                 debug!("text_input_ctx_on_selection_change({:?})", htictx);
-                todo!()
+                // TODO: Forward this event
             }
             _ => unreachable!(),
         }
@@ -759,7 +798,7 @@ impl iface::Wm for Wm {
             }
             (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
                 debug!("text_input_ctx_on_layout_change({:?})", htictx);
-                todo!()
+                // TODO: Forward this event
             }
             _ => unreachable!(),
         }
@@ -770,9 +809,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
                 wm.text_input_ctx_set_active(htictx, active)
             }
-            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(tc_htictx)) => {
                 debug!("text_input_ctx_set_active({:?}, {:?})", htictx, active);
-                todo!()
+                tc_htictx.set_active(self, active);
             }
             _ => unreachable!(),
         }
@@ -783,9 +822,9 @@ impl iface::Wm for Wm {
             (BackendAndWm::Native { wm }, HTextInputCtxInner::Native(htictx)) => {
                 wm.remove_text_input_ctx(htictx)
             }
-            (BackendAndWm::Testing, HTextInputCtxInner::Testing(_htictx)) => {
+            (BackendAndWm::Testing, HTextInputCtxInner::Testing(tc_htictx)) => {
                 debug!("remove_text_input_ctx({:?})", htictx);
-                todo!()
+                tc_htictx.remove(self);
             }
             _ => unreachable!(),
         }
@@ -920,10 +959,27 @@ impl fmt::Debug for HTextInputCtx {
     }
 }
 
+impl HTextInputCtx {
+    fn testing_htictx_ref(&self) -> Option<&textinput::HTextInputCtx> {
+        match &self.inner {
+            HTextInputCtxInner::Native(_) => None,
+            HTextInputCtxInner::Testing(imp) => Some(imp),
+        }
+    }
+}
+
+impl From<textinput::HTextInputCtx> for HTextInputCtx {
+    fn from(x: textinput::HTextInputCtx) -> Self {
+        Self {
+            inner: HTextInputCtxInner::Testing(x),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum HTextInputCtxInner {
     Native(native::HTextInputCtx),
-    Testing(()), // TODO
+    Testing(textinput::HTextInputCtx),
 }
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields

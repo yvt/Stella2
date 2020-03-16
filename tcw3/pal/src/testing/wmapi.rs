@@ -1,7 +1,7 @@
 use cgmath::{Point2, Vector2};
 use std::time::Instant;
 
-use crate::{iface, HWnd};
+use crate::{iface, HTextInputCtx, HWnd};
 
 /// Provides access to a virtual environment.
 ///
@@ -67,6 +67,20 @@ pub trait TestingWm: 'static {
 
     /// Trigger `WndListener::scroll_gesture`.
     fn raise_scroll_gesture(&self, hwnd: &HWnd, loc: Point2<f32>) -> Box<dyn ScrollGesture>;
+
+    /// Get the list of currently active text input contexts.
+    fn active_text_input_ctxs(&self) -> Vec<HTextInputCtx>;
+
+    /// Get the currently active text input context. Panic if there are more
+    /// than one of such contexts.
+    fn expect_unique_active_text_input_ctx(&self) -> Option<HTextInputCtx>;
+
+    /// Trigger `TextInputCtxListener::edit`.
+    fn raise_edit(
+        &self,
+        htictx: &HTextInputCtx,
+        write: bool,
+    ) -> Box<dyn iface::TextInputCtxEdit<crate::Wm>>;
 }
 
 /// A snapshot of window attributes.

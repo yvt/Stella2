@@ -45,6 +45,10 @@ impl<T> UniqPool<T> {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.pool.clear();
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         self.pool.reserve(additional);
     }
