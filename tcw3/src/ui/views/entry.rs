@@ -20,6 +20,9 @@ use crate::{
     },
 };
 
+#[cfg(test)]
+mod tests;
+
 /// A text entry widget.
 #[derive(Debug)]
 pub struct Entry {
