@@ -6,6 +6,7 @@ import!("layouts/table.tcwdl");
 import!("theming/manager.tcwdl");
 import!("theming/view.tcwdl");
 import!("views/button.tcwdl");
+import!("views/entry.tcwdl");
 import!("views/label.tcwdl");
 import!("views/spacer.tcwdl");
 import!("views/split.tcwdl");
