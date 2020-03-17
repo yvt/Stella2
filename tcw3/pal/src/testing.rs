@@ -118,7 +118,7 @@ use std::{
     time::Duration,
 };
 
-use super::{iface, iface::Wm as _, native, prelude::MtLazyStatic};
+use super::{iface, native, prelude::MtLazyStatic, prelude::*};
 
 mod eventloop;
 mod logging;

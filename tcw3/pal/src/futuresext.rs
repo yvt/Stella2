@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{iface::Wm as _, HInvoke, MtSticky, Wm};
+use crate::{prelude::*, HInvoke, MtSticky, Wm};
 
 /// Extends [`Wm`] for interoperability with futures (`std::future::Future`).
 ///

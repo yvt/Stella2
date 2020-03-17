@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Condvar, Mutex},
     time::Duration,
 };
-use tcw3::pal::{iface::Wm as _, HInvoke, MtLock, Wm};
+use tcw3::pal::{prelude::*, HInvoke, MtLock, Wm};
 
 use super::profile::Profile;
 use crate::model;

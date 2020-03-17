@@ -1,6 +1,6 @@
 use log::{error, info};
 use std::time::Duration;
-use tcw3_pal::{prelude::Wm as _, Wm};
+use tcw3_pal::{prelude::*, Wm};
 
 mod common;
 

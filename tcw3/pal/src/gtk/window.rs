@@ -15,7 +15,7 @@ use std::{
 };
 
 use super::{comp, Wm, WndAttrs};
-use crate::{iface, iface::Wm as WmTrait, MtSticky};
+use crate::{iface, prelude::*, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {

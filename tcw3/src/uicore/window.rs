@@ -17,7 +17,7 @@ use super::{
     Superview, SuperviewStrong, UpdateCtx, ViewDirtyFlags, ViewFlags, ViewListener, Wnd,
     WndStyleFlags,
 };
-use crate::pal::{self, prelude::Wm as _, Wm};
+use crate::pal::{self, prelude::*, Wm};
 
 impl HViewRef<'_> {
     /// Get the containing window for a view.

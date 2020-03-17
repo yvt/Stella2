@@ -25,7 +25,7 @@ use super::{
     utils::{assert_win32_nonnull, assert_win32_ok},
     Wm, WndAttrs,
 };
-use crate::{iface, iface::Wm as WmTrait};
+use crate::{iface, prelude::*};
 
 const WND_CLASS: &[u16] = wch_c!("TcwAppWnd");
 

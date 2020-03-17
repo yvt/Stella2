@@ -1,7 +1,7 @@
 use neo_linked_list::{linked_list::Node, AssertUnpin, LinkedListCell};
 use std::pin::Pin;
 
-use crate::pal::{iface::Wm as WmTrait, MtSticky, Wm};
+use crate::pal::{prelude::*, MtSticky, Wm};
 
 #[allow(clippy::type_complexity)]
 static ON_UPDATE_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = {

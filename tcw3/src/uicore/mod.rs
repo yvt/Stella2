@@ -103,7 +103,7 @@ use std::{
 };
 use subscriber_list::{SubscriberList, UntypedSubscription};
 
-use crate::pal::{self, prelude::Wm as _, Wm};
+use crate::pal::{self, prelude::*, Wm};
 
 mod images;
 mod invocation;

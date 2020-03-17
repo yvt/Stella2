@@ -15,11 +15,15 @@ pub mod futuresext;
 pub mod iface;
 
 /// Re-exports traits from `iface`.
+///
+/// The trait [`Wm`](crate::iface::Wm) is re-exported as `WmTrait` so that it
+/// doesn't collide with the concrete type alias [`Wm`](crate::Wm).
 pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout, Wm, WndListener,
+        ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout, Wm as WmTrait,
+        WndListener,
     };
 
     pub use super::futuresext::WmFuturesExt;

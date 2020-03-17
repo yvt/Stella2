@@ -1,7 +1,7 @@
 use futures::task::LocalSpawnExt;
 use log::info;
 use std::time::{Duration, Instant};
-use tcw3_pal::{prelude::Wm as _, prelude::*, Wm};
+use tcw3_pal::{prelude::*, Wm};
 
 mod common;
 

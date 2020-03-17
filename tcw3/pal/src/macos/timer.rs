@@ -3,7 +3,7 @@ use objc::{msg_send, sel, sel_impl};
 use std::{ops::Range, time::Duration};
 
 use super::{utils::with_autorelease_pool, IdRef, Wm};
-use crate::iface::Wm as _;
+use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HInvoke {

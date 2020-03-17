@@ -2,7 +2,7 @@ use array_intrusive_list::{Link, ListHead};
 use leakypool::{LeakyPool, UncheckedToken};
 use quick_error::quick_error;
 use std::{cell::RefCell, fmt, sync::Arc};
-use tcw3_pal::{self as pal, iface::Wm as _, Bitmap, MtLock, MtSticky, Wm};
+use tcw3_pal::{self as pal, prelude::*, Bitmap, MtLock, MtSticky, Wm};
 
 /// A bitmap created by rasterizing [`Img`]. The second value represents the
 /// actual DPI scale value of the bitmap, which may or may not match the
@@ -437,7 +437,6 @@ impl fmt::Debug for DpiScale {
 mod tests {
     use super::super::BitmapImg;
     use super::*;
-    use tcw3_pal::prelude::*;
 
     #[test]
     fn dpi_scales() {

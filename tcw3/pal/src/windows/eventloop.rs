@@ -34,7 +34,7 @@ use super::{
     utils::{assert_hresult_ok, assert_win32_nonnull, assert_win32_ok},
     window, Wm,
 };
-use crate::{iface::Wm as WmTrait, MtSticky};
+use crate::{prelude::*, MtSticky};
 
 /// `HWND`
 static MSG_HWND: AtomicUsize = AtomicUsize::new(0);

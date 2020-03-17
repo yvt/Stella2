@@ -1,6 +1,6 @@
 use futures::{channel::oneshot::channel, task::LocalSpawnExt};
 use std::time::Duration;
-use tcw3_pal::{prelude::Wm as _, prelude::*, Wm};
+use tcw3_pal::{prelude::*, Wm};
 
 mod common;
 
