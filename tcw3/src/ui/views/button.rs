@@ -43,15 +43,12 @@ impl Button {
     pub fn new(style_manager: &'static Manager) -> Self {
         let label = Label::new(style_manager);
 
-        let styled_box = StyledBox::new(
-            style_manager,
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER,
-        );
+        let styled_box = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
         styled_box.set_child(Role::Generic, Some(&label));
         styled_box.set_class_set(ClassSet::BUTTON);
         styled_box.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
-        let view = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG);
+        let view = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG);
 
         view.set_layout(FillLayout::new(styled_box.view()));
 

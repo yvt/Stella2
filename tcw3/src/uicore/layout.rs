@@ -361,7 +361,7 @@ impl HViewRef<'_> {
 
         let hit_local = self.view.global_frame.get().contains_point(&p);
 
-        if flags.intersects(ViewFlags::CLIP_HITTEST) && !hit_local {
+        if !flags.intersects(ViewFlags::NO_CLIP_HITTEST) && !hit_local {
             return None;
         }
 

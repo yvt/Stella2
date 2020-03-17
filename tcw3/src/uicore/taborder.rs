@@ -366,7 +366,7 @@ mod tests {
     use std::fmt;
 
     fn new_view() -> HView {
-        HView::new(ViewFlags::default() | ViewFlags::TAB_STOP)
+        HView::new(ViewFlags::TAB_STOP)
     }
 
     struct Indent(usize);

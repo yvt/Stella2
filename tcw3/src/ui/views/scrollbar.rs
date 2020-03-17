@@ -112,10 +112,7 @@ impl<T: ScrollbarDragListener + 'static> From<T> for Box<dyn ScrollbarDragListen
 
 impl Scrollbar {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
-        let frame = StyledBox::new(
-            style_manager,
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER,
-        );
+        let frame = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
         frame.set_class_set(if vertical {
             ClassSet::SCROLLBAR | ClassSet::VERTICAL
         } else {
@@ -126,9 +123,7 @@ impl Scrollbar {
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
         frame.set_child(Role::Generic, Some(&thumb));
 
-        let wrapper = HView::new(
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::NO_FOCUS_ON_CLICK,
-        );
+        let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::NO_FOCUS_ON_CLICK);
         wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {

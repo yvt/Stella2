@@ -70,10 +70,10 @@ fn mouse_over_evts(twm: &dyn TestingWm) {
     let events = Rc::new(RefCell::new(Vec::new()));
 
     let view0 = HView::new(ViewFlags::default());
-    let view1 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER);
-    let view2 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER);
-    let view3 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER);
-    let view4 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER);
+    let view1 = HView::new(ViewFlags::ACCEPT_MOUSE_OVER);
+    let view2 = HView::new(ViewFlags::ACCEPT_MOUSE_OVER);
+    let view3 = HView::new(ViewFlags::ACCEPT_MOUSE_OVER);
+    let view4 = HView::new(ViewFlags::ACCEPT_MOUSE_OVER);
 
     view0.set_listener(RecordingViewListener(0, events.clone()));
     view1.set_listener(RecordingViewListener(1, events.clone()));
@@ -176,7 +176,7 @@ fn scroll_evts(twm: &dyn TestingWm) {
     let events = Rc::new(RefCell::new(Vec::new()));
 
     let view0 = HView::new(ViewFlags::default());
-    let view1 = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
+    let view1 = HView::new(ViewFlags::ACCEPT_SCROLL);
     let view2 = HView::new(ViewFlags::default());
 
     view0.set_listener(RecordingViewListener(0, events.clone()));

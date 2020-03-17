@@ -109,9 +109,7 @@ impl Split {
     /// `Some(0)`, `Some(1)`, and `None`.
     pub fn new(style_manager: &'static Manager, vertical: bool, fix: Option<usize>) -> Self {
         let container = HView::new(ViewFlags::default());
-        let splitter = HView::new(
-            ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER,
-        );
+        let splitter = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::ACCEPT_MOUSE_OVER);
 
         let splitter_sb = StyledBox::new(style_manager, ViewFlags::default());
 

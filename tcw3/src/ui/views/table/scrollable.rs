@@ -59,7 +59,7 @@ impl ScrollableTable {
         styled_box.set_class_set(ClassSet::SCROLL_CONTAINER);
 
         // Create a view for receiving scroll wheel events
-        let wrapper = HView::new(ViewFlags::default() | ViewFlags::ACCEPT_SCROLL);
+        let wrapper = HView::new(ViewFlags::ACCEPT_SCROLL);
         wrapper.set_layout(FillLayout::new(styled_box.view()));
 
         let this = Self {

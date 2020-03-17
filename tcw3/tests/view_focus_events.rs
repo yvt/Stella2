@@ -76,17 +76,17 @@ fn focus_evts(twm: &dyn TestingWm) {
     new_view_tree! {
         let view0 = HView::new(ViewFlags::default());
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
             {
-                let view2 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+                let view2 = HView::new(ViewFlags::TAB_STOP);
                 {
                     let view5 = HView::new(ViewFlags::default());
                 }
             }
 
-            let view3 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view3 = HView::new(ViewFlags::TAB_STOP);
             {
-                let view4 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+                let view4 = HView::new(ViewFlags::TAB_STOP);
             }
         }
     }
@@ -166,9 +166,9 @@ fn is_focused(twm: &dyn TestingWm) {
     let wnd = HWnd::new(wm);
 
     new_view_tree! {
-        let view0 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+        let view0 = HView::new(ViewFlags::TAB_STOP);
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
         }
     }
 
@@ -236,7 +236,7 @@ fn view_removal(twm: &dyn TestingWm) {
     new_view_tree! {
         let view0 = HView::new(ViewFlags::default());
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
         }
     }
 
@@ -302,7 +302,7 @@ fn clear_tab_stop(twm: &dyn TestingWm) {
     new_view_tree! {
         let view0 = HView::new(ViewFlags::default());
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
         }
     }
 
@@ -372,7 +372,7 @@ fn wnd_defocus(twm: &dyn TestingWm) {
     new_view_tree! {
         let view0 = HView::new(ViewFlags::default());
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
         }
     }
 
@@ -458,7 +458,7 @@ fn access_focus_state_in_handler(twm: &dyn TestingWm) {
     new_view_tree! {
         let view0 = HView::new(ViewFlags::default());
         {
-            let view1 = HView::new(ViewFlags::default() | ViewFlags::TAB_STOP);
+            let view1 = HView::new(ViewFlags::TAB_STOP);
         }
     }
 
@@ -504,8 +504,7 @@ fn focus_on_click(twm: &dyn TestingWm) {
         };
     }
 
-    let view0 =
-        HView::new(ViewFlags::default() | ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG);
+    let view0 = HView::new(ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG);
     view0.set_listener(RecordingViewListener(0, events.clone()));
 
     wnd.content_view()

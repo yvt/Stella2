@@ -389,9 +389,9 @@ bitflags! {
         /// This flag cannot be added or removed once a view is created.
         const LAYER_GROUP = 1;
 
-        /// Clip hit testing (e.g., the one performed when the user presses
-        /// a mouse button) by the view's frame.
-        const CLIP_HITTEST = 1 << 1;
+        /// Don't clip hit testing (e.g., the one performed when the user
+        /// presses a mouse button) by the view's frame.
+        const NO_CLIP_HITTEST = 1 << 1;
 
         /// Prevent the view and its subviews from accepting mouse events.
         const DENY_MOUSE = 1 << 2;
@@ -426,14 +426,15 @@ bitflags! {
 }
 
 impl Default for ViewFlags {
+    /// Return `ViewFlags::empty()` (all flags are opt-in).
     fn default() -> Self {
-        ViewFlags::CLIP_HITTEST
+        ViewFlags::empty()
     }
 }
 
 impl ViewFlags {
     fn mutable_flags() -> Self {
-        flags![ViewFlags::{CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG |
+        flags![ViewFlags::{NO_CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG |
             TAB_STOP}]
     }
 }

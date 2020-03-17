@@ -564,7 +564,7 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
 }
 
 pub(crate) fn new_root_content_view() -> HView {
-    let view = HView::new(ViewFlags::default() | ViewFlags::LAYER_GROUP);
+    let view = HView::new(ViewFlags::LAYER_GROUP);
     view.set_listener(RootViewListener::new());
     view
 }

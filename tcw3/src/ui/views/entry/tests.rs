@@ -31,8 +31,7 @@ fn text_input_ctx_activation(twm: &dyn TestingWm) {
     let style_manager = Manager::global(wm);
 
     let entry = Entry::new(style_manager);
-    let empty_view =
-        HView::new(ViewFlags::default() | ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG);
+    let empty_view = HView::new(ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG);
     empty_view.set_layout(EmptyLayout::new(
         SizeTraits::default().with_min([0.0, 20.0].into()),
     ));
