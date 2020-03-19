@@ -6,7 +6,7 @@ use std::{
         Condvar, Mutex,
     },
 };
-use winapi::um::dwmapi::DwmFlush;
+use winapi::um::{dwmapi::DwmFlush, synchapi::Sleep};
 
 use super::Wm;
 use crate::{iface::Wm as _, MtSticky};
@@ -59,7 +59,13 @@ impl DisplayLink {
 
                 // This is rather surprising, but actually what Firefox
                 // seems to do.
-                unsafe { DwmFlush() };
+                let fail = unsafe { DwmFlush() } < 0;
+
+                if fail {
+                    // Fall back to `Sleep`.
+                    log::trace!("DwmFlush failed; failling back to `Sleep`");
+                    unsafe { Sleep(15) };
+                }
 
                 handler();
             });
@@ -175,7 +181,7 @@ mod tests {
         DL.stop();
 
         // shouldn't fire too fast
-        assert!(dbg!(COUNT.load(Ordering::Relaxed)) < 100000);
+        assert!(dbg!(COUNT.load(Ordering::Relaxed)) < 10000);
 
         // should fire at least once
         assert!(COUNT.load(Ordering::Relaxed) > 0);
