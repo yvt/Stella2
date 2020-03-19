@@ -85,6 +85,8 @@ jobs:
     parameters:
       rustup_toolchain: ${{ parameters.rust }}
 
+  - template: ../steps/set-rustflags.yml
+
   # *********************************************************************************************
   # parameters from `cargo test --help`
 

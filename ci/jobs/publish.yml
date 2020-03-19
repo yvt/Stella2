@@ -23,6 +23,8 @@ jobs:
       rustup_toolchain: ${{ variables.rustVersion }}
       components: [ rust-src ]
 
+  - template: ../steps/set-rustflags.yml
+
   - script: cargo install xargo --version 0.3.17
     displayName: Install xargo
 

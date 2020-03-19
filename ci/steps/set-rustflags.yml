@@ -1,0 +1,14 @@
+parameters:
+  target_cpu: nehalem  # e.g., native, core2, skylake, znver2
+
+steps:
+  - bash: |
+      mkdir -p `dirname "$CONFIG"`
+      echo "[build]" >> "$CONFIG"
+      echo "rustflags = [" >> "$CONFIG"
+      echo "  \"-Ctarget-cpu=${{parameters.target_cpu}}\"," >> "$CONFIG"
+      echo "]" >> "$CONFIG"
+    env:
+      TARGET_CPU: ${{parameters.target_cpu}}
+      CONFIG: .cargo/config
+    displayName: "Generate .cargo/config"
