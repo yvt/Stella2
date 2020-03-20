@@ -28,6 +28,7 @@ use lazy_static::lazy_static;
 use std::{
     f32::{INFINITY, NEG_INFINITY},
     mem::MaybeUninit,
+    ops::Range,
     os::raw::c_void,
 };
 
@@ -224,6 +225,30 @@ impl iface::TextLayout for TextLayout {
         }
 
         bounds
+    }
+
+    fn cursor_index_from_point(&self, _point: Point2<f32>) -> usize {
+        todo!()
+    }
+
+    fn cursor_pos(&self, _i: usize) -> [iface::Beam; 2] {
+        todo!()
+    }
+
+    fn num_lines(&self) -> usize {
+        todo!()
+    }
+
+    fn line_index_range(&self, _i: usize) -> Range<usize> {
+        todo!()
+    }
+
+    fn line_vertical_bounds(&self, _i: usize) -> Range<f32> {
+        todo!()
+    }
+
+    fn run_metrics_of_range(&self, _i: Range<usize>) -> Vec<iface::RunMetrics> {
+        todo!()
     }
 }
 

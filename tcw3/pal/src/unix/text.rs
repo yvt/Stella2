@@ -1,7 +1,9 @@
 use alt_fp::FloatOrd;
 use cggeom::{box2, Box2};
+use cgmath::Point2;
 use pango::{FontDescription, FontMapExt, Layout};
 use rgb::RGBA16;
+use std::ops::Range;
 
 use super::super::iface;
 
@@ -169,6 +171,30 @@ impl iface::TextLayout for TextLayout {
     fn layout_bounds(&self) -> Box2<f32> {
         let (_ink_rect, logical_rect) = self.lock_layout().get_extents();
         pango_rect_to_box2_f32(logical_rect)
+    }
+
+    fn cursor_index_from_point(&self, _point: Point2<f32>) -> usize {
+        todo!()
+    }
+
+    fn cursor_pos(&self, _i: usize) -> [iface::Beam; 2] {
+        todo!()
+    }
+
+    fn num_lines(&self) -> usize {
+        todo!()
+    }
+
+    fn line_index_range(&self, _i: usize) -> Range<usize> {
+        todo!()
+    }
+
+    fn line_vertical_bounds(&self, _i: usize) -> Range<f32> {
+        todo!()
+    }
+
+    fn run_metrics_of_range(&self, _i: Range<usize>) -> Vec<iface::RunMetrics> {
+        todo!()
     }
 }
 

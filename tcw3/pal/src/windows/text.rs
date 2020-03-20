@@ -1,7 +1,8 @@
 use alt_fp::FloatOrd;
 use cggeom::Box2;
+use cgmath::Point2;
 use directwrite::{enums::FontWeight, factory::Factory};
-use std::fmt;
+use std::{fmt, ops::Range};
 
 use crate::iface;
 
@@ -149,5 +150,29 @@ impl iface::TextLayout for TextLayout {
             min: [0.0, 0.0],
             max: [met.left() + met.width(), met.top() + met.height()],
         }
+    }
+
+    fn cursor_index_from_point(&self, _point: Point2<f32>) -> usize {
+        todo!()
+    }
+
+    fn cursor_pos(&self, _i: usize) -> [iface::Beam; 2] {
+        todo!()
+    }
+
+    fn num_lines(&self) -> usize {
+        todo!()
+    }
+
+    fn line_index_range(&self, _i: usize) -> Range<usize> {
+        todo!()
+    }
+
+    fn line_vertical_bounds(&self, _i: usize) -> Range<f32> {
+        todo!()
+    }
+
+    fn run_metrics_of_range(&self, _i: Range<usize>) -> Vec<iface::RunMetrics> {
+        todo!()
     }
 }

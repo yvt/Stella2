@@ -7,7 +7,7 @@
 //! specialized for the default backend, as well as simple re-exports of
 //! non-generic types.
 use bitflags::bitflags;
-use cggeom::Box2;
+use cggeom::{box2, Box2};
 use cgmath::{Matrix3, Point2, Vector2};
 use rgb::RGBA;
 use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash, ops::Range, time::Duration};
@@ -988,8 +988,8 @@ pub trait BitmapBuilderNew: BitmapBuilder + Sized {
 
 /// Encapsulates information needed to layout a given text.
 ///
-/// This corresponds to `CTFrame` of Core Text and `IDWriteTextLayout` of
-/// DirectWrite.
+/// This corresponds to `CTFrame` of Core Text, `IDWriteTextLayout` of
+/// DirectWrite, and `PangoLayout` of Pango.
 pub trait TextLayout: Send + Sync + Sized {
     type CharStyle: CharStyle;
 
@@ -1001,9 +1001,145 @@ pub trait TextLayout: Send + Sync + Sized {
     /// Get the layout bounds of a `TextLayout`.
     fn layout_bounds(&self) -> Box2<f32>;
 
-    // TODO: hit test & get selection rectangles from a subscring
+    /// Find the character boundary (as a UTF-8 offset) closest to the given
+    /// point.
+    fn cursor_index_from_point(&self, point: Point2<f32>) -> usize;
+
+    /// Determine the location of the cursor at the given UTF-8 offset.
+    ///
+    /// Two locations will be returned. The first `Beam` represents the strong
+    /// cursor location where characters of the directionality matcing the base
+    /// writing direction are inserted. The second `Beam` represents the weak
+    /// cursor location wher other characters are inserted.
+    ///
+    /// `i` must be in range `0..=len` where `len` is the length of the source
+    /// string.
+    fn cursor_pos(&self, i: usize) -> [Beam; 2];
+
+    /// Get the number of lines in the layout.
+    fn num_lines(&self) -> usize;
+
+    /// Get the UTF-8 offset range for the line `i`.
+    ///
+    /// `i` must be in range `0..num_lines()`.
+    ///
+    /// The ranges returned by this method are a partition of the source string.
+    /// Each range includes any trailing line break character(s).
+    fn line_index_range(&self, i: usize) -> Range<usize>;
+
+    /// Get the line containing the given UTF-8 offset.
+    ///
+    /// `i` must be in range `0..=len` where `len` is the length of the source
+    /// string. If `i == len`, this function returns `self.num_lines() - 1`.
+    fn line_from_index(&self, i: usize) -> usize {
+        let mut base = 0;
+        let mut size = self.num_lines();
+        while size > 1 {
+            let half = size / 2;
+            let mid = base + half;
+            base = if i >= self.line_index_range(mid).start {
+                mid
+            } else {
+                base
+            };
+            size -= half;
+        }
+        base
+    }
+
+    /// Get the vertical geometric range for the line `i` that can be used for
+    /// displaying selection and hit testing.
+    ///
+    /// `i` must be in range `0..num_lines()`.
+    ///
+    /// The ranges returned by this method are a partition of `layout_bounds()`.
+    fn line_vertical_bounds(&self, i: usize) -> Range<f32>;
+
+    /// Get a list of `RunMetrics` for a UTF-8 offset range. The returned
+    /// elements are stored in the visual (top to bottom, left to right) order.
+    ///
+    /// `i` must be an improper subset of `0..num_lines()`. `i.end` must be
+    /// greater than `i.start`. `i` must not span across multiple lines; i.e.,
+    /// there must be some `range = self.line_index_range(line)` for which
+    /// `range.contains(i.start) && range.contains(i.end - 1)`.
+    /// (This means the return value of `line_index_range` is a valid range to
+    /// pass to `run_metrics_of_range`.)
+    ///
+    /// The set of the values of `RunMetrics::index` returned by this method are
+    /// a partition of `i`.
+    fn run_metrics_of_range(&self, i: Range<usize>) -> Vec<RunMetrics>;
+
     // TODO: alignment
     // TODO: inline/foreign object
+}
+
+/// Represents the geometric position of an insertion cursor within a text
+/// layout. This is essentially a `Box2<f32>` with a zero width.
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct Beam {
+    pub x: f32,
+    pub top: f32,
+    pub bottom: f32,
+}
+
+impl Beam {
+    /// Construct a `Beam` with given corner coordinates.
+    pub fn new(x: f32, top: f32, bottom: f32) -> Self {
+        Self { x, top, bottom }
+    }
+
+    #[inline]
+    pub fn height(&self) -> f32 {
+        self.bottom - self.top
+    }
+
+    /// Convert this `Beam` to `Box2`.
+    #[inline]
+    pub fn as_box2(&self) -> Box2<f32> {
+        box2! {
+            min: [self.x, self.top],
+            max: [self.x, self.bottom],
+        }
+    }
+
+    /// Convert this `Beam` to `Box2` with a given width.
+    #[inline]
+    pub fn as_wide_box2(&self, width: f32) -> Box2<f32> {
+        box2! {
+            min: [self.x - width / 2.0, self.top],
+            max: [self.x + width / 2.0, self.bottom],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunMetrics {
+    pub flags: RunFlags,
+    /// A UTF-8 offset range in the source text.
+    pub index: Range<usize>,
+    /// The bounding box that can be used for displaying selection and
+    /// hit testing.
+    pub bounds: Range<f32>,
+}
+
+bitflags! {
+    pub struct RunFlags: u8 {
+        /// The run proceeds from right to left.
+        ///
+        /// # Rationale
+        ///
+        /// This flag corresponds to `kCTRunStatusRightToLeft` from Core Text.
+        /// `CTRun` from Core Text doesn't have a BiDi level, which other APIs
+        /// have as exemplified by `DWRITE_HIT_TEST_METRICS::bidiLevel`
+        /// (DirectWrite) and `PangoAnalysis::level` (Pango).
+        const RIGHT_TO_LEFT = 1;
+    }
+}
+
+impl Default for RunFlags {
+    fn default() -> Self {
+        RunFlags::empty()
+    }
 }
 
 pub trait CanvasText<TLayout>: Canvas {
