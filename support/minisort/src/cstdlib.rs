@@ -10,6 +10,18 @@ use std::{
     },
 };
 
+mod libc {
+    use std::os::raw::{c_int, c_void};
+    extern "C" {
+        pub fn qsort(
+            base: *mut c_void,
+            num: usize,
+            size: usize,
+            compar: Option<unsafe extern "C" fn(*const c_void, *const c_void) -> c_int>,
+        );
+    }
+}
+
 /// Sort the slice using the `qsort` function from the C standard library.
 ///
 /// # Performance
