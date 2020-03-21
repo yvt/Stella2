@@ -1373,6 +1373,7 @@ name = "minisort"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "libc",
  "quickcheck",
  "quickcheck_macros",
 ]

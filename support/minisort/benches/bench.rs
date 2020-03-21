@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use minisort::insertion_sort;
+use minisort::{insertion_sort, qsort};
 
 struct Xorshift32(u32);
 
@@ -41,6 +41,16 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let array = black_box(&mut array[..]);
                 fill(array, Xorshift32(42));
                 insertion_sort(array);
+            });
+        });
+
+        group.bench_function(BenchmarkId::new("qsort", size), move |b| {
+            let mut array = vec![0u32; size];
+
+            b.iter(|| {
+                let array = black_box(&mut array[..]);
+                fill(array, Xorshift32(42));
+                qsort(array);
             });
         });
 
