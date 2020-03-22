@@ -1318,6 +1318,7 @@ impl iface::TextLayout for TextLayout {
         fn num_lines(&self) -> usize;
         fn line_index_range(&self, i: usize) -> Range<usize>;
         fn line_vertical_bounds(&self, i: usize) -> Range<f32>;
+        fn line_baseline(&self, i: usize) -> f32;
         fn run_metrics_of_range(&self, i: Range<usize>) -> Vec<iface::RunMetrics>;
     }
 }

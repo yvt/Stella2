@@ -172,6 +172,10 @@ impl iface::TextLayout for TextLayout {
         todo!()
     }
 
+    fn line_baseline(&self, _i: usize) -> f32 {
+        todo!()
+    }
+
     fn run_metrics_of_range(&self, _i: Range<usize>) -> Vec<iface::RunMetrics> {
         todo!()
     }

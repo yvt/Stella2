@@ -1083,6 +1083,16 @@ pub trait TextLayout: Send + Sync + Sized {
     /// The time complexity of this method is `O(1)`.
     fn line_vertical_bounds(&self, i: usize) -> Range<f32>;
 
+    /// Get the Y coordinate of the baseline of the line `i` that can be used
+    /// for positioning the text.
+    ///
+    /// `i` must be in range `0..num_lines()`.
+    ///
+    /// # Complexity
+    ///
+    /// The time complexity of this method is `O(1)`.
+    fn line_baseline(&self, i: usize) -> f32;
+
     /// Get a list of `RunMetrics` for a UTF-8 offset range. The returned
     /// elements are stored in the visual (top to bottom, left to right) order.
     ///
