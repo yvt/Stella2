@@ -460,6 +460,8 @@ static NSString *coalesceString(id string) {
                                           (size_t)range.location,
                                           (size_t)range.length, actualRange);
 
+    bounds = [self.superview convertRect:bounds toView:nil];
+
     return [self.window convertRectToScreen:bounds];
 }
 
@@ -472,6 +474,9 @@ static NSString *coalesceString(id string) {
     point =
         [self.window convertRectFromScreen:NSMakeRect(point.x, point.y, 0, 0)]
             .origin;
+
+    point = [self convertRect:NSMakeRect(point.x, point.y, 0, 0) fromView:nil]
+                .origin;
 
     return tcw_wnd_get_char_index_from_point(self->controller.listenerUserData,
                                              point);
