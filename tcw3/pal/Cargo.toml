@@ -10,7 +10,7 @@ default = []
 
 # Enables the testing backend. Note that the testing backend needs to be
 # activated at runtime before use.
-testing = ["atom2", "cairo-rs", "pangocairo", "pango", "rayon"]
+testing = ["cairo-rs", "pangocairo", "pango", "rayon"]
 
 [dependencies]
 alt_fp = { path = "../../support/alt_fp" }
@@ -18,7 +18,7 @@ arr_macro = "0.1.3"
 array = "0.0.1"
 array_intrusive_list = { path = "../../support/array_intrusive_list" }
 arrayvec = "0.5"
-atom2 = { path = "../../support/atom2", optional = true }
+atom2 = { path = "../../support/atom2" }
 bitflags = "1.1.0"
 cggeom = { path = "../../support/cggeom", features = ["quickcheck"] }
 cgmath = "0.17.0"

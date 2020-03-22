@@ -990,6 +990,12 @@ pub trait BitmapBuilderNew: BitmapBuilder + Sized {
 ///
 /// This corresponds to `CTFrame` of Core Text, `IDWriteTextLayout` of
 /// DirectWrite, and `PangoLayout` of Pango.
+///
+/// # Notes on the Complexity of the Methods
+///
+/// Some methods of this trait have time complexity requirements. Some of them
+/// may require additional pre-processing steps, whose execution times are,
+/// however, not accounted in the requirements.
 pub trait TextLayout: Send + Sync + Sized {
     type CharStyle: CharStyle;
 
@@ -1007,13 +1013,23 @@ pub trait TextLayout: Send + Sync + Sized {
 
     /// Determine the location of the cursor at the given UTF-8 offset.
     ///
-    /// Two locations will be returned. The first `Beam` represents the strong
+    /// Two locations will be returned. One `Beam` represents the strong
     /// cursor location where characters of the directionality matcing the base
-    /// writing direction are inserted. The second `Beam` represents the weak
-    /// cursor location wher other characters are inserted.
+    /// writing direction are inserted. The other `Beam` represents the weak
+    /// cursor location wher other characters are inserted. The order in which
+    /// these two `Beam`s are returned is unspecified.
     ///
     /// `i` must be in range `0..=len` where `len` is the length of the source
     /// string.
+    ///
+    /// If `i` refers to a position inside a grapheme cluster, `i` will be
+    /// rounded to a nearest boundary in an unspecified way.
+    ///
+    /// # Rationale
+    ///
+    /// Originally, the order of the two `Beam` was specified, but later it was
+    /// found that `CTLineGetOffsetForStringIndex` may return two offsets in a
+    /// different order.
     fn cursor_pos(&self, i: usize) -> [Beam; 2];
 
     /// Get the number of lines in the layout.
@@ -1025,12 +1041,20 @@ pub trait TextLayout: Send + Sync + Sized {
     ///
     /// The ranges returned by this method are a partition of the source string.
     /// Each range includes any trailing line break character(s).
+    ///
+    /// # Complexity
+    ///
+    /// The time complexity of this method is `O(1)`.
     fn line_index_range(&self, i: usize) -> Range<usize>;
 
     /// Get the line containing the given UTF-8 offset.
     ///
     /// `i` must be in range `0..=len` where `len` is the length of the source
     /// string. If `i == len`, this function returns `self.num_lines() - 1`.
+    ///
+    /// # Complexity
+    ///
+    /// The time complexity of this method is `O(log(num_lines))`.
     fn line_from_index(&self, i: usize) -> usize {
         let mut base = 0;
         let mut size = self.num_lines();
@@ -1053,6 +1077,10 @@ pub trait TextLayout: Send + Sync + Sized {
     /// `i` must be in range `0..num_lines()`.
     ///
     /// The ranges returned by this method are a partition of `layout_bounds()`.
+    ///
+    /// # Complexity
+    ///
+    /// The time complexity of this method is `O(1)`.
     fn line_vertical_bounds(&self, i: usize) -> Range<f32>;
 
     /// Get a list of `RunMetrics` for a UTF-8 offset range. The returned
@@ -1067,6 +1095,16 @@ pub trait TextLayout: Send + Sync + Sized {
     ///
     /// The set of the values of `RunMetrics::index` returned by this method are
     /// a partition of `i`.
+    ///
+    /// If some of the specified endpoints refer to positions inside grapheme
+    /// clusters, they will be rounded to nearest boundaries in an unspecified
+    /// way.
+    ///
+    /// # Complexity
+    ///
+    /// The time complexity of this method is `O(line_len_8 + line_len_16)`
+    /// where `line_len_8` and `line_len_16` are the lengths of the *whole* line
+    /// encoded in UTF-8 and UTF-16, respectively.
     fn run_metrics_of_range(&self, i: Range<usize>) -> Vec<RunMetrics>;
 
     // TODO: alignment
