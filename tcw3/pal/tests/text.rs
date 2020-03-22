@@ -88,11 +88,21 @@ fn test_text_layout_invariants() {
 
         assert!(text_layout.line_from_index(text.len()) == line_ranges.len() - 1);
 
-        for (line_i, line_range) in line_ranges.iter().enumerate() {
+        for (line_i, line_range) in line_ranges.iter().cloned().enumerate() {
             log::info!("  line[{:?}] = {:?}", line_i, &text[line_range.clone()]);
 
             if line_range.len() == 0 {
                 continue;
+            }
+
+            // Exclude the trailing newline character from the `cursor_pos` test
+            // because the width of such a character is inconsistent between
+            // platforms and even OS versions
+            let mut line_textual_range = line_range.clone();
+            let last_char = text.as_bytes()[line_range.end - 1];
+            if matches!(last_char, 13 | 10) {
+                log::info!("  Trimming the trailing newline character in `line_textual_range`");
+                line_textual_range.end -= 1;
             }
 
             let line_valid_indices: Vec<usize> = text[line_range.clone()]
@@ -114,7 +124,7 @@ fn test_text_layout_invariants() {
             );
 
             let run_metrics = text_layout.run_metrics_of_range(line_range.clone());
-            log::debug!("    runs = {:?}", run_metrics);
+            log::debug!("    runs({:?}) = {:?}", line_range, run_metrics);
 
             // `RunMetrics::index` must be a partition of `line_range`
             let mut run_ranges: Vec<_> = run_metrics.iter().map(|m| m.index.clone()).collect();
@@ -123,40 +133,45 @@ fn test_text_layout_invariants() {
             assert_eq!(run_ranges.last().unwrap().end, line_range.end);
             assert!(run_ranges.windows(2).all(|r| r[0].end == r[1].start));
 
-            // Each `RunMetrics` must be consistent with `cursor_pos`
-            // (Grapheme cluster rounding might be inconsistent, so this test
-            // can't be done for substrings)
-            for rm in run_metrics.iter() {
-                let is_rtl = rm.flags.contains(pal::RunFlags::RIGHT_TO_LEFT);
+            if line_textual_range.len() > 0 {
+                let run_metrics = text_layout.run_metrics_of_range(line_textual_range.clone());
+                log::debug!("    runs({:?}) = {:?}", line_textual_range, run_metrics);
 
-                let mut rm_range = [rm.index.start, rm.index.end];
-                while rm_range[1] > rm_range[0]
-                    && matches!(text.as_bytes()[rm_range[1] - 1], 13 | 10)
-                {
-                    rm_range[1] -= 1;
+                // Each `RunMetrics` must be consistent with `cursor_pos`
+                // (Grapheme cluster rounding might be inconsistent, so this test
+                // can't be done for substrings)
+                for rm in run_metrics.iter() {
+                    let is_rtl = rm.flags.contains(pal::RunFlags::RIGHT_TO_LEFT);
+
+                    let mut rm_range = [rm.index.start, rm.index.end];
+                    while rm_range[1] > rm_range[0]
+                        && matches!(text.as_bytes()[rm_range[1] - 1], 13 | 10)
+                    {
+                        rm_range[1] -= 1;
+                    }
+
+                    let epsilon = 0.1;
+
+                    // The left edge
+                    let expected = text_layout.cursor_pos(rm_range[is_rtl as usize]);
+                    assert!(
+                        (rm.bounds.start - expected[0].x).abs() < epsilon
+                            || (rm.bounds.start - expected[1].x).abs() < epsilon,
+                        "rm.bounds.start ({:?}) doesn't align with neither of {:?}",
+                        rm.bounds.start,
+                        expected
+                    );
+
+                    // The right edge
+                    let expected = text_layout.cursor_pos(rm_range[!is_rtl as usize]);
+                    assert!(
+                        (rm.bounds.end - expected[0].x).abs() < epsilon
+                            || (rm.bounds.end - expected[1].x).abs() < epsilon,
+                        "rm.bounds.end ({:?}) doesn't align with neither of {:?}",
+                        rm.bounds.end,
+                        expected
+                    );
                 }
-
-                let epsilon = 0.1;
-
-                // The left edge
-                let expected = text_layout.cursor_pos(rm_range[is_rtl as usize]);
-                assert!(
-                    (rm.bounds.start - expected[0].x).abs() < epsilon
-                        || (rm.bounds.start - expected[1].x).abs() < epsilon,
-                    "rm.bounds.start ({:?}) doesn't align with neither of {:?}",
-                    rm.bounds.start,
-                    expected
-                );
-
-                // The right edge
-                let expected = text_layout.cursor_pos(rm_range[!is_rtl as usize]);
-                assert!(
-                    (rm.bounds.end - expected[0].x).abs() < epsilon
-                        || (rm.bounds.end - expected[1].x).abs() < epsilon,
-                    "rm.bounds.end ({:?}) doesn't align with neither of {:?}",
-                    rm.bounds.end,
-                    expected
-                );
             }
 
             // For every possible range in the line...
