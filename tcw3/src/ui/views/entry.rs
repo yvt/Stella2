@@ -1,5 +1,5 @@
-use cggeom::{prelude::*, Box2};
-use cgmath::Point2;
+use cggeom::{box2, prelude::*, Box2};
+use cgmath::{Matrix3, Point2, Vector2};
 use std::{
     cell::{Cell, RefCell, RefMut},
     ops::Range,
@@ -15,8 +15,8 @@ use crate::{
         theming::{self, ClassSet, HElem, Prop, PropKindFlags, PropValue, Role, Widget},
     },
     uicore::{
-        CursorShape, HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener,
-        WeakHView,
+        CursorShape, HView, HViewRef, HWndRef, MouseDragListener, SizeTraits, UpdateCtx, ViewFlags,
+        ViewListener, WeakHView,
     },
 };
 
@@ -109,12 +109,22 @@ struct State {
     canvas: CanvasMixin,
     tictx: Option<pal::HTextInputCtx>,
     sel_range: [usize; 2],
+    comp_range: Option<[usize; 2]>,
 }
 
 #[derive(Debug)]
 struct TextLayoutInfo {
     text_layout: pal::TextLayout,
     layout_bounds: Box2<f32>,
+
+    line_height: f32,
+
+    /// Cache of `text_layout.run_metrics_of_range()` Used to quickly respond to
+    /// `slice_bounds`. Sorted by `runs[i].index.start`.
+    runs: Vec<pal::RunMetrics>,
+    /// Cache of `text_layout.line_vertical_bounds()` for the line containing
+    /// `runs`.
+    line_vertical_bounds: Range<f32>,
 }
 
 impl EntryCore {
@@ -139,6 +149,7 @@ impl EntryCore {
                     canvas: CanvasMixin::new(),
                     tictx: None,
                     sel_range: [0; 2],
+                    comp_range: None,
                 }),
                 style_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
@@ -183,7 +194,7 @@ impl EntryCore {
 }
 
 impl State {
-    fn ensure_text_layout(&mut self, elem: &theming::Elem) {
+    fn ensure_text_layout(&mut self, elem: &theming::Elem) -> &mut TextLayoutInfo {
         if self.text_layout_info.is_none() {
             let font_type = match elem.compute_prop(Prop::Font) {
                 PropValue::SysFontType(value) => value,
@@ -201,16 +212,37 @@ impl State {
             self.text_layout_info = Some(TextLayoutInfo {
                 text_layout,
                 layout_bounds,
+                runs: Vec::new(),
+                line_vertical_bounds: 0.0..0.0,
+                line_height: char_style.size(),
             });
         }
+
+        self.text_layout_info.as_mut().unwrap()
     }
 
     /// Delete the cached `TextLayout` (if any).
-    ///
-    /// After calling this, you probably want to call `HView::set_layout` again
-    /// because the API contract of `Layout` requires immutability.
     fn invalidate_text_layout(&mut self) {
         self.text_layout_info = None;
+    }
+}
+
+impl TextLayoutInfo {
+    fn text_origin(&self, view: HViewRef<'_>) -> Vector2<f32> {
+        let baseline = self.text_layout.line_baseline(0);
+        let height = view.frame().size().y;
+        // TODO: Stop hard-coding the margin
+        [3.0, (height + self.line_height) * 0.5 - baseline].into()
+    }
+
+    fn text_origin_global(&self, view: HViewRef<'_>) -> Vector2<f32> {
+        let global_loc: [f32; 2] = view.global_frame().min.into();
+        self.text_origin(view) + Vector2::from(global_loc)
+    }
+
+    fn cursor_index_from_global_point(&self, x: f32, view: HViewRef<'_>) -> usize {
+        self.text_layout
+            .cursor_index_from_point([x - self.text_origin_global(view).x, 0.0].into())
     }
 }
 
@@ -283,6 +315,23 @@ impl ViewListener for EntryCoreListener {
         }
     }
 
+    fn mouse_drag(
+        &self,
+        _: pal::Wm,
+        hview: HViewRef<'_>,
+        _loc: Point2<f32>,
+        button: u8,
+    ) -> Box<dyn MouseDragListener> {
+        if button == 0 {
+            Box::new(EntryCoreDragListener::new(
+                hview.cloned(),
+                Rc::clone(&self.inner),
+            ))
+        } else {
+            Box::new(())
+        }
+    }
+
     fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
         self.inner.state.borrow_mut().canvas.position(wm, view);
 
@@ -307,6 +356,8 @@ impl ViewListener for EntryCoreListener {
         };
 
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
+        let sel_range = &state.sel_range;
+        let comp_range = &state.comp_range;
 
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
 
@@ -315,7 +366,79 @@ impl ViewListener for EntryCoreListener {
             .update_layer(wm, view, ctx.hwnd(), visual_bounds, |draw_ctx| {
                 let c = &mut draw_ctx.canvas;
 
-                c.draw_text(&text_layout_info.text_layout, Point2::new(0.0, 0.0), color);
+                let mut sel_range = sel_range.clone();
+                let text_layout = &text_layout_info.text_layout;
+                let text_origin = text_layout_info.text_origin(view);
+
+                c.save();
+                c.mult_transform(Matrix3::from_translation(text_origin));
+
+                if sel_range[0] != sel_range[1] {
+                    if sel_range[1] < sel_range[0] {
+                        sel_range.reverse();
+                    }
+                    // TODO: Make sure the text is really single-lined. Otherwise,
+                    //       we might break the contract of `run_metrics_of_range`
+                    //       when the range is in a different line
+                    let line = 0;
+                    let vert_bounds = text_layout.line_vertical_bounds(line);
+                    let runs = text_layout.run_metrics_of_range(sel_range[0]..sel_range[1]);
+                    log::trace!("sel_range = {:?}", sel_range[0]..sel_range[1]);
+                    log::trace!("runs({:?}) = {:?}", sel_range[0]..sel_range[1], runs);
+
+                    // Fill the selection
+                    c.set_fill_rgb([0.3, 0.6, 1.0, 0.5].into()); // TODO: derive from stylesheet
+                    for run in runs.iter() {
+                        c.fill_rect(box2! {
+                            min: [run.bounds.start, vert_bounds.start],
+                            max: [run.bounds.end, vert_bounds.end],
+                        });
+                    }
+                } else {
+                    // Render the caret
+                    // TODO: Make the caret blink
+                    let beams = text_layout.cursor_pos(sel_range[0]);
+                    log::trace!("cursor_pos({:?}) = {:?}", sel_range[0], beams);
+
+                    use array::Array2;
+                    let [mut rect0, mut rect1] = beams.map(|beam| beam.as_wide_box2(1.0));
+
+                    c.set_fill_rgb(color);
+                    if beams[0].x != beams[1].x {
+                        // If there are a strong cursor and a weak cursor,
+                        // display the former in the upper half and the latter
+                        // in the lower half
+                        rect0.max.y = rect0.mid().y;
+                        rect1.min.y = rect0.max.y;
+                        c.fill_rect(rect0);
+                    }
+                    c.fill_rect(rect1);
+                }
+
+                c.draw_text(&text_layout, Point2::new(0.0, 0.0), color);
+
+                if let Some(comp_range) = comp_range {
+                    // Draw an underline below the preedit text
+                    // TODO: The backend shouldn't give a zero-length composition range
+                    if comp_range[1] > comp_range[0] {
+                        // TODO: See the above TODO regarding `line`
+                        let line = 0;
+                        let y = text_layout.line_baseline(line);
+                        let runs = text_layout.run_metrics_of_range(comp_range[0]..comp_range[1]);
+                        log::trace!("comp_range = {:?}", comp_range[0]..comp_range[1]);
+                        log::trace!("runs({:?}) = {:?}", comp_range[0]..comp_range[1], runs);
+
+                        c.set_fill_rgb([color.r, color.g, color.b, color.a * 0.6].into());
+                        for run in runs.iter() {
+                            c.fill_rect(box2! {
+                                min: [run.bounds.start, y + 1.0],
+                                max: [run.bounds.end, y + 2.0],
+                            });
+                        }
+                    }
+                }
+
+                c.restore();
             });
 
         // TODO: Display selection and caret
@@ -336,6 +459,7 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
         Box::new(Edit {
             state: self.inner.state.borrow_mut(),
             view: self.inner.view.upgrade().unwrap(),
+            inner: &self.inner,
         })
     }
 
@@ -352,6 +476,7 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
 /// Implements `TextInputCtxEdit`.
 struct Edit<'a> {
     state: RefMut<'a, State>,
+    inner: &'a Inner,
     view: HView,
 }
 
@@ -377,14 +502,14 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.check_range(&range);
 
         self.state.sel_range = [range.start, range.end];
-        self.view.pend_update();
+        self.state.canvas.pend_draw(self.view.as_ref());
     }
 
     fn set_composition_range(&mut self, range: Option<Range<usize>>) {
         range.as_ref().map(|r| self.check_range(r));
 
-        // TODO
-        log::warn!("set_composition_range({:?}): stub!", range);
+        self.state.comp_range = range.map(|r| [r.start, r.end]);
+        self.state.canvas.pend_draw(self.view.as_ref());
     }
 
     fn replace(&mut self, range: Range<usize>, text: &str) {
@@ -446,8 +571,136 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     fn slice_bounds(&mut self, range: Range<usize>) -> (Box2<f32>, usize) {
         self.check_range(&range);
 
-        // TODO
-        log::warn!("slice_bounds({:?}): stub!", range);
-        (self.frame(), range.end)
+        let text_layout_info = self.state.ensure_text_layout(&self.inner.style_elem);
+        let text_layout = &text_layout_info.text_layout;
+        let text_origin = text_layout_info.text_origin(self.view.as_ref());
+
+        let offset: [f32; 2] = self.view.global_frame().min.into();
+        let mut offset: cgmath::Vector2<f32> = offset.into();
+        offset += text_origin;
+
+        // If `range.len() == 0`, return the caret position calculated by
+        // `text_layout.cursor_pos`
+        if range.len() == 0 {
+            let strong_cursor = text_layout.cursor_pos(range.start)[0];
+            return (strong_cursor.as_box2().translate(offset), range.start);
+        }
+
+        // Do we already have a run starting at `range.start`?
+        let runs = &mut text_layout_info.runs;
+        let line_vertical_bounds = &mut text_layout_info.line_vertical_bounds;
+        let run_i = if let Ok(i) = runs.binary_search_by_key(&range.start, |r| r.index.start) {
+            // `RunMetrics` doesn't have sufficient information for us to slice
+            // them, so `runs[i].index` must be an improper subset of `range`.
+            if runs[i].index.end <= range.end {
+                Some(i)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // If we don't have one, recalculate and cache `runs` (because the
+        // backend may call `slice_bounds` repeatedly until all bounding boxes
+        // for a given string range is known)
+        let run_i: usize = run_i.unwrap_or_else(|| {
+            // Find the line contianing `range.start`.
+            // (Note: `EntryCore` is supposed to be a single-line input widget)
+            let line = text_layout.line_from_index(range.start);
+            let line_end = text_layout.line_index_range(line).end;
+
+            *line_vertical_bounds = text_layout.line_vertical_bounds(line);
+
+            // Recalculate `runs`
+            *runs = text_layout.run_metrics_of_range(range.start..line_end.min(range.end));
+            minisort::minisort_by_key(runs, |r| r.index.start);
+
+            // Find the run starting at `range.start`. (This will always succeed
+            // because of `run_metrics_of_range`'s postcondition)
+            runs.binary_search_by_key(&range.start, |r| r.index.start)
+                .unwrap()
+        });
+
+        // Return the found run
+        let run = &runs[run_i];
+        let bounds = box2! {
+            min: [run.bounds.start, line_vertical_bounds.start],
+            max: [run.bounds.end, line_vertical_bounds.end],
+        };
+        (bounds.translate(offset), run.index.end)
+    }
+}
+
+struct EntryCoreDragListener {
+    view: HView,
+    inner: Rc<Inner>,
+    orig_sel_range: [usize; 2],
+}
+
+impl EntryCoreDragListener {
+    fn new(view: HView, inner: Rc<Inner>) -> Self {
+        let orig_sel_range = inner.state.borrow().sel_range;
+        Self {
+            view,
+            inner,
+            orig_sel_range,
+        }
+    }
+
+    fn update_selection(&self, wm: pal::Wm, f: &mut dyn FnMut(&mut State)) {
+        let mut state = self.inner.state.borrow_mut();
+        let old_sel_range = state.sel_range;
+
+        // Call the given function
+        f(&mut *state);
+
+        // Return early if the selection did not change
+        if old_sel_range == state.sel_range {
+            return;
+        }
+
+        let tictx = state.tictx.clone();
+        state.canvas.pend_draw(self.view.as_ref());
+
+        // Unborrow `state` before calling `text_input_ctx_on_selection_change`,
+        // which might request a document lock
+        drop(state);
+        if let Some(tictx) = tictx {
+            wm.text_input_ctx_on_selection_change(&tictx);
+        }
+    }
+}
+
+impl MouseDragListener for EntryCoreDragListener {
+    fn mouse_down(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
+        self.update_selection(wm, &mut |state| {
+            if let Some(text_layout_info) = &state.text_layout_info {
+                let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
+                state.sel_range = [i, i];
+            }
+        });
+    }
+
+    fn mouse_motion(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
+        self.update_selection(wm, &mut |state| {
+            if let Some(text_layout_info) = &state.text_layout_info {
+                let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
+                state.sel_range[1] = i;
+            }
+        });
+    }
+
+    fn cancel(&self, wm: pal::Wm, _: HViewRef<'_>) {
+        let orig_sel_range = &self.orig_sel_range;
+        self.update_selection(wm, &mut |state| {
+            // Before resetting the selection, make sure `orig_sel_range` is
+            // still a valid selection range
+            let start = orig_sel_range[0].min(orig_sel_range[0]);
+            let end = orig_sel_range[0].max(orig_sel_range[0]);
+            if state.text.get(start..end).is_some() {
+                state.sel_range = *orig_sel_range;
+            }
+        });
     }
 }

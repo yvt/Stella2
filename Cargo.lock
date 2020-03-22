@@ -2582,6 +2582,7 @@ name = "tcw3"
 version = "0.1.0"
 dependencies = [
  "alt_fp",
+ "array",
  "array_intrusive_list",
  "arrayvec 0.5.1",
  "as_any",
