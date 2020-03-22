@@ -107,6 +107,7 @@ env_logger = "0.7.0"
 quickcheck = "0.9"
 quickcheck_macros = "0.9"
 structopt = "0.3.0"
+unicode-segmentation = "1.6.0"
 arg_enum_proc_macro = "0.3.0"
 
 [[test]]

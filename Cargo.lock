@@ -2742,6 +2742,7 @@ dependencies = [
  "structopt",
  "svgbobdoc",
  "try_match",
+ "unicode-segmentation",
  "utf16count",
  "wchar",
  "winapi",

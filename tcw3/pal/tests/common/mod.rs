@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{env::var_os, time::Duration};
 
 pub fn set_timelimit_default() {
@@ -15,4 +16,8 @@ pub fn exit_if_native_backend_tests_are_disabled() {
             std::process::exit(0);
         }
     }
+}
+
+pub fn try_init_logger_for_default_harness() {
+    let _ = env_logger::builder().is_test(true).try_init();
 }
