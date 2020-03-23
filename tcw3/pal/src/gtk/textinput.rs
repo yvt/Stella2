@@ -4,7 +4,7 @@ use gtk::{prelude::*, IMMulticontext};
 use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 use std::{
     cell::{Cell, RefCell},
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     fmt,
     ops::Range,
 };
@@ -258,11 +258,11 @@ impl HTextInputCtx {
 
         edit.set_composition_range(None);
         edit.set_selected_range(new_sel_i..new_sel_i);
+
+        ctx.recalculate_and_set_cursor_location(wm, edit);
     }
 
     fn handle_preedit_changed(&self, wm: Wm) {
-        use std::cmp::min;
-
         ctx! { let ctx (wm, self.ptr) orelse return () }
 
         let (preedit_string, _attr_list, cursor_pos) = ctx.gtk_ctx.get_preedit_string();
@@ -281,7 +281,13 @@ impl HTextInputCtx {
             cell_get_by_clone(&ctx.comp_range).unwrap_or_else(|| edit.selected_range());
 
         // The caret position is specified by `cursor_pos`.
-        let new_sel_i = replace_range.start + min(cursor_pos as usize, preedit_string.len());
+        let cursor_pos_u8 = preedit_string
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(cursor_pos as usize)
+            .unwrap_or(preedit_string.len());
+        log::trace!("... cursor_pos_u8 = {:?}", cursor_pos_u8);
+        let new_sel_i = replace_range.start + cursor_pos_u8;
 
         // The new composition range after the replacing operation.
         let new_comp_range = if preedit_string.len() > 0 {
@@ -295,6 +301,8 @@ impl HTextInputCtx {
         edit.set_composition_range(new_comp_range.clone());
         edit.set_selected_range(new_sel_i..new_sel_i);
         ctx.comp_range.set(new_comp_range);
+
+        ctx.recalculate_and_set_cursor_location(wm, edit);
     }
 
     /// The "cursor position" used for handling the `retrieve-surrounding` signal.
@@ -343,12 +351,38 @@ impl HTextInputCtx {
         let cursor_range = Self::cursor_range(&mut *edit, ctx);
         log::trace!("... cursor_range = {:?}", cursor_range);
 
-        // The deletion range in absolute indices
-        let del_start = isize::try_from(cursor_range.start).expect("index overflow")
-            + isize::try_from(offset).expect("index overflow");
-        let del_end = del_start
-            .checked_add(isize::try_from(n_chars).expect("index overflow"))
-            .expect("index overflow");
+        // Convert the deletion range to absolute indices
+        let mut offset_chars = |mut i: usize, mut off: i32| -> usize {
+            while off < 0 {
+                i = edit.floor_index(i.checked_sub(1).expect("index overflow"));
+                off += 1;
+            }
+            while off > 0 {
+                i = edit.ceil_index(i.checked_add(1).expect("index overflow"));
+                off -= 1;
+            }
+            i
+        };
+        let del_start = offset_chars(
+            if offset < 0 {
+                cursor_range.start
+            } else {
+                cursor_range.end
+            },
+            offset,
+        );
+        let del_end = {
+            let chars_end = offset + n_chars;
+
+            offset_chars(
+                if chars_end < 0 {
+                    cursor_range.start
+                } else {
+                    cursor_range.end
+                },
+                chars_end,
+            )
+        };
 
         log::trace!("... del_range = {:?}", del_start..del_end);
 
@@ -388,7 +422,34 @@ impl HTextInputCtx {
             }
         }
 
+        ctx.recalculate_and_set_cursor_location(wm, edit);
+
         true
+    }
+}
+
+impl Ctx {
+    fn recalculate_and_set_cursor_location(&self, wm: Wm, mut edit: Box<DynTextInputCtxEdit<'_>>) {
+        let sel_i = edit.selected_range().end;
+        let (bounds, _) = edit.slice_bounds(sel_i..sel_i);
+        drop(edit);
+
+        log::trace!(
+            "recalculate_and_set_cursor_location: bounds = {:?}",
+            bounds.display_im()
+        );
+
+        let gtk_rect = gtk::Rectangle {
+            x: bounds.min.x as i32,
+            y: bounds.min.y as i32,
+            width: bounds.size().x as i32,
+            height: bounds.size().y as i32,
+        };
+
+        self.gtk_ctx
+            .set_client_window(self.hwnd.gdk_window(wm).as_ref());
+
+        self.gtk_ctx.set_cursor_location(&gtk_rect);
     }
 }
 
