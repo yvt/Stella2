@@ -2728,6 +2728,7 @@ dependencies = [
  "lazy_static",
  "leakypool",
  "log",
+ "minisort",
  "neo_linked_list",
  "objc",
  "once_cell",

@@ -32,6 +32,7 @@ itertools = "0.8.0"
 lazy_static = "1"
 leakypool = { path = "../../support/leakypool" }
 log = "0.4"
+minisort = { path = "../../support/minisort" }
 neo_linked_list = { path = "../../support/neo_linked_list" }
 once_cell = "1.2.0"
 owning_ref = "0.4.0"

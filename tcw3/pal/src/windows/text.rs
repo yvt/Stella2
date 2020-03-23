@@ -1,9 +1,17 @@
 use alt_fp::FloatOrd;
+use atom2::SetOnceAtom;
 use cggeom::Box2;
 use cgmath::Point2;
-use directwrite::{enums::FontWeight, factory::Factory};
-use std::{fmt, ops::Range};
+use directwrite::{
+    enums::FontWeight,
+    factory::Factory,
+    text_layout::metrics::{HitTestMetrics, LineMetrics},
+};
+use std::{convert::TryFrom, fmt, ops::Range};
+use utf16count::{find_utf16_pos, find_utf16_pos_in_utf8_str, utf16_len_of_utf8_str};
+use winapi::shared::winerror::S_OK;
 
+use super::utils::panic_hresult;
 use crate::iface;
 
 lazy_static::lazy_static! {
@@ -88,6 +96,22 @@ impl CharStyle {
 pub struct TextLayout {
     pub(super) dwrite_layout: directwrite::TextLayout,
     pub(super) color: Option<iface::RGBAF32>,
+    text: String,
+    metrics: SetOnceAtom<Box<LayoutMetrics>>,
+}
+
+struct LayoutMetrics {
+    line_boundaries: Box<[LineBoundary]>,
+    line_positions: Box<[f32]>,
+    line_metrics_list: Vec<LineMetrics>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LineBoundary {
+    // Using `u32` here is a code size optimization - x86 doesn't have an
+    // addressing mode for 16-byte elements.
+    pos_u8: u32,
+    pos_u16: u32,
 }
 
 impl fmt::Debug for TextLayout {
@@ -95,7 +119,76 @@ impl fmt::Debug for TextLayout {
         f.debug_struct("TextLayout")
             .field("dwrite_layout", &unsafe { self.dwrite_layout.get_raw() })
             .field("color", &self.color)
+            .field("text", &self.text)
+            .field("metrics", &self.metrics)
             .finish()
+    }
+}
+
+impl fmt::Debug for LayoutMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LayoutMetrics")
+            .field("line_boundaries", &self.line_boundaries)
+            .field("line_positions", &self.line_positions)
+            .finish()
+    }
+}
+
+impl TextLayout {
+    fn ensure_metrics(&self) -> &LayoutMetrics {
+        self.metrics
+            .get_or_racy_insert_with(|| {
+                let mut line_metrics_list = Vec::new();
+                self.dwrite_layout.get_line_metrics(&mut line_metrics_list);
+
+                debug_assert_ne!(line_metrics_list.len(), 0);
+
+                let text = &self.text[..];
+
+                // Generate `line_boundaries`
+                let mut pos_u16 = 0;
+                let mut pos_u8 = 0;
+                let line_boundaries: Box<[LineBoundary]> = std::iter::once(LineBoundary {
+                    pos_u8: 0,
+                    pos_u16: 0,
+                })
+                .chain(line_metrics_list.iter().map(|line_metrics| {
+                    let adv_u16 = line_metrics.length();
+                    let adv_u8 = find_utf16_pos_in_utf8_str(
+                        adv_u16 as usize,
+                        &text.as_bytes()[pos_u8 as usize..],
+                    )
+                    .utf8_cursor as u32;
+                    pos_u16 += adv_u16;
+                    pos_u8 += adv_u8;
+                    LineBoundary { pos_u8, pos_u16 }
+                }))
+                .collect::<Vec<_>>()
+                // Converting to `Box<[LineBoundary]>` involves no reallocation
+                // because this iterator is `ExactSizeIterator`
+                .into();
+
+                // generate `line_positions`
+                let mut y = 0.0;
+                let line_positions: Box<[f32]> = std::iter::once(0.0)
+                    .chain(line_metrics_list.iter().map(|line_metrics| {
+                        y += line_metrics.height();
+                        y
+                    }))
+                    .collect::<Vec<_>>()
+                    .into();
+
+                let metrics = Box::new(LayoutMetrics {
+                    line_metrics_list,
+                    line_boundaries,
+                    line_positions,
+                });
+
+                log::trace!("metrics({:?}) = {:?}", text, metrics);
+
+                metrics
+            })
+            .0
     }
 }
 
@@ -103,6 +196,8 @@ impl iface::TextLayout for TextLayout {
     type CharStyle = CharStyle;
 
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
+        assert!(u32::try_from(text.len()).is_ok(), "text is too long");
+
         let dwrite_layout = directwrite::TextLayout::create(&G.dwrite)
             .with_text(text)
             .with_width(width.unwrap_or(std::f32::INFINITY).fmax(0.0))
@@ -122,6 +217,8 @@ impl iface::TextLayout for TextLayout {
         Self {
             dwrite_layout,
             color: style.color,
+            text: text.to_owned(),
+            metrics: SetOnceAtom::empty(),
         }
     }
 
@@ -152,31 +249,327 @@ impl iface::TextLayout for TextLayout {
         }
     }
 
-    fn cursor_index_from_point(&self, _point: Point2<f32>) -> usize {
-        todo!()
+    fn cursor_index_from_point(&self, point: Point2<f32>) -> usize {
+        let result = self.dwrite_layout.hit_test_point(point.x, point.y);
+        let metrics = &result.metrics;
+
+        // Find the text position of the edge closest to `point`
+        let trailing = point.x - metrics.left() > metrics.width() * 0.5;
+        let is_rtl = metrics.bidi_level() % 2 != 0;
+        let pos = match (trailing, is_rtl) {
+            (false, false) | (true, true) => metrics.text_position(),
+            _ => metrics.text_position() + metrics.length(),
+        };
+
+        // Convert the text position to UTF-8
+        find_utf16_pos(pos as usize, &self.text).utf8_cursor
     }
 
-    fn cursor_pos(&self, _i: usize) -> [iface::Beam; 2] {
-        todo!()
+    fn cursor_pos(&self, i: usize) -> [iface::Beam; 2] {
+        // Convert `i` to UTF-16
+        let i = utf16_len_of_utf8_str(&self.text.as_bytes()[0..i]) as u32;
+
+        let result1 = self
+            .dwrite_layout
+            .hit_test_text_position(i, true)
+            .expect("HitTestTextPosition failed");
+
+        let result2 = if i == 0 {
+            result1
+        } else {
+            self.dwrite_layout
+                .hit_test_text_position(i - 1, false)
+                .expect("HitTestTextPosition failed")
+        };
+
+        use array::Array2;
+        [result1, result2].map(|result| iface::Beam {
+            x: result.point_x,
+            top: result.metrics.top(),
+            bottom: result.metrics.top() + result.metrics.height(),
+        })
     }
 
     fn num_lines(&self) -> usize {
-        todo!()
+        self.dwrite_layout.get_line_metrics_count()
     }
 
-    fn line_index_range(&self, _i: usize) -> Range<usize> {
-        todo!()
+    fn line_index_range(&self, i: usize) -> Range<usize> {
+        let line_boundaries = &self.ensure_metrics().line_boundaries[..];
+
+        debug_assert_eq!(line_boundaries.len(), self.num_lines() + 1);
+
+        let the_boundaries = &line_boundaries[i..][..2];
+        the_boundaries[0].pos_u8 as usize..the_boundaries[1].pos_u8 as usize
     }
 
-    fn line_vertical_bounds(&self, _i: usize) -> Range<f32> {
-        todo!()
+    fn line_vertical_bounds(&self, i: usize) -> Range<f32> {
+        let line_positions = &self.ensure_metrics().line_positions[..];
+
+        debug_assert_eq!(line_positions.len(), self.num_lines() + 1);
+
+        let the_positions = &line_positions[i..][..2];
+        the_positions[0]..the_positions[1]
     }
 
-    fn line_baseline(&self, _i: usize) -> f32 {
-        todo!()
+    fn line_baseline(&self, i: usize) -> f32 {
+        let metrics = self.ensure_metrics();
+        metrics.line_metrics_list[i].baseline() + metrics.line_positions[i]
     }
 
-    fn run_metrics_of_range(&self, _i: Range<usize>) -> Vec<iface::RunMetrics> {
-        todo!()
+    fn run_metrics_of_range(&self, range: Range<usize>) -> Vec<iface::RunMetrics> {
+        debug_assert_ne!(range.start, range.end, "The range mustn't be empty");
+
+        // Finding the containing line isn't strictly necessary, but allows up
+        // to expedite the process of converting the range to UTF-16.
+        // Without this, we can't meet the time complexity requirement of
+        // this method (`O(line_len_8*log(line_len_8) +
+        // line_len_16*log(line_len_16) + line_i)`).
+        let line = self.line_from_index(range.start);
+        debug_assert_eq!(
+            self.line_from_index(range.end - 1),
+            line,
+            "The range mustn't span across lines"
+        );
+
+        // Convert `range` to UTF-16
+        let metrics = self.ensure_metrics();
+        let line_start = metrics.line_boundaries[line];
+        let text = self.text.as_bytes();
+        let start_u16 = utf16_len_of_utf8_str(&text[line_start.pos_u8 as usize..range.start])
+            as u32
+            + line_start.pos_u16;
+        let len_u16 = utf16_len_of_utf8_str(&text[range.clone()]) as u32;
+
+        log::trace!("run_metrics_of_range({:?})", range);
+        log::trace!("  line = {:?}", line);
+        log::trace!("  line_start = {:?}", line_start);
+        log::trace!("  range_u16 = {:?}", start_u16..start_u16 + len_u16);
+
+        // DirectWrite automatically rounds endpoints to the previous cluster,
+        // which might turn the range into an empty one. The precondition of
+        // this method does not allow an empty range, so we don't want the range
+        // to be empty even after rounding. To avoid this, we manually round
+        // `start_u16 + len_u16` to the next cluster boundary.
+        let len_u16 = {
+            let htm = self
+                .dwrite_layout
+                .hit_test_text_position(start_u16 + len_u16, true)
+                .unwrap()
+                .metrics;
+            if htm.text_position() == start_u16 + len_u16 {
+                len_u16
+            } else {
+                htm.text_position() + htm.length() - start_u16
+            }
+        };
+        log::trace!(
+            "  range_u16 (rounded) = {:?}",
+            start_u16..start_u16 + len_u16
+        );
+
+        // Retrieve a list of `HitTestMetrics`
+        let mut hit_test_metrics_list = Vec::new();
+        self.dwrite_layout.hit_test_text_range_2(
+            start_u16,
+            len_u16,
+            0.0,
+            0.0,
+            &mut hit_test_metrics_list,
+        );
+
+        log::trace!(
+            "  The endpoints of the returned runs (UTF-16) = {:?}",
+            hit_test_metrics_list
+                .iter()
+                .map(|htm| htm.text_position()..htm.text_position() + htm.length())
+                .collect::<Vec<_>>()
+        );
+        log::trace!(
+            "  The extents of the returned runs (UTF-16) = {:?}",
+            hit_test_metrics_list
+                .iter()
+                .map(|htm| htm.left()..htm.left() + htm.width())
+                .collect::<Vec<_>>()
+        );
+
+        // Discard zero-sized runs, which we aren't interested in
+        hit_test_metrics_list.retain(|htm| htm.length() > 0);
+
+        // The earliest position in `hit_test_metrics_list` might differ from
+        // `start_u16` if `start_u16` is in the middle of a grapheme cluster.
+        let min_u16 = hit_test_metrics_list
+            .iter()
+            .map(|htm| htm.text_position())
+            .min()
+            .unwrap_or(start_u16);
+
+        // Collect the endpoints. Sort them, which lets us compute their
+        // mapping to UTF-8 offsets in `O(line_len_8)`.
+        //
+        // The ranges represented by `hit_test_metrics_list` are a partition
+        // of `range` minus any trailing newline characters. This means that
+        // if we add `htm.text_position() + htm.length()`, we are also adding
+        // `htm2.text_position()` for the subsequent `htm2` unless `htm2`
+        // doesn't exist.
+        //
+        //                     v htm.pos+htm.len     v htm2.pos+htm2.len
+        //      ┌──────────────┬─────────────────────┐
+        //      | htm          | htm2                |
+        //      └──────────────┴─────────────────────┘
+        //      ^ htm.pos      ^ htm2.pos
+        //
+        // However, `htm2.text_position()` isn't added for the earliest run
+        // because there's no corresponding `htm`. This case is covered by
+        // `std::iter::one((min_u16, 0))`.
+        let mut eps: Vec<(u32, u32)> = std::iter::once((min_u16, 0))
+            .chain(
+                hit_test_metrics_list
+                    .iter()
+                    .map(|htm| (htm.text_position() + htm.length(), 0)),
+            )
+            .collect();
+        minisort::minisort_by_key(&mut eps, |&(pos_u16, _)| pos_u16);
+
+        eps.iter_mut().fold(
+            (line_start.pos_u16, line_start.pos_u8),
+            |(last_u16, last_u8), (pos_u16, pos_u8)| {
+                *pos_u8 = find_utf16_pos_in_utf8_str(
+                    (*pos_u16 - last_u16) as usize,
+                    &text[last_u8 as usize..],
+                )
+                .utf8_cursor as u32
+                    + last_u8;
+
+                (*pos_u16, *pos_u8)
+            },
+        );
+        log::trace!("  eps = {:?}", eps);
+
+        // Convert the list of `HitTestMetrics`
+        let mut out_run_metrics: Vec<iface::RunMetrics> = hit_test_metrics_list
+            .iter()
+            .map(|htm| {
+                // Make `RunFlags`
+                let mut flags = iface::RunFlags::empty();
+                if htm.bidi_level() % 2 != 0 {
+                    flags |= iface::RunFlags::RIGHT_TO_LEFT;
+                }
+
+                // Convert `htm.text_position()` to UTF-8
+                // (`O(log(hit_test_metrics_list.len()))`)
+                let i = eps
+                    .binary_search_by_key(&htm.text_position(), |&(pos_u16, _)| pos_u16)
+                    .unwrap();
+                let index = eps[i].1 as usize..eps[i + 1].1 as usize;
+                debug_assert_eq!(eps[i + 1].0, htm.text_position() + htm.length());
+
+                let bounds = htm.left()..htm.left() + htm.width();
+
+                iface::RunMetrics {
+                    flags,
+                    index,
+                    bounds,
+                }
+            })
+            .collect();
+
+        let max_returned_index = eps
+            .last()
+            .map(|&(_, pos_u8)| pos_u8 as usize)
+            .unwrap_or(range.start);
+        if range.end > max_returned_index {
+            // DirectWrite doesn't generate runs for trailing newline characters,
+            // but `TextLayout`'s API contract requires those.
+            log::trace!(
+                "  Synthesizing the run for the suffix {:?}",
+                max_returned_index.max(range.start)..range.end
+            );
+            let http = self
+                .dwrite_layout
+                .hit_test_text_position(metrics.line_boundaries[line + 1].pos_u16 as u32 - 1, true)
+                .expect("HitTestTextPosition failed");
+            let x = http.metrics.left();
+            out_run_metrics.push(iface::RunMetrics {
+                flags: iface::RunFlags::empty(),
+                index: max_returned_index.max(range.start)..range.end,
+                bounds: x..x,
+            });
+        }
+
+        debug_assert_ne!(out_run_metrics.len(), 0);
+
+        out_run_metrics
+    }
+}
+
+trait TextLayoutExt {
+    fn hit_test_text_range_2(
+        &self,
+        position: u32,
+        length: u32,
+        origin_x: f32,
+        origin_y: f32,
+        metrics: &mut Vec<HitTestMetrics>,
+    );
+}
+
+impl TextLayoutExt for directwrite::TextLayout {
+    /// The fixed version of `hit_test_text_range` (back ported from the
+    /// `master` version of `directwrite`).
+    ///
+    /// `hit_test_text_range` of `directwrite 0.1.4` has a bug caused by
+    /// interpreting `E_NOT_SUFFICIENT_BUFFER` as an error, making it
+    /// practically unusable.
+    fn hit_test_text_range_2(
+        &self,
+        position: u32,
+        length: u32,
+        origin_x: f32,
+        origin_y: f32,
+        metrics: &mut Vec<HitTestMetrics>,
+    ) {
+        use std::ptr;
+        const E_NOT_SUFFICIENT_BUFFER: i32 = -2147024774;
+        metrics.clear();
+
+        unsafe {
+            let ptr = &*self.get_raw();
+
+            // Calculate the total number of items we need
+            let mut actual_count = 0;
+            let res = ptr.HitTestTextRange(
+                position,
+                length,
+                origin_x,
+                origin_y,
+                ptr::null_mut(),
+                0,
+                &mut actual_count,
+            );
+            match res {
+                E_NOT_SUFFICIENT_BUFFER => (),
+                S_OK => return,
+                hr => panic_hresult(hr),
+            }
+
+            metrics.reserve(actual_count as usize);
+            let buf_ptr = metrics[..].as_mut_ptr() as *mut _;
+            let len = metrics.capacity() as u32;
+            let res = ptr.HitTestTextRange(
+                position,
+                length,
+                origin_x,
+                origin_y,
+                buf_ptr,
+                len,
+                &mut actual_count,
+            );
+            if res != S_OK {
+                panic_hresult(res);
+            }
+
+            metrics.set_len(actual_count as usize);
+        }
     }
 }
