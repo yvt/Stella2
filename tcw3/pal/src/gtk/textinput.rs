@@ -252,6 +252,7 @@ impl HTextInputCtx {
             .comp_range
             .take()
             .unwrap_or_else(|| edit.selected_range());
+        let replace_range = sort_range(replace_range);
         let new_sel_i = replace_range.start + text.len();
 
         edit.replace(replace_range, text);
@@ -279,6 +280,7 @@ impl HTextInputCtx {
         // the current selection.
         let replace_range =
             cell_get_by_clone(&ctx.comp_range).unwrap_or_else(|| edit.selected_range());
+        let replace_range = sort_range(replace_range);
 
         // The caret position is specified by `cursor_pos`.
         let cursor_pos_u8 = preedit_string
@@ -315,6 +317,7 @@ impl HTextInputCtx {
         // be excluded as well because it will be removed when the user types
         // something.
         let range = cell_get_by_clone(&ctx.comp_range).unwrap_or_else(|| edit.selected_range());
+        let range = sort_range(range);
         min(range.start, len)..min(range.end, len)
     }
 
@@ -450,6 +453,14 @@ impl Ctx {
             .set_client_window(self.hwnd.gdk_window(wm).as_ref());
 
         self.gtk_ctx.set_cursor_location(&gtk_rect);
+    }
+}
+
+fn sort_range(r: Range<usize>) -> Range<usize> {
+    if r.end < r.start {
+        r.end..r.start
+    } else {
+        r
     }
 }
 
