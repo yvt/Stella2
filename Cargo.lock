@@ -2734,6 +2734,7 @@ dependencies = [
  "owning_ref",
  "packed_simd",
  "pango",
+ "pango-sys",
  "pangocairo",
  "pkg-config",
  "quickcheck",

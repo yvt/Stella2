@@ -1112,9 +1112,10 @@ pub trait TextLayout: Send + Sync + Sized {
     ///
     /// # Complexity
     ///
-    /// The time complexity of this method is `O(line_len_8 + line_len_16)`
+    /// The time complexity of this method is `O(line_len_8 + line_len_16 + line_i)`
     /// where `line_len_8` and `line_len_16` are the lengths of the *whole* line
-    /// encoded in UTF-8 and UTF-16, respectively.
+    /// encoded in UTF-8 and UTF-16, respectively, and `line_i` is the number of
+    /// the lines before the one containing `i`.
     fn run_metrics_of_range(&self, i: Range<usize>) -> Vec<RunMetrics>;
 
     // TODO: alignment

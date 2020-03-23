@@ -260,7 +260,7 @@ fn inflate_range(x: &Range<f32>) -> Range<f32> {
     x.start - 0.1..x.end + 0.1
 }
 
-fn is_disjoint_ranges_subset_of<T: PartialOrd>(
+fn is_disjoint_ranges_subset_of<T: PartialOrd + std::fmt::Debug>(
     x: impl IntoIterator<Item = Range<T>>,
     y: impl IntoIterator<Item = Range<T>>,
 ) -> bool {
@@ -279,10 +279,25 @@ fn is_disjoint_ranges_subset_of<T: PartialOrd>(
     }
 
     // Remove zero-sized exterior intervals
-    endpoints.dedup_by(|a, b| a.0 == b.0);
+    endpoints.dedup_by(|a, b| {
+        if a.0 == b.0 {
+            // retain the latter element
+            std::mem::swap(a, b);
+            true
+        } else {
+            false
+        }
+    });
 
     // Remove interior endpoints
     endpoints.dedup_by(|a, b| (a.1 > 0) == (b.1 > 0));
+
+    assert_eq!(
+        endpoints.last().unwrap().1,
+        0,
+        "bad endpoints: {:?}",
+        endpoints
+    );
 
     x.into_iter().all(|range| {
         let i = match endpoints.binary_search_by(|probe| probe.0.partial_cmp(&range.start).unwrap())
