@@ -414,16 +414,67 @@ impl iface::TextLayout for TextLayout {
         let line_range = self.line_index_range(line);
         let line_range_u16 = ctline_get_string_range(&ctline);
         let line_start = line_range.start;
-        let line_end = line_range.end;
 
-        let rel_start_u16 = utf16_len_of_utf8_str(&self.text.as_bytes()[line_start..range.start]);
-        let rel_end_u16 =
-            rel_start_u16 + utf16_len_of_utf8_str(&self.text.as_bytes()[range.clone()]);
+        let text = self.text.as_bytes();
+
+        let start_u16 = utf16_len_of_utf8_str(&text[line_start..range.start])
+            + line_range_u16.location as usize;
+        let end_u16 = start_u16 + utf16_len_of_utf8_str(&text[range.clone()]);
 
         // `CTRun`s for the current line sorted by a visual order (left to right)
         let glyph_runs: CFArray<CTRun> = ctline.glyph_runs();
 
-        let mut u8_mapper = Utf16ToUtf8Mapper::new(&self.text[line_start..line_end]);
+        // Collect the endpoints. Sort them, which lets us compute their
+        // mapping to UTF-8 offsets in `O(line_len_8)`.
+        //
+        // The ranges represented by `glyph_runs` are a partition of
+        // `line_range_u16`. This means that if we add
+        // `ctrun_get_string_range(run).end`, we are also adding
+        // `ctrun_get_string_range(run).start` for the subsequent `run2` unless
+        // `run2` doesn't exist.
+        //
+        //                     v run.pos+run.len     v run2.pos+run2.len
+        //      ┌──────────────┬─────────────────────┐
+        //      | run          | run2                |
+        //      └──────────────┴─────────────────────┘
+        //      ^ run.pos      ^ run2.pos
+        //
+        // However, `ctrun_get_string_range(run2).start` isn't added for the
+        // earliest run because there's no corresponding `run`. This case is
+        // covered by `once((min_u16, 0))`.
+        let mut eps: Vec<(usize, usize)> = std::iter::once((line_range_u16.location as usize, 0))
+            .chain(glyph_runs.iter().map(|run| {
+                let range = ctrun_get_string_range(&run);
+                ((range.location + range.length) as usize, 0)
+            }))
+            .filter(|&(pos_u16, _)| pos_u16 > start_u16 && pos_u16 < end_u16)
+            .collect();
+        eps.push((start_u16, 0));
+        eps.push((end_u16, 0));
+        minisort::minisort_by_key(&mut eps, |&(pos_u16, _)| pos_u16);
+
+        // Fill the second field of each tuple of `eps`
+        eps.iter_mut().fold(
+            (start_u16, range.start),
+            |(last_u16, last_u8), (pos_u16, pos_u8)| {
+                *pos_u8 = find_utf16_pos_in_utf8_str(*pos_u16 - last_u16, &text[last_u8..])
+                    .utf8_cursor
+                    + last_u8;
+
+                (*pos_u16, *pos_u8)
+            },
+        );
+        log::trace!("  eps = {:?}", eps);
+
+        // Define a closure that converts text offsets using `eps`.
+        let utf16_to_utf8 = |pos_u16| {
+            let i = eps
+                .binary_search_by_key(&pos_u16, |&(ep_u16, _)| ep_u16)
+                // `pos_u16` must be included in `eps`
+                .unwrap();
+            let (_, ep_u8) = eps[i];
+            ep_u8
+        };
 
         let mut out_run_metrics = Vec::new();
 
@@ -436,12 +487,11 @@ impl iface::TextLayout for TextLayout {
                 log::warn!("run_metrics_of_range: todo! `kCTRunStatusHasNonIdentityMatrix`");
             }
 
-            let mut glyph_str_range = ctrun_get_string_range(&run);
-            glyph_str_range.location -= line_range_u16.location;
+            let glyph_str_range = ctrun_get_string_range(&run);
             let glyph_str_start_u16 = glyph_str_range.location as usize;
             let glyph_str_end_u16 = (glyph_str_range.location + glyph_str_range.length) as usize;
 
-            if glyph_str_start_u16 >= rel_end_u16 || glyph_str_end_u16 <= rel_start_u16 {
+            if glyph_str_start_u16 >= end_u16 || glyph_str_end_u16 <= start_u16 {
                 // The run doesn't overlap with `range`
                 continue;
             }
@@ -457,14 +507,14 @@ impl iface::TextLayout for TextLayout {
             let run_right = ctrun_get_positions_one(&run, glyph_count - 1).x
                 + ctrun_get_advances_one(&run, glyph_count - 1).width;
 
-            if glyph_str_start_u16 >= rel_start_u16 && glyph_str_end_u16 <= rel_end_u16 {
+            if glyph_str_start_u16 >= start_u16 && glyph_str_end_u16 <= end_u16 {
                 // The run is completely contained by `range`
-                let glyph_str_start_u8 = u8_mapper.utf16_to_utf8(glyph_str_start_u16);
-                let glyph_str_end_u8 = u8_mapper.utf16_to_utf8(glyph_str_end_u16);
+                let glyph_str_start_u8 = utf16_to_utf8(glyph_str_start_u16);
+                let glyph_str_end_u8 = utf16_to_utf8(glyph_str_end_u16);
 
                 out_run_metrics.push(iface::RunMetrics {
                     flags,
-                    index: (glyph_str_start_u8 + line_start)..(glyph_str_end_u8 + line_start),
+                    index: glyph_str_start_u8..glyph_str_end_u8,
                     bounds: run_left as f32..run_right as f32,
                 });
                 continue;
@@ -482,44 +532,37 @@ impl iface::TextLayout for TextLayout {
                 );
             }
 
-            // Clip the current run by the range `rel_start_u16..rel_end_u16`.
+            // Clip the current run by the range `start_u16..end_u16`.
             // Use `CTLineGetOffsetForStringIndex` to derive the visual position
             // for the endpoints that fall within the run. We can ignore the
             // secondary offset returned by `CTLineGetOffsetForStringIndex`
             // because such endpoints are not on a writing direction boundary.
-            let (out_run_visual_start, out_rel_start_u16) = if glyph_str_start_u16 >= rel_start_u16
-            {
+            let (out_run_visual_start, out_start_u16) = if glyph_str_start_u16 >= start_u16 {
                 (
                     if is_run_rtl { run_right } else { run_left },
                     glyph_str_start_u16,
                 )
             } else {
                 (
-                    ctline_get_primary_offset_for_string_index(
-                        &ctline,
-                        rel_start_u16 as CFIndex + line_range_u16.location,
-                    ),
-                    rel_start_u16,
+                    ctline_get_primary_offset_for_string_index(&ctline, start_u16 as CFIndex),
+                    start_u16,
                 )
             };
 
-            let (out_run_visual_end, out_rel_end_u16) = if glyph_str_end_u16 <= rel_end_u16 {
+            let (out_run_visual_end, out_end_u16) = if glyph_str_end_u16 <= end_u16 {
                 (
                     if is_run_rtl { run_left } else { run_right },
                     glyph_str_end_u16,
                 )
             } else {
                 (
-                    ctline_get_primary_offset_for_string_index(
-                        &ctline,
-                        rel_end_u16 as CFIndex + line_range_u16.location,
-                    ),
-                    rel_end_u16,
+                    ctline_get_primary_offset_for_string_index(&ctline, end_u16 as CFIndex),
+                    end_u16,
                 )
             };
 
-            let glyph_str_start_u8 = u8_mapper.utf16_to_utf8(out_rel_start_u16);
-            let glyph_str_end_u8 = u8_mapper.utf16_to_utf8(out_rel_end_u16);
+            let glyph_str_start_u8 = utf16_to_utf8(out_start_u16);
+            let glyph_str_end_u8 = utf16_to_utf8(out_end_u16);
 
             let mut out_run_visual_start = out_run_visual_start as f32;
             let mut out_run_visual_end = out_run_visual_end as f32;
@@ -530,7 +573,7 @@ impl iface::TextLayout for TextLayout {
 
             out_run_metrics.push(iface::RunMetrics {
                 flags,
-                index: (glyph_str_start_u8 + line_start)..(glyph_str_end_u8 + line_start),
+                index: glyph_str_start_u8..glyph_str_end_u8,
                 bounds: out_run_visual_start..out_run_visual_end,
             });
         }
@@ -547,46 +590,6 @@ impl iface::CanvasText<TextLayout> for BitmapBuilder {
         self.set_fill_rgb(color);
         layout.frame.draw(&self.cg_context);
         self.cg_context.restore();
-    }
-}
-
-/// Converts UTF-16 offsets to UTF-8 offsets efficiently by remembering the
-/// last position.
-struct Utf16ToUtf8Mapper<'a> {
-    text: &'a str,
-    /// Since `find_utf16_pos_in_utf8_str` doesn't support backward search,
-    /// we store a reversed version of `text`.
-    rev_text: String,
-    cursor_u8: usize,
-    cursor_u16: usize,
-}
-
-impl<'a> Utf16ToUtf8Mapper<'a> {
-    fn new(text: &'a str) -> Self {
-        Self {
-            text,
-            rev_text: text.chars().rev().collect(),
-            cursor_u8: 0,
-            cursor_u16: 0,
-        }
-    }
-
-    fn utf16_to_utf8(&mut self, i: usize) -> usize {
-        if i > self.cursor_u16 {
-            self.cursor_u8 += find_utf16_pos_in_utf8_str(
-                i - self.cursor_u16,
-                &self.text.as_bytes()[self.cursor_u8..],
-            )
-            .utf8_cursor;
-        } else if i < self.cursor_u16 {
-            self.cursor_u8 -= find_utf16_pos_in_utf8_str(
-                self.cursor_u16 - i,
-                &self.rev_text.as_bytes()[self.text.len() - self.cursor_u8..],
-            )
-            .utf8_cursor;
-        }
-        self.cursor_u16 = i;
-        self.cursor_u8
     }
 }
 
