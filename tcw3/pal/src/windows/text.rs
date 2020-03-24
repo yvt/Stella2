@@ -314,7 +314,7 @@ impl iface::TextLayout for TextLayout {
 
     fn line_baseline(&self, i: usize) -> f32 {
         let metrics = self.ensure_metrics();
-        metrics.line_metrics_list[i].baseline() + metrics.line_positions[i]
+        metrics.line_metrics_list[i].baseline() * 1.1 + metrics.line_positions[i]
     }
 
     fn run_metrics_of_range(&self, range: Range<usize>) -> Vec<iface::RunMetrics> {

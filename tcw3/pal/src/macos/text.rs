@@ -395,7 +395,9 @@ impl iface::TextLayout for TextLayout {
     }
 
     fn line_baseline(&self, i: usize) -> f32 {
-        self.height - self.line_origins[i].y as f32
+        let lines = ctframe_get_lines(&self.frame);
+        let typo_bounds = ctline_get_typographic_bounds(&lines.get(i as _).unwrap());
+        self.height - self.line_origins[i].y as f32 + typo_bounds.ascent as f32 * 0.1
     }
 
     fn run_metrics_of_range(&self, range: Range<usize>) -> Vec<iface::RunMetrics> {
