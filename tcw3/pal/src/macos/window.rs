@@ -281,6 +281,8 @@ impl HTextInputCtx {
                     self,
                     flags![iface::TextInputCtxEventFlags::{RESET | SELECTION_CHANGE | LAYOUT_CHANGE}],
                 );
+
+                let () = unsafe { msg_send![wnd_ctrler, resetTextInput] };
             } else {
                 // No active context
                 cur_tictx = None;

@@ -380,6 +380,7 @@ extern CGSConnection CGSDefaultConnectionForThread();
 - (void)resetTextInput {
     NSTextInputContext *inputContext = self->gestureHandler.inputContext;
     [inputContext discardMarkedText];
+    [self->gestureHandler unmarkText];
 }
 
 /** Called by `window.rs` */
