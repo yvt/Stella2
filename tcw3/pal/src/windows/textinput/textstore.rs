@@ -1293,7 +1293,7 @@ unsafe extern "system" fn impl_get_text_ext(
     hresult_from_result_with(|| {
         let this = &*(this as *const TextStore);
 
-        log::warn!("impl_get_text_ext{:?}", (vcView, acpStart..acpEnd));
+        log::trace!("impl_get_text_ext{:?}", (vcView, acpStart..acpEnd));
 
         if prc.is_null() {
             log::debug!("... `prc` is null, returning `E_INVALIDARG`");
