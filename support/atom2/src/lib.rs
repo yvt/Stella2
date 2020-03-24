@@ -8,7 +8,9 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Arc, Weak};
 use std::{
-    fmt, mem,
+    fmt,
+    hint::unreachable_unchecked,
+    mem,
     ptr::{self, NonNull},
 };
 
@@ -390,6 +392,79 @@ impl<T: TrivialPtrSized> SetOnceAtom<T> {
             None
         } else {
             Some(unsafe { &mut *((&mut self.ptr) as *mut _ as *mut T) })
+        }
+    }
+
+    /// Insert a value computed from `f` if the contained value is `None`.
+    /// After that, return a reference to the inner object.
+    ///
+    /// Because multiple threads can compete to do this, by the time the call to
+    /// `f` is complete, `self` may be already occupied. In this case, the
+    /// computed value that couldn't be stored to `self` will be returned as the
+    /// second value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use atom2::SetOnceAtom;
+    /// let cell = SetOnceAtom::empty();
+    /// // `f` is evaluated because `cell` is empty at this point
+    /// assert_eq!(
+    ///     cell.get_or_racy_insert_with(|| Box::new(42u32)),
+    ///     (&Box::new(42), None)
+    /// );
+    ///
+    /// // `f` isn't evaluated because `cell` is occupied
+    /// assert_eq!(
+    ///     cell.get_or_racy_insert_with(|| unreachable!()),
+    ///     (&Box::new(42), None)
+    /// );
+    ///
+    /// // (It's hard to cause the second return value to be `Some` in a
+    /// // reliable way.)
+    /// ```
+    pub fn get_or_racy_insert_with(&self, f: impl FnOnce() -> T) -> (&T, Option<T>) {
+        if let Some(inner) = self.get() {
+            (inner, None)
+        } else {
+            let value = f();
+            // Let `Err(x) = self.store(y)`. `x` is a moved value of `y`.
+            // Ergo, this is safe.
+            let extra = self
+                .store(Some(value))
+                .err()
+                .map(|x| x.unwrap_or_else(|| unsafe { unreachable_unchecked() }));
+            (
+                self.get()
+                    .unwrap_or_else(|| unsafe { unreachable_unchecked() }),
+                extra,
+            )
+        }
+    }
+
+    /// Insert a value computed from `f` if the contained value is `None`.
+    /// After that, return a mutable reference to the inner object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use atom2::SetOnceAtom;
+    /// let mut cell = SetOnceAtom::empty();
+    /// // `f` is evaluated because `cell` is empty at this point
+    /// assert_eq!(cell.get_mut_or_insert_with(|| Box::new(42u32)), &mut Box::new(42));
+    ///
+    /// // `f` isn't evaluated because `cell` is occupied
+    /// assert_eq!(cell.get_mut_or_insert_with(|| unreachable!()), &mut Box::new(42));
+    /// ```
+    pub fn get_mut_or_insert_with(&mut self, f: impl FnOnce() -> T) -> &mut T {
+        if self.ptr.get_mut().is_null() {
+            *self.ptr.get_mut() = T::into_raw(f()).as_ptr();
+            // We've just filled the inner value, so this is safe.
+            self.get_mut()
+                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+        } else {
+            // This is safe by the safety requirement of `TrivialPtrSized`
+            unsafe { &mut *((&mut self.ptr) as *mut _ as *mut T) }
         }
     }
 }

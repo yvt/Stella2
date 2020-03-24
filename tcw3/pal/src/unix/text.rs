@@ -1,7 +1,9 @@
 use alt_fp::FloatOrd;
 use cggeom::{box2, Box2};
-use pango::{FontDescription, FontMapExt, Layout};
+use cgmath::Point2;
+use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
 use rgb::RGBA16;
+use std::ops::Range;
 
 use super::super::iface;
 
@@ -108,6 +110,15 @@ fn rgbaf32_to_rgba16(c: iface::RGBAF32) -> RGBA16 {
 #[derive(Debug)]
 pub struct TextLayout {
     pango_layout: ImmutableLayout,
+    text_len: usize,
+    line_metrics: Vec<LineMetrics>,
+}
+
+#[derive(Debug)]
+struct LineMetrics {
+    baseline: f32,
+    logical_extents: Range<f32>,
+    start_index: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -154,8 +165,38 @@ impl iface::TextLayout for TextLayout {
 
         // TODO: `decor`
 
+        let num_lines = layout.get_line_count() as usize;
+        log::trace!("The text {:?} generated {:?} line(s)", text, num_lines);
+
+        let line_metrics: Vec<LineMetrics> = {
+            let mut iter = layout.get_iter().unwrap();
+            (0..num_lines)
+                .map(|_| {
+                    let baseline = iter.get_baseline();
+
+                    let (_, logical_extents) = iter.get_line_extents();
+                    let logical_top = pango_coord_to_f32(logical_extents.y);
+                    let logical_bottom =
+                        pango_coord_to_f32(logical_extents.y + logical_extents.height);
+
+                    let start_index = iter.get_line_readonly().unwrap().start_index();
+
+                    iter.next_line();
+
+                    LineMetrics {
+                        baseline: pango_coord_to_f32(baseline),
+                        logical_extents: logical_top..logical_bottom,
+                        start_index,
+                    }
+                })
+                .collect()
+        };
+        log::trace!("line_metrics = {:?}", line_metrics);
+
         Self {
             pango_layout: ImmutableLayout { inner: layout },
+            text_len: text.len(),
+            line_metrics,
         }
     }
 
@@ -170,6 +211,232 @@ impl iface::TextLayout for TextLayout {
         let (_ink_rect, logical_rect) = self.lock_layout().get_extents();
         pango_rect_to_box2_f32(logical_rect)
     }
+
+    fn cursor_index_from_point(&self, point: Point2<f32>) -> usize {
+        let [x, y] = point_to_pango_xy(point);
+
+        let layout = self.lock_layout();
+        let (_, index, trailing) = layout.xy_to_index(x, y);
+
+        // We want the closest edge (rather than the starting index of the
+        // grapheme containing the point), so add `trailing` to get the final
+        // index. `trailing` is measured in "the number of characters", not
+        // UTF-8 bytes.
+        //
+        // First, we get the source string. These methods are actually supposed
+        // to be `unsafe` (see the discussion in `run_metrics_of_range`).
+        let text = layout.get_text().unwrap();
+        let text = text.as_str();
+
+        // Advance the cursor by `trailing` scalars
+        let mut i = index as usize;
+        for _ in 0..trailing {
+            if i >= text.len() {
+                break;
+            }
+
+            i += 1;
+            while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
+                i += 1;
+            }
+        }
+
+        debug_assert!(
+            text.get(0..i).is_some(),
+            "The UTF-8 offset {:?} ({:?} + {:?} characters) is not a valid UTF-8 boundary.",
+            i,
+            index,
+            trailing
+        );
+
+        i
+    }
+
+    fn cursor_pos(&self, i: usize) -> [iface::Beam; 2] {
+        let pango_layout = self.lock_layout();
+
+        let (strong_pos, weak_pos) = pango_layout.get_cursor_pos(i as i32);
+
+        use array::Array2;
+        [strong_pos, weak_pos]
+            .map(pango_rect_to_box2_f32)
+            .map(|x| iface::Beam {
+                x: x.min.x,
+                top: x.min.y,
+                bottom: x.max.y,
+            })
+    }
+
+    fn num_lines(&self) -> usize {
+        self.lock_layout().get_line_count() as usize
+    }
+
+    fn line_index_range(&self, i: usize) -> Range<usize> {
+        let start = self.line_metrics[i].start_index as usize;
+        let end = if let Some(line_metrics) = self.line_metrics.get(i + 1) {
+            line_metrics.start_index as usize
+        } else {
+            self.text_len
+        };
+        start..end
+    }
+
+    fn line_vertical_bounds(&self, i: usize) -> Range<f32> {
+        self.line_metrics[i].logical_extents.clone()
+    }
+
+    fn line_baseline(&self, i: usize) -> f32 {
+        self.line_metrics[i].baseline
+    }
+
+    fn run_metrics_of_range(&self, range: Range<usize>) -> Vec<iface::RunMetrics> {
+        debug_assert_ne!(range.start, range.end, "The range mustn't be empty");
+
+        let line = self.line_from_index(range.start);
+        debug_assert_eq!(
+            self.line_from_index(range.end - 1),
+            line,
+            "The range mustn't span across lines"
+        );
+
+        let pango_layout = self.lock_layout();
+        let mut iter = pango_layout.get_iter().unwrap();
+
+        // Move to the line
+        for _ in 0..line {
+            iter.next_line();
+        }
+
+        let mut out_run_metrics = Vec::new();
+        let mut pen = 0;
+        let mut max_run_index = 0;
+
+        //  `Layout::get_text` is actually very unsafe - The returned string
+        // gets freed when `set_text` is called. We know this usage is safe
+        // because (1) the returned `GString` doesn't outlive `pango_layout`,
+        // and (2) we don't call `set_text` here.
+        // Also, `set_text` validates UTF-8 validity, but simply replaces
+        // invalid bytes with `0xff`, which is still invalid in UTF-8.
+        // Thus, converting `GString` to `str` is actually unsafe. We know this
+        // `as_str` is safe because we always pass a valid string to `set_text`.
+        let text = pango_layout.get_text().unwrap();
+        let text = text.as_str();
+
+        // For each run in the line...
+        pango_for_each_run_in_line(&mut iter, |run| {
+            let pango_item = run.item();
+            let mut pango_glyph_string = run.glyph_string();
+            let pango_analysis = pango_item.analysis();
+
+            let run_range = pango_item.offset() as usize
+                ..pango_item.offset() as usize + pango_item.length() as usize;
+
+            log::trace!("run_range = {:?}", run_range);
+
+            // Update `max_run_index` to use later
+            max_run_index = max_run_index.max(run_range.end);
+
+            let run_left = pen;
+            let run_width = pango_glyph_string.get_width();
+            pen += run_width;
+            let run_right = pen;
+
+            log::trace!("  run_range = {:?}", run_left..run_right);
+
+            if range.start >= run_range.end || range.end <= run_range.start {
+                // This run doesn't overlap with `range`
+                return;
+            }
+
+            // Make `RunFlags`
+            let mut flags = iface::RunFlags::empty();
+            let is_run_rtl = pango_analysis.level() % 2 != 0;
+            if is_run_rtl {
+                flags |= iface::RunFlags::RIGHT_TO_LEFT;
+            }
+
+            if range.start <= run_range.start && range.end >= run_range.end {
+                // This run is completely inside `range`
+                out_run_metrics.push(iface::RunMetrics {
+                    flags,
+                    index: run_range.clone(),
+                    bounds: pango_coord_to_f32(run_left)..pango_coord_to_f32(run_right),
+                });
+                return;
+            }
+
+            // A note for complexity analysis:
+            // The rest of this block will run only up to twice during
+            // a single call to `run_metrics_of_range`
+
+            // Clip the current run by `range`
+            let out_start = range.start.max(run_range.start);
+            let out_end = range.end.min(run_range.end);
+
+            // Find the coordinates of the clipped endpoints.
+            let run_text = &text[run_range.start..];
+            let mut x1 = pango_glyph_string.index_to_x_2(
+                run_text,
+                &pango_analysis,
+                (out_start - run_range.start) as i32,
+                false,
+            );
+            let mut x2 = if out_end == run_range.end {
+                if is_run_rtl {
+                    0
+                } else {
+                    run_width
+                }
+            } else {
+                pango_glyph_string.index_to_x_2(
+                    run_text,
+                    &pango_analysis,
+                    (out_end - run_range.start) as i32,
+                    false,
+                )
+            };
+
+            log::trace!("  x1 (i = {:?}) = {:?}", out_start - run_range.start, x1);
+            log::trace!("  x2 (i = {:?}) = {:?}", out_end - run_range.start, x2);
+
+            if is_run_rtl {
+                std::mem::swap(&mut x1, &mut x2);
+            }
+
+            debug_assert!(x1 <= x2);
+
+            out_run_metrics.push(iface::RunMetrics {
+                flags,
+                index: out_start..out_end,
+                bounds: pango_coord_to_f32(x1 + run_left)..pango_coord_to_f32(x2 + run_left),
+            });
+        });
+
+        if range.end > max_run_index {
+            // Pango doesn't generate runs for trailing newline characters, but
+            // `TextLayout`'s API contract requires those.
+            let x = pango_coord_to_f32(pen);
+            out_run_metrics.push(iface::RunMetrics {
+                flags: iface::RunFlags::empty(),
+                index: max_run_index.max(range.start)..range.end,
+                bounds: x..x,
+            });
+        }
+
+        out_run_metrics
+    }
+}
+
+fn pango_for_each_run_in_line(iter: &mut pango::LayoutIter, mut f: impl FnMut(pango::LayoutRun)) {
+    while let Some(run) = iter.get_run_readonly() {
+        f(run);
+        iter.next_run();
+    }
+}
+
+#[inline]
+fn pango_coord_to_f32(x: i32) -> f32 {
+    x as f32 / pango::SCALE as f32
 }
 
 fn pango_rect_to_box2_f32(x: pango::Rectangle) -> Box2<f32> {
@@ -177,5 +444,66 @@ fn pango_rect_to_box2_f32(x: pango::Rectangle) -> Box2<f32> {
     box2! {
         top_left: [x.x as f32 / scale, x.y as f32 / scale],
         size: [x.width as f32 / scale, x.height as f32 / scale],
+    }
+}
+
+fn point_to_pango_xy(x: Point2<f32>) -> [i32; 2] {
+    let scale = pango::SCALE as f32;
+    [(x.x * scale) as i32, (x.y * scale) as i32]
+}
+
+trait LayoutLineExt {
+    fn start_index(&self) -> i32;
+}
+
+impl LayoutLineExt for LayoutLine {
+    fn start_index(&self) -> i32 {
+        use glib::translate::ToGlibPtr;
+        unsafe { &*self.to_glib_full() }.start_index
+    }
+}
+
+trait GlyphStringExt {
+    /// The same as `pango::GlyphString::index_to_x` except that it takes
+    /// `&Analysis` instead of `&mut Analysis`.
+    fn index_to_x_2(
+        &mut self,
+        text: &str,
+        analysis: &pango::Analysis,
+        index_: i32,
+        trailing: bool,
+    ) -> i32;
+}
+
+impl GlyphStringExt for pango::GlyphString {
+    fn index_to_x_2(
+        &mut self,
+        text: &str,
+        analysis: &pango::Analysis,
+        index_: i32,
+        trailing: bool,
+    ) -> i32 {
+        use glib::translate::{ToGlib, ToGlibPtr, ToGlibPtrMut};
+        use std::mem;
+        // We can't use `GlyphString::index_to_x` because it takes
+        // `&mut Analysis` as a parameter even though it doesn't actually
+        // mutate the `Analysis`, whereas we only get `&Analysis`.
+        // Transmuting `&_` to `&mut _` will break the pointer aliasing
+        // rules, so we are definitely not doing that. Instead, we call the
+        // underlying function, `pango_glyph_string_x_to_index` directly.
+        let length = text.len() as i32;
+        unsafe {
+            let mut x_pos = mem::MaybeUninit::uninit();
+            pango_sys::pango_glyph_string_index_to_x(
+                self.to_glib_none_mut().0,
+                text.to_glib_none().0,
+                length,
+                analysis.to_glib_none().0 as _,
+                index_,
+                trailing.to_glib(),
+                x_pos.as_mut_ptr(),
+            );
+            x_pos.assume_init()
+        }
     }
 }

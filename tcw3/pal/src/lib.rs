@@ -128,8 +128,9 @@ pub type TextLayout = current::TextLayout;
 // the default backend.
 
 pub use self::iface::{
-    BadThread, CursorShape, IndexFromPointFlags, LayerFlags, LineCap, LineJoin, ScrollDelta,
-    SysFontType, TextDecorFlags, TextInputCtxEventFlags, WndFlags, RGBAF32,
+    BadThread, Beam, CursorShape, IndexFromPointFlags, LayerFlags, LineCap, LineJoin, RunFlags,
+    RunMetrics, ScrollDelta, SysFontType, TextDecorFlags, TextInputCtxEventFlags, WndFlags,
+    RGBAF32,
 };
 
 /// The window handle type of [`Wm`].

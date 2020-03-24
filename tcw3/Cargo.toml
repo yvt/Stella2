@@ -10,6 +10,7 @@ testing = ["tcw3_pal/testing", "tcw3_testing/testing"]
 
 [dependencies]
 alt_fp = { path = "../support/alt_fp" }
+array = "0.0.1"
 array_intrusive_list = { path = "../support/array_intrusive_list" }
 arrayvec = "0.5"
 as_any = { path = "../support/as_any" }

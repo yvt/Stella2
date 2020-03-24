@@ -1313,5 +1313,12 @@ impl iface::TextLayout for TextLayout {
         inner_type: TextLayoutInner;
         fn visual_bounds(&self) -> Box2<f32>;
         fn layout_bounds(&self) -> Box2<f32>;
+        fn cursor_index_from_point(&self, point: Point2<f32>) -> usize;
+        fn cursor_pos(&self, i: usize) -> [iface::Beam; 2];
+        fn num_lines(&self) -> usize;
+        fn line_index_range(&self, i: usize) -> Range<usize>;
+        fn line_vertical_bounds(&self, i: usize) -> Range<f32>;
+        fn line_baseline(&self, i: usize) -> f32;
+        fn run_metrics_of_range(&self, i: Range<usize>) -> Vec<iface::RunMetrics>;
     }
 }
