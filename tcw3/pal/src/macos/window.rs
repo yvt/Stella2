@@ -574,6 +574,23 @@ unsafe extern "C" fn tcw_wnd_insert_text(
             st
         );
 
+        let has_control_char = st.bytes().any(|b| b.is_ascii_control() && b != b'\r');
+        let mut handle_backspace = false;
+
+        if has_control_char {
+            if st == "\u{8}" {
+                // Kotoeri generates a backspace character when the user hits
+                // the backspace key again after deleting an entire marked
+                // string.
+                handle_backspace = true;
+            } else {
+                log::warn!(
+                    "Rejecting `insertText` because of the inclusion of a disallowed control character"
+                );
+                return;
+            }
+        }
+
         let mut edit = tictx.listener.edit(
             wm,
             &HTextInputCtx {
@@ -581,6 +598,11 @@ unsafe extern "C" fn tcw_wnd_insert_text(
             },
             true,
         );
+
+        if handle_backspace {
+            log::warn!("TODO: handle backspace");
+            return;
+        }
 
         let replace_range = if replace_start >= i32::max_value() as usize {
             // `NSNotFound`
