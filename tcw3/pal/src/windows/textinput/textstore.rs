@@ -563,7 +563,8 @@ unsafe extern "system" fn impl_get_status(
 
     let pdcs = &mut *pdcs;
     pdcs.dwDynamicFlags = 0;
-    pdcs.dwStaticFlags = 0;
+    pdcs.dwStaticFlags =
+        tsf::TS_SS_NOHIDDENTEXT | tsf::TS_SS_TKBAUTOCORRECTENABLE | tsf::TS_SS_TKBPREDICTIONENABLE;
 
     S_OK
 }
