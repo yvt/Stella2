@@ -58,7 +58,10 @@ pub fn qsort<T: Ord>(a: &mut [T]) {
 /// assert!(v == [1, 2, -3, 4, -5]);
 /// ```
 pub fn qsort_by_key<T, K: Ord>(a: &mut [T], mut f: impl FnMut(&T) -> K) {
-    qsort_raw(a, |x, y| f(x).qcmp(&f(y)));
+    // Moving `f` into the closure ensures the closure is zero-sized when `f` is
+    // zero-sized. The closure will never be zero-sized if `f was captured by
+    // reference.
+    qsort_raw(a, move |x, y| f(x).qcmp(&f(y)));
 }
 
 /// Sort the slice with a comparator function.
@@ -74,7 +77,10 @@ pub fn qsort_by_key<T, K: Ord>(a: &mut [T], mut f: impl FnMut(&T) -> K) {
 /// assert!(v == [1, 2, 3, 4, 5]);
 /// ```
 pub fn qsort_by<T>(a: &mut [T], mut f: impl FnMut(&T, &T) -> Ordering) {
-    qsort_raw(a, |x, y| to_qsort_ordering(f(x, y)));
+    // Moving `f` into the closure ensures the closure is zero-sized when `f` is
+    // zero-sized. The closure will never be zero-sized if `f was captured by
+    // reference.
+    qsort_raw(a, move |x, y| to_qsort_ordering(f(x, y)));
 }
 
 pub fn qsort_raw<T, F: FnMut(&T, &T) -> c_int>(a: &mut [T], mut f: F) {
