@@ -2,7 +2,7 @@ use harmony::Elem;
 use tcw3::{
     ui::{
         AlignFlags,
-        views::{Label, Button, FixedSpacer},
+        views::{Label, Button, FixedSpacer, EntryCore},
         layouts::TableLayout,
         theming::{self, Manager, StyledBox, HElem},
     },
@@ -81,14 +81,13 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         },
         class_set = elem_id::SEARCH_FIELD,
         auto_class_set = theming::ClassSet::FOCUS,
-        child_generic = get!(&search_bar_placeholder),
+        child_generic = get!(&search_bar_entry),
     };
     on (init) {
         get!(&search_bar.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
     }
 
-    const search_bar_placeholder = Label::new! {
+    const search_bar_entry = EntryCore::new! {
         style_manager,
-        text = "Search",
     };
 }

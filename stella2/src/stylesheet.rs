@@ -195,8 +195,8 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 himg_from_rounded_rect([0.3, 0.3, 0.3, 1.0].into(), [[3.0; 2]; 4])
             ),
         },
-        ([.LABEL] < [#SEARCH_FIELD]) (priority = 10000) {
-            fg_color: [1.0, 1.0, 1.0, 0.6].into(),
+        ([] .. [#SEARCH_FIELD]) (priority = 10000) {
+            fg_color: [1.0, 1.0, 1.0, 1.0].into(),
         },
 
         // Composing area
@@ -342,8 +342,8 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
                 size: [16.0, 16.0].into(),
             },
         },
-        ([.LABEL] < [#SEARCH_FIELD]) (priority = 20000) {
-            fg_color: [0.0, 0.0, 0.0, 0.6].into(),
+        ([] .. [#SEARCH_FIELD]) (priority = 20000) {
+            fg_color: [0.0, 0.0, 0.0, 1.0].into(),
         },
     }
 }
