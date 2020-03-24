@@ -176,7 +176,7 @@ impl TextStore {
 
         // Insert `ch`
         let mut edit = self.listener.edit(self.wm, &self.expect_htictx(), true);
-        let sel_range = edit.selected_range();
+        let sel_range = sort_range(edit.selected_range());
         edit.replace(sel_range.clone(), ch_u8);
 
         // Move the cursor to the end of the inserted text
