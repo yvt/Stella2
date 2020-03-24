@@ -1318,21 +1318,28 @@ unsafe extern "system" fn impl_get_text_ext(
         let acp_end: usize = acpEnd.try_into().map_err(|_| E_UNEXPECTED)?;
         let range = edit_convert_range_to_utf8(&mut **edit, acp_start..acp_end).0;
 
-        // Find the union of the bounding rectangles of all characters in the range
-        let bounds = union_box_f32(
-            itertools::unfold(range.start, |i| {
-                if *i >= range.end {
-                    None
-                } else {
-                    let (bx, i_next) = edit.slice_bounds(*i..range.end);
-                    log::trace!("... slice_bounds({:?}) = {:?}", *i..range.end, (bx, i_next));
-                    debug_assert!(i_next > *i && i_next <= range.end);
-                    *i = i_next;
-                    Some(bx)
-                }
-            })
-            .filter(|bx| bx.is_valid()),
-        );
+        let bounds = if range.start < range.end {
+            // Find the union of the bounding rectangles of all characters in the range
+            union_box_f32(
+                itertools::unfold(range.start, |i| {
+                    if *i >= range.end {
+                        None
+                    } else {
+                        let (bx, i_next) = edit.slice_bounds(*i..range.end);
+                        log::trace!("... slice_bounds({:?}) = {:?}", *i..range.end, (bx, i_next));
+                        debug_assert!(i_next > *i && i_next <= range.end);
+                        *i = i_next;
+                        Some(bx)
+                    }
+                })
+                .filter(|bx| bx.is_valid()),
+            )
+        } else {
+            let (bx, i_next) = edit.slice_bounds(range.clone());
+            log::trace!("... slice_bounds({:?}) = {:?}", range.clone(), (bx, i_next));
+            debug_assert_eq!(i_next, range.end);
+            Some(bx).filter(|bx| bx.is_valid())
+        };
 
         if let Some(bx) = bounds {
             log::trace!("... bounds = {:?}", bx.display_im());
