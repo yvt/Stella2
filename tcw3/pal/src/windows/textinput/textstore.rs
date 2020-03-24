@@ -174,14 +174,37 @@ impl TextStore {
 
         log::trace!("handle_char: inserting {:?}", ch_u8);
 
-        // Insert `ch`
+        // Get `TextInputCtxEdit`
         let mut edit = self.listener.edit(self.wm, &self.expect_htictx(), true);
         let sel_range = sort_range(edit.selected_range());
+
+        // Convert `sel_range` to UTF-16 so that we can call `OnTextChange`
+        // later
+        let prefix = edit.slice(0..sel_range.end);
+        debug_assert_eq!(prefix.len(), sel_range.end);
+        let start_u16 = utf16_len(&prefix[0..sel_range.start]);
+        let len_u16 = utf16_len(&prefix[sel_range.start..]);
+        let old_end_u16 = start_u16 + len_u16;
+        let new_end_u16 = start_u16 + ch.len_utf16();
+
+        // Insert `ch`
         edit.replace(sel_range.clone(), ch_u8);
 
         // Move the cursor to the end of the inserted text
         let i = sel_range.start + ch_u8.len();
         edit.set_selected_range(i..i);
+
+        drop(edit);
+
+        if let Some(sink) = cell_get_by_clone(&self.sink) {
+            let textchange = tsf::TS_TEXTCHANGE {
+                acpStart: start_u16 as _,
+                acpOldEnd: old_end_u16 as _,
+                acpNewEnd: new_end_u16 as _,
+            };
+            assert_hresult_ok(unsafe { sink.OnTextChange(0, &textchange) });
+            assert_hresult_ok(unsafe { sink.OnSelectionChange() });
+        }
     }
 
     pub(super) fn on_layout_change(&self) {
