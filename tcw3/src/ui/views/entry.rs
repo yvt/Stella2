@@ -2,6 +2,7 @@ use array::{Array, Array2};
 use arrayvec::ArrayVec;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Vector2};
+use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell, RefMut},
     ops::Range,
@@ -116,6 +117,8 @@ struct State {
     /// whenever the selection range is updated.
     caret: Option<[pal::Beam; 2]>,
     caret_layers: Option<[pal::HLayer; 2]>,
+    caret_blink: bool,
+    caret_blink_timer: Option<pal::HInvoke>,
 }
 
 #[derive(Debug)]
@@ -158,6 +161,8 @@ impl EntryCore {
                     comp_range: None,
                     caret: None,
                     caret_layers: None,
+                    caret_blink: true,
+                    caret_blink_timer: None,
                 }),
                 style_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
@@ -245,6 +250,58 @@ impl State {
             hview.pend_update();
         }
     }
+
+    /// Reset the timer used for making the caret blink. This method is also
+    /// responsible for starting or stopping the timer as needed by inspecting
+    /// the current state.
+    ///
+    /// `override_focus` overrides the result of `improper_subview_is_focused`
+    /// used while deciding whether the timer should be running or not.
+    fn reset_timer(
+        &mut self,
+        wm: pal::Wm,
+        hview: HViewRef<'_>,
+        inner: RcBorrow<'_, Inner>,
+        override_focus: Option<bool>,
+    ) {
+        if let Some(hinv) = self.caret_blink_timer.take() {
+            wm.cancel_invoke(&hinv);
+        }
+
+        let should_start_timer = override_focus
+            .unwrap_or_else(|| hview.improper_subview_is_focused())
+            && self.sel_range[0] == self.sel_range[1];
+
+        if should_start_timer {
+            self.caret_blink_timer = Some(self.schedule_timer(wm, RcBorrow::upgrade(inner)));
+        } else {
+            log::trace!("Not scheduling a deferred invocation because the caret is invisible now");
+        }
+    }
+
+    /// Schedule a deferred invocation which toggles `caret_blink` and get the
+    /// handle representing the invocation.
+    fn schedule_timer(&mut self, wm: pal::Wm, inner: Rc<Inner>) -> pal::HInvoke {
+        use std::time::Duration;
+
+        log::trace!("Scheduling a deferred invocation for blinking the caret");
+
+        // TODO: Retrieve the preferred period from the operating system
+        wm.invoke_after(
+            Duration::from_millis(400)..Duration::from_millis(700),
+            move |wm| {
+                if let Some(hview) = inner.view.upgrade() {
+                    // Toggle the caret's visibility
+                    let mut state = inner.state.borrow_mut();
+                    state.caret_blink = !state.caret_blink;
+                    hview.pend_update();
+
+                    // Schedule the next invocation
+                    state.caret_blink_timer = Some(state.schedule_timer(wm, Rc::clone(&inner)));
+                }
+            },
+        )
+    }
 }
 
 impl TextLayoutInfo {
@@ -322,6 +379,11 @@ impl ViewListener for EntryCoreListener {
             wm.remove_layer(layer);
         }
         state.caret_layers = None;
+
+        // Stop the caret-blinking timer by specifying
+        // `override_focus = Some(false)`.
+        state.reset_timer(wm, view, RcBorrow::from(&self.inner), Some(false));
+
         drop(state);
 
         let tictx = self.inner.state.borrow_mut().tictx.take();
@@ -336,10 +398,15 @@ impl ViewListener for EntryCoreListener {
             wm.text_input_ctx_set_active(&tictx, true);
         }
 
-        self.inner
-            .state
-            .borrow_mut()
-            .pend_update_after_focus_event(hview);
+        let mut state = self.inner.state.borrow_mut();
+        state.caret_blink = true;
+        state.pend_update_after_focus_event(hview);
+
+        // Start the caret-blinking timer if needed.
+        // `hview.is_focused() returns `true` at this point, so `reset_timer`
+        // will think the view is not focused yet. Override this behavior by
+        // specifying `override_focus = Some(true)`.
+        state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(true));
     }
 
     fn focus_leave(&self, wm: pal::Wm, hview: HViewRef<'_>) {
@@ -348,10 +415,14 @@ impl ViewListener for EntryCoreListener {
             wm.text_input_ctx_set_active(&tictx, false);
         }
 
-        self.inner
-            .state
-            .borrow_mut()
-            .pend_update_after_focus_event(hview);
+        let mut state = self.inner.state.borrow_mut();
+        state.pend_update_after_focus_event(hview);
+
+        // Stop the caret-blinking timer.
+        // `hview.is_focused() returns `true` at this point, so `reset_timer`
+        // will think the view is still focuse. Override this behavior by
+        // specifying `override_focus = Some(false)`.
+        state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(false));
     }
 
     fn mouse_drag(
@@ -463,7 +534,6 @@ impl ViewListener for EntryCoreListener {
             });
 
         // Display the caret
-        // TODO: Make the caret blink
         let caret_layers = state.caret_layers.as_ref().unwrap();
         if sel_range[0] == sel_range[1] {
             // Calculate the location of the caret.
@@ -500,9 +570,9 @@ impl ViewListener for EntryCoreListener {
             }
             layer_attrs[0].bounds = Some(rect0);
 
-            // Hide the caret if it's out of view
+            // Hide the caret if it's out of view or `caret_blink == false`
             for i in 0..2 {
-                if !(0.0..global_frame.size().x).contains(&pos[i].x) {
+                if !state.caret_blink || !(0.0..global_frame.size().x).contains(&pos[i].x) {
                     layer_attrs[i].opacity = Some(0.0);
                 }
             }
@@ -539,14 +609,15 @@ impl ViewListener for EntryCoreListener {
 impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
     fn edit(
         &self,
-        _: pal::Wm,
+        wm: pal::Wm,
         _: &pal::HTextInputCtx,
         _mutating: bool,
     ) -> Box<dyn pal::iface::TextInputCtxEdit<pal::Wm> + '_> {
         Box::new(Edit {
+            wm,
             state: self.inner.state.borrow_mut(),
             view: self.inner.view.upgrade().unwrap(),
-            inner: &self.inner,
+            inner: RcBorrow::from(&self.inner),
         })
     }
 
@@ -562,8 +633,9 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
 
 /// Implements `TextInputCtxEdit`.
 struct Edit<'a> {
+    wm: pal::Wm,
     state: RefMut<'a, State>,
-    inner: &'a Inner,
+    inner: RcBorrow<'a, Inner>,
     view: HView,
 }
 
@@ -595,6 +667,11 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.state.sel_range = range;
         self.state.canvas.pend_draw(self.view.as_ref());
         self.state.caret = None;
+
+        // Update the timer's state
+        self.state
+            .reset_timer(self.wm, self.view.as_ref(), self.inner, None);
+        self.state.caret_blink = true;
     }
 
     fn set_composition_range(&mut self, range: Option<Range<usize>>) {
@@ -623,6 +700,11 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
 
         self.state.invalidate_text_layout();
         self.state.canvas.pend_draw(self.view.as_ref());
+
+        // Reset the timer's phase
+        self.state
+            .reset_timer(self.wm, self.view.as_ref(), self.inner, None);
+        self.state.caret_blink = true;
     }
 
     fn slice(&mut self, range: Range<usize>) -> String {
@@ -767,6 +849,11 @@ impl EntryCoreDragListener {
             self.view.pend_update();
         }
 
+        // Update the caret-blinking timer
+        state.caret_blink = true;
+        state.reset_timer(wm, self.view.as_ref(), RcBorrow::from(&self.inner), None);
+
+        // Invalidate the remembered caret position
         state.caret = None;
 
         // Unborrow `state` before calling `text_input_ctx_on_selection_change`,
