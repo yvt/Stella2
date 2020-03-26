@@ -1,3 +1,5 @@
+use array::{Array, Array2};
+use arrayvec::ArrayVec;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Vector2};
 use std::{
@@ -110,6 +112,10 @@ struct State {
     tictx: Option<pal::HTextInputCtx>,
     sel_range: [usize; 2],
     comp_range: Option<[usize; 2]>,
+    /// The cached caret location. Should be invalidated by assigning `None`
+    /// whenever the selection range is updated.
+    caret: Option<[pal::Beam; 2]>,
+    caret_layers: Option<[pal::HLayer; 2]>,
 }
 
 #[derive(Debug)]
@@ -150,6 +156,8 @@ impl EntryCore {
                     tictx: None,
                     sel_range: [0; 2],
                     comp_range: None,
+                    caret: None,
+                    caret_layers: None,
                 }),
                 style_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
@@ -224,6 +232,7 @@ impl State {
     /// Delete the cached `TextLayout` (if any).
     fn invalidate_text_layout(&mut self) {
         self.text_layout_info = None;
+        self.caret = None;
     }
 }
 
@@ -283,7 +292,10 @@ impl EntryCoreListener {
 
 impl ViewListener for EntryCoreListener {
     fn mount(&self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
-        self.inner.state.borrow_mut().canvas.mount(wm, view, wnd);
+        let mut state = self.inner.state.borrow_mut();
+        state.canvas.mount(wm, view, wnd);
+        state.caret_layers = Some(Array::from_fn(|_| wm.new_layer(Default::default())));
+        drop(state);
 
         // TODO: Does `new_text_input_ctx` get a document lock? This should be
         //       documented
@@ -293,7 +305,13 @@ impl ViewListener for EntryCoreListener {
     }
 
     fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
-        self.inner.state.borrow_mut().canvas.unmount(wm, view);
+        let mut state = self.inner.state.borrow_mut();
+        state.canvas.unmount(wm, view);
+        for layer in state.caret_layers.as_ref().unwrap() {
+            wm.remove_layer(layer);
+        }
+        state.caret_layers = None;
+        drop(state);
 
         let tictx = self.inner.state.borrow_mut().tictx.take();
         if let Some(tictx) = tictx {
@@ -358,6 +376,7 @@ impl ViewListener for EntryCoreListener {
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
         let sel_range = &state.sel_range;
         let comp_range = &state.comp_range;
+        let text_origin = text_layout_info.text_origin(view);
 
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
 
@@ -368,7 +387,6 @@ impl ViewListener for EntryCoreListener {
 
                 let mut sel_range = sel_range.clone();
                 let text_layout = &text_layout_info.text_layout;
-                let text_origin = text_layout_info.text_origin(view);
 
                 c.save();
                 c.mult_transform(Matrix3::from_translation(text_origin));
@@ -394,25 +412,6 @@ impl ViewListener for EntryCoreListener {
                             max: [run.bounds.end, vert_bounds.end],
                         });
                     }
-                } else {
-                    // Render the caret
-                    // TODO: Make the caret blink
-                    let beams = text_layout.cursor_pos(sel_range[0]);
-                    log::trace!("cursor_pos({:?}) = {:?}", sel_range[0], beams);
-
-                    use array::Array2;
-                    let [mut rect0, mut rect1] = beams.map(|beam| beam.as_wide_box2(1.0));
-
-                    c.set_fill_rgb(color);
-                    if beams[0].x != beams[1].x {
-                        // If there are a strong cursor and a weak cursor,
-                        // display the former in the upper half and the latter
-                        // in the lower half
-                        rect0.max.y = rect0.mid().y;
-                        rect1.min.y = rect0.max.y;
-                        c.fill_rect(rect0);
-                    }
-                    c.fill_rect(rect1);
                 }
 
                 c.draw_text(&text_layout, Point2::new(0.0, 0.0), color);
@@ -441,10 +440,72 @@ impl ViewListener for EntryCoreListener {
                 c.restore();
             });
 
-        // TODO: Display selection and caret
+        // Display the caret
+        // TODO: Make the caret blink
+        let caret_layers = state.caret_layers.as_ref().unwrap();
+        if sel_range[0] == sel_range[1] {
+            // Calculate the location of the caret.
+            let pos = state.caret.get_or_insert_with(|| {
+                let pos = text_layout_info.text_layout.cursor_pos(sel_range[0]);
+                log::trace!("cursor_pos({:?}) = {:?}", sel_range[0], pos);
+                pos
+            });
 
-        if ctx.layers().len() != 1 {
-            ctx.set_layers(vec![state.canvas.layer().unwrap().clone()]);
+            let mut layer_attrs: ArrayVec<[_; 2]> = (0..2)
+                .map(|_| pal::LayerAttrs {
+                    opacity: Some(1.0),
+                    bg_color: Some(color),
+                    ..Default::default()
+                })
+                .collect();
+
+            let global_frame = view.global_frame();
+            let offset: [f32; 2] = global_frame.min.into();
+            let mut offset: cgmath::Vector2<f32> = offset.into();
+            offset += text_origin;
+
+            let [mut rect0, mut rect1] = pos.map(|beam| beam.as_wide_box2(1.0).translate(offset));
+
+            if pos[0].x != pos[1].x {
+                // If there are a strong cursor and a weak cursor,
+                // display the former in the upper half and the latter
+                // in the lower half
+                rect0.max.y = rect0.mid().y;
+                rect1.min.y = rect0.max.y;
+                layer_attrs[1].bounds = Some(rect1);
+            } else {
+                layer_attrs[1].opacity = Some(0.0);
+            }
+            layer_attrs[0].bounds = Some(rect0);
+
+            // Hide the caret if it's out of view
+            for i in 0..2 {
+                if !(0.0..global_frame.size().x).contains(&pos[i].x) {
+                    layer_attrs[i].opacity = Some(0.0);
+                }
+            }
+
+            for (layer, attrs) in caret_layers.iter().zip(layer_attrs.drain(..)) {
+                wm.set_layer_attr(layer, attrs);
+            }
+        } else {
+            for layer in caret_layers.iter() {
+                wm.set_layer_attr(
+                    layer,
+                    pal::LayerAttrs {
+                        opacity: Some(0.0),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        if ctx.layers().len() != 3 {
+            ctx.set_layers(vec![
+                state.canvas.layer().unwrap().clone(),
+                caret_layers[0].clone(),
+                caret_layers[1].clone(),
+            ]);
         }
     }
 }
@@ -501,14 +562,23 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     fn set_selected_range(&mut self, range: Range<usize>) {
         self.check_range(&range);
 
-        self.state.sel_range = [range.start, range.end];
+        let range = [range.start, range.end];
+        if range == self.state.sel_range {
+            return;
+        }
+        self.state.sel_range = range;
         self.state.canvas.pend_draw(self.view.as_ref());
+        self.state.caret = None;
     }
 
     fn set_composition_range(&mut self, range: Option<Range<usize>>) {
         range.as_ref().map(|r| self.check_range(r));
 
-        self.state.comp_range = range.map(|r| [r.start, r.end]);
+        let range = range.map(|r| [r.start, r.end]);
+        if range == self.state.comp_range {
+            return;
+        }
+        self.state.comp_range = range;
         self.state.canvas.pend_draw(self.view.as_ref());
     }
 
@@ -661,7 +731,17 @@ impl EntryCoreDragListener {
         }
 
         let tictx = state.tictx.clone();
-        state.canvas.pend_draw(self.view.as_ref());
+
+        if (old_sel_range[0] != old_sel_range[1]) || (state.sel_range[0] != state.sel_range[1]) {
+            // A ranged selection is rendered using the `CanvasMixin`, so we
+            // have to set the redraw flag of `CanvasMixin` in addition to just
+            // calling `pend_update` (which is implicitly called by `pend_draw`)
+            state.canvas.pend_draw(self.view.as_ref());
+        } else {
+            self.view.pend_update();
+        }
+
+        state.caret = None;
 
         // Unborrow `state` before calling `text_input_ctx_on_selection_change`,
         // which might request a document lock
