@@ -234,6 +234,17 @@ impl State {
         self.text_layout_info = None;
         self.caret = None;
     }
+
+    fn pend_update_after_focus_event(&mut self, hview: HViewRef<'_>) {
+        if self.sel_range[0] != self.sel_range[1] {
+            // A ranged selection is rendered using the `CanvasMixin`, so we
+            // have to set the redraw flag of `CanvasMixin` in addition to just
+            // calling `pend_update` (which is implicitly called by `pend_draw`)
+            self.canvas.pend_draw(hview);
+        } else {
+            hview.pend_update();
+        }
+    }
 }
 
 impl TextLayoutInfo {
@@ -319,18 +330,28 @@ impl ViewListener for EntryCoreListener {
         }
     }
 
-    fn focus_enter(&self, wm: pal::Wm, _: HViewRef<'_>) {
+    fn focus_enter(&self, wm: pal::Wm, hview: HViewRef<'_>) {
         let tictx = self.inner.state.borrow().tictx.clone();
         if let Some(tictx) = tictx {
             wm.text_input_ctx_set_active(&tictx, true);
         }
+
+        self.inner
+            .state
+            .borrow_mut()
+            .pend_update_after_focus_event(hview);
     }
 
-    fn focus_leave(&self, wm: pal::Wm, _: HViewRef<'_>) {
+    fn focus_leave(&self, wm: pal::Wm, hview: HViewRef<'_>) {
         let tictx = self.inner.state.borrow().tictx.clone();
         if let Some(tictx) = tictx {
             wm.text_input_ctx_set_active(&tictx, false);
         }
+
+        self.inner
+            .state
+            .borrow_mut()
+            .pend_update_after_focus_event(hview);
     }
 
     fn mouse_drag(
@@ -377,6 +398,7 @@ impl ViewListener for EntryCoreListener {
         let sel_range = &state.sel_range;
         let comp_range = &state.comp_range;
         let text_origin = text_layout_info.text_origin(view);
+        let is_focused = view.improper_subview_is_focused();
 
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
 
@@ -391,7 +413,7 @@ impl ViewListener for EntryCoreListener {
                 c.save();
                 c.mult_transform(Matrix3::from_translation(text_origin));
 
-                if sel_range[0] != sel_range[1] {
+                if is_focused && sel_range[0] != sel_range[1] {
                     if sel_range[1] < sel_range[0] {
                         sel_range.reverse();
                     }
@@ -500,12 +522,16 @@ impl ViewListener for EntryCoreListener {
             }
         }
 
-        if ctx.layers().len() != 3 {
-            ctx.set_layers(vec![
-                state.canvas.layer().unwrap().clone(),
-                caret_layers[0].clone(),
-                caret_layers[1].clone(),
-            ]);
+        let expected_num_layers = 1 + is_focused as usize * 2;
+
+        if ctx.layers().len() != expected_num_layers {
+            let mut layers = Vec::with_capacity(3);
+            layers.push(state.canvas.layer().unwrap().clone());
+            if is_focused {
+                layers.push(caret_layers[0].clone());
+                layers.push(caret_layers[1].clone());
+            }
+            ctx.set_layers(layers);
         }
     }
 }
