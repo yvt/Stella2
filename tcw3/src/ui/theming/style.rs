@@ -98,19 +98,20 @@ pub mod elem_id {
 pub type ElemClassPath = [ClassSet];
 
 /// A role of a subview.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, variant_count::VariantCount)]
 pub enum Role {
     /// The default role.
     Generic = 0,
     HorizontalScrollbar,
     VerticalScrollbar,
     Bullet,
-
-    #[doc(hidden)]
-    __Count,
 }
 
-pub const ROLE_COUNT: usize = Role::__Count as usize;
+/// The number of roles defined by [`Role`].
+///
+/// The discriminant values of `Role` are guaranteed to range between
+/// `0` and `ROLE_COUNT - 1`.
+pub const ROLE_COUNT: usize = Role::VARIANT_COUNT as usize;
 
 /// Represents a single styling property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
