@@ -41,7 +41,7 @@ rgb = "0.8.13"
 svgbobdoc = "0.2"
 try_match = "0.2.1"
 utf16count = { path = "../../support/utf16count" }
-zerocopy = "0.2.8"
+zerocopy = "0.3.0"
 
 # testing backend (borrows some implementation from `unix`)
 cairo-rs = { version = "0.8.0", optional = true }
