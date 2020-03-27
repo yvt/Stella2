@@ -8,3 +8,7 @@ mod canvas;
 mod figures;
 mod img;
 pub use self::{bitmap::*, canvas::*, figures::*, img::*};
+
+// Re-exports for macros defined in this crate
+#[doc(hidden)]
+pub use tcw3_pal::RGBAF32;

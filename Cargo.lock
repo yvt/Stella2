@@ -2668,6 +2668,7 @@ dependencies = [
  "cggeom",
  "cgmath",
  "leakypool",
+ "packed_simd",
  "quick-error",
  "tcw3_pal",
 ]
