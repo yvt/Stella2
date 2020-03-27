@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use std::ops::Range;
 
 use super::{
     manager::PropKindFlags,
@@ -44,14 +45,6 @@ pub struct StylesheetMacroOutput {
     /// The static part (everything other than prop values) of the stylesheet.
     pub rules: &'static [Rule],
     /// The runtime part (prop values) of the stylesheet.
-    /// Each element corresponds an element in `rules` with an identical index.
-    pub ruleprops: Vec<RuleProps>,
-}
-
-/// The properties specified by a rule.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct RuleProps {
     pub props: Vec<(Prop, PropValue)>,
 }
 
@@ -60,6 +53,8 @@ pub struct RuleProps {
 pub struct Rule {
     pub priority: i16,
     pub prop_kinds: PropKindFlags,
+    /// An index range into `StylesheetMacroOutput::props`.
+    pub props_range_u16: Range<u16>,
     pub selector: Selector,
 }
 
@@ -95,7 +90,12 @@ impl Stylesheet for StylesheetMacroOutput {
         self.rules.get(id).map(Rule::prop_kinds)
     }
     fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>> {
-        self.ruleprops.get(id).map(|r| r.get_prop_value(prop))
+        self.rules.get(id).map(|r| {
+            self.props[r.props_range()]
+                .iter()
+                .find(|p| p.0 == *prop)
+                .map(|p| &p.1)
+        })
     }
 }
 
@@ -107,16 +107,9 @@ impl Rule {
     fn prop_kinds(&self) -> PropKindFlags {
         self.prop_kinds
     }
-}
 
-impl RuleProps {
-    pub fn new(items: Vec<(Prop, PropValue)>) -> Self {
-        Self { props: items }
-    }
-
-    fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
-        // TODO: Use binary search?
-        self.props.iter().find(|p| p.0 == *prop).map(|p| &p.1)
+    fn props_range(&self) -> Range<usize> {
+        self.props_range_u16.start as usize..self.props_range_u16.end as usize
     }
 }
 
@@ -374,18 +367,62 @@ macro_rules! prop {
     };
 }
 
-/// Construct a `Vec<(Prop, PropValue)>`.
+/// Unwraps the top-level group.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! unwrap {
+    (($($x:tt)*)) => {$($x)*};
+    ({$($x:tt)*}) => {$($x)*};
+    ([$($x:tt)*]) => {$($x)*};
+}
+
+/// Produces an expression of type `Vec<(Prop, PropValue)>`.
+///
+/// # Attributes
+///
+/// Usually we use `$(#[$m:meta])*` for attributes, but we can't here
+/// because the compiler gets confused about loop nesting. We intend to
+/// support only zero or one attribute for each rule, so fortunately there's a
+/// solution. For the cases where there's one attribute, the caller of this
+/// macro specifies input tokens like `#[a][b]`. This macro captures `[a]` and
+/// ignores `[b]`. For the cases where there are no attributes, the caller of
+/// this macro specifies input tokens like `#[b]`. `[b]` is usually something
+/// that will behave as if no attributes are specified at all. In this case,
+/// this macro captures `[b]`, thus simulating the effect of not specifying any
+/// attributes.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! props {
-    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
-        vec![
-            $( $crate::prop!($name $([$param])* : $value ), )*
+    (
+        $(
+            // See the discussion in the doc comment for why we ignore the
+            // second token tree.
+            meta = # $meta:tt $([$($ignored:tt)*])?;
+            props = {
+                $( $name:ident $([$param:expr])* : $value:expr ),* $(,)*
+            };
+        )*
+    ) => {
+        ::std::vec![
+            // For each rule...
+            $(
+                // (`$meta` is defined by each rule)
+
+                // For each prop specification...
+                $(
+                    // Repeat `$meta` for all prop specifications in the rule
+                    #$meta
+
+                    // Emit an element
+                    $crate::prop!( $name $([$param])* : $value ),
+                )*
+            )*
         ]
     };
 }
 
-/// Accepts the same syntax as `props`, but produces `PropKindFlags` instead.
+/// Given prop specifications, emits an expression of type `PropKindFlags`
+/// representing the union of `PropKindFlags` of the given prop specifications.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop_kinds {
@@ -401,32 +438,37 @@ macro_rules! prop_kinds {
     };
 }
 
+/// Given prop specifications, emits an integer literal representing the number
+/// of the prop specifications.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! rule {
-    (
-        ($($sel:tt)*) (priority = $pri:expr) {
-            $($props:tt)*
-        }
-    ) => {
-        $crate::ui::theming::Rule {
-            priority: $pri,
-            prop_kinds: $crate::prop_kinds! { $($props)* },
-            selector: $crate::sel!($($sel)*),
-        }
+macro_rules! prop_count {
+    ($name:ident $([$param:expr])* : $value:expr $(, $(,)* $($rest:tt)*)?) => {
+        1 + $crate::prop_count!($($($rest)*)?)
     };
+    () => { 0 }
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! ruleprops {
+macro_rules! rule {
     (
+        // The counter variable that keep track of the current index into
+        // `StylesheetMacroOutput::props`.
+        $i:expr,
         ($($sel:tt)*) (priority = $pri:expr) {
             $($props:tt)*
         }
     ) => {{
-        $crate::ui::theming::RuleProps {
-            props: $crate::props! { $($props)* },
+        let start = $i;
+        $i += $crate::prop_count! { $($props)* };
+        let end = $i;
+
+        $crate::ui::theming::Rule {
+            priority: $pri,
+            prop_kinds: $crate::prop_kinds! { $($props)* },
+            props_range_u16: start..end,
+            selector: $crate::sel!($($sel)*),
         }
     }};
 }
@@ -469,7 +511,7 @@ macro_rules! stylesheet {
         // for each rule...
         $(
             // `#[cfg(...)]`, etc.
-            $( #[$cfg:meta] )*
+            $( #[$cfg:meta] )?
             // scope and priority
             $( ($( $meta:tt )*) )*
             // props
@@ -477,20 +519,21 @@ macro_rules! stylesheet {
         ),*
         $(,)*
     ) => {{
-        static RULES: &[$crate::ui::theming::Rule] = &[
-            $(
-                $( #[$cfg] )*
-                $crate::rule!( $(($($meta)*))* {$($rule)*} ),
-            )*
-        ];
-        $crate::ui::theming::StylesheetMacroOutput {
-            rules: RULES,
-            ruleprops: std::vec![
+        static RULES: &[$crate::ui::theming::Rule] = {
+            let mut i = 0;
+            &[
                 $(
                     $( #[$cfg] )*
-                    $crate::ruleprops!( $(($($meta)*))* {$($rule)*} ),
+                    $crate::rule!( i, $(($($meta)*))* {$($rule)*} ),
                 )*
-            ],
+            ]
+        };
+        $crate::ui::theming::StylesheetMacroOutput {
+            rules: RULES,
+            props: $crate::props!{$(
+                meta = #$([$cfg])* [cfg(all())];
+                props = { $($rule)* };
+            )*}
         }
     }};
 }
