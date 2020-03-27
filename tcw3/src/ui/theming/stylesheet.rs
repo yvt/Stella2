@@ -500,7 +500,7 @@ macro_rules! stylesheet {
 //
 // TODO: Make it dynamic (based on the operating system's configuration)
 //
-use crate::{images::himg_from_rounded_rect, pal::RGBAF32};
+use crate::{images::himg_figures, pal::RGBAF32};
 use cggeom::box2;
 use std::f32::NAN;
 
@@ -515,9 +515,7 @@ lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.7, 0.7, 0.7, 1.0), [[4.0; 2]; 4]
-            )),
+            layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.8,
             subview_metrics[Role::Generic]: Metrics {
@@ -529,9 +527,7 @@ lazy_static! {
             layer_opacity[0]: 1.0,
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
-            layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.2, 0.4, 0.9, 1.0), [[4.0; 2]; 4]
-            )),
+            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
         },
         // Button label
         ([] < [.BUTTON]) (priority = 100) {
@@ -546,9 +542,7 @@ lazy_static! {
             num_layers: 2,
 
             // Focus ring
-            layer_img[0]: Some(
-                himg_from_rounded_rect([0.2, 0.4, 0.9, 1.0].into(), [[5.0; 2]; 4])
-            ),
+            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
@@ -557,9 +551,7 @@ lazy_static! {
             },
 
             // Background
-            layer_img[1]: Some(himg_from_rounded_rect(
-                RGBAF32::new(1.0, 1.0, 1.0, 1.0), [[3.0; 2]; 4]
-            )),
+            layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
             subview_metrics[Role::Generic]: Metrics {
                 margin: [0.0; 4],
@@ -577,9 +569,9 @@ lazy_static! {
         // Scrollbar
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.12), [[SCROLLBAR_VISUAL_RADIUS; 2]; 4]
-            )),
+            layer_img[0]: Some(himg_figures![
+                rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
+            ]),
             layer_metrics[0]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
                 .. Metrics::default()
@@ -605,9 +597,9 @@ lazy_static! {
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_from_rounded_rect(
-                RGBAF32::new(0.5, 0.5, 0.5, 0.7), [[SCROLLBAR_VISUAL_RADIUS; 2]; 4]
-            )),
+            layer_img[0]: Some(himg_figures![
+                rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
+            ]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
         },

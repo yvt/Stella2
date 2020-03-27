@@ -5,8 +5,8 @@ use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 #[allow(unused_imports)]
 use tcw3::{
-    images::{himg_from_rounded_rect, HImg},
-    pal::{LayerFlags, SysFontType},
+    images::{himg_figures, HImg},
+    pal::{LayerFlags, SysFontType, RGBAF32},
     stylesheet,
     ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
 };
@@ -155,9 +155,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 3,
 
             // Focus ring
-            layer_img[0]: Some(
-                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[5.0; 2]; 4])
-            ),
+            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
@@ -166,9 +164,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Background
-            layer_img[1]: Some(
-                himg_from_rounded_rect([0.0, 0.0, 0.0, 0.2].into(), [[3.0; 2]; 4])
-            ),
+            layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.2]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
@@ -191,9 +187,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
             // Make the background opaque so that the focus ring actually
             // renders as a ring
-            layer_img[1]: Some(
-                himg_from_rounded_rect([0.3, 0.3, 0.3, 1.0].into(), [[3.0; 2]; 4])
-            ),
+            layer_img[1]: Some(himg_figures![rect([0.3, 0.3, 0.3, 1.0]).radius(3.0)]),
         },
         ([] .. [#SEARCH_FIELD]) (priority = 10000) {
             fg_color: [1.0, 1.0, 1.0, 1.0].into(),
@@ -204,9 +198,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 2,
 
             // Focus ring
-            layer_img[0]: Some(
-                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[5.0; 2]; 4])
-            ),
+            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
@@ -215,9 +207,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Background
-            layer_img[1]: Some(
-                himg_from_rounded_rect([1.0; 4].into(), [[3.0; 2]; 4])
-            ),
+            layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             subview_metrics[Role::Generic]: Metrics {
@@ -318,9 +308,7 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
             num_layers: 4,
 
             // Focus ring
-            layer_img[0]: Some(
-                himg_from_rounded_rect([0.1, 0.4, 0.8, 1.0].into(), [[2.0; 2]; 4])
-            ),
+            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
 
             // Border
             layer_img[1]: None,
