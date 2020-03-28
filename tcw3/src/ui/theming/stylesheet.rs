@@ -295,15 +295,6 @@ macro_rules! prop {
     (@value font: $val:expr) => { $crate::ui::theming::PropValue::SysFontType($val) };
 }
 
-/// Unwraps the top-level group.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! unwrap {
-    (($($x:tt)*)) => {$($x)*};
-    ({$($x:tt)*}) => {$($x)*};
-    ([$($x:tt)*]) => {$($x)*};
-}
-
 /// Produces an expression of type `Vec<(Prop, PropValue)>`.
 ///
 /// # Attributes
