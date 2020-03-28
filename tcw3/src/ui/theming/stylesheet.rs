@@ -242,7 +242,11 @@ macro_rules! sel {
 ///
 /// The following input forms are internal:
 ///
-///  - `prop!(@value name[param]: value)` produces a `PropValue`.
+///  - `prop!(@value name[param]: value)` produces a `PropValue`. If necessary,
+///    boxing is done in a way suitable for compile-time evaluation.
+///  - `prop!(@dynvalue name[param]: value)` produces a `PropValue`. If
+///    necessary, boxing is done in a way suitable for runtime evaluation. This
+///    will fallback to `@value` if boxing is not needed for the given prop.
 ///
 #[doc(hidden)]
 #[macro_export]
@@ -261,7 +265,7 @@ macro_rules! prop {
     (@setdynvalue($store_to:expr) #[dyn] $($rest:tt)*) => {
         ::std::mem::forget(::std::mem::replace(
             &mut $store_to,
-            $crate::prop!(@value $($rest)*),
+            $crate::prop!(@dynvalue $($rest)*),
         ))
     };
     (@setdynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
@@ -304,6 +308,9 @@ macro_rules! prop {
 
     (@prop font) => { $crate::ui::theming::Prop::Font };
     (@value font: $val:expr) => { $crate::ui::theming::PropValue::SysFontType($val) };
+
+    // `@dynvalue` falls back to `@value` if boxing is not necessary
+    (@dynvalue $($rest:tt)*) => { $crate::prop!(@value $($rest)*) };
 }
 
 /// Produces an expression of type `Vec<(Prop, PropValue)>`.
