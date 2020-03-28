@@ -230,30 +230,41 @@ macro_rules! sel {
     }};
 }
 
-/// This macro is used for two purposes:
-///  - To create `Prop` (`prop!(@prop name[param])`).
-///  - To create `PropValue` for the first pass
-///    (`prop!(@value #[dyn] name[param]: value)`).
-///  - Assign `PropValue` for the second pass
-///    (`prop!(@dynvalue(store_to) #[dyn] name[param]: value)`).
+/// This is an internal macro to be used by other macros defined in this module.
+///
+/// This macro accepts the following input forms:
+///
+///  - `prop!(@prop name[param])` produces a `Prop`.
+///  - `prop!(@constvalue #[dyn] name[param]: value)` produces a `PropValue` for
+///    the first pass.
+///  - `prop!(@setdynvalue(store_to) #[dyn] name[param]: value)` produces an
+///    expression assigning `PropValue` for the second pass.
+///
+/// The following input forms are internal:
+///
+///  - `prop!(@value name[param]: value)` produces a `PropValue`.
+///
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop {
     // For the first pass, prop specifications with `#[dyn]` are replaced with
     // dummy values.
-    (@value #[dyn] $name:ident $($rest:tt)*) => {
+    (@constvalue #[dyn] $name:ident $($rest:tt)*) => {
         $crate::ui::theming::PropValue::Bool(false)
+    };
+    (@constvalue $name:ident $($rest:tt)*) => {
+        $crate::prop!(@value $name $($rest)*)
     };
 
     // For the second pass, only the prop specifications with `#[dyn]` are
     // evaluated.
-    (@dynvalue($store_to:expr) #[dyn] $($rest:tt)*) => {
+    (@setdynvalue($store_to:expr) #[dyn] $($rest:tt)*) => {
         ::std::mem::forget(::std::mem::replace(
             &mut $store_to,
             $crate::prop!(@value $($rest)*),
         ))
     };
-    (@dynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
+    (@setdynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
 
     (@prop num_layers) => { $crate::ui::theming::Prop::NumLayers };
     (@value num_layers: $val:expr) => { $crate::ui::theming::PropValue::Usize($val) };
@@ -348,7 +359,7 @@ macro_rules! props {
                     // Emit an element
                     (
                         $crate::prop!( @prop $name $([$param])* ),
-                        $crate::prop!( @value $(#[$mod])* $name $([$param])* : $value ),
+                        $crate::prop!( @constvalue $(#[$mod])* $name $([$param])* : $value ),
                     ),
                 )*
             )*
@@ -369,7 +380,7 @@ macro_rules! props {
                     // Update `props_ptr[0]` if the prop specification
                     // has `#[dyn]`
                     $crate::prop!(
-                        @dynvalue(props_ptr[0].1)
+                        @setdynvalue(props_ptr[0].1)
                         $(#[$mod])* $name $([$param])* : $value
                     );
                     props_ptr = &mut props_ptr[1..];
