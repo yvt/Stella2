@@ -280,7 +280,10 @@ macro_rules! prop {
     (@value layer_center[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Box2($val) };
 
     (@prop layer_xform[$i:expr]) => { $crate::ui::theming::Prop::LayerXform($i) };
-    (@value layer_xform[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerXform($val) };
+    (@value layer_xform[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue layer_xform[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_box(Box::new($val))) };
 
     (@prop layer_opacity[$i:expr]) => { $crate::ui::theming::Prop::LayerOpacity($i) };
     (@value layer_opacity[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
@@ -292,10 +295,16 @@ macro_rules! prop {
     (@value layer_flags[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerFlags($val) };
 
     (@prop layer_metrics[$i:expr]) => { $crate::ui::theming::Prop::LayerMetrics($i) };
-    (@value layer_metrics[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Metrics($val) };
+    (@value layer_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue layer_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
     (@prop subview_metrics[$i:expr]) => { $crate::ui::theming::Prop::SubviewMetrics($i) };
-    (@value subview_metrics[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Metrics($val) };
+    (@value subview_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue subview_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
     (@prop subview_visibility[$i:expr]) => { $crate::ui::theming::Prop::SubviewVisibility($i) };
     (@value subview_visibility[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Bool($val) };

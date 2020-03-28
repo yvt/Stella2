@@ -347,7 +347,7 @@ impl SbLayout {
                 .clone()
                 .map(
                     |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
-                        PropValue::Metrics(m) => (role, m),
+                        PropValue::Metrics(m) => (role, (*m).clone()),
                         _ => unreachable!(),
                     },
                 )

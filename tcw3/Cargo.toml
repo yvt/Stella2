@@ -29,6 +29,7 @@ ndarray = "0.13.0"
 neo_linked_list = { path = "../support/neo_linked_list" }
 owning_ref = "0.4.0"
 rc-borrow = "1.0.0"
+rob = "0.1"
 rope = { path = "../support/rope" }
 sorted_diff = { path = "../support/sorted_diff" }
 subscriber_list = { path = "../support/subscriber_list" }
