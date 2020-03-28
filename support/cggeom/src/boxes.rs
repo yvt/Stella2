@@ -226,6 +226,20 @@ pub struct Box3<T> {
     pub max: Point3<T>,
 }
 
+impl<T> Box2<T> {
+    #[inline]
+    pub const fn new(min: Point2<T>, max: Point2<T>) -> Self {
+        Self { min, max }
+    }
+}
+
+impl<T> Box3<T> {
+    #[inline]
+    pub const fn new(min: Point3<T>, max: Point3<T>) -> Self {
+        Self { min, max }
+    }
+}
+
 impl<T: BaseNum + Average2> AxisAlignedBox<T> for Box2<T> {
     type Point = Point2<T>;
     type Vector = Vector2<T>;
