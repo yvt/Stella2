@@ -97,7 +97,10 @@ impl State {
         let attrs: Vec<_> = (0..16)
             .map(|_| {
                 let mut attrs = pal::LayerAttrs {
-                    bounds: Some(box2! { min: [0.0, 0.0], max: [size as f32; 2] }),
+                    bounds: Some(box2! {
+                        min: [0.0, 0.0],
+                        max: [size as f32, size as f32],
+                    }),
                     ..Default::default()
                 };
 
@@ -121,7 +124,10 @@ impl State {
                         builder.set_fill_rgb(color.into());
 
                         builder.rounded_rect(
-                            box2! { top_left: [0.0, 0.0], size: [size as f32; 2] },
+                            box2! {
+                                top_left: [0.0, 0.0],
+                                size: [size as f32, size as f32],
+                            },
                             [[radius as f32; 2]; 4],
                         );
                         builder.fill();
@@ -134,7 +140,10 @@ impl State {
 
                         builder.set_fill_rgb(color.into());
 
-                        builder.ellipse(box2! { top_left: [0.0, 0.0], size: [size as f32; 2] });
+                        builder.ellipse(box2! {
+                            top_left: [0.0, 0.0],
+                            size: [size as f32, size as f32],
+                        });
                         builder.fill();
 
                         attrs.contents = Some(Some(builder.into_bitmap()));

@@ -55,10 +55,16 @@ impl ViewListener for MyViewListener {
             let size = draw_ctx.size;
 
             c.set_fill_rgb(pal::RGBAF32::new(0.3, 0.9, 0.3, 0.3));
-            c.fill_rect(box2! { top_left: [0.0, 0.0], size: self.size_traits.preferred });
+            c.fill_rect(box2! {
+                top_left: [0.0, 0.0].into(),
+                size: self.size_traits.preferred.into(),
+            });
 
             c.set_fill_rgb(pal::RGBAF32::new(0.9, 0.3, 0.3, 0.8));
-            c.fill_rect(box2! { top_left: [0.0, 0.0], size: self.size_traits.min });
+            c.fill_rect(box2! {
+                top_left: [0.0, 0.0].into(),
+                size: self.size_traits.min.into(),
+            });
 
             c.stroke_rect(box2! { min: [0.5, 0.5], max: [size.x - 0.5, size.y - 0.5] });
         });

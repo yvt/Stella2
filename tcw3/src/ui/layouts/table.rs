@@ -1,5 +1,5 @@
 use alt_fp::FloatOrd;
-use cggeom::{prelude::*, Box2};
+use cggeom::Box2;
 use cgmath::{vec2, Point2, Vector2};
 use std::{cell::RefCell, cmp::max};
 

@@ -105,10 +105,13 @@ mod tests {
         twm.step_unsend();
 
         // preferred size
-        assert_eq!(sv.global_frame(), box2! { min: [10.0; 2], max: [40.0; 2] });
+        assert_eq!(
+            sv.global_frame(),
+            box2! { min: [10.0, 10.0], max: [40.0, 40.0] }
+        );
         assert_eq!(
             wnd.content_view().global_frame(),
-            box2! { min: [0.0; 2], max: [50.0; 2] }
+            box2! { min: [0.0, 0.0], max: [50.0, 50.0] }
         );
     }
 }

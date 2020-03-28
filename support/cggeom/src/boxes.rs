@@ -495,8 +495,12 @@ impl<T: Arbitrary + BaseNum + Average2> Arbitrary for Box3<T> {
     }
 }
 
-/// A macro for constructing `Box2` using various types of origin points and
-/// using `Into::into`.
+/// A macro for constructing `Box2` using various types of origin points.
+///
+/// When *all* endpoints and sizes are specified by `[x, y]`, they are
+/// automatically converted to `Vector2` or `Point2`.
+///
+/// This macro is `const fn`-compatible.
 ///
 /// The syntax of this macro assumes a coordinate space where the increases in
 /// X and Y coordinates correspond to the right and down direction, respectively.
@@ -521,79 +525,130 @@ impl<T: Arbitrary + BaseNum + Average2> Arbitrary for Box3<T> {
 #[macro_export]
 macro_rules! box2 {
     {
+        point: [$x:expr, $y:expr $(,)*]$(,)*
+    } => {{
+        let point = $crate::cgmath::Point2::new($x, $y);
+        $crate::Box2::new(point, point)
+    }};
+
+    {
         point: $point:expr$(,)*
-    } => {
-        {
-            let point: $crate::cgmath::Point2<_> = Into::into($point);
-            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(point, point)
-        }
-    };
+    } => {{
+        let point = $point;
+        $crate::Box2::new(point, point)
+    }};
+
+    {
+        min: [$min_x:expr, $min_y:expr $(,)*],
+        max: [$max_x:expr, $max_y:expr $(,)*]$(,)*
+    } => {{
+        let min = $crate::cgmath::Point2::new($min_x, $min_y);
+        let max = $crate::cgmath::Point2::new($max_x, $max_y);
+        $crate::Box2::new(min, max)
+    }};
 
     {
         min: $min:expr,
         max: $max:expr$(,)*
     } => {
-        <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
-            Into::into($min),
-            Into::into($max),
-        )
+        $crate::Box2::new($min, $max)
     };
+
+    {
+        top_left: [$origin_x:expr, $origin_y:expr $(,)*],
+        size: [$size_x:expr, $size_y:expr $(,)*]$(,)*
+    } => {{
+        let origin = $crate::cgmath::Point2::new($origin_x, $origin_y);
+        let size = $crate::cgmath::Vector2::new($size_x, $size_y);
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x, origin.y),
+            $crate::cgmath::Point2::new(origin.x + size.x, origin.y + size.y),
+        )
+    }};
 
     {
         top_left: $origin:expr,
         size: $size:expr$(,)*
-    } => {
-        {
-            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
-            let size: $crate::cgmath::Vector2<_> = Into::into($size);
-            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
-                $crate::cgmath::Point2::new(origin.x, origin.y),
-                $crate::cgmath::Point2::new(origin.x + size.x, origin.y + size.y),
-            )
-        }
-    };
+    } => {{
+        let origin: $crate::cgmath::Point2<_> = $origin;
+        let size: $crate::cgmath::Vector2<_> = $size;
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x, origin.y),
+            $crate::cgmath::Point2::new(origin.x + size.x, origin.y + size.y),
+        )
+    }};
+
+    {
+        top_right: [$origin_x:expr, $origin_y:expr $(,)*],
+        size: [$size_x:expr, $size_y:expr $(,)*]$(,)*
+    } => {{
+        let origin = $crate::cgmath::Point2::new($origin_x, $origin_y);
+        let size = $crate::cgmath::Vector2::new($size_x, $size_y);
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x - size.x, origin.y),
+            $crate::cgmath::Point2::new(origin.x, origin.y + size.y),
+        )
+    }};
 
     {
         top_right: $origin:expr,
         size: $size:expr$(,)*
-    } => {
-        {
-            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
-            let size: $crate::cgmath::Vector2<_> = Into::into($size);
-            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
-                $crate::cgmath::Point2::new(origin.x - size.x, origin.y),
-                $crate::cgmath::Point2::new(origin.x, origin.y + size.y),
-            )
-        }
-    };
+    } => {{
+        let origin: $crate::cgmath::Point2<_> = $origin;
+        let size: $crate::cgmath::Vector2<_> = $size;
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x - size.x, origin.y),
+            $crate::cgmath::Point2::new(origin.x, origin.y + size.y),
+        )
+    }};
+
+    {
+        bottom_left: [$origin_x:expr, $origin_y:expr $(,)*],
+        size: [$size_x:expr, $size_y:expr $(,)*]$(,)*
+    } => {{
+        let origin = $crate::cgmath::Point2::new($origin_x, $origin_y);
+        let size = $crate::cgmath::Vector2::new($size_x, $size_y);
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x, origin.y - size.y),
+            $crate::cgmath::Point2::new(origin.x + size.x, origin.y),
+        )
+    }};
 
     {
         bottom_left: $origin:expr,
         size: $size:expr$(,)*
-    } => {
-        {
-            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
-            let size: $crate::cgmath::Vector2<_> = Into::into($size);
-            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
-                $crate::cgmath::Point2::new(origin.x, origin.y - size.y),
-                $crate::cgmath::Point2::new(origin.x + size.x, origin.y),
-            )
-        }
-    };
+    } => {{
+        let origin: $crate::cgmath::Point2<_> = $origin;
+        let size: $crate::cgmath::Vector2<_> = $size;
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x, origin.y - size.y),
+            $crate::cgmath::Point2::new(origin.x + size.x, origin.y),
+        )
+    }};
+
+    {
+        bottom_right: [$origin_x:expr, $origin_y:expr $(,)*],
+        size: [$size_x:expr, $size_y:expr $(,)*]$(,)*
+    } => {{
+        let origin = $crate::cgmath::Point2::new($origin_x, $origin_y);
+        let size = $crate::cgmath::Vector2::new($size_x, $size_y);
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x - size.x, origin.y - size.y),
+            $crate::cgmath::Point2::new(origin.x, origin.y),
+        )
+    }};
 
     {
         bottom_right: $origin:expr,
         size: $size:expr$(,)*
-    } => {
-        {
-            let origin: $crate::cgmath::Point2<_> = Into::into($origin);
-            let size: $crate::cgmath::Vector2<_> = Into::into($size);
-            <$crate::Box2<_> as $crate::AxisAlignedBox<_>>::new(
-                $crate::cgmath::Point2::new(origin.x - size.x, origin.y - size.y),
-                $crate::cgmath::Point2::new(origin.x, origin.y),
-            )
-        }
-    }
+    } => {{
+        let origin: $crate::cgmath::Point2<_> = $origin;
+        let size: $crate::cgmath::Vector2<_> = $size;
+        $crate::Box2::new(
+            $crate::cgmath::Point2::new(origin.x - size.x, origin.y - size.y),
+            $crate::cgmath::Point2::new(origin.x, origin.y),
+        )
+    }}
 }
 
 #[cfg(test)]

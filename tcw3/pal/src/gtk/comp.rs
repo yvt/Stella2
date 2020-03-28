@@ -116,7 +116,7 @@ impl Compositor {
 
             wnd.surf_size = surf_size_sz;
             wnd.surf_dpi_scale = surf_dpi_scale;
-            wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size_sz });
+            wnd.dirty_rect = Some(box2! { min: [0, 0].into(), max: surf_size_sz.into() });
         }
 
         // Compute the dirty region

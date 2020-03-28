@@ -88,12 +88,12 @@ mod tests {
             vec![
                 (
                     sv1.clone(),
-                    box2! { min: [10.0; 2], max: [30.0; 2] },
+                    box2! { min: [10.0, 10.0], max: [30.0, 30.0] },
                     AlignFlags::JUSTIFY,
                 ),
                 (
                     sv2.clone(),
-                    box2! { min: [50.0; 2], max: [90.0; 2] },
+                    box2! { min: [50.0, 50.0], max: [90.0, 90.0] },
                     AlignFlags::CENTER,
                 ),
             ],
@@ -101,7 +101,13 @@ mod tests {
         wnd.set_visibility(true);
         twm.step_unsend();
 
-        assert_eq!(sv1.global_frame(), box2! { min: [10.0; 2], max: [30.0; 2] });
-        assert_eq!(sv2.global_frame(), box2! { min: [60.0; 2], max: [80.0; 2] });
+        assert_eq!(
+            sv1.global_frame(),
+            box2! { min: [10.0, 10.0], max: [30.0, 30.0] }
+        );
+        assert_eq!(
+            sv2.global_frame(),
+            box2! { min: [60.0, 60.0], max: [80.0, 80.0] }
+        );
     }
 }

@@ -405,7 +405,7 @@ impl<TBmp: Bmp> BinnerBuilder<'_, TBmp> {
 
             if let Some(xform) = mask_xform {
                 // Calculate the AABB of the mask shape
-                let unit_sq = box2! { min: [0.0; 2], max: [1.0; 2] };
+                let unit_sq = box2! { min: [0.0, 0.0], max: [1.0, 1.0] };
                 let bb = xform_aabb(xform, unit_sq);
 
                 let bb = saturating_aabb_f32_to_u16(round_aabb_conservative(bb))?;

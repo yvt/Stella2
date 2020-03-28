@@ -93,7 +93,7 @@ mod tests {
             builder.push_elem(ElemInfo {
                 xform,
                 bounds: box2! { min: [0.0, 0.0], max: [100.0, 100.0] },
-                contents_center: box2! { min: [0.0; 2], max: [1.0; 2] },
+                contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
                 contents_scale: 1.0,
                 bitmap: None,
                 bg_color: [50, 80, 100, 200].into(),

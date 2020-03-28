@@ -427,7 +427,7 @@ impl Layout for SbLayout {
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         for (&(role, ref metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let sv_traits = ctx.subview_size_traits(sv.as_ref());
-            let container = box2! {top_left: [0.0, 0.0], size: size};
+            let container = box2! {top_left: [0.0, 0.0].into(), size: size.into()};
 
             let mut frame = metrics.arrange(container, sv_traits.preferred);
 

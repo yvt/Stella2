@@ -53,8 +53,8 @@ fn bounds_for_edit(edit: &TableEdit<'_>) -> Box2<f64> {
     let limit = edit.scroll_limit();
 
     (box2! {
-        min: [0.0, 0.0],
-        max: limit,
+        min: [0.0, 0.0].into(),
+        max: limit.into(),
     })
     .translate(-Vector2::from(edit.scroll_pos()))
 }
