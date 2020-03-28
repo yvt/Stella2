@@ -45,7 +45,7 @@ pub struct StylesheetMacroOutput {
     /// The static part (everything other than prop values) of the stylesheet.
     pub rules: &'static [Rule],
     /// The runtime part (prop values) of the stylesheet.
-    pub props: Vec<(Prop, PropValue)>,
+    pub props: Box<[(Prop, PropValue)]>,
 }
 
 #[doc(hidden)]
@@ -231,140 +231,68 @@ macro_rules! sel {
 }
 
 /// This macro is used for two purposes:
-///  - To create `PropKindFlags`.
-///  - To create `(Prop, PropValue)`.
+///  - To create `Prop` (`prop!(@prop name[param])`).
+///  - To create `PropValue` for the first pass
+///    (`prop!(@value #[dyn] name[param]: value)`).
+///  - Assign `PropValue` for the second pass
+///    (`prop!(@dynvalue(store_to) #[dyn] name[param]: value)`).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop {
-    (@kind num_layers) => {
-        $crate::ui::theming::Prop::NumLayers.kind_flags()
-    };
-    (num_layers: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::NumLayers,
-            $crate::ui::theming::PropValue::Usize($val),
-        )
+    // For the first pass, prop specifications with `#[dyn]` are replaced with
+    // dummy values.
+    (@value #[dyn] $name:ident $($rest:tt)*) => {
+        $crate::ui::theming::PropValue::Bool(false)
     };
 
-    (@kind layer_img[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerImg($i).kind_flags()
+    // For the second pass, only the prop specifications with `#[dyn]` are
+    // evaluated.
+    (@dynvalue($store_to:expr) #[dyn] $($rest:tt)*) => {
+        ::std::mem::forget(::std::mem::replace(
+            &mut $store_to,
+            $crate::prop!(@value $($rest)*),
+        ))
     };
-    (layer_img[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerImg($i),
-            $crate::ui::theming::PropValue::Himg($val),
-        )
-    };
+    (@dynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
 
-    (@kind layer_center[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerCenter($i).kind_flags()
-    };
-    (layer_center[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerCenter($i),
-            $crate::ui::theming::PropValue::Box2($val),
-        )
-    };
+    (@prop num_layers) => { $crate::ui::theming::Prop::NumLayers };
+    (@value num_layers: $val:expr) => { $crate::ui::theming::PropValue::Usize($val) };
 
-    (@kind layer_xform[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerXform($i).kind_flags()
-    };
-    (layer_xform[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerXform($i),
-            $crate::ui::theming::PropValue::LayerXform($val),
-        )
-    };
+    (@prop layer_img[$i:expr]) => { $crate::ui::theming::Prop::LayerImg($i) };
+    (@value layer_img[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Himg($val) };
 
-    (@kind layer_opacity[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerOpacity($i).kind_flags()
-    };
-    (layer_opacity[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerOpacity($i),
-            $crate::ui::theming::PropValue::Float($val),
-        )
-    };
+    (@prop layer_center[$i:expr]) => { $crate::ui::theming::Prop::LayerCenter($i) };
+    (@value layer_center[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Box2($val) };
 
-    (@kind layer_bg_color[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerBgColor($i).kind_flags()
-    };
-    (layer_bg_color[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerBgColor($i),
-            $crate::ui::theming::PropValue::Rgbaf32($val),
-        )
-    };
+    (@prop layer_xform[$i:expr]) => { $crate::ui::theming::Prop::LayerXform($i) };
+    (@value layer_xform[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerXform($val) };
 
-    (@kind layer_flags[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerFlags($i).kind_flags()
-    };
-    (layer_flags[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerFlags($i),
-            $crate::ui::theming::PropValue::LayerFlags($val),
-        )
-    };
+    (@prop layer_opacity[$i:expr]) => { $crate::ui::theming::Prop::LayerOpacity($i) };
+    (@value layer_opacity[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
 
-    (@kind layer_metrics[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerMetrics($i).kind_flags()
-    };
-    (layer_metrics[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerMetrics($i),
-            $crate::ui::theming::PropValue::Metrics($val),
-        )
-    };
+    (@prop layer_bg_color[$i:expr]) => { $crate::ui::theming::Prop::LayerBgColor($i) };
+    (@value layer_bg_color[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
 
-    (@kind subview_metrics[$i:expr]) => {
-        $crate::ui::theming::Prop::SubviewMetrics($i).kind_flags()
-    };
-    (subview_metrics[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::SubviewMetrics($i),
-            $crate::ui::theming::PropValue::Metrics($val),
-        )
-    };
+    (@prop layer_flags[$i:expr]) => { $crate::ui::theming::Prop::LayerFlags($i) };
+    (@value layer_flags[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerFlags($val) };
 
-    (@kind subview_visibility[$i:expr]) => {
-        $crate::ui::theming::Prop::SubviewVisibility($i).kind_flags()
-    };
-    (subview_visibility[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::SubviewVisibility($i),
-            $crate::ui::theming::PropValue::Bool($val),
-        )
-    };
+    (@prop layer_metrics[$i:expr]) => { $crate::ui::theming::Prop::LayerMetrics($i) };
+    (@value layer_metrics[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Metrics($val) };
 
-    (@kind min_size) => {
-        $crate::ui::theming::Prop::MinSize.kind_flags()
-    };
-    (min_size: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::MinSize,
-            $crate::ui::theming::PropValue::Vector2($val),
-        )
-    };
+    (@prop subview_metrics[$i:expr]) => { $crate::ui::theming::Prop::SubviewMetrics($i) };
+    (@value subview_metrics[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Metrics($val) };
 
-    (@kind fg_color) => {
-        $crate::ui::theming::Prop::FgColor.kind_flags()
-    };
-    (fg_color: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::FgColor,
-            $crate::ui::theming::PropValue::Rgbaf32($val),
-        )
-    };
+    (@prop subview_visibility[$i:expr]) => { $crate::ui::theming::Prop::SubviewVisibility($i) };
+    (@value subview_visibility[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Bool($val) };
 
-    (@kind font) => {
-        $crate::ui::theming::Prop::Font.kind_flags()
-    };
-    (font: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::Font,
-            $crate::ui::theming::PropValue::SysFontType($val),
-        )
-    };
+    (@prop min_size) => { $crate::ui::theming::Prop::MinSize };
+    (@value min_size: $val:expr) => { $crate::ui::theming::PropValue::Vector2($val) };
+
+    (@prop fg_color) => { $crate::ui::theming::Prop::FgColor };
+    (@value fg_color: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
+
+    (@prop font) => { $crate::ui::theming::Prop::Font };
+    (@value font: $val:expr) => { $crate::ui::theming::PropValue::SysFontType($val) };
 }
 
 /// Unwraps the top-level group.
@@ -399,11 +327,24 @@ macro_rules! props {
             // second token tree.
             meta = # $meta:tt $([$($ignored:tt)*])?;
             props = {
-                $( $name:ident $([$param:expr])* : $value:expr ),* $(,)*
+                $( $(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr ),* $(,)*
             };
         )*
-    ) => {
-        ::std::vec![
+    ) => {{
+        const PROP_COUNT: usize = {
+            let mut count = 0;
+            // For each rule...
+            $(
+                #$meta
+                {
+                    count += $crate::prop_count!{ $($name $([$param])* : $value,)* };
+                }
+            )*
+            count
+        };
+
+        // Pass 1: Create a static array containing all static property values
+        const PROPS: [($crate::ui::theming::Prop, $crate::ui::theming::PropValue); PROP_COUNT] = [
             // For each rule...
             $(
                 // (`$meta` is defined by each rule)
@@ -414,11 +355,39 @@ macro_rules! props {
                     #$meta
 
                     // Emit an element
-                    $crate::prop!( $name $([$param])* : $value ),
+                    (
+                        $crate::prop!( @prop $name $([$param])* ),
+                        $crate::prop!( @value $(#[$mod])* $name $([$param])* : $value ),
+                    ),
                 )*
             )*
-        ]
-    };
+        ];
+
+        let mut props = Box::new(PROPS);
+
+        // Pass 2: Assign runtime values
+        let mut props_ptr = &mut props[..];
+
+        // For each rule...
+        $(
+            #[allow(unused_assignments)]
+            #$meta
+            {
+                // For each prop specification...
+                $(
+                    // Update `props_ptr[0]` if the prop specification
+                    // has `#[dyn]`
+                    $crate::prop!(
+                        @dynvalue(props_ptr[0].1)
+                        $(#[$mod])* $name $([$param])* : $value
+                    );
+                    props_ptr = &mut props_ptr[1..];
+                )*
+            }
+        )*
+
+        props
+    }};
 }
 
 /// Given prop specifications, emits an expression of type `PropKindFlags`
@@ -426,13 +395,13 @@ macro_rules! props {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop_kinds {
-    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
+    ($( $(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
         $crate::ui::theming::PropKindFlags::from_bits_truncate(
             // 0 | x | y | z | ...
             0
             $(
                 |
-                $crate::prop!(@kind $name $([$param])*).bits()
+                $crate::prop!(@prop $name $([$param])*).kind_flags().bits()
             )*
         )
     };
@@ -443,7 +412,7 @@ macro_rules! prop_kinds {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop_count {
-    ($name:ident $([$param:expr])* : $value:expr $(, $(,)* $($rest:tt)*)?) => {
+    ($(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr $(, $(,)* $($rest:tt)*)?) => {
         1 + $crate::prop_count!($($($rest)*)?)
     };
     () => { 0 }
@@ -487,6 +456,8 @@ macro_rules! rule {
 ///
 ///     const CUSTOM_ID: ClassSet = ClassSet::id(42);
 ///
+///     # #[tcw3::testing::use_testing_wm]
+///     # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
 ///     let stylesheet = stylesheet! {
 ///         // Selector are similar to CSS, but use predefined symbols instead.
 ///         //  - ID values (`CUSTOM_ID`) are constant expressions. They must be
@@ -496,6 +467,11 @@ macro_rules! rule {
 ///             // Arbitrary expressions are permitted only as property values
 ///             // like the following:
 ///             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
+///
+///             // Non-constant expressions require `#[dyn]`.
+///             #[dyn] layer_img[0]: Some(
+///                 tcw3::images::himg_figures![rect([0.1, 0.4, 0.8, 1.0])]
+///             ),
 ///         },
 ///
 ///         #[cfg(target_os = "windows")]
@@ -504,6 +480,8 @@ macro_rules! rule {
 ///             layer_opacity[0]: 0.5,
 ///         },
 ///     };
+///     # }
+///     # inner();
 ///
 #[macro_export]
 macro_rules! stylesheet {
@@ -545,6 +523,7 @@ macro_rules! stylesheet {
 //
 use crate::{images::himg_figures, pal::RGBAF32};
 use cggeom::box2;
+use cgmath::Vector2;
 use std::f32::NAN;
 
 const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
@@ -558,7 +537,7 @@ lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.8,
             subview_metrics[Role::Generic]: Metrics {
@@ -570,7 +549,7 @@ lazy_static! {
             layer_opacity[0]: 1.0,
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
-            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
         },
         // Button label
         ([] < [.BUTTON]) (priority = 100) {
@@ -585,20 +564,20 @@ lazy_static! {
             num_layers: 2,
 
             // Focus ring
-            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
                 margin: [-2.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
 
             // Background
-            layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
             subview_metrics[Role::Generic]: Metrics {
                 margin: [0.0; 4],
-                size: [NAN, FIELD_HEIGHT].into(),
+                size: Vector2::new(NAN, FIELD_HEIGHT),
             },
         },
         ([.ENTRY.FOCUS]) (priority = 200) {
@@ -612,7 +591,7 @@ lazy_static! {
         // Scrollbar
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![
+            #[dyn] layer_img[0]: Some(himg_figures![
                 rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
             ]),
             layer_metrics[0]: Metrics {
@@ -628,29 +607,29 @@ lazy_static! {
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
-                size: [NAN, SCROLLBAR_VISUAL_WIDTH].into(),
+                size: Vector2::new(NAN, SCROLLBAR_VISUAL_WIDTH),
             },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
-                size: [SCROLLBAR_VISUAL_WIDTH, NAN].into(),
+                size: Vector2::new(SCROLLBAR_VISUAL_WIDTH, NAN),
             },
         },
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![
+            #[dyn] layer_img[0]: Some(himg_figures![
                 rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
             ]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
-            min_size: [SCROLLBAR_LEN_MIN, 0.0].into(),
+            min_size: Vector2::new(SCROLLBAR_LEN_MIN, 0.0),
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
-            min_size: [0.0, SCROLLBAR_LEN_MIN].into(),
+            min_size: Vector2::new(0.0, SCROLLBAR_LEN_MIN),
         },
 
         ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
@@ -697,8 +676,8 @@ lazy_static! {
         // Splitter
         ([.SPLITTER]) (priority = 100) {
             num_layers: 1,
-            layer_bg_color[0]: [0.5, 0.5, 0.5, 0.8].into(),
-            min_size: [1.0, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.5, 0.5, 0.5, 0.8),
+            min_size: Vector2::new(1.0, 1.0),
         },
     };
 }

@@ -214,12 +214,18 @@ pub struct Metrics {
     pub size: Vector2<f32>,
 }
 
-impl Default for Metrics {
-    fn default() -> Self {
+impl Metrics {
+    pub const fn default() -> Self {
         Self {
             margin: [0.0; 4],
-            size: [std::f32::NAN; 2].into(),
+            size: Vector2::new(std::f32::NAN, std::f32::NAN),
         }
+    }
+}
+
+impl Default for Metrics {
+    fn default() -> Self {
+        Self::default()
     }
 }
 
@@ -291,14 +297,20 @@ pub struct LayerXform {
     pub translate: Vector2<f32>,
 }
 
-impl Default for LayerXform {
-    fn default() -> Self {
+impl LayerXform {
+    pub const fn default() -> Self {
         Self {
-            anchor: [0.5; 2].into(),
+            anchor: Point2::new(0.5, 0.5),
             scale: [1.0; 2],
             rotate: Rad(0.0),
-            translate: [0.0; 2].into(),
+            translate: Vector2::new(0.0, 0.0),
         }
+    }
+}
+
+impl Default for LayerXform {
+    fn default() -> Self {
+        Self::default()
     }
 }
 

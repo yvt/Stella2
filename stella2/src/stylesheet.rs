@@ -1,6 +1,6 @@
 use cggeom::box2;
-use cgmath::{Deg, Vector2};
-use std::f32::NAN;
+use cgmath::{Rad, Vector2};
+use std::f32::{consts::PI, NAN};
 use stella2_assets as assets;
 use stvg_tcw3::StvgImg;
 #[allow(unused_imports)]
@@ -65,41 +65,41 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     stylesheet! {
         ([.SPLITTER]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [0.85, 0.85, 0.85, 0.8].into(),
-            min_size: [1.0, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.85, 0.85, 0.85, 0.8),
+            min_size: Vector2::new(1.0, 1.0),
         },
         ([#EDITOR_SPLIT.SPLITTER]) (priority = 10000) {
-            min_size: [0.0, 0.0].into(),
+            min_size: Vector2::new(0.0, 0.0),
         },
 
         // Toolbar and titlebar background
         ([#TOOLBAR]) (priority = 10000) {
             num_layers: 2,
-            layer_bg_color[0]: [0.8, 0.8, 0.8, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.8, 0.8, 0.8, 1.0),
             layer_metrics[0]: Metrics {
                 margin: [-100.0, 0.0, 0.0, 0.0],
-                ..Default::default()
+                ..Metrics::default()
             },
 
-            layer_bg_color[1]: [0.3, 0.3, 0.3, 0.35].into(),
+            layer_bg_color[1]: RGBAF32::new(0.3, 0.3, 0.3, 0.35),
             layer_metrics[1]: Metrics {
                 margin: [NAN, 0.0, 0.0, 0.0],
-                size: [NAN, 0.65].into(),
+                size: Vector2::new(NAN, 0.65),
             },
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [5.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
         },
         ([#TOOLBAR] .. [#WND.ACTIVE]) (priority = 10500) {
-            layer_bg_color[0]: [0.6, 0.6, 0.6, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.6, 0.6, 0.6, 1.0),
         },
 
         // Pane background
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // sidebar looks awkward without backdrop blur, so we disable
@@ -107,45 +107,45 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // See also: `self::ENABLE_BACKDROP_BLUR`
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         ([#SIDEBAR] .. [#WND.ACTIVE]) (priority = 10500) {
-            layer_bg_color[0]: [0.93, 0.93, 0.93, 0.8].into(),
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
         },
         ([#LOG_VIEW]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [1.0, 1.0, 1.0, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
         ([#EDITOR]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [0.93, 0.93, 0.93, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [5.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
         },
 
         // Toolbar buttons
         ([#GO_BACK.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_BACK)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_BACK)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#GO_FORWARD.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_FORWARD)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_FORWARD)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_SHOW.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_SHOW)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_SHOW)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_HIDE.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_HIDE)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_HIDE)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
@@ -155,30 +155,30 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 3,
 
             // Focus ring
-            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
                 margin: [-2.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
 
             // Background
-            layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.2]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.2]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
-            layer_img[2]: Some(himg_from_stvg(assets::SEARCH)),
+            #[dyn] layer_img[2]: Some(himg_from_stvg(assets::SEARCH)),
             layer_metrics[2]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
-                size: [16.0, 16.0].into(),
+                size: Vector2::new(16.0, 16.0),
             },
 
-            min_size: [150.0, TOOLBAR_BTN_MIN_SIZE.y].into(),
+            min_size: Vector2::new(150.0, TOOLBAR_BTN_MIN_SIZE.y),
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [2.0, 2.0, 2.0, 22.0],
-                ..Default::default()
+                ..Metrics::default()
             },
         },
         ([#SEARCH_FIELD.FOCUS]) (priority = 10000) {
@@ -187,10 +187,10 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
             // Make the background opaque so that the focus ring actually
             // renders as a ring
-            layer_img[1]: Some(himg_figures![rect([0.3, 0.3, 0.3, 1.0]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([0.3, 0.3, 0.3, 1.0]).radius(3.0)]),
         },
         ([] .. [#SEARCH_FIELD]) (priority = 10000) {
-            fg_color: [1.0, 1.0, 1.0, 1.0].into(),
+            fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
 
         // Composing area
@@ -198,21 +198,21 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 2,
 
             // Focus ring
-            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
                 margin: [-2.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
 
             // Background
-            layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             subview_metrics[Role::Generic]: Metrics {
                 margin: [3.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
         },
         ([#EDITOR_FIELD.FOCUS]) (priority = 10500) {
@@ -220,7 +220,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             layer_opacity[0]: 0.5,
         },
         ([.LABEL] < [#EDITOR_FIELD]) (priority = 10000) {
-            fg_color: [0.0, 0.0, 0.0, 0.4].into(),
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.4),
         },
 
         // Sidebar
@@ -228,25 +228,25 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             // label
             subview_metrics[Role::Generic]: Metrics {
                 margin: [NAN, NAN, NAN, 25.0],
-                ..Default::default()
+                ..Metrics::default()
             },
             // bullet (open/close)
             subview_metrics[Role::Bullet]: Metrics {
                 margin: [NAN, NAN, NAN, 5.0],
-                size: [16.0, 16.0].into(),
+                size: Vector2::new(16.0, 16.0),
             },
         },
         ([.LABEL] < [#SIDEBAR_GROUP_HEADER]) (priority = 10000) {
-            fg_color: [0.0, 0.0, 0.0, 0.4].into(),
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.4),
             font: SysFontType::Emph,
         },
 
         ([#SIDEBAR_GROUP_BULLET]) (priority = 10000) {
             num_layers: 1,
-            layer_img[0]: Some(himg_from_stvg(assets::LIST_GROUP_OPEN)),
+            #[dyn] layer_img[0]: Some(himg_from_stvg(assets::LIST_GROUP_OPEN)),
             layer_metrics[0]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
-                size: [12.0, 12.0].into(),
+                size: Vector2::new(12.0, 12.0),
             },
             layer_opacity[0]: 0.5,
         },
@@ -258,29 +258,29 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([#SIDEBAR_GROUP_BULLET] < [#SIDEBAR_GROUP_HEADER:not(.ACTIVE)]) (priority = 10000) {
             layer_xform[0]: LayerXform {
-                rotate: Deg(-90.0).into(),
-                ..Default::default()
+                rotate: Rad(PI * -0.5),
+                ..LayerXform::default()
             },
         },
 
         ([#SIDEBAR_ITEM]) (priority = 10000) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [NAN, NAN, NAN, 25.0],
-                ..Default::default()
+                ..Metrics::default()
             },
         },
         ([#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.25].into(),
+            layer_bg_color[0]: RGBAF32::new(0.3, 0.3, 0.3, 0.25),
         },
         ([#SIDEBAR_ITEM.ACTIVE] .. [#WND.ACTIVE]) (priority = 10500) {
-            layer_bg_color[0]: [0.3, 0.3, 0.3, 0.5].into(),
+            layer_bg_color[0]: RGBAF32::new(0.3, 0.3, 0.3, 0.5),
         },
         ([#SIDEBAR_ITEM.ACTIVE] .. [.FOCUS]) (priority = 11000) {
-            layer_bg_color[0]: [0.1, 0.3, 0.6, 0.9].into(),
+            layer_bg_color[0]: RGBAF32::new(0.1, 0.3, 0.6, 0.9),
         },
         ([.LABEL] < [#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
-            fg_color: [1.0, 1.0, 1.0, 1.0].into(),
+            fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
     }
 }
@@ -292,46 +292,46 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
             layer_opacity[0]: 0.3,
         },
         ([.BUTTON]) (priority = 20000) {
-            layer_bg_color[0]: [0.7, 0.7, 0.7, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
             layer_img[0]: None,
         },
         ([.BUTTON.ACTIVE]) (priority = 21000) {
-            layer_bg_color[0]: [0.2, 0.4, 0.9, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.2, 0.4, 0.9, 1.0),
             layer_img[0]: None,
         },
 
         ([#TOOLBAR]) (priority = 20000) {
-            layer_bg_color[0]: [1.0; 4].into(),
+            layer_bg_color[0]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
 
         ([#SEARCH_FIELD]) (priority = 20000) {
             num_layers: 4,
 
             // Focus ring
-            layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
 
             // Border
             layer_img[1]: None,
-            layer_bg_color[1]: [0.0, 0.0, 0.0, 0.2].into(),
+            layer_bg_color[1]: RGBAF32::new(0.0, 0.0, 0.0, 0.2),
 
             // Background fill
             layer_img[2]: None,
-            layer_bg_color[2]: [1.0; 4].into(),
+            layer_bg_color[2]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
             layer_metrics[2]: Metrics {
                 margin: [1.0, 1.0, 1.0, 1.0],
-                ..Default::default()
+                ..Metrics::default()
             },
             layer_center[2]: box2! { point: [0.5, 0.5] },
 
             // Icon
-            layer_img[3]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
+            #[dyn] layer_img[3]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
             layer_metrics[3]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
-                size: [16.0, 16.0].into(),
+                size: Vector2::new(16.0, 16.0),
             },
         },
         ([] .. [#SEARCH_FIELD]) (priority = 20000) {
-            fg_color: [0.0, 0.0, 0.0, 1.0].into(),
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
         },
     }
 }
