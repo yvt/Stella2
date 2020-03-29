@@ -42,8 +42,9 @@ pub mod elem_id {
 use self::elem_id::*;
 
 /// Construct a `HImg` from an StVG image.
-fn himg_from_stvg(data: (&'static [u8], [f32; 2])) -> HImg {
-    StvgImg::new(data).into_himg()
+#[inline(never)]
+fn himg_from_stvg(data: &(&'static [u8], [f32; 2])) -> HImg {
+    StvgImg::new(*data).into_himg()
 }
 
 /// Construct a colorized `HImg` from an StVG image.
@@ -127,25 +128,25 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Toolbar buttons
         ([#GO_BACK.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_BACK)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::GO_BACK)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#GO_FORWARD.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::GO_FORWARD)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::GO_FORWARD)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_SHOW.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_SHOW)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_SHOW)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_HIDE.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(assets::toolbar::SIDEBAR_HIDE)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_HIDE)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
@@ -168,7 +169,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
-            #[dyn] layer_img[2]: Some(himg_from_stvg(assets::SEARCH)),
+            #[dyn] layer_img[2]: Some(himg_from_stvg(&assets::SEARCH)),
             layer_metrics[2]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: Vector2::new(16.0, 16.0),
@@ -243,7 +244,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         ([#SIDEBAR_GROUP_BULLET]) (priority = 10000) {
             num_layers: 1,
-            #[dyn] layer_img[0]: Some(himg_from_stvg(assets::LIST_GROUP_OPEN)),
+            #[dyn] layer_img[0]: Some(himg_from_stvg(&assets::LIST_GROUP_OPEN)),
             layer_metrics[0]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: Vector2::new(12.0, 12.0),
