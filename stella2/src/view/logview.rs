@@ -281,7 +281,7 @@ impl RowVisual {
                     builder.rounded_rect(
                         box2! {
                             top_right: [GUTTER_WIDTH - 6.0, y],
-                            size: [avatar_size; 2],
+                            size: [avatar_size, avatar_size],
                         },
                         [[2.0; 2]; 4],
                     );

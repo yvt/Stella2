@@ -303,7 +303,7 @@ impl Screen {
         let num_bytes = img_stride.checked_mul(surf_size[1]).unwrap();
 
         if (surf_size, dpi_scale) != (wnd.img_size, wnd.img_dpi_scale) {
-            wnd.dirty_rect = Some(box2! { min: [0, 0], max: surf_size });
+            wnd.dirty_rect = Some(box2! { min: [0, 0].into(), max: surf_size.into() });
             wnd.img_size = surf_size;
             wnd.img_data.resize(num_bytes, 0);
 

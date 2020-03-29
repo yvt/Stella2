@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use std::ops::Range;
 
 use super::{
     manager::PropKindFlags,
@@ -44,15 +45,7 @@ pub struct StylesheetMacroOutput {
     /// The static part (everything other than prop values) of the stylesheet.
     pub rules: &'static [Rule],
     /// The runtime part (prop values) of the stylesheet.
-    /// Each element corresponds an element in `rules` with an identical index.
-    pub ruleprops: Vec<RuleProps>,
-}
-
-/// The properties specified by a rule.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct RuleProps {
-    pub props: Vec<(Prop, PropValue)>,
+    pub props: Box<[(Prop, PropValue)]>,
 }
 
 #[doc(hidden)]
@@ -60,6 +53,8 @@ pub struct RuleProps {
 pub struct Rule {
     pub priority: i16,
     pub prop_kinds: PropKindFlags,
+    /// An index range into `StylesheetMacroOutput::props`.
+    pub props_range_u16: Range<u16>,
     pub selector: Selector,
 }
 
@@ -95,7 +90,12 @@ impl Stylesheet for StylesheetMacroOutput {
         self.rules.get(id).map(Rule::prop_kinds)
     }
     fn get_rule_prop_value(&self, id: RuleId, prop: &Prop) -> Option<Option<&PropValue>> {
-        self.ruleprops.get(id).map(|r| r.get_prop_value(prop))
+        self.rules.get(id).map(|r| {
+            self.props[r.props_range()]
+                .iter()
+                .find(|p| p.0 == *prop)
+                .map(|p| &p.1)
+        })
     }
 }
 
@@ -107,16 +107,9 @@ impl Rule {
     fn prop_kinds(&self) -> PropKindFlags {
         self.prop_kinds
     }
-}
 
-impl RuleProps {
-    pub fn new(items: Vec<(Prop, PropValue)>) -> Self {
-        Self { props: items }
-    }
-
-    fn get_prop_value(&self, prop: &Prop) -> Option<&PropValue> {
-        // TODO: Use binary search?
-        self.props.iter().find(|p| p.0 == *prop).map(|p| &p.1)
+    fn props_range(&self) -> Range<usize> {
+        self.props_range_u16.start as usize..self.props_range_u16.end as usize
     }
 }
 
@@ -237,196 +230,232 @@ macro_rules! sel {
     }};
 }
 
-/// This macro is used for two purposes:
-///  - To create `PropKindFlags`.
-///  - To create `(Prop, PropValue)`.
+/// This is an internal macro to be used by other macros defined in this module.
+///
+/// This macro accepts the following input forms:
+///
+///  - `prop!(@prop name[param])` produces a `Prop`.
+///  - `prop!(@constvalue #[dyn] name[param]: value)` produces a `PropValue` for
+///    the first pass.
+///  - `prop!(@setdynvalue(store_to) #[dyn] name[param]: value)` produces an
+///    expression assigning `PropValue` for the second pass.
+///
+/// The following input forms are internal:
+///
+///  - `prop!(@value name[param]: value)` produces a `PropValue`. If necessary,
+///    boxing is done in a way suitable for compile-time evaluation.
+///  - `prop!(@dynvalue name[param]: value)` produces a `PropValue`. If
+///    necessary, boxing is done in a way suitable for runtime evaluation. This
+///    will fallback to `@value` if boxing is not needed for the given prop.
+///
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop {
-    (@kind num_layers) => {
-        $crate::ui::theming::Prop::NumLayers.kind_flags()
+    // For the first pass, prop specifications with `#[dyn]` are replaced with
+    // dummy values.
+    (@constvalue #[dyn] $name:ident $($rest:tt)*) => {
+        $crate::ui::theming::PropValue::Bool(false)
     };
-    (num_layers: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::NumLayers,
-            $crate::ui::theming::PropValue::Usize($val),
-        )
-    };
-
-    (@kind layer_img[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerImg($i).kind_flags()
-    };
-    (layer_img[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerImg($i),
-            $crate::ui::theming::PropValue::Himg($val),
-        )
+    (@constvalue $name:ident $($rest:tt)*) => {
+        $crate::prop!(@value $name $($rest)*)
     };
 
-    (@kind layer_center[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerCenter($i).kind_flags()
+    // For the second pass, only the prop specifications with `#[dyn]` are
+    // evaluated.
+    (@setdynvalue($store_to:expr) #[dyn] $($rest:tt)*) => {
+        ::std::mem::forget(::std::mem::replace(
+            &mut $store_to,
+            $crate::prop!(@dynvalue $($rest)*),
+        ))
     };
-    (layer_center[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerCenter($i),
-            $crate::ui::theming::PropValue::Box2($val),
-        )
-    };
+    (@setdynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
 
-    (@kind layer_xform[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerXform($i).kind_flags()
-    };
-    (layer_xform[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerXform($i),
-            $crate::ui::theming::PropValue::LayerXform($val),
-        )
-    };
+    (@prop num_layers) => { $crate::ui::theming::Prop::NumLayers };
+    (@value num_layers: $val:expr) => { $crate::ui::theming::PropValue::Usize($val) };
 
-    (@kind layer_opacity[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerOpacity($i).kind_flags()
-    };
-    (layer_opacity[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerOpacity($i),
-            $crate::ui::theming::PropValue::Float($val),
-        )
-    };
+    (@prop layer_img[$i:expr]) => { $crate::ui::theming::Prop::LayerImg($i) };
+    (@value layer_img[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Himg($val) };
 
-    (@kind layer_bg_color[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerBgColor($i).kind_flags()
-    };
-    (layer_bg_color[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerBgColor($i),
-            $crate::ui::theming::PropValue::Rgbaf32($val),
-        )
-    };
+    (@prop layer_center[$i:expr]) => { $crate::ui::theming::Prop::LayerCenter($i) };
+    (@value layer_center[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Box2($val) };
 
-    (@kind layer_flags[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerFlags($i).kind_flags()
-    };
-    (layer_flags[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerFlags($i),
-            $crate::ui::theming::PropValue::LayerFlags($val),
-        )
-    };
+    (@prop layer_xform[$i:expr]) => { $crate::ui::theming::Prop::LayerXform($i) };
+    (@value layer_xform[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue layer_xform[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_box(Box::new($val))) };
 
-    (@kind layer_metrics[$i:expr]) => {
-        $crate::ui::theming::Prop::LayerMetrics($i).kind_flags()
-    };
-    (layer_metrics[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::LayerMetrics($i),
-            $crate::ui::theming::PropValue::Metrics($val),
-        )
-    };
+    (@prop layer_opacity[$i:expr]) => { $crate::ui::theming::Prop::LayerOpacity($i) };
+    (@value layer_opacity[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
 
-    (@kind subview_metrics[$i:expr]) => {
-        $crate::ui::theming::Prop::SubviewMetrics($i).kind_flags()
-    };
-    (subview_metrics[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::SubviewMetrics($i),
-            $crate::ui::theming::PropValue::Metrics($val),
-        )
-    };
+    (@prop layer_bg_color[$i:expr]) => { $crate::ui::theming::Prop::LayerBgColor($i) };
+    (@value layer_bg_color[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
 
-    (@kind subview_visibility[$i:expr]) => {
-        $crate::ui::theming::Prop::SubviewVisibility($i).kind_flags()
-    };
-    (subview_visibility[$i:expr]: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::SubviewVisibility($i),
-            $crate::ui::theming::PropValue::Bool($val),
-        )
-    };
+    (@prop layer_flags[$i:expr]) => { $crate::ui::theming::Prop::LayerFlags($i) };
+    (@value layer_flags[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerFlags($val) };
 
-    (@kind min_size) => {
-        $crate::ui::theming::Prop::MinSize.kind_flags()
-    };
-    (min_size: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::MinSize,
-            $crate::ui::theming::PropValue::Vector2($val),
-        )
-    };
+    (@prop layer_metrics[$i:expr]) => { $crate::ui::theming::Prop::LayerMetrics($i) };
+    (@value layer_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue layer_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
-    (@kind fg_color) => {
-        $crate::ui::theming::Prop::FgColor.kind_flags()
-    };
-    (fg_color: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::FgColor,
-            $crate::ui::theming::PropValue::Rgbaf32($val),
-        )
-    };
+    (@prop subview_metrics[$i:expr]) => { $crate::ui::theming::Prop::SubviewMetrics($i) };
+    (@value subview_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
+    (@dynvalue subview_metrics[$i:expr]: $val:expr) =>
+        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
-    (@kind font) => {
-        $crate::ui::theming::Prop::Font.kind_flags()
-    };
-    (font: $val:expr) => {
-        (
-            $crate::ui::theming::Prop::Font,
-            $crate::ui::theming::PropValue::SysFontType($val),
-        )
-    };
+    (@prop subview_visibility[$i:expr]) => { $crate::ui::theming::Prop::SubviewVisibility($i) };
+    (@value subview_visibility[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Bool($val) };
+
+    (@prop min_size) => { $crate::ui::theming::Prop::MinSize };
+    (@value min_size: $val:expr) => { $crate::ui::theming::PropValue::Vector2($val) };
+
+    (@prop fg_color) => { $crate::ui::theming::Prop::FgColor };
+    (@value fg_color: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
+
+    (@prop font) => { $crate::ui::theming::Prop::Font };
+    (@value font: $val:expr) => { $crate::ui::theming::PropValue::SysFontType($val) };
+
+    // `@dynvalue` falls back to `@value` if boxing is not necessary
+    (@dynvalue $($rest:tt)*) => { $crate::prop!(@value $($rest)*) };
 }
 
-/// Construct a `Vec<(Prop, PropValue)>`.
+/// Produces an expression of type `Vec<(Prop, PropValue)>`.
+///
+/// # Attributes
+///
+/// Usually we use `$(#[$m:meta])*` for attributes, but we can't here
+/// because the compiler gets confused about loop nesting. We intend to
+/// support only zero or one attribute for each rule, so fortunately there's a
+/// solution. For the cases where there's one attribute, the caller of this
+/// macro specifies input tokens like `#[a][b]`. This macro captures `[a]` and
+/// ignores `[b]`. For the cases where there are no attributes, the caller of
+/// this macro specifies input tokens like `#[b]`. `[b]` is usually something
+/// that will behave as if no attributes are specified at all. In this case,
+/// this macro captures `[b]`, thus simulating the effect of not specifying any
+/// attributes.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! props {
-    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
-        vec![
-            $( $crate::prop!($name $([$param])* : $value ), )*
-        ]
-    };
+    (
+        $(
+            // See the discussion in the doc comment for why we ignore the
+            // second token tree.
+            meta = # $meta:tt $([$($ignored:tt)*])?;
+            props = {
+                $( $(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr ),* $(,)*
+            };
+        )*
+    ) => {{
+        const PROP_COUNT: usize = {
+            let mut count = 0;
+            // For each rule...
+            $(
+                #$meta
+                {
+                    count += $crate::prop_count!{ $($name $([$param])* : $value,)* };
+                }
+            )*
+            count
+        };
+
+        // Pass 1: Create a static array containing all static property values
+        const PROPS: [($crate::ui::theming::Prop, $crate::ui::theming::PropValue); PROP_COUNT] = [
+            // For each rule...
+            $(
+                // (`$meta` is defined by each rule)
+
+                // For each prop specification...
+                $(
+                    // Repeat `$meta` for all prop specifications in the rule
+                    #$meta
+
+                    // Emit an element
+                    (
+                        $crate::prop!( @prop $name $([$param])* ),
+                        $crate::prop!( @constvalue $(#[$mod])* $name $([$param])* : $value ),
+                    ),
+                )*
+            )*
+        ];
+
+        let mut props = Box::new(PROPS);
+
+        // Pass 2: Assign runtime values
+        let mut props_ptr = &mut props[..];
+
+        // For each rule...
+        $(
+            #[allow(unused_assignments)]
+            #$meta
+            {
+                // For each prop specification...
+                $(
+                    // Update `props_ptr[0]` if the prop specification
+                    // has `#[dyn]`
+                    $crate::prop!(
+                        @setdynvalue(props_ptr[0].1)
+                        $(#[$mod])* $name $([$param])* : $value
+                    );
+                    props_ptr = &mut props_ptr[1..];
+                )*
+            }
+        )*
+
+        props
+    }};
 }
 
-/// Accepts the same syntax as `props`, but produces `PropKindFlags` instead.
+/// Given prop specifications, emits an expression of type `PropKindFlags`
+/// representing the union of `PropKindFlags` of the given prop specifications.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! prop_kinds {
-    ($( $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
+    ($( $(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr ),* $(,)* ) => {
         $crate::ui::theming::PropKindFlags::from_bits_truncate(
             // 0 | x | y | z | ...
             0
             $(
                 |
-                $crate::prop!(@kind $name $([$param])*).bits()
+                $crate::prop!(@prop $name $([$param])*).kind_flags().bits()
             )*
         )
     };
+}
+
+/// Given prop specifications, emits an integer literal representing the number
+/// of the prop specifications.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! prop_count {
+    ($(#[$mod:tt])* $name:ident $([$param:expr])* : $value:expr $(, $(,)* $($rest:tt)*)?) => {
+        1 + $crate::prop_count!($($($rest)*)?)
+    };
+    () => { 0 }
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rule {
     (
-        ($($sel:tt)*) (priority = $pri:expr) {
-            $($props:tt)*
-        }
-    ) => {
-        $crate::ui::theming::Rule {
-            priority: $pri,
-            prop_kinds: $crate::prop_kinds! { $($props)* },
-            selector: $crate::sel!($($sel)*),
-        }
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! ruleprops {
-    (
+        // The counter variable that keep track of the current index into
+        // `StylesheetMacroOutput::props`.
+        $i:expr,
         ($($sel:tt)*) (priority = $pri:expr) {
             $($props:tt)*
         }
     ) => {{
-        $crate::ui::theming::RuleProps {
-            props: $crate::props! { $($props)* },
+        let start = $i;
+        $i += $crate::prop_count! { $($props)* };
+        let end = $i;
+
+        $crate::ui::theming::Rule {
+            priority: $pri,
+            prop_kinds: $crate::prop_kinds! { $($props)* },
+            props_range_u16: start..end,
+            selector: $crate::sel!($($sel)*),
         }
     }};
 }
@@ -445,6 +474,8 @@ macro_rules! ruleprops {
 ///
 ///     const CUSTOM_ID: ClassSet = ClassSet::id(42);
 ///
+///     # #[tcw3::testing::use_testing_wm]
+///     # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
 ///     let stylesheet = stylesheet! {
 ///         // Selector are similar to CSS, but use predefined symbols instead.
 ///         //  - ID values (`CUSTOM_ID`) are constant expressions. They must be
@@ -454,6 +485,11 @@ macro_rules! ruleprops {
 ///             // Arbitrary expressions are permitted only as property values
 ///             // like the following:
 ///             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
+///
+///             // Non-constant expressions require `#[dyn]`.
+///             #[dyn] layer_img[0]: Some(
+///                 tcw3::images::himg_figures![rect([0.1, 0.4, 0.8, 1.0])]
+///             ),
 ///         },
 ///
 ///         #[cfg(target_os = "windows")]
@@ -462,6 +498,8 @@ macro_rules! ruleprops {
 ///             layer_opacity[0]: 0.5,
 ///         },
 ///     };
+///     # }
+///     # inner();
 ///
 #[macro_export]
 macro_rules! stylesheet {
@@ -469,7 +507,7 @@ macro_rules! stylesheet {
         // for each rule...
         $(
             // `#[cfg(...)]`, etc.
-            $( #[$cfg:meta] )*
+            $( #[$cfg:meta] )?
             // scope and priority
             $( ($( $meta:tt )*) )*
             // props
@@ -477,20 +515,21 @@ macro_rules! stylesheet {
         ),*
         $(,)*
     ) => {{
-        static RULES: &[$crate::ui::theming::Rule] = &[
-            $(
-                $( #[$cfg] )*
-                $crate::rule!( $(($($meta)*))* {$($rule)*} ),
-            )*
-        ];
-        $crate::ui::theming::StylesheetMacroOutput {
-            rules: RULES,
-            ruleprops: std::vec![
+        static RULES: &[$crate::ui::theming::Rule] = {
+            let mut i = 0;
+            &[
                 $(
                     $( #[$cfg] )*
-                    $crate::ruleprops!( $(($($meta)*))* {$($rule)*} ),
+                    $crate::rule!( i, $(($($meta)*))* {$($rule)*} ),
                 )*
-            ],
+            ]
+        };
+        $crate::ui::theming::StylesheetMacroOutput {
+            rules: RULES,
+            props: $crate::props!{$(
+                meta = #$([$cfg])* [cfg(all())];
+                props = { $($rule)* };
+            )*}
         }
     }};
 }
@@ -502,6 +541,7 @@ macro_rules! stylesheet {
 //
 use crate::{images::himg_figures, pal::RGBAF32};
 use cggeom::box2;
+use cgmath::Vector2;
 use std::f32::NAN;
 
 const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
@@ -515,7 +555,7 @@ lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.8,
             subview_metrics[Role::Generic]: Metrics {
@@ -527,7 +567,7 @@ lazy_static! {
             layer_opacity[0]: 1.0,
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
-            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
         },
         // Button label
         ([] < [.BUTTON]) (priority = 100) {
@@ -542,20 +582,20 @@ lazy_static! {
             num_layers: 2,
 
             // Focus ring
-            layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
                 margin: [-2.0; 4],
-                ..Default::default()
+                ..Metrics::default()
             },
 
             // Background
-            layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
             subview_metrics[Role::Generic]: Metrics {
                 margin: [0.0; 4],
-                size: [NAN, FIELD_HEIGHT].into(),
+                size: Vector2::new(NAN, FIELD_HEIGHT),
             },
         },
         ([.ENTRY.FOCUS]) (priority = 200) {
@@ -569,7 +609,7 @@ lazy_static! {
         // Scrollbar
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![
+            #[dyn] layer_img[0]: Some(himg_figures![
                 rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
             ]),
             layer_metrics[0]: Metrics {
@@ -585,29 +625,29 @@ lazy_static! {
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
-                size: [NAN, SCROLLBAR_VISUAL_WIDTH].into(),
+                size: Vector2::new(NAN, SCROLLBAR_VISUAL_WIDTH),
             },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
-                size: [SCROLLBAR_VISUAL_WIDTH, NAN].into(),
+                size: Vector2::new(SCROLLBAR_VISUAL_WIDTH, NAN),
             },
         },
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            layer_img[0]: Some(himg_figures![
+            #[dyn] layer_img[0]: Some(himg_figures![
                 rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
             ]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
-            min_size: [SCROLLBAR_LEN_MIN, 0.0].into(),
+            min_size: Vector2::new(SCROLLBAR_LEN_MIN, 0.0),
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
-            min_size: [0.0, SCROLLBAR_LEN_MIN].into(),
+            min_size: Vector2::new(0.0, SCROLLBAR_LEN_MIN),
         },
 
         ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
@@ -654,8 +694,8 @@ lazy_static! {
         // Splitter
         ([.SPLITTER]) (priority = 100) {
             num_layers: 1,
-            layer_bg_color[0]: [0.5, 0.5, 0.5, 0.8].into(),
-            min_size: [1.0, 1.0].into(),
+            layer_bg_color[0]: RGBAF32::new(0.5, 0.5, 0.5, 0.8),
+            min_size: Vector2::new(1.0, 1.0),
         },
     };
 }

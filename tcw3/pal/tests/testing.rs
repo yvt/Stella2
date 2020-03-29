@@ -492,7 +492,7 @@ fn wnd_with_layer() {
             bg_color: Some([0.2, 0.3, 0.4, 0.8].into()),
             flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
             transform: Some(Matrix3::from_angle(Deg(30.0))),
-            bounds: Some(box2! { top_left: [10.0; 2], size: [30.0; 2] }),
+            bounds: Some(box2! { top_left: [10.0, 10.0], size: [30.0, 30.0] }),
             ..Default::default()
         });
 
@@ -553,7 +553,7 @@ fn defer_layer_changes_until_update_wnd() {
             flags: Some(pal::LayerFlags::MASK_TO_BOUNDS),
             transform: Some(Matrix3::from_angle(Deg(30.0))),
             // Off-screen
-            bounds: Some(box2! { top_left: [-40.0; 2], size: [30.0; 2] }),
+            bounds: Some(box2! { top_left: [-40.0, -40.0], size: [30.0, 30.0] }),
             ..Default::default()
         });
 
@@ -576,7 +576,7 @@ fn defer_layer_changes_until_update_wnd() {
         wm.set_layer_attr(
             &hlayer,
             pal::LayerAttrs {
-                bounds: Some(box2! { top_left: [10.0; 2], size: [30.0; 2] }),
+                bounds: Some(box2! { top_left: [10.0, 10.0], size: [30.0, 30.0] }),
                 ..Default::default()
             },
         );

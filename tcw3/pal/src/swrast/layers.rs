@@ -200,7 +200,7 @@ impl<TBmp> Default for LayerAttrs<TBmp> {
             transform: Matrix3::identity(),
             contents: None,
             bounds: Box2::zero(),
-            contents_center: box2! { min: [0.0; 2], max: [1.0; 2] },
+            contents_center: box2! { min: [0.0, 0.0], max: [1.0, 1.0] },
             contents_scale: 1.0,
             bg_color: [0.0; 4].into(),
             opacity: 1.0,
@@ -490,7 +490,7 @@ impl<TBmp: Bmp> Screen<TBmp> {
         let wnd = &mut self.wnds[hwnd.ptr];
         if wnd.dirty {
             wnd.dirty = false;
-            dirty_region = Some(box2! { min: [0, 0], max: wnd.size });
+            dirty_region = Some(box2! { min: [0, 0].into(), max: wnd.size.into() });
         }
 
         dirty_region

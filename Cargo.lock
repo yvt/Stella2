@@ -2154,6 +2154,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
 
 [[package]]
+name = "rob"
+version = "0.1.0"
+source = "git+https://github.com/yvt/rust-rob?rev=c2d723c6c2672914c6d8ac9d0d3cc80b5d99cbb9#c2d723c6c2672914c6d8ac9d0d3cc80b5d99cbb9"
+
+[[package]]
 name = "rope"
 version = "0.1.0"
 dependencies = [
@@ -2602,6 +2607,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rc-borrow",
+ "rob",
  "rope",
  "sorted_diff",
  "structopt",

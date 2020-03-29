@@ -1,6 +1,6 @@
 use alt_fp::FloatOrd;
 use arrayvec::ArrayVec;
-use cggeom::{prelude::*, Box2};
+use cggeom::Box2;
 use cgmath::{Point2, Vector2};
 use iterpool::Pool;
 use ndarray::Array2;

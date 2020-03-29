@@ -18,6 +18,10 @@ pub use tcw3_images as images;
 pub use tcw3_pal as pal;
 pub use tcw3_testing as testing;
 
+// Re-export `rob` to use from `stylesheet!`
+#[doc(hidden)]
+pub use rob;
+
 pub mod ui;
 pub mod uicore;
 

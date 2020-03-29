@@ -57,3 +57,12 @@ tcw3_pal = { opt-level = 3 }
 # to be merged
 git = "https://github.com/yvt/winapi-rs.git"
 rev = "a6df41df91d6b8c156cff69bede2da2196c663cb"
+
+[patch.crates-io.rob]
+# Waiting for the following PRs to be merged:
+# - “Make `from_ref`, `from_raw`, and `is_owned` `const fn`”
+#   <https://github.com/eduardosm/rust-rob/pull/1>
+# - “Implement `Send` and `Sync`”
+#   <https://github.com/eduardosm/rust-rob/pull/2>
+git = "https://github.com/yvt/rust-rob"
+rev = "c2d723c6c2672914c6d8ac9d0d3cc80b5d99cbb9"

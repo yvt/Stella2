@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Rad, Vector2};
+use rob::Rob;
 
 use crate::pal::{LayerFlags, SysFontType, RGBAF32};
 
@@ -170,31 +171,35 @@ pub enum PropValue {
     Usize(usize),
     Himg(Option<crate::images::HImg>),
     Rgbaf32(RGBAF32),
-    Metrics(Metrics),
+    Metrics(Rob<'static, Metrics>),
     Vector2(Vector2<f32>),
     Point2(Point2<f32>),
     Box2(Box2<f32>),
-    LayerXform(LayerXform),
+    LayerXform(Rob<'static, LayerXform>),
     SysFontType(SysFontType),
     LayerFlags(LayerFlags),
 }
 
 impl PropValue {
     pub fn default_for_prop(prop: &Prop) -> Self {
+        static DEFAULT_METRICS: Metrics = Metrics::default();
         match prop {
             Prop::NumLayers => PropValue::Usize(0),
             Prop::LayerImg(_) => PropValue::Himg(None),
             Prop::LayerBgColor(_) => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 0.0)),
-            Prop::LayerMetrics(_) => PropValue::Metrics(Metrics::default()),
+            Prop::LayerMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::LayerOpacity(_) => PropValue::Float(1.0),
             Prop::LayerCenter(_) => PropValue::Box2(box2! {
                 min: [0.0, 0.0], max: [1.0, 1.0]
             }),
-            Prop::LayerXform(_) => PropValue::LayerXform(LayerXform::default()),
+            Prop::LayerXform(_) => {
+                static DEFAULT: LayerXform = LayerXform::default();
+                PropValue::LayerXform(Rob::from_ref(&DEFAULT))
+            }
             Prop::LayerFlags(_) => PropValue::LayerFlags(LayerFlags::default()),
-            Prop::SubviewMetrics(_) => PropValue::Metrics(Metrics::default()),
+            Prop::SubviewMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::SubviewVisibility(_) => PropValue::Bool(true),
-            Prop::ClipMetrics => PropValue::Metrics(Metrics::default()),
+            Prop::ClipMetrics => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
             Prop::FgColor => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)),
             Prop::Font => PropValue::SysFontType(SysFontType::Normal),
@@ -214,12 +219,18 @@ pub struct Metrics {
     pub size: Vector2<f32>,
 }
 
-impl Default for Metrics {
-    fn default() -> Self {
+impl Metrics {
+    pub const fn default() -> Self {
         Self {
             margin: [0.0; 4],
-            size: [std::f32::NAN; 2].into(),
+            size: Vector2::new(std::f32::NAN, std::f32::NAN),
         }
+    }
+}
+
+impl Default for Metrics {
+    fn default() -> Self {
+        Self::default()
     }
 }
 
@@ -291,14 +302,20 @@ pub struct LayerXform {
     pub translate: Vector2<f32>,
 }
 
-impl Default for LayerXform {
-    fn default() -> Self {
+impl LayerXform {
+    pub const fn default() -> Self {
         Self {
-            anchor: [0.5; 2].into(),
+            anchor: Point2::new(0.5, 0.5),
             scale: [1.0; 2],
             rotate: Rad(0.0),
-            translate: [0.0; 2].into(),
+            translate: Vector2::new(0.0, 0.0),
         }
+    }
+}
+
+impl Default for LayerXform {
+    fn default() -> Self {
+        Self::default()
     }
 }
 
