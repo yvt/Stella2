@@ -188,7 +188,7 @@ pub trait Icon {
     /// Writes the contents of the icon to `w`.
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use icon_baker::*;
     /// use std::{io, fs::File};
     ///
