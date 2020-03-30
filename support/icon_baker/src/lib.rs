@@ -26,7 +26,7 @@
 //! use icon_baker::*;
 //!
 //! fn example() -> icon_baker::Result<()> {
-//!     let icon = Ico::new();
+//!     let mut icon = Ico::new();
 //!
 //!     match SourceImage::from_path("image.svg") {
 //!         Some(img) => icon.add_entry(resample::linear, &img, 32),
@@ -41,12 +41,12 @@
 //! use std::{io, fs::File};
 //!
 //! fn example() -> io::Result<()> {
-//!     let icon = PngSequence::new();
+//!     let mut icon = Icns::new();
 //!
 //!     /* Process the icon */
 //!
-//!     let file = File::create("ou.icns")?;
-//!     icon.write(file)
+//!     let mut file = File::create("ou.icns")?;
+//!     icon.write(&mut file)
 //! }
 //! ```
 //!
@@ -98,6 +98,7 @@ pub trait Icon {
     ///
     /// # Example
     /// ```rust
+    /// use icon_baker::{Ico, Icon};
     /// let icon = Ico::new();
     /// ```
     fn new() -> Self;
@@ -122,7 +123,7 @@ pub trait Icon {
     /// use icon_baker::*;
     ///
     /// fn main() -> icon_baker::Result<()> {
-    ///     let icon = Ico::new();
+    ///     let mut icon = Ico::new();
     ///
     ///     match SourceImage::from_path("image.svg") {
     ///         Some(img) => icon.add_entry(resample::linear, &img, 32),
@@ -156,7 +157,7 @@ pub trait Icon {
     /// use icon_baker::*;
     ///
     /// fn main() -> icon_baker::Result<()> {
-    ///     let icon = Icns::new();
+    ///     let mut icon = Icns::new();
     ///
     ///     match SourceImage::from_path("image.svg") {
     ///         Some(img) => icon.add_entries(
@@ -192,12 +193,12 @@ pub trait Icon {
     /// use std::{io, fs::File};
     ///
     /// fn main() -> io::Result<()> {
-    ///     let icon = PngSequence::new();
+    ///     let mut icon = Icns::new();
     ///
     ///     /* Process the icon */
     ///
-    ///     let file = File::create("out.icns")?;
-    ///     icon.write(file)
+    ///     let mut file = File::create("out.icns")?;
+    ///     icon.write(&mut file)
     /// }
     /// ```
     fn write<W: Write>(&mut self, w: &mut W) -> io::Result<()>;
@@ -231,8 +232,8 @@ impl SourceImage {
     /// methods should always be preferred.
     ///
     /// # Example
-    /// ```rust
-    /// let img = SourceImage::from_path("source.png")?;
+    /// ```no_compile
+    /// let img = SourceImage::from_path("source.png");
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
         match image::open(&path) {
