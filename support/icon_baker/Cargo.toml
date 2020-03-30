@@ -11,7 +11,6 @@ readme = "README.md"
 keywords = ["icon", "ico", "icns"]
 
 [dependencies]
-tar = "0.4.26"
 nsvg = "0.5.0"
 ico = "0.1.0"
 icns = "0.3.0"

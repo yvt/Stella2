@@ -87,21 +87,3 @@ fn test_icns() {
         panic!("{:?}", err);
     }
 }
-
-#[test]
-fn test_png() {
-    let mut file = File::create("tests/test.tar")
-        .expect("Couldn't create file");
-
-    let mut icon = PngSequence::new();
-    let img = SourceImage::from_path("tests/hydra.png")
-        .expect("File not found");
-
-    if let Err(err) = icon.add_entries(resample::linear, &img, vec![32, 64]) {
-        panic!("{:?}", err);
-    }
-
-    if let Err(err) = icon.write(&mut file) {
-        panic!("{:?}", err);
-    }
-}

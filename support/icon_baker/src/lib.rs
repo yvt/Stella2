@@ -2,64 +2,64 @@
 //!  such as `.ico` and `.icns`. This crate is mostly a wrapper
 //!  for other libraries, unifying existing APIs into a single,
 //!  cohesive interface.
-//! 
+//!
 //! This crate serves as **[IconPie's](https://github.com/GarkGarcia/icon-pie)**
 //!  internal library.
-//! 
+//!
 //! # Overview
-//! 
+//!
 //! An icon stores a collection of small images of different
 //!  sizes. Individual images within the icon are bound to a
 //!  source image, which is rescaled to fit a particular size
 //!  using a resampling filter.
-//! 
+//!
 //! Resampling filters are represented by functions that take
 //!  a source image and a size and return a rescaled raw RGBA
 //!  buffer. This allows the users of this crate to provide
 //!  their custom resampling filters. Common resampling filters
 //!  are provided by the `resample` module.
-//! 
+//!
 //! # Examples
-//! 
+//!
 //! ## General Usage
 //! ```rust
 //! use icon_baker::*;
-//!  
+//!
 //! fn example() -> icon_baker::Result<()> {
 //!     let icon = Ico::new();
-//! 
+//!
 //!     match SourceImage::from_path("image.svg") {
 //!         Some(img) => icon.add_entry(resample::linear, &img, 32),
 //!         None      => Ok(())
 //!     }
 //! }
 //! ```
-//! 
+//!
 //! ## Writing to a File
 //! ```rust
 //! use icon_baker::*;
 //! use std::{io, fs::File};
-//!  
+//!
 //! fn example() -> io::Result<()> {
 //!     let icon = PngSequence::new();
-//! 
+//!
 //!     /* Process the icon */
-//! 
+//!
 //!     let file = File::create("ou.icns")?;
 //!     icon.write(file)
 //! }
 //! ```
-//! 
+//!
 //! # Supported Image Formats
-//! | Format | Supported?                                         | 
-//! | ------ | -------------------------------------------------- | 
-//! | `PNG`  | All supported color types                          | 
-//! | `JPEG` | Baseline and progressive                           | 
-//! | `GIF`  | Yes                                                | 
-//! | `BMP`  | Yes                                                | 
-//! | `ICO`  | Yes                                                | 
-//! | `TIFF` | Baseline(no fax support), `LZW`, PackBits          | 
-//! | `WEBP` | Lossy(Luma channel only)                           | 
+//! | Format | Supported?                                         |
+//! | ------ | -------------------------------------------------- |
+//! | `PNG`  | All supported color types                          |
+//! | `JPEG` | Baseline and progressive                           |
+//! | `GIF`  | Yes                                                |
+//! | `BMP`  | Yes                                                |
+//! | `ICO`  | Yes                                                |
+//! | `TIFF` | Baseline(no fax support), `LZW`, PackBits          |
+//! | `WEBP` | Lossy(Luma channel only)                           |
 //! | `PNM ` | `PBM`, `PGM`, `PPM`, standard `PAM`                |
 //! | `SVG`  | Limited(flat filled shapes only)                   |
 
@@ -70,8 +70,6 @@ pub use nsvg::{image::{self, DynamicImage, RgbaImage, GenericImage}, SvgImage};
 
 pub use crate::ico::Ico;
 pub use crate::icns::Icns;
-pub use crate::png_sequence::PngSequence;
-pub use crate::favicon::FavIcon;
 
 pub type Size = u32;
 pub type Result<T> = result::Result<T, Error>;
@@ -80,8 +78,6 @@ pub type Result<T> = result::Result<T, Error>;
 mod test;
 mod ico;
 mod icns;
-mod favicon;
-mod png_sequence;
 pub mod resample;
 
 const INVALID_SIZE_ERROR: &str = "invalid size supplied to the add_entry method";
@@ -89,7 +85,7 @@ const INVALID_SIZE_ERROR: &str = "invalid size supplied to the add_entry method"
 /// A generic representation of an icon encoder.
 pub trait Icon {
     /// Creates a new icon.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// let icon = Ico::new();
@@ -97,12 +93,12 @@ pub trait Icon {
     fn new() -> Self;
 
     /// Adds an individual entry to the icon.
-    /// 
+    ///
     /// # Arguments
     /// * `filter` The resampling filter that will be used to re-scale `source`.
     /// * `source` A reference to the source image this entry will be based on.
     /// * `size` The target size of the entry in pixels.
-    /// 
+    ///
     /// # Return Value
     /// * Returns `Err(Error::InvalidSize(_))` if the dimensions provided in the
     ///  `size` argument are not supported.
@@ -110,14 +106,14 @@ pub trait Icon {
     ///  if the resampling filter provided in the `filter` argument produces
     ///  results of dimensions other than the ones specified by `size`.
     /// * Otherwise return `Ok(())`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use icon_baker::*;
-    ///  
+    ///
     /// fn main() -> icon_baker::Result<()> {
     ///     let icon = Ico::new();
-    /// 
+    ///
     ///     match SourceImage::from_path("image.svg") {
     ///         Some(img) => icon.add_entry(resample::linear, &img, 32),
     ///         None      => Ok(())
@@ -136,7 +132,7 @@ pub trait Icon {
     /// * `filter` The resampling filter that will be used to re-scale `source`.
     /// * `source` A reference to the source image this entry will be based on.
     /// * `size` A container for the target sizes of the entries in pixels.
-    /// 
+    ///
     /// # Return Value
     /// * Returns `Err(Error::InvalidSize(_))` if the dimensions provided in the
     ///  `size` argument are not supported.
@@ -144,14 +140,14 @@ pub trait Icon {
     ///  if the resampling filter provided in the `filter` argument produces
     ///  results of dimensions other than the ones specified by `size`.
     /// * Otherwise return `Ok(())`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use icon_baker::*;
-    ///  
+    ///
     /// fn main() -> icon_baker::Result<()> {
     ///     let icon = Icns::new();
-    /// 
+    ///
     ///     match SourceImage::from_path("image.svg") {
     ///         Some(img) => icon.add_entries(
     ///             resample::linear,
@@ -176,17 +172,17 @@ pub trait Icon {
     }
 
     /// Writes the contents of the icon to `w`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use icon_baker::*;
     /// use std::{io, fs::File};
-    ///  
+    ///
     /// fn main() -> io::Result<()> {
     ///     let icon = PngSequence::new();
-    /// 
+    ///
     ///     /* Process the icon */
-    /// 
+    ///
     ///     let file = File::create("out.icns")?;
     ///     icon.write(file)
     /// }
@@ -217,10 +213,10 @@ pub enum Error {
 
 impl SourceImage {
     /// Attempts to create a `SourceImage` from a given path.
-    /// 
+    ///
     /// The `SourceImage::from<DynamicImage>` and `SourceImage::from<SvgImage>`
     /// methods should always be preferred.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// let img = SourceImage::from_path("source.png")?;
