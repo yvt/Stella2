@@ -1,0 +1,17 @@
+[package]
+name = "icon_baker"
+version = "2.3.0"
+authors = ["Gark Garcia <thiago.brevidelli.garcia@protonmail.com>"]
+edition = "2018"
+description = "A simple solution for encoding common icon file formats."
+license-file = "LICENSE"
+repository = "https://github.com/GarkGarcia/icon_baker"
+homepage = "https://github.com/GarkGarcia/icon_baker"
+readme = "README.md"
+keywords = ["icon", "ico", "icns"]
+
+[dependencies]
+nsvg = { version = "0.5.0", default-features = false }
+ico = "0.1.0"
+icns = "0.3.0"
+image = { version = "0.23.2", default-features = false }

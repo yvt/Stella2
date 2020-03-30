@@ -123,6 +123,7 @@ nix-shell --run 'cargo build --release -p stella2'
 This source tree includes the following third-party projects:
 
  - (Git subtree) <https://github.com/yvt/alt_fp-rs> at `support/alt_fp`
+ - (Git subtree) <https://github.com/GarkGarcia/icon_baker> at `support/icon_baker`. It's not included in the final binary.
  - `stvg_macro` is partly based on [Pathfinder 3](https://github.com/servo/pathfinder), licensed by the Pathfinder Project developers under the Apache License, Version 2.0 or the MIT license. Being a procedural macro, it's not included in the final binary.
 
 ## License
