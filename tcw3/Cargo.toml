@@ -24,6 +24,7 @@ itertools = "0.8.0"
 lazy_static = "1"
 leakypool = { path = "../support/leakypool" }
 log = "0.4"
+macro_rules_attribute = "0.0.1"
 minisort = { path = "../support/minisort" }
 ndarray = "0.13.0"
 neo_linked_list = { path = "../support/neo_linked_list" }
@@ -35,7 +36,6 @@ sorted_diff = { path = "../support/sorted_diff" }
 subscriber_list = { path = "../support/subscriber_list" }
 svgbobdoc = "0.2"
 try_match = "0.2.1"
-variant_count = "1.0.0"
 
 tcw3_designer_runtime = { path = "designer_runtime" }
 tcw3_images = { path = "images" }

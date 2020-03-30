@@ -18,6 +18,12 @@ pub use tcw3_images as images;
 pub use tcw3_pal as pal;
 pub use tcw3_testing as testing;
 
+#[macro_use]
+mod utils {
+    #[macro_use]
+    mod variant_count;
+}
+
 // Re-export `rob` to use from `stylesheet!`
 #[doc(hidden)]
 pub use rob;

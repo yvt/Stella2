@@ -99,7 +99,8 @@ pub mod elem_id {
 pub type ElemClassPath = [ClassSet];
 
 /// A role of a subview.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, variant_count::VariantCount)]
+#[macro_rules_attribute::macro_rules_attribute(variant_count!)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
     /// The default role.
     Generic = 0,

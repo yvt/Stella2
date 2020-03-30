@@ -1302,6 +1302,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d947cbb889ed21c2a84be6ffbaebf5b4e0f4340638cba0444907e38b56be084"
 
 [[package]]
+name = "macro_rules_attribute"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba872376c62e14e3f35fbdd7ac7ba50382f0bb22fb558e67e63b87069f9462a9"
+dependencies = [
+ "macro_rules_attribute-proc_macro",
+]
+
+[[package]]
+name = "macro_rules_attribute-proc_macro"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b3e35e29d93aba52f0ba55643197ee3e9f578060739615575fe753ba8d59b45"
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2599,6 +2614,7 @@ dependencies = [
  "leakypool",
  "lipsum",
  "log",
+ "macro_rules_attribute",
  "minisort",
  "momo",
  "ndarray",
@@ -2619,7 +2635,6 @@ dependencies = [
  "tcw3_pal",
  "tcw3_testing",
  "try_match",
- "variant_count",
 ]
 
 [[package]]
@@ -2915,16 +2930,6 @@ checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
 dependencies = [
  "rand 0.7.3",
  "serde",
-]
-
-[[package]]
-name = "variant_count"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a354a533b2174d183981d781a3b7eaf5f747a818332ba65cbf96c70285866b0"
-dependencies = [
- "quote 0.6.13",
- "syn 0.15.44",
 ]
 
 [[package]]
