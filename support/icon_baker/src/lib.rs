@@ -65,20 +65,30 @@
 
 pub extern crate nsvg;
 
-use std::{result, error, convert::From, path::Path, io::{self, Write}, fmt::{self, Display}};
-pub use nsvg::{image::{self, DynamicImage, RgbaImage, GenericImage}, SvgImage};
+pub use nsvg::{
+    image::{self, DynamicImage, GenericImage, RgbaImage},
+    SvgImage,
+};
+use std::{
+    convert::From,
+    error,
+    fmt::{self, Display},
+    io::{self, Write},
+    path::Path,
+    result,
+};
 
-pub use crate::ico::Ico;
 pub use crate::icns::Icns;
+pub use crate::ico::Ico;
 
 pub type Size = u32;
 pub type Result<T> = result::Result<T, Error>;
 
+mod icns;
+mod ico;
+pub mod resample;
 #[cfg(test)]
 mod test;
-mod ico;
-mod icns;
-pub mod resample;
 
 const INVALID_SIZE_ERROR: &str = "invalid size supplied to the add_entry method";
 
@@ -124,7 +134,7 @@ pub trait Icon {
         &mut self,
         filter: F,
         source: &SourceImage,
-        size: Size
+        size: Size,
     ) -> Result<()>;
 
     /// Adds a series of entries to the icon.
@@ -158,11 +168,14 @@ pub trait Icon {
     ///     }
     /// }
     /// ```
-    fn add_entries<F: FnMut(&SourceImage, Size) -> Result<RgbaImage>,I: IntoIterator<Item = Size>>(
+    fn add_entries<
+        F: FnMut(&SourceImage, Size) -> Result<RgbaImage>,
+        I: IntoIterator<Item = Size>,
+    >(
         &mut self,
         mut filter: F,
         source: &SourceImage,
-        sizes: I
+        sizes: I,
     ) -> Result<()> {
         for size in sizes.into_iter() {
             self.add_entry(|src, size| filter(src, size), source, size)?;
@@ -195,7 +208,7 @@ pub enum SourceImage {
     /// A generic raster image.
     Raster(DynamicImage),
     /// A svg-encoded vector image.
-    Svg(SvgImage)
+    Svg(SvgImage),
 }
 
 #[derive(Debug)]
@@ -208,7 +221,7 @@ pub enum Error {
     /// An unsupported size was suplied to an `Icon` operation.
     InvalidSize(Size),
     /// Generic I/O error.
-    Io(io::Error)
+    Io(io::Error),
 }
 
 impl SourceImage {
@@ -224,14 +237,10 @@ impl SourceImage {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
         match image::open(&path) {
             Ok(bit) => Some(SourceImage::Raster(bit)),
-            Err(_)  => match nsvg::parse_file(
-                path.as_ref(),
-                nsvg::Units::Pixel,
-                96.0
-            ) {
+            Err(_) => match nsvg::parse_file(path.as_ref(), nsvg::Units::Pixel, 96.0) {
                 Ok(svg) => Some(SourceImage::Svg(svg)),
-                Err(_)  => None
-            }
+                Err(_) => None,
+            },
         }
     }
 
@@ -239,7 +248,7 @@ impl SourceImage {
     pub fn width(&self) -> f32 {
         match self {
             SourceImage::Raster(bit) => bit.width() as f32,
-            SourceImage::Svg(svg)    => svg.width()
+            SourceImage::Svg(svg) => svg.width(),
         }
     }
 
@@ -247,7 +256,7 @@ impl SourceImage {
     pub fn height(&self) -> f32 {
         match self {
             SourceImage::Raster(bit) => bit.height() as f32,
-            SourceImage::Svg(svg)    => svg.height()
+            SourceImage::Svg(svg) => svg.height(),
         }
     }
 
@@ -272,10 +281,10 @@ impl From<DynamicImage> for SourceImage {
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Nsvg(err)      => write!(f, "{}", err),
-            Error::Image(err)     => write!(f, "{}", err),
-            Error::Io(err)        => write!(f, "{}", err),
-            Error::InvalidSize(_) => write!(f, "{}", INVALID_SIZE_ERROR)
+            Error::Nsvg(err) => write!(f, "{}", err),
+            Error::Image(err) => write!(f, "{}", err),
+            Error::Io(err) => write!(f, "{}", err),
+            Error::InvalidSize(_) => write!(f, "{}", INVALID_SIZE_ERROR),
         }
     }
 }
@@ -283,19 +292,19 @@ impl Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            Error::Nsvg(err)      => err.description(),
-            Error::Image(err)     => err.description(),
-            Error::Io(err)        => err.description(),
-            Error::InvalidSize(_) => INVALID_SIZE_ERROR
+            Error::Nsvg(err) => err.description(),
+            Error::Image(err) => err.description(),
+            Error::Io(err) => err.description(),
+            Error::InvalidSize(_) => INVALID_SIZE_ERROR,
         }
     }
 
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            Error::Nsvg(err)      => err.source(),
-            Error::Image(err)     => err.source(),
-            Error::Io(ref err)    => Some(err),
-            Error::InvalidSize(_) => None
+            Error::Nsvg(err) => err.source(),
+            Error::Image(err) => err.source(),
+            Error::Io(ref err) => Some(err),
+            Error::InvalidSize(_) => None,
         }
     }
 }
