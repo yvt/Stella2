@@ -1130,9 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "icon_baker"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea1a2430d36fc436750b2f210de537c62661533c1d6c6c5309709097b53f96b"
+version = "2.3.0"
 dependencies = [
  "icns",
  "ico",
