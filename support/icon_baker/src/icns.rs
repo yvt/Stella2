@@ -1,7 +1,7 @@
 extern crate icns;
 
 use crate::{Error, Icon, Result, Size, SourceImage};
-use nsvg::image::{ImageError, RgbaImage};
+use image::RgbaImage;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Write},
@@ -29,9 +29,10 @@ impl Icon for Icns {
         let icon = filter(source, size)?;
 
         // The Image::from_data method only fails when the specified
-        // image dimensions do not fit the buffer length
-        let image = icns::Image::from_data(icns::PixelFormat::RGBA, size, size, icon.into_vec())
-            .map_err(|_| Error::Image(ImageError::DimensionError))?;
+        // image dimensions do not fit the buffer length, which is a contract
+        // breach by `F`
+        let image =
+            icns::Image::from_data(icns::PixelFormat::RGBA, size, size, icon.into_vec()).unwrap();
 
         // The IconFamily::add_icon method only fails when the
         // specified image dimensions are not supported by ICNS

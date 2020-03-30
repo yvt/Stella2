@@ -1,7 +1,7 @@
 extern crate ico;
 
 use crate::{Error, Icon, Result, Size, SourceImage};
-use nsvg::image::{ImageError, RgbaImage};
+use image::RgbaImage;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Write},
@@ -35,9 +35,7 @@ impl Icon for Ico {
         }
 
         let icon = filter(source, size)?;
-        if icon.width() != size || icon.height() != size {
-            return Err(Error::Image(ImageError::DimensionError));
-        }
+        assert_eq!([icon.width(), icon.height()], [size; 2]);
 
         let size = icon.width();
         let data = ico::IconImage::from_rgba_data(size, size, icon.into_vec());

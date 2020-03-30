@@ -65,10 +65,8 @@
 
 pub extern crate nsvg;
 
-pub use nsvg::{
-    image::{self, DynamicImage, GenericImage, RgbaImage},
-    SvgImage,
-};
+pub use image::{self, DynamicImage, GenericImage, GenericImageView, RgbaImage};
+pub use nsvg::SvgImage;
 use std::{
     convert::From,
     error,
