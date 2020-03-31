@@ -44,8 +44,8 @@ tcw3_pal = { path = "pal" }
 tcw3_testing = { path = "testing" }
 
 [dependencies.momo]
-git = "https://github.com/llogiq/momo.git"
-rev = "3d9d9709a5675bf3f5ebddcb3c1ec8ccf91e9b40"
+git = "https://github.com/yvt/momo.git"
+rev = "26101cc1dacfd4afe9906af464fcbecaca6a18e2"
 
 [dev-dependencies]
 enclose = "1.1.8"
