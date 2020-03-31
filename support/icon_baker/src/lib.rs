@@ -289,6 +289,9 @@ impl Display for Error {
 }
 
 impl error::Error for Error {
+    // Do not warn on the uses of `description` because we are just delegating
+    // to the inner error object
+    #[allow(deprecated)]
     fn description(&self) -> &str {
         match self {
             Error::Nsvg(err) => err.description(),
