@@ -76,7 +76,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Toolbar and titlebar background
         ([#TOOLBAR]) (priority = 10000) {
             num_layers: 2,
-            layer_bg_color[0]: RGBAF32::new(0.8, 0.8, 0.8, 1.0),
+            layer_bg_color[0]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
             layer_metrics[0]: Metrics {
                 margin: [-100.0, 0.0, 0.0, 0.0],
                 ..Metrics::default()
@@ -94,7 +94,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
         },
         ([#TOOLBAR] .. [#WND.ACTIVE]) (priority = 10500) {
-            layer_bg_color[0]: RGBAF32::new(0.6, 0.6, 0.6, 1.0),
+            layer_bg_color[0]: RGBAF32::new(0.9, 0.9, 0.9, 1.0),
         },
 
         // Pane background
@@ -165,11 +165,11 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Background
-            #[dyn] layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.2]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
-            #[dyn] layer_img[2]: Some(himg_from_stvg(&assets::SEARCH)),
+            #[dyn] layer_img[2]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
             layer_metrics[2]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: Vector2::new(16.0, 16.0),
@@ -185,13 +185,6 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SEARCH_FIELD.FOCUS]) (priority = 10000) {
             // Display the focus ring
             layer_opacity[0]: 0.5,
-
-            // Make the background opaque so that the focus ring actually
-            // renders as a ring
-            #[dyn] layer_img[1]: Some(himg_figures![rect([0.3, 0.3, 0.3, 1.0]).radius(3.0)]),
-        },
-        ([] .. [#SEARCH_FIELD]) (priority = 10000) {
-            fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
 
         // Composing area
@@ -289,50 +282,13 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 #[cfg(target_os = "windows")]
 fn new_custom_platform_stylesheet() -> impl Stylesheet {
     stylesheet! {
-        ([.BUTTON:not(.HOVER)]) (priority = 20000) {
-            layer_opacity[0]: 0.3,
-        },
-        ([.BUTTON]) (priority = 20000) {
-            layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
-            layer_img[0]: None,
-        },
-        ([.BUTTON.ACTIVE]) (priority = 21000) {
-            layer_bg_color[0]: RGBAF32::new(0.2, 0.4, 0.9, 1.0),
-            layer_img[0]: None,
-        },
-
-        ([#TOOLBAR]) (priority = 20000) {
-            layer_bg_color[0]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
-        },
-
         ([#SEARCH_FIELD]) (priority = 20000) {
-            num_layers: 4,
-
             // Focus ring
             #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
 
-            // Border
-            layer_img[1]: None,
-            layer_bg_color[1]: RGBAF32::new(0.0, 0.0, 0.0, 0.2),
-
             // Background fill
-            layer_img[2]: None,
-            layer_bg_color[2]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
-            layer_metrics[2]: Metrics {
-                margin: [1.0, 1.0, 1.0, 1.0],
-                ..Metrics::default()
-            },
-            layer_center[2]: box2! { point: [0.5, 0.5] },
-
-            // Icon
-            #[dyn] layer_img[3]: Some(himg_from_stvg_col(assets::SEARCH, [0.4, 0.4, 0.4, 1.0].into())),
-            layer_metrics[3]: Metrics {
-                margin: [NAN, NAN, NAN, 4.0],
-                size: Vector2::new(16.0, 16.0),
-            },
-        },
-        ([] .. [#SEARCH_FIELD]) (priority = 20000) {
-            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+            layer_img[1]: None,
+            layer_bg_color[1]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
     }
 }

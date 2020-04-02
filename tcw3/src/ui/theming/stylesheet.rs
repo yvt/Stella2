@@ -544,6 +544,8 @@ use cggeom::box2;
 use cgmath::Vector2;
 use std::f32::NAN;
 
+const BUTTON_CORNER_RADIUS: f32 = 2.0;
+
 const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
 const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
 const SCROLLBAR_MARGIN: f32 = 6.0;
@@ -555,11 +557,28 @@ lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
             num_layers: 1,
-            #[dyn] layer_img[0]: Some(himg_figures![rect([0.7, 0.7, 0.7, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![
+                rect([0.0, 0.0, 0.0, 0.05])
+                    .radius(BUTTON_CORNER_RADIUS + 0.5)
+                    .margin([0.5; 4]),
+                rect([0.0, 0.0, 0.0, 0.1])
+                    .radius(BUTTON_CORNER_RADIUS + 0.5)
+                    .margin([1.0, 0.5, 0.0, 0.5]),
+                rect([0.0, 0.0, 0.0, 0.2])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([1.5, 1.0, 0.5, 1.0]),
+                rect([0.97, 0.97, 0.97, 1.0])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([1.0; 4]),
+            ]),
+            layer_metrics[0]: Metrics {
+                margin: [-1.0; 4],
+                .. Metrics::default()
+            },
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.8,
             subview_metrics[Role::Generic]: Metrics {
-                margin: [4.0; 4],
+                margin: [3.0, 8.0, 3.0, 8.0],
                 .. Metrics::default()
             },
         },
@@ -567,14 +586,24 @@ lazy_static! {
             layer_opacity[0]: 1.0,
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
-            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(4.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![
+                rect([0.0, 0.0, 0.0, 0.05])
+                    .radius(BUTTON_CORNER_RADIUS + 0.5)
+                    .margin([0.5; 4]),
+                rect([0.0, 0.0, 0.0, 0.1])
+                    .radius(BUTTON_CORNER_RADIUS + 0.5)
+                    .margin([1.0, 0.5, 0.0, 0.5]),
+                rect([0.0, 0.0, 0.0, 0.2])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([1.5, 1.0, 0.5, 1.0]),
+                rect([0.85, 0.85, 0.85, 1.0])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([1.0; 4]),
+            ]),
         },
         // Button label
         ([] < [.BUTTON]) (priority = 100) {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
-        },
-        ([] < [.BUTTON.ACTIVE]) (priority = 200) {
-            fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
 
         // Entry wrapper
