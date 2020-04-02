@@ -72,7 +72,7 @@ pub fn himg_from_figures(figures: impl Borrow<[Figure]> + Send + Sync + 'static)
             shuffle!(margins, [3, 2, 0, 0]),
         ]
         .fmax();
-        let size = size * 2.0 + 1.0;
+        let size = size * 2.0 + 2.0;
 
         [size.extract(0), size.extract(1)]
     }
