@@ -28,7 +28,8 @@ use crate::{
 ///
 /// The following [`Prop`]s are handled: `NumLayers`, `LayerImg`,
 /// `LayerBgColor`, `LayerMetrics`, `LayerOpacity`, `LayerCenter`, `LayerXform`,
-/// `SubviewMetrics`, `SubviewVisibility`, `ClipMetrics`, and `MinSize`.
+/// `SubviewMetrics`, `SubviewVisibility`, `ClipMetrics`, `MinSize`, and
+/// `AllowGrow`.
 ///
 /// [`Prop`]: crate::ui::theming::Prop
 #[derive(Debug)]
@@ -329,6 +330,7 @@ struct SbLayout {
     subview_layout: Vec<(Role, Metrics)>,
     subviews: Vec<HView>,
     min_size: Vector2<f32>,
+    allow_grow: [bool; 2],
     overrider: Rc<dyn StyledBoxOverride>,
 }
 
@@ -355,6 +357,10 @@ impl SbLayout {
             subviews: subviews_filtered.map(|x| x.1.clone()).collect(),
             min_size: match elem.compute_prop(Prop::MinSize) {
                 PropValue::Vector2(v) => v,
+                _ => unreachable!(),
+            },
+            allow_grow: match elem.compute_prop(Prop::AllowGrow) {
+                PropValue::Bool2(v) => v,
                 _ => unreachable!(),
             },
             overrider,
@@ -407,6 +413,14 @@ impl Layout for SbLayout {
                 traits.max.y = traits.max.y.fmin(sv_traits.max.y + margin_y);
                 traits.preferred.y += sv_traits.preferred.y + margin_y;
                 num_pref_y += 1;
+            }
+        }
+
+        // Restrict the size to minimum for each direction if the corresponding
+        // element of `Prop::AllowGrow` is `false`
+        for i in 0..2 {
+            if !self.allow_grow[i] {
+                traits.max[i] = traits.min[i];
             }
         }
 

@@ -158,6 +158,9 @@ pub enum Prop {
     /// The minimum size.
     MinSize,
 
+    /// Expandability for each axis.
+    AllowGrow,
+
     /// The default foreground color.
     FgColor,
 
@@ -168,6 +171,7 @@ pub enum Prop {
 #[derive(Debug, Clone)]
 pub enum PropValue {
     Bool(bool),
+    Bool2([bool; 2]),
     Float(f32),
     Usize(usize),
     Himg(Option<crate::images::HImg>),
@@ -202,6 +206,7 @@ impl PropValue {
             Prop::SubviewVisibility(_) => PropValue::Bool(true),
             Prop::ClipMetrics => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
+            Prop::AllowGrow => PropValue::Bool2([true; 2]),
             Prop::FgColor => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)),
             Prop::Font => PropValue::SysFontType(SysFontType::Normal),
         }

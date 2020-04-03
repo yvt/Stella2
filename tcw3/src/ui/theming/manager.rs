@@ -442,6 +442,7 @@ impl Prop {
             Prop::SubviewMetrics(_) => PropKindFlags::LAYOUT,
             Prop::SubviewVisibility(_) => PropKindFlags::LAYOUT,
             Prop::MinSize => PropKindFlags::LAYOUT,
+            Prop::AllowGrow => PropKindFlags::LAYOUT,
             Prop::ClipMetrics => PropKindFlags::CLIP_LAYER,
             Prop::FgColor => PropKindFlags::FG_COLOR,
             Prop::Font => PropKindFlags::FONT,

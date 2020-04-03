@@ -312,6 +312,9 @@ macro_rules! prop {
     (@prop min_size) => { $crate::ui::theming::Prop::MinSize };
     (@value min_size: $val:expr) => { $crate::ui::theming::PropValue::Vector2($val) };
 
+    (@prop allow_grow) => { $crate::ui::theming::Prop::AllowGrow };
+    (@value allow_grow: $val:expr) => { $crate::ui::theming::PropValue::Bool2($val) };
+
     (@prop fg_color) => { $crate::ui::theming::Prop::FgColor };
     (@value fg_color: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
 
