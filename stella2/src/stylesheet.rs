@@ -61,7 +61,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         margin: [NAN; 4],
         size: TOOLBAR_IMG_SIZE,
     };
-    const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(30.0, 22.0);
+    const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(34.0, 22.0);
 
     stylesheet! {
         ([.SPLITTER]) (priority = 10000) {
@@ -89,7 +89,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             subview_metrics[Role::Generic]: Metrics {
-                margin: [5.0; 4],
+                margin: [8.0, 9.0, 8.0, 9.0],
                 ..Metrics::default()
             },
         },
@@ -169,8 +169,10 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Background
-            // TODO: border
-            #[dyn] layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.08]).radius(3.0)]),
+            #[dyn] layer_img[1]: Some(himg_figures![
+                rect([0.0, 0.0, 0.0, 0.05]).radius(3.0),
+                rect([0.0, 0.0, 0.0, 0.15]).radius(3.0 - 0.25).margin([0.25; 4]).line_width(0.5),
+            ]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
@@ -291,12 +293,21 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 #[cfg(target_os = "windows")]
 fn new_custom_platform_stylesheet() -> impl Stylesheet {
     stylesheet! {
+        // Remove the rounded corners on Windows
         ([#SEARCH_FIELD]) (priority = 20000) {
             // Focus ring
             #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
 
             // Background fill
-            layer_img[1]: None,
+            #[dyn] layer_img[1]: Some(himg_figures![
+                rect([0.0, 0.0, 0.0, 0.05]),
+                rect([0.0, 0.0, 0.0, 0.15]).margin([0.25; 4]).line_width(0.5),
+            ]),
+        },
+        ([#SEARCH_FIELD.FOCUS]) (priority = 20000) {
+            // Make the background opaque so that the focus ring really looks
+            // like a ring
+            #[dyn] layer_img[1]: None,
             layer_bg_color[1]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
         },
     }

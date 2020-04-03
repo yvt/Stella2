@@ -558,6 +558,7 @@ lazy_static! {
         ([.BUTTON]) (priority = 100) {
             num_layers: 1,
             #[dyn] layer_img[0]: Some(himg_figures![
+                // Shadow
                 rect([0.0, 0.0, 0.0, 0.05])
                     .radius(BUTTON_CORNER_RADIUS + 0.5)
                     .margin([0.5; 4]),
@@ -567,6 +568,7 @@ lazy_static! {
                 rect([0.0, 0.0, 0.0, 0.2])
                     .radius(BUTTON_CORNER_RADIUS)
                     .margin([1.5, 1.0, 0.5, 1.0]),
+                // Button face
                 rect([0.97, 0.97, 0.97, 1.0])
                     .radius(BUTTON_CORNER_RADIUS)
                     .margin([1.0; 4]),
@@ -587,6 +589,7 @@ lazy_static! {
         },
         ([.BUTTON.ACTIVE]) (priority = 200) {
             #[dyn] layer_img[0]: Some(himg_figures![
+                // Shadow
                 rect([0.0, 0.0, 0.0, 0.05])
                     .radius(BUTTON_CORNER_RADIUS + 0.5)
                     .margin([0.5; 4]),
@@ -596,9 +599,15 @@ lazy_static! {
                 rect([0.0, 0.0, 0.0, 0.2])
                     .radius(BUTTON_CORNER_RADIUS)
                     .margin([1.5, 1.0, 0.5, 1.0]),
-                rect([0.85, 0.85, 0.85, 1.0])
+                // Button face
+                rect([0.90, 0.90, 0.90, 1.0])
                     .radius(BUTTON_CORNER_RADIUS)
                     .margin([1.0; 4]),
+                // Obscure the button face layer completely except the topmost
+                // 0.5px-wide area for a subtle highlight effect
+                rect([0.85, 0.85, 0.85, 1.0])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([1.5, 1.0, 1.0, 1.0]),
             ]),
         },
         // Button label

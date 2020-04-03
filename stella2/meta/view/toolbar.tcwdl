@@ -32,7 +32,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
                     (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
                     (get!(spacer2.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(menu_button.view), AlignFlags::JUSTIFY),
-                    (get!(spacer3.view), AlignFlags::HORZ_JUSTIFY),
                 ])
             ),
         },
@@ -41,9 +40,8 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     pub const view: HView = get!(wrapper.view);
     pub const style_elem: HElem = get!(wrapper.style_elem);
 
-    const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
-    const spacer2 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
-    const spacer3 = FixedSpacer::new! { wm };
+    const spacer1 = FixedSpacer::new! { wm };
+    const spacer2 = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
 
     const toggle_sidebar_button = Button::new! {
         style_manager,
