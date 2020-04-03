@@ -87,7 +87,6 @@ comp crate::view::MainView {
     const sidebar_view_wrap = StyledBox::new! {
         style_manager,
         class_set = elem_id::SIDEBAR,
-        auto_class_set = ClassSet::FOCUS,
         subview_generic = get!(sidebar_view),
         subelement_generic = get!(sidebar_elem.helem),
     };
@@ -95,7 +94,7 @@ comp crate::view::MainView {
     const sidebar_elem = theming::Elem::new! { style_manager };
     const sidebar_view = HView::new! {
         layout = TableLayout::stack_vert(
-            ArrayVec::from([get!(search_bar_wrap.view), get!(channel_list.view)])
+            ArrayVec::from([get!(search_bar_wrap.view), get!(channel_list_wrap.view)])
                 .into_iter()
                 .map(|view| (view, AlignFlags::JUSTIFY))
         ),
@@ -118,11 +117,17 @@ comp crate::view::MainView {
         style_manager,
     };
 
+    const channel_list_wrap = StyledBox::new! {
+        style_manager,
+        auto_class_set = ClassSet::FOCUS,
+        child_generic = get!(&channel_list),
+    };
+
     const channel_list = ChannelListView::new! { wm, style_manager };
 
     on (init) {
         get!(&style_elem).insert_child(get!(sidebar_view_wrap.style_elem));
-        get!(&sidebar_elem).insert_child(get!(channel_list.style_elem));
+        get!(&sidebar_elem).insert_child(get!(channel_list_wrap.style_elem));
         get!(&sidebar_elem).insert_child(get!(search_bar_wrap.style_elem));
     }
 

@@ -6,7 +6,7 @@ use tcw3::{
         theming,
         views::{table, table::LineTy, Button, Label},
     },
-    uicore::{HView, SizeTraits, ViewFlags},
+    uicore::{HView, HViewRef, SizeTraits, ViewFlags},
 };
 
 use crate::stylesheet::elem_id;
@@ -28,6 +28,16 @@ impl ChannelListView {
             edit.insert(LineTy::Col, 0..1);
             edit.set_scroll_pos([0.0, 0.0]);
         }
+    }
+}
+
+impl theming::Widget for ChannelListView {
+    fn view_ref(&self) -> HViewRef<'_> {
+        self.view().as_ref()
+    }
+
+    fn style_elem(&self) -> Option<theming::HElem> {
+        Some(self.style_elem())
     }
 }
 
