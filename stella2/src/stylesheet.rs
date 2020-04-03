@@ -16,11 +16,11 @@ pub mod elem_id {
     use tcw3::ui::theming::ClassSet;
 
     iota::iota! {
-        pub const GO_BACK: ClassSet = ClassSet::id(iota);
-                , GO_FORWARD
+        pub const SHOW_MENU: ClassSet = ClassSet::id(iota);
                 , SIDEBAR_SHOW
                 , SIDEBAR_HIDE
 
+                , SEARCH_FIELD_WRAP
                 , SEARCH_FIELD
 
                 , TOOLBAR
@@ -38,7 +38,7 @@ pub mod elem_id {
     }
 }
 
-// Import IDs (e.g., `#GO_BACK`) into the scope
+// Import IDs (e.g., `#SHOW_MENU`) into the scope
 use self::elem_id::*;
 
 /// Construct a `HImg` from an StVG image.
@@ -101,6 +101,10 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
+            layer_metrics[0]: Metrics {
+                margin: [-100.0, 0.0, 0.0, 0.0],
+                ..Metrics::default()
+            },
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // sidebar looks awkward without backdrop blur, so we disable
@@ -126,15 +130,9 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
 
         // Toolbar buttons
-        ([#GO_BACK.BUTTON]) (priority = 10000) {
+        ([#SHOW_MENU.BUTTON]) (priority = 10000) {
             num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::GO_BACK)),
-            layer_metrics[1]: TOOLBAR_IMG_METRICS,
-            min_size: TOOLBAR_BTN_MIN_SIZE,
-        },
-        ([#GO_FORWARD.BUTTON]) (priority = 10000) {
-            num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::GO_FORWARD)),
+            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::MENU)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
@@ -151,7 +149,13 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
 
-        // Toolbar elements
+        // Search field
+        ([#SEARCH_FIELD_WRAP]) (priority = 10000) {
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [10.0; 4],
+                size: Vector2::new(NAN, 22.0),
+            },
+        },
         ([#SEARCH_FIELD]) (priority = 10000) {
             num_layers: 3,
 
@@ -165,7 +169,8 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Background
-            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
+            // TODO: border
+            #[dyn] layer_img[1]: Some(himg_figures![rect([0.0, 0.0, 0.0, 0.08]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
             // Icon
@@ -185,6 +190,10 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SEARCH_FIELD.FOCUS]) (priority = 10000) {
             // Display the focus ring
             layer_opacity[0]: 0.5,
+
+            // Make the background opaque so that the focus ring really looks
+            // like a ring
+            #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
         },
 
         // Composing area

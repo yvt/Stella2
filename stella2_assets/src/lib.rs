@@ -17,6 +17,5 @@ pub mod toolbar {
 
     pub static SIDEBAR_HIDE: Stvg = stvg!("src/toolbar/sidebar_hide.svg");
     pub static SIDEBAR_SHOW: Stvg = stvg!("src/toolbar/sidebar_show.svg");
-    pub static GO_BACK: Stvg = stvg!("src/toolbar/go_back.svg");
-    pub static GO_FORWARD: Stvg = stvg!("src/toolbar/go_forward.svg");
+    pub static MENU: Stvg = stvg!("src/toolbar/menu.svg");
 }

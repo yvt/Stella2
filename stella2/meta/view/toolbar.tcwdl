@@ -2,7 +2,7 @@ use harmony::Elem;
 use tcw3::{
     ui::{
         AlignFlags,
-        views::{Label, Button, FixedSpacer, EntryCore},
+        views::{Label, Button, FixedSpacer},
         layouts::TableLayout,
         theming::{self, Manager, StyledBox, HElem},
     },
@@ -28,13 +28,11 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         subview_generic = HView::new! {
             layout = TableLayout::stack_horz(
                 ArrayVec::from([
+                    (get!(spacer1.view), AlignFlags::CENTER),
                     (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
-                    (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(go_back_button.view), AlignFlags::JUSTIFY),
                     (get!(spacer2.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(go_forward_button.view), AlignFlags::JUSTIFY),
-                    (get!(spacer3.view), AlignFlags::CENTER),
-                    (get!(search_bar.view), AlignFlags::RIGHT),
+                    (get!(menu_button.view), AlignFlags::JUSTIFY),
+                    (get!(spacer3.view), AlignFlags::HORZ_JUSTIFY),
                 ])
             ),
         },
@@ -57,27 +55,10 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
 
     on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
 
-    const go_back_button = Button::new! {
+    const menu_button = Button::new! {
         style_manager,
-        class_set = theming::ClassSet::BUTTON | elem_id::GO_BACK,
+        class_set = theming::ClassSet::BUTTON | elem_id::SHOW_MENU,
     };
 
-    const go_forward_button = Button::new! {
-        style_manager,
-        class_set = theming::ClassSet::BUTTON | elem_id::GO_FORWARD,
-    };
-
-    on (go_back_button.activated) dbg!();
-    on (go_forward_button.activated) dbg!();
-
-    const search_bar = StyledBox::new! {
-        style_manager,
-        class_set = elem_id::SEARCH_FIELD,
-        auto_class_set = theming::ClassSet::FOCUS,
-        child_generic = get!(&search_bar_entry),
-    };
-
-    const search_bar_entry = EntryCore::new! {
-        style_manager,
-    };
+    on (menu_button.activated) dbg!();
 }
