@@ -8,12 +8,31 @@ use tcw3_pal::{prelude::*, RGBAF32};
 use super::{himg_from_paint_fn, HImg, PaintContext};
 
 /// A drawing command for [`himg_from_figures`].
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Figure {
     color: RGBAF32,
     margins: [f32; 4],
     radii: [[f32; 2]; 4],
     line_width: f32,
+}
+
+impl PartialEq for Figure {
+    /// Compare the fields by `==`. The exception is `line_width`, for which `eq`
+    /// performs a bit-wise comparison (`a.to_bits() == b.to_bits()`) so that the
+    /// comparison makes sense when `line_width` is not specified.
+    fn eq(&self, other: &Self) -> bool {
+        (
+            self.color,
+            self.margins,
+            self.radii,
+            self.line_width.to_bits(),
+        ) == (
+            other.color,
+            other.margins,
+            other.radii,
+            other.line_width.to_bits(),
+        )
+    }
 }
 
 impl Figure {
