@@ -153,8 +153,9 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SEARCH_FIELD_WRAP]) (priority = 10000) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [10.0; 4],
-                size: Vector2::new(NAN, 22.0),
+                ..Metrics::default()
             },
+            allow_grow: [true, false],
         },
         ([#SEARCH_FIELD]) (priority = 10000) {
             num_layers: 3,
