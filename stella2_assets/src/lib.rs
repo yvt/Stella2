@@ -17,5 +17,6 @@ pub mod toolbar {
 
     pub static SIDEBAR_HIDE: Stvg = stvg!("src/toolbar/sidebar_hide.svg");
     pub static SIDEBAR_SHOW: Stvg = stvg!("src/toolbar/sidebar_show.svg");
+    pub static USER_OUTLINE: Stvg = stvg!("src/toolbar/user_outline.svg");
     pub static MENU: Stvg = stvg!("src/toolbar/menu.svg");
 }

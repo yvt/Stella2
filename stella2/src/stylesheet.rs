@@ -23,6 +23,9 @@ pub mod elem_id {
                 , SEARCH_FIELD_WRAP
                 , SEARCH_FIELD
 
+                , TOOLBAR_SEPARATOR
+                , MEMBER_COUNT_ICON
+
                 , TOOLBAR
                 , SIDEBAR
                 , LOG_VIEW
@@ -147,6 +150,28 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_HIDE)),
             layer_metrics[1]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
+        },
+
+        // Toolbar presentation elements
+        ([#MEMBER_COUNT_ICON]) (priority = 10000) {
+            num_layers: 1,
+            #[dyn] layer_img[0]: Some(himg_from_stvg(&assets::toolbar::USER_OUTLINE)),
+            layer_metrics[0]: Metrics {
+                margin: [NAN; 4],
+                size: Vector2::new(16.0, 16.0),
+            },
+            min_size: Vector2::new(16.0, 16.0),
+            allow_grow: [false, true],
+        },
+        ([#TOOLBAR_SEPARATOR]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: RGBAF32::new(0.63, 0.63, 0.63, 1.0),
+            layer_metrics[0]: Metrics {
+                margin: [NAN; 4],
+                size: Vector2::new(1.0, 15.0),
+            },
+            min_size: Vector2::new(15.0, 15.0),
+            allow_grow: [false, true],
         },
 
         // Search field

@@ -28,9 +28,12 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         subview_generic = HView::new! {
             layout = TableLayout::stack_horz(
                 ArrayVec::from([
-                    (get!(spacer1.view), AlignFlags::CENTER),
+                    (get!(member_count_icon.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(member_count.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(separator.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(topic.view), AlignFlags::LEFT),
                     (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
-                    (get!(spacer2.view), AlignFlags::HORZ_JUSTIFY),
+                    (get!(spacer.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(menu_button.view), AlignFlags::JUSTIFY),
                 ])
             ),
@@ -40,8 +43,26 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     pub const view: HView = get!(wrapper.view);
     pub const style_elem: HElem = get!(wrapper.style_elem);
 
-    const spacer1 = FixedSpacer::new! { wm };
-    const spacer2 = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
+    const spacer = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
+
+    const separator = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::TOOLBAR_SEPARATOR,
+    };
+
+    const member_count_icon = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::MEMBER_COUNT_ICON,
+    };
+    const member_count = Label::new! {
+        style_manager,
+        text = "12",
+    };
+
+    const topic = Label::new! {
+        style_manager,
+        text = "Company-wide announcements and work-based matter",
+    };
 
     const toggle_sidebar_button = Button::new! {
         style_manager,
