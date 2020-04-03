@@ -76,7 +76,9 @@ pub fn himg_from_figures_slice(figures: &'static [Figure]) -> HImg {
     himg_from_figures(figures)
 }
 
-/// Construct a `HImg` containing the specified list of figures.
+/// Construct a `HImg` containing the specified list of figures. The image size
+/// is automatically chosen to be large enough for 9-slice scaling with uniform
+/// edge thickness.
 pub fn himg_from_figures(figures: impl Borrow<[Figure]> + Send + Sync + 'static) -> HImg {
     // Calculate the maximum radius for each direction
     fn calc_size(figures: &[Figure]) -> [f32; 2] {
@@ -115,6 +117,15 @@ pub fn himg_from_figures(figures: impl Borrow<[Figure]> + Send + Sync + 'static)
 
     let size = calc_size(figures.borrow());
 
+    himg_from_figures_with_size(figures, size)
+}
+
+/// Construct a `HImg` containing the specified list of figures. The image size
+/// is explicitly given.
+pub fn himg_from_figures_with_size(
+    figures: impl Borrow<[Figure]> + Send + Sync + 'static,
+    size: [f32; 2],
+) -> HImg {
     // Construct `HImg`. The core routine is separated into a non-generic
     // function to reduce the code size.
     fn paint(figures: &[Figure], draw_ctx: &mut PaintContext<'_>) {

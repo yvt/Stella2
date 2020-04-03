@@ -542,7 +542,10 @@ macro_rules! stylesheet {
 //
 // TODO: Make it dynamic (based on the operating system's configuration)
 //
-use crate::{images::himg_figures, pal::RGBAF32};
+use crate::{
+    images::{figures, himg_figures, himg_from_figures_with_size},
+    pal::RGBAF32,
+};
 use cggeom::box2;
 use cgmath::Vector2;
 use std::f32::NAN;
@@ -650,9 +653,6 @@ lazy_static! {
         // Scrollbar
         ([.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            #[dyn] layer_img[0]: Some(himg_figures![
-                rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
-            ]),
             layer_metrics[0]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
                 .. Metrics::default()
@@ -667,6 +667,12 @@ lazy_static! {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(NAN, SCROLLBAR_VISUAL_WIDTH),
             },
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
+                ],
+                [SCROLLBAR_VISUAL_WIDTH + 2.0, SCROLLBAR_VISUAL_WIDTH],
+            )),
             layer_center[0]: box2! { min: [0.5, 0.0], max: [0.5, 1.0] },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
@@ -674,22 +680,37 @@ lazy_static! {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(SCROLLBAR_VISUAL_WIDTH, NAN),
             },
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect([0.5, 0.5, 0.5, 0.12]).radius(SCROLLBAR_VISUAL_RADIUS)
+                ],
+                [SCROLLBAR_VISUAL_WIDTH, SCROLLBAR_VISUAL_WIDTH + 2.0],
+            )),
             layer_center[0]: box2! { min: [0.0, 0.5], max: [1.0, 0.5] },
         },
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
             num_layers: 1,
-            #[dyn] layer_img[0]: Some(himg_figures![
-                rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
-            ]),
             layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             min_size: Vector2::new(SCROLLBAR_LEN_MIN, 0.0),
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
+                ],
+                [SCROLLBAR_VISUAL_WIDTH + 2.0, SCROLLBAR_VISUAL_WIDTH],
+            )),
             layer_center[0]: box2! { min: [0.5, 0.0], max: [0.5, 1.0] },
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
             min_size: Vector2::new(0.0, SCROLLBAR_LEN_MIN),
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
+                ],
+                [SCROLLBAR_VISUAL_WIDTH, SCROLLBAR_VISUAL_WIDTH + 2.0],
+            )),
             layer_center[0]: box2! { min: [0.0, 0.5], max: [1.0, 0.5] },
         },
 
