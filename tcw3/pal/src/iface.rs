@@ -895,11 +895,20 @@ pub trait Canvas: Debug {
 
     /// Fill the area within the current path, using the non-zero winding number
     /// rule.
+    ///
+    /// After the operation, this method resets the current path to an empty
+    /// path.
     fn fill(&mut self);
     /// Draw a line along the current path.
+    ///
+    /// After the operation, this method resets the current path to an empty
+    /// path.
     fn stroke(&mut self);
     /// Set the current clipping region to its intersection with the area within
     /// current path.
+    ///
+    /// After the operation, this method resets the current path to an empty
+    /// path.
     fn clip(&mut self);
 
     /// Stroke the specified rectangle.

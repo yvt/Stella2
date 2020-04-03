@@ -203,17 +203,17 @@ impl iface::Canvas for BitmapBuilder {
         self.cairo_ctx
             .set_source_rgba(col[0], col[1], col[2], col[3]);
 
-        self.cairo_ctx.fill_preserve();
+        self.cairo_ctx.fill();
     }
     fn stroke(&mut self) {
         let col = self.state_top.state.stroke_col;
         self.cairo_ctx
             .set_source_rgba(col[0], col[1], col[2], col[3]);
 
-        self.cairo_ctx.stroke_preserve();
+        self.cairo_ctx.stroke();
     }
     fn clip(&mut self) {
-        self.cairo_ctx.clip_preserve();
+        self.cairo_ctx.clip();
     }
     fn set_fill_rgb(&mut self, rgb: iface::RGBAF32) {
         self.state_top.state.fill_col = [rgb.r as f64, rgb.g as f64, rgb.b as f64, rgb.a as f64];

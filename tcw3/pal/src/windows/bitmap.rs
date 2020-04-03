@@ -496,6 +496,7 @@ impl iface::Canvas for BitmapBuilder {
                 self.path.gp_path,
             ));
         }
+        self.begin_path();
     }
     fn stroke(&mut self) {
         unsafe {
@@ -505,6 +506,7 @@ impl iface::Canvas for BitmapBuilder {
                 self.path.gp_path,
             ));
         }
+        self.begin_path();
     }
     fn clip(&mut self) {
         unsafe {
@@ -514,6 +516,7 @@ impl iface::Canvas for BitmapBuilder {
                 gdiplusenums::CombineModeIntersect,
             ));
         }
+        self.begin_path();
     }
     fn set_fill_rgb(&mut self, rgb: iface::RGBAF32) {
         unsafe {
