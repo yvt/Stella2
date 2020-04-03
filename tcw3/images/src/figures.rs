@@ -13,6 +13,7 @@ pub struct Figure {
     color: RGBAF32,
     margins: [f32; 4],
     radii: [[f32; 2]; 4],
+    line_width: f32,
 }
 
 impl Figure {
@@ -22,6 +23,7 @@ impl Figure {
             color,
             margins: [0.0; 4],
             radii: [[0.0; 2]; 4],
+            line_width: std::f32::NAN,
         }
     }
 
@@ -38,6 +40,11 @@ impl Figure {
 
     pub const fn with_margin(self, margins: [f32; 4]) -> Self {
         Self { margins, ..self }
+    }
+
+    /// Set the line width. `NAN` (default value) means the figure is filled.
+    pub const fn with_line_width(self, line_width: f32) -> Self {
+        Self { line_width, ..self }
     }
 }
 
@@ -57,13 +64,23 @@ pub fn himg_from_figures(figures: impl Borrow<[Figure]> + Send + Sync + 'static)
         let margins = figures
             .iter()
             .map(|fig| {
-                let Figure { radii, margins, .. } = &fig;
+                let Figure {
+                    radii,
+                    margins,
+                    line_width,
+                    ..
+                } = &fig;
+
+                // Convert NaN to zero
+                let line_width = line_width.fmax(0.0);
+
                 f32x4::from(*margins)
                     + [
                         f32x4::new(radii[0][1], radii[1][0], radii[2][1], radii[3][0]),
                         f32x4::new(radii[1][1], radii[2][0], radii[3][1], radii[0][0]),
                     ]
                     .fmax()
+                    + f32x4::splat(line_width)
             })
             .fold(f32x4::splat(0.0), FloatOrd::fmax);
 
@@ -95,9 +112,15 @@ pub fn himg_from_figures(figures: impl Borrow<[Figure]> + Send + Sync + 'static)
                 ]
             };
 
-            c.set_fill_rgb(figure.color);
             c.rounded_rect(bx, *radii);
-            c.fill();
+            if figure.line_width.is_nan() {
+                c.set_fill_rgb(figure.color);
+                c.fill();
+            } else {
+                c.set_stroke_rgb(figure.color);
+                c.set_line_width(figure.line_width);
+                c.stroke();
+            }
         }
     }
 
@@ -124,11 +147,13 @@ pub fn himg_from_rounded_rect(color: RGBAF32, radii: [[f32; 2]; 4]) -> HImg {
 ///             .with_corner_radius(3.0),
 ///         Figure::rect([0.0, 0.0, 0.0, 1.0].into())
 ///             .with_corner_radius(2.0)
-///             .with_margin([1.0; 4]),
+///             .with_margin([1.0; 4])
+///             .with_line_width(2.0),
 ///     ],
 ///     figures![
 ///         rect([1.0, 1.0, 1.0, 1.0]).radius(3.0),
-///         rect([0.0, 0.0, 0.0, 1.0]).radius(2.0).margin([1.0; 4]),
+///         rect([0.0, 0.0, 0.0, 1.0])
+///             .radius(2.0).margin([1.0; 4]).line_width(2.0),
 ///     ]
 /// )
 /// ```
@@ -156,6 +181,7 @@ macro_rules! figures {
     (@modifier radius) => {$crate::Figure::with_corner_radius};
     (@modifier radii) => {$crate::Figure::with_corner_radii};
     (@modifier margin) => {$crate::Figure::with_margin};
+    (@modifier line_width) => {$crate::Figure::with_line_width};
     (@modifier $unknown:ident) => {
         compile_error!(concat!("Unknown modifier: `", stringify!($unknown), "`"))
     };
