@@ -654,7 +654,6 @@ lazy_static! {
                 margin: [SCROLLBAR_MARGIN; 4],
                 .. Metrics::default()
             },
-            layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
         },
         ([.SCROLLBAR.HOVER]) (priority = 150) {
@@ -665,12 +664,14 @@ lazy_static! {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(NAN, SCROLLBAR_VISUAL_WIDTH),
             },
+            layer_center[0]: box2! { min: [0.5, 0.0], max: [0.5, 1.0] },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
             subview_metrics[Role::Generic]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(SCROLLBAR_VISUAL_WIDTH, NAN),
             },
+            layer_center[0]: box2! { min: [0.0, 0.5], max: [1.0, 0.5] },
         },
         // Scrollbar thumb
         ([] < [.SCROLLBAR]) (priority = 100) {
@@ -678,14 +679,15 @@ lazy_static! {
             #[dyn] layer_img[0]: Some(himg_figures![
                 rect([0.5, 0.5, 0.5, 0.7]).radius(SCROLLBAR_VISUAL_RADIUS)
             ]),
-            layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.6,
         },
         ([] < [.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
             min_size: Vector2::new(SCROLLBAR_LEN_MIN, 0.0),
+            layer_center[0]: box2! { min: [0.5, 0.0], max: [0.5, 1.0] },
         },
         ([] < [.SCROLLBAR.VERTICAL]) (priority = 100) {
             min_size: Vector2::new(0.0, SCROLLBAR_LEN_MIN),
+            layer_center[0]: box2! { min: [0.0, 0.5], max: [1.0, 0.5] },
         },
 
         ([] < [.SCROLLBAR.HOVER]) (priority = 150) {
