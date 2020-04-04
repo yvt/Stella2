@@ -16,9 +16,11 @@ pub fn gen_builder(
     item_meta2sem_map: &[usize],
     diag: &mut Diag,
     out: &mut String,
+    scoped_out: &mut String,
 ) {
     let comp = ctx.cur_comp;
     let comp_ident = &comp.ident.sym;
+    let comp_path = &comp.path;
 
     // The simple builder API does not have a builder type. Our codegen can't
     // generate it anyway.
@@ -101,11 +103,11 @@ pub fn gen_builder(
 
     // `ComponentBuilder::<Unset, ...>::new`
     // -------------------------------------------------------------------
-    writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
+    writeln!(scoped_out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
-        out,
+        scoped_out,
         "impl {ident}{gen} {{",
-        ident = CompBuilderTy(&comp.ident.sym),
+        ident = CompBuilderTy(comp_path),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(
                 repeat(ctx.path_unset()).take(num_non_optional_consts),
@@ -117,21 +119,21 @@ pub fn gen_builder(
     .unwrap();
 
     writeln!(
-        out,
+        scoped_out,
         "    {}",
-        doc_attr!("Construct {}.", MdCode(CompBuilderTy(&comp.ident.sym)))
+        doc_attr!("Construct {}.", MdCode(CompBuilderTy(comp_path)))
     )
     .unwrap();
     writeln!(
-        out,
+        scoped_out,
         "    {vis} fn new() -> Self {{",
         vis = builder_vis.display(ctx.repo)
     )
     .unwrap();
-    writeln!(out, "        Self {{").unwrap();
+    writeln!(scoped_out, "        Self {{").unwrap();
     for field in settable_fields.clone() {
         writeln!(
-            out,
+            scoped_out,
             "            {ident}: {ty},",
             ident = InnerValueField(&field.ident.sym),
             ty = if field.value.is_some() {
@@ -142,17 +144,17 @@ pub fn gen_builder(
         )
         .unwrap();
     }
-    writeln!(out, "        }}").unwrap();
-    writeln!(out, "    }}").unwrap();
-    writeln!(out, "}}").unwrap();
+    writeln!(scoped_out, "        }}").unwrap();
+    writeln!(scoped_out, "    }}").unwrap();
+    writeln!(scoped_out, "}}").unwrap();
 
     // `ComponentBuilder::{with_*}`
     // -------------------------------------------------------------------
-    writeln!(out, "#[allow(non_camel_case_types)]").unwrap();
+    writeln!(scoped_out, "#[allow(non_camel_case_types)]").unwrap();
     writeln!(
-        out,
+        scoped_out,
         "impl{gen} {ty}{gen} {{",
-        ty = CompBuilderTy(&comp.ident.sym),
+        ty = CompBuilderTy(comp_path),
         gen = if non_optional_fields.clone().next().is_some() {
             Left(Angle(CommaSeparated(builder_ty_params.clone())))
         } else {
@@ -161,23 +163,23 @@ pub fn gen_builder(
     )
     .unwrap();
 
-    let gen_setter_doc = |out: &mut String, field: &sem::FieldDef<'_>| {
+    let gen_setter_doc = |scoped_out: &mut String, field: &sem::FieldDef<'_>| {
         writeln!(
-            out,
+            scoped_out,
             "    {}",
             doc_attr!("Set the value of {} property.", MdCode(&field.ident.sym))
         )
         .unwrap();
-        writeln!(out, "    {}", doc_attr!("")).unwrap();
-        gen_doc_attrs(&field.doc_attrs, "    ", out);
+        writeln!(scoped_out, "    {}", doc_attr!("")).unwrap();
+        gen_doc_attrs(&field.doc_attrs, "    ", scoped_out);
     };
 
     for field in optional_fields.clone() {
         // They just assign a new value to `Option<T>`
-        gen_setter_doc(out, field);
+        gen_setter_doc(scoped_out, field);
 
         writeln!(
-            out,
+            scoped_out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> Self {{",
             vis = field.accessors.set.as_ref().unwrap().vis,
             method = FactorySetterForField(&field.ident.sym),
@@ -186,23 +188,23 @@ pub fn gen_builder(
         )
         .unwrap();
         writeln!(
-            out,
+            scoped_out,
             "        Self {{ {field}: {some}({ident}), ..self }}",
             some = paths::SOME,
             field = InnerValueField(&field.ident.sym),
             ident = field.ident.sym,
         )
         .unwrap();
-        writeln!(out, "    }}",).unwrap();
+        writeln!(scoped_out, "    }}",).unwrap();
     }
 
     for (i, field) in non_optional_fields.clone().enumerate() {
         // They each change one type parameter of `ComponentBuilder`
-        gen_setter_doc(out, field);
+        gen_setter_doc(scoped_out, field);
 
         let new_builder_ty = format!(
             "{ty}<{gen}>",
-            ty = CompBuilderTy(&comp.ident.sym),
+            ty = CompBuilderTy(comp_path),
             gen = CommaSeparated(
                 builder_ty_params
                     .clone()
@@ -211,7 +213,7 @@ pub fn gen_builder(
             )
         );
         writeln!(
-            out,
+            scoped_out,
             "    {vis} fn {method}(self, {ident}: {ty}) -> {new_bldr_ty} {{",
             vis = field.accessors.set.as_ref().unwrap().vis,
             method = FactorySetterForField(&field.ident.sym),
@@ -221,9 +223,9 @@ pub fn gen_builder(
         )
         .unwrap();
         writeln!(
-            out,
+            scoped_out,
             "        {ty} {{ {fields} }}",
-            ty = CompBuilderTy(&comp.ident.sym),
+            ty = CompBuilderTy(comp_path),
             fields = CommaSeparated(settable_fields.clone().map(|field2| {
                 if field2.ident.sym == field.ident.sym {
                     // Replace with the new value
@@ -239,16 +241,16 @@ pub fn gen_builder(
             }))
         )
         .unwrap();
-        writeln!(out, "    }}",).unwrap();
+        writeln!(scoped_out, "    }}",).unwrap();
     }
-    writeln!(out, "}}").unwrap();
+    writeln!(scoped_out, "}}").unwrap();
 
     // `ComponentBuilder::<u32, ...>::build`
     // -------------------------------------------------------------------
     writeln!(
-        out,
+        scoped_out,
         "impl {ty}{gen} {{",
-        ty = CompBuilderTy(&comp.ident.sym),
+        ty = CompBuilderTy(comp_path),
         gen = if num_non_optional_consts != 0 {
             Left(Angle(CommaSeparated(builder_complete_ty_params)))
         } else {
@@ -258,20 +260,20 @@ pub fn gen_builder(
     .unwrap();
 
     writeln!(
-        out,
+        scoped_out,
         "    {}",
         doc_attr!("Construct {}.", MdCode(CompTy(&comp.ident.sym)))
     )
     .unwrap();
 
     writeln!(
-        out,
+        scoped_out,
         "    {vis} fn build(self) -> {ty} {{",
         vis = builder_vis.display(ctx.repo),
-        ty = comp.ident.sym
+        ty = comp_path,
     )
     .unwrap();
-    initgen::gen_construct(analysis, dep_analysis, ctx, item_meta2sem_map, out);
-    writeln!(out, "    }}").unwrap();
-    writeln!(out, "}}").unwrap();
+    initgen::gen_construct(analysis, dep_analysis, ctx, item_meta2sem_map, scoped_out);
+    writeln!(scoped_out, "    }}").unwrap();
+    writeln!(scoped_out, "}}").unwrap();
 }

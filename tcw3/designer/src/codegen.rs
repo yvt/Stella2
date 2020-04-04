@@ -336,7 +336,7 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
         for (parsed_file, diag_file) in files.iter() {
             for item in parsed_file.items.iter() {
                 if let parser::Item::Comp(comp) = item {
-                    comps.push(sem::analyze_comp(comp, diag_file, &mut diag));
+                    comps.push(sem::analyze_comp(comp, parsed_file, diag_file, &mut diag));
                 }
             }
         }
@@ -362,6 +362,7 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
             .iter()
             .enumerate()
             .map(|(comp_i, comp)| {
+                let enclosing_mod_name = format!("__m{}", comp_i);
                 let implgen_ctx = implgen::Ctx {
                     repo: &repo,
                     imports_crate_i: &imports_crate_i,
@@ -372,9 +373,9 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
                 };
                 (
                     comp,
-                    implgen::gen_comp(&implgen_ctx, &mut diag).unwrap_or_else(|EmittedError| {
-                        "compile_error!(\"code generation failed.\")".to_string()
-                    }),
+                    implgen::gen_comp(&implgen_ctx, &enclosing_mod_name, &mut diag).unwrap_or_else(
+                        |EmittedError| "compile_error!(\"code generation failed.\")".to_string(),
+                    ),
                 )
             })
             .collect();

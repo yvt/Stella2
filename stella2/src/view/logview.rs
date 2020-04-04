@@ -5,11 +5,10 @@ use tcw3::{
     pal,
     prelude::*,
     ui::{
-        mixins::scrollwheel::ScrollAxisFlags,
         prelude::*,
         views::{table, table::LineTy},
     },
-    uicore::{HView, HViewRef, HWndRef, SizeTraits, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, HWndRef, UpdateCtx, ViewListener},
 };
 
 stella2_meta::designer_impl! {

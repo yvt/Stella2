@@ -1,6 +1,4 @@
-use crate::{model, stylesheet::elem_id};
-use arrayvec::ArrayVec;
-use tcw3::ui::{layouts::TableLayout, theming, AlignFlags};
+use crate::model;
 
 stella2_meta::designer_impl! {
     crate::view::toolbar::ToolbarView

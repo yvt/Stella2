@@ -42,11 +42,10 @@ pub enum Visibility {
         span: Option<codemap::Span>,
         path: Box<Path>,
     },
-    Inherited,
 }
 
 impl Visibility {
-    pub fn from_syn(i: &syn::Visibility, file: &codemap::File) -> Self {
+    pub fn from_syn(i: &syn::Visibility, default_path: &Box<Path>, file: &codemap::File) -> Self {
         match i {
             syn::Visibility::Public(_) => Visibility::Public {
                 span: parser::span_to_codemap(i.span(), file),
@@ -58,7 +57,10 @@ impl Visibility {
                 span: parser::span_to_codemap(i.span(), file),
                 path: Box::new(Path::from_syn(&r.path, file)),
             },
-            syn::Visibility::Inherited => Visibility::Inherited,
+            syn::Visibility::Inherited => Visibility::Restricted {
+                span: parser::span_to_codemap(i.span(), file),
+                path: default_path.clone(),
+            },
         }
     }
 }
@@ -69,7 +71,6 @@ impl fmt::Display for Visibility {
             Self::Public { .. } => write!(f, "pub"),
             Self::Crate { .. } => write!(f, "pub(crate)"),
             Self::Restricted { path, .. } => write!(f, "pub(in {})", path),
-            Self::Inherited => Ok(()),
         }
     }
 }
@@ -130,6 +131,21 @@ impl DocAttr {
     }
 }
 
+/// Represents a set of `use` items which are used to resolve paths in
+/// dynamic expressions.
+pub struct ImportScope<'a> {
+    file: &'a parser::File,
+}
+
+impl<'a> ImportScope<'a> {
+    pub fn iter_use_items(&self) -> impl Iterator<Item = &'a syn::ItemUse> + '_ {
+        self.file
+            .items
+            .iter()
+            .filter_map(|item| try_match!(parser::Item::Use(x) = item).ok())
+    }
+}
+
 pub struct CompDef<'a> {
     pub flags: CompFlags,
     pub vis: Visibility,
@@ -139,6 +155,7 @@ pub struct CompDef<'a> {
     pub ident: Ident,
     pub items: Vec<CompItemDef<'a>>,
     pub syn: &'a parser::Comp,
+    pub import_scope: ImportScope<'a>,
 }
 
 pub use crate::metadata::CompFlags;
@@ -357,6 +374,7 @@ pub struct ObjInitField {
 /// comments to figure out what is done and what is not.
 pub fn analyze_comp<'a>(
     comp: &'a parser::Comp,
+    parser_file: &'a parser::File,
     file: &codemap::File,
     diag: &mut Diag,
 ) -> CompDef<'a> {
@@ -365,7 +383,7 @@ pub fn analyze_comp<'a>(
         diag,
         next_input_index: 0,
     }
-    .analyze_comp(comp)
+    .analyze_comp(comp, ImportScope { file: parser_file })
 }
 
 struct AnalyzeCtx<'a, 'b> {
@@ -391,27 +409,43 @@ impl CompReloc {
 }
 
 impl AnalyzeCtx<'_, '_> {
-    fn analyze_comp<'a>(&mut self, comp: &'a parser::Comp) -> CompDef<'a> {
+    fn analyze_comp<'a>(
+        &mut self,
+        comp: &'a parser::Comp,
+        import_scope: ImportScope<'a>,
+    ) -> CompDef<'a> {
         let mut lifted_fields = Vec::new();
         let mut relocs = Vec::new();
 
+        let path = Path::from_syn_with_span_of(&comp.path, &comp.orig_path, self.file);
+
+        let parent_path = {
+            let mut path = path.clone();
+            path_remove_last_segment(&mut path.syn_path).unwrap();
+            Box::new(path)
+        };
+
         let mut this = CompDef {
             flags: CompFlags::empty(),
-            vis: Visibility::from_syn(&comp.vis, self.file),
+            vis: Visibility::from_syn(&comp.vis, &parent_path, self.file),
             doc_attrs: Vec::new(),
-            path: Path::from_syn_with_span_of(&comp.path, &comp.orig_path, self.file),
+            path,
             ident: Ident::from_syn(&comp.path.segments.last().unwrap().ident, self.file),
             items: comp
                 .items
                 .iter()
                 .enumerate()
                 .map(|(item_i, item)| {
-                    self.analyze_comp_item(item, &mut lifted_fields, |reloc| {
-                        relocs.push(reloc.with_item_i(item_i))
-                    })
+                    self.analyze_comp_item(
+                        item,
+                        &mut lifted_fields,
+                        |reloc| relocs.push(reloc.with_item_i(item_i)),
+                        &parent_path,
+                    )
                 })
                 .collect(),
             syn: comp,
+            import_scope,
         };
 
         this.items
@@ -544,13 +578,19 @@ impl AnalyzeCtx<'_, '_> {
         item: &'a parser::CompItem,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
         reloc: impl FnMut(CompReloc),
+        default_vis_path: &Box<Path>,
     ) -> CompItemDef<'a> {
         match item {
-            parser::CompItem::Field(i) => {
-                CompItemDef::Field(self.analyze_field(i, out_lifted_fields, reloc))
-            }
+            parser::CompItem::Field(i) => CompItemDef::Field(self.analyze_field(
+                i,
+                out_lifted_fields,
+                reloc,
+                default_vis_path,
+            )),
             parser::CompItem::On(i) => CompItemDef::On(self.analyze_on(i)),
-            parser::CompItem::Event(i) => CompItemDef::Event(self.analyze_event(i)),
+            parser::CompItem::Event(i) => {
+                CompItemDef::Event(self.analyze_event(i, default_vis_path))
+            }
         }
     }
 
@@ -559,18 +599,25 @@ impl AnalyzeCtx<'_, '_> {
         item: &'a parser::CompItemField,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
         mut reloc: impl FnMut(CompReloc),
+        default_vis_path: &Box<Path>,
     ) -> FieldDef<'a> {
         let mut accessors;
         let default_accessors = match item.field_ty {
-            FieldType::Const => {
-                FieldAccessors::default_const(Visibility::from_syn(&item.vis, self.file))
-            }
-            FieldType::Prop => {
-                FieldAccessors::default_prop(Visibility::from_syn(&item.vis, self.file))
-            }
-            FieldType::Wire => {
-                FieldAccessors::default_wire(Visibility::from_syn(&item.vis, self.file))
-            }
+            FieldType::Const => FieldAccessors::default_const(Visibility::from_syn(
+                &item.vis,
+                default_vis_path,
+                self.file,
+            )),
+            FieldType::Prop => FieldAccessors::default_prop(Visibility::from_syn(
+                &item.vis,
+                default_vis_path,
+                self.file,
+            )),
+            FieldType::Wire => FieldAccessors::default_wire(Visibility::from_syn(
+                &item.vis,
+                default_vis_path,
+                self.file,
+            )),
         };
         if let Some(syn_accessors) = &item.accessors {
             accessors = FieldAccessors::default_none();
@@ -581,7 +628,7 @@ impl AnalyzeCtx<'_, '_> {
                 let (acc_ty, span) = match syn_accessor {
                     parser::FieldAccessor::Set { set_token, vis } => {
                         accessors.set = Some(FieldSetter {
-                            vis: Visibility::from_syn(vis, self.file),
+                            vis: Visibility::from_syn(vis, default_vis_path, self.file),
                         });
                         (0, set_token.span())
                     }
@@ -591,7 +638,7 @@ impl AnalyzeCtx<'_, '_> {
                         mode,
                     } => {
                         accessors.get = Some(FieldGetter {
-                            vis: Visibility::from_syn(vis, self.file),
+                            vis: Visibility::from_syn(vis, default_vis_path, self.file),
                             mode: mode
                                 .unwrap_or_else(|| default_accessors.get.as_ref().unwrap().mode),
                         });
@@ -615,7 +662,7 @@ impl AnalyzeCtx<'_, '_> {
                         };
 
                         accessors.watch = Some(FieldWatcher {
-                            vis: Visibility::from_syn(vis, self.file),
+                            vis: Visibility::from_syn(vis, default_vis_path, self.file),
                             event_item_i: 0, // set later with `CompReloc::FieldWatchEvent`
                             event_span,
                         });
@@ -822,7 +869,7 @@ impl AnalyzeCtx<'_, '_> {
         }
 
         FieldDef {
-            vis: Visibility::from_syn(&item.vis, self.file),
+            vis: Visibility::from_syn(&item.vis, default_vis_path, self.file),
             doc_attrs,
             field_ty: item.field_ty,
             flags: FieldFlags::empty(),
@@ -833,13 +880,19 @@ impl AnalyzeCtx<'_, '_> {
                 if item.field_ty == FieldType::Const {
                     match d {
                         parser::DynExpr::Func(func) => DynExpr::Func(self.analyze_func(func)),
-                        parser::DynExpr::ObjInit(init) => {
-                            DynExpr::ObjInit(self.analyze_obj_init(init, out_lifted_fields))
-                        }
+                        parser::DynExpr::ObjInit(init) => DynExpr::ObjInit(self.analyze_obj_init(
+                            init,
+                            default_vis_path,
+                            out_lifted_fields,
+                        )),
                     }
                 } else {
                     // `ObjInit` is not allowed for non-`const` fields
-                    DynExpr::Func(self.analyze_dyn_expr_as_func(d, out_lifted_fields))
+                    DynExpr::Func(self.analyze_dyn_expr_as_func(
+                        d,
+                        default_vis_path,
+                        out_lifted_fields,
+                    ))
                 }
             }),
             syn: Some(item),
@@ -858,7 +911,11 @@ impl AnalyzeCtx<'_, '_> {
         }
     }
 
-    fn analyze_event<'a>(&mut self, item: &'a parser::CompItemEvent) -> EventDef<'a> {
+    fn analyze_event<'a>(
+        &mut self,
+        item: &'a parser::CompItemEvent,
+        default_vis_path: &Box<Path>,
+    ) -> EventDef<'a> {
         let mut doc_attrs = Vec::new();
 
         for attr in item.attrs.iter() {
@@ -885,7 +942,7 @@ impl AnalyzeCtx<'_, '_> {
         }
 
         EventDef {
-            vis: Visibility::from_syn(&item.vis, self.file),
+            vis: Visibility::from_syn(&item.vis, default_vis_path, self.file),
             doc_attrs,
             ident: Ident::from_syn(&item.ident, self.file),
             inputs: item.inputs.iter().cloned().collect(),
@@ -897,12 +954,13 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_dyn_expr_as_func(
         &mut self,
         d: &parser::DynExpr,
+        default_vis_path: &Box<Path>,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> Func {
         match d {
             parser::DynExpr::Func(func) => self.analyze_func(func),
             parser::DynExpr::ObjInit(init) => {
-                self.analyze_obj_init_as_func(init, out_lifted_fields)
+                self.analyze_obj_init_as_func(init, default_vis_path, out_lifted_fields)
             }
         }
     }
@@ -1156,6 +1214,7 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_obj_init(
         &mut self,
         init: &parser::ObjInit,
+        default_vis_path: &Box<Path>,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> ObjInit {
         let mut path = Path::from_syn_with_span_of(&init.path, &init.orig_path, self.file);
@@ -1170,7 +1229,11 @@ impl AnalyzeCtx<'_, '_> {
                 .map(|field| ObjInitField {
                     ident: Ident::from_syn(&field.ident, self.file),
                     value: if let Some(value) = &field.value {
-                        self.analyze_dyn_expr_as_func(&value.dyn_expr, out_lifted_fields)
+                        self.analyze_dyn_expr_as_func(
+                            &value.dyn_expr,
+                            default_vis_path,
+                            out_lifted_fields,
+                        )
                     } else {
                         self.mk_func_with_named_input(field.ident.clone())
                     },
@@ -1182,9 +1245,10 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_obj_init_as_func(
         &mut self,
         init: &parser::ObjInit,
+        default_vis_path: &Box<Path>,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> Func {
-        let obj_init = self.analyze_obj_init(init, out_lifted_fields);
+        let obj_init = self.analyze_obj_init(init, default_vis_path, out_lifted_fields);
 
         // Instantiate the given `ObjInit` as a `const` field, which is the
         // only place where `ObjInit` is allowed to appear.
@@ -1201,7 +1265,10 @@ impl AnalyzeCtx<'_, '_> {
         path_remove_trailing_new(&mut ty_path);
 
         out_lifted_fields.push(FieldDef {
-            vis: Visibility::Inherited,
+            vis: Visibility::Restricted {
+                span: None,
+                path: default_vis_path.clone(),
+            },
             doc_attrs: Vec::new(),
             field_ty: FieldType::Const,
             flags: FieldFlags::empty(),
@@ -1354,10 +1421,17 @@ impl syn::visit_mut::VisitMut for InferStaticLifetime<'_, '_> {
 
 /// Remove the trailing `::new` from a given path.
 fn path_remove_trailing_new(path: &mut syn::Path) {
-    // Remove the trailing `new`
-    assert_eq!(path.segments.pop().unwrap().value().ident, "new");
+    assert_eq!(path_remove_last_segment(path).unwrap().ident, "new");
+}
+
+/// Remove the last segment from a given path.
+fn path_remove_last_segment(path: &mut syn::Path) -> Option<syn::PathSegment> {
+    // Remove the last segment
+    let seg = path.segments.pop()?.into_value();
 
     // Remove the trailing `::`
     let last = path.segments.pop().unwrap().into_value();
     path.segments.push_value(last);
+
+    Some(seg)
 }

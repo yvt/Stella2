@@ -1,16 +1,17 @@
 use tcw3::{
     ui::{
         theming::{self, Manager},
-        views::ScrollableTable,
+        mixins::scrollwheel::ScrollAxisFlags,
+        views::{ScrollableTable, table},
     },
-    uicore::HView,
+    uicore::{HView, SizeTraits, ViewFlags},
     pal,
 };
 
 use crate::{
     model,
     stylesheet::elem_id,
-    view::dpiscalewatcher::DpiScaleWatcher,
+    view::{dpiscalewatcher::DpiScaleWatcher, logview::GUTTER_WIDTH},
 };
 
 #[widget]

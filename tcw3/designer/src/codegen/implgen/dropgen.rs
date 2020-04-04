@@ -6,7 +6,7 @@ use super::{
 
 /// Generate `impl Drop for ComponentTypeShared`.
 pub fn gen_shared_drop(ctx: &Ctx<'_>, dep_analysis: &DepAnalysis, out: &mut String) {
-    let comp_ident = &ctx.cur_comp.ident.sym;
+    let comp_path = &ctx.cur_comp.path;
 
     let num_subs = dep_analysis.num_subs();
     if num_subs == 0 {
@@ -18,7 +18,7 @@ pub fn gen_shared_drop(ctx: &Ctx<'_>, dep_analysis: &DepAnalysis, out: &mut Stri
         out,
         "impl {} for {} {{",
         paths::TRAIT_DROP,
-        CompSharedTy(comp_ident)
+        CompSharedTy(comp_path)
     )
     .unwrap();
     writeln!(out, "    fn drop(&mut self) {{").unwrap();

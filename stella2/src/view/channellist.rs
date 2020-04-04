@@ -1,12 +1,11 @@
 use std::{ops::Range, rc::Rc};
 use tcw3::{
     ui::{
-        mixins::scrollwheel::ScrollAxisFlags,
         prelude::*,
         theming,
         views::{table, table::LineTy, Button, Label},
     },
-    uicore::{HView, HViewRef, SizeTraits, ViewFlags},
+    uicore::{HView, HViewRef},
 };
 
 use crate::stylesheet::elem_id;

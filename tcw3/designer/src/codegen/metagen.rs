@@ -233,7 +233,6 @@ fn validate_comp_path(ctx: &mut Ctx<'_, '_>, path: &metadata::Path, orig_path: &
 
 fn gen_vis(ctx: &mut Ctx<'_, '_>, vis: &sem::Visibility) -> metadata::Visibility {
     match vis {
-        sem::Visibility::Inherited => metadata::Visibility::Private,
         sem::Visibility::Public { .. } => metadata::Visibility::Public,
         sem::Visibility::Crate { .. } => metadata::Visibility::Restricted(metadata::Path {
             crate_i: ctx.resolver.local_crate_i,
