@@ -22,6 +22,50 @@ TODO - please see `tcw3_meta`.
 
 TODO
 
+## Paths
+
+Paths behave in the same way as in Rust except for the following known
+difference:
+
+ - Relative paths aren't supported because each `.tcwdl` file is not
+   associated with a particular module.
+
+Note that paths in dynamic expressions are copied verbatim to the generated
+code, so they are not resolved by `use` items defined in a `*.tcwdl` file.
+They are instead resolved by the Rust compiler in the scope in which the
+`designer_impl!` macro is executed.
+
+## Imports: `use crate::path`
+
+`use` items behave in the same way as in Rust.
+
+## Components: `comp crate::ComponentName`
+
+TODO
+
+The path specifies where the component type is defined. This is *quite
+different* from Rust's `struct`s, for which you specify an identifier. The
+following code suprisingly works:
+
+```text
+use crate::module2::Component2;
+
+// Define a component at `crate::module1::Component1`
+comp crate::module1::Component1 { /* ... */ }
+
+// Define a component at `crate::module2::Component2`
+comp Component2 { /* ... */ }
+
+comp crate::module1::Component3 {
+    // `Component2` refers to the component defined above because we have
+    // the corresponding `use` item, not because the component is defined here.
+    const comp2 = Component2::new! {};
+
+    // Consequently, the following line will not compile:
+    // const comp1 = Component1::new! {};
+}
+```
+
 ## Fields: `const name: u32`, etc.
 
 Fields are values stored in each instance of a component. There are three
