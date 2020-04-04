@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use harmony::Elem;
 use log::trace;
 use std::{
@@ -8,16 +7,14 @@ use std::{
 use tcw3::{
     pal,
     pal::prelude::*,
-    ui::layouts::{FillLayout, TableLayout},
-    ui::theming::{self, ClassSet},
-    ui::AlignFlags,
+    ui::layouts::FillLayout,
+    ui::theming,
     uicore::{HWnd, HWndRef, WndListener, WndStyleFlags},
 };
 
 use crate::{
     config::{profile::Profile, viewpersistence},
-    model,
-    stylesheet::{self, elem_id},
+    model, stylesheet,
 };
 
 mod channellist;

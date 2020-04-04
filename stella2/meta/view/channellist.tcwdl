@@ -2,9 +2,10 @@ use std::rc::Rc;
 use tcw3::{
     ui::{
         theming::{self, Manager},
-        views::ScrollableTable,
+        views::{ScrollableTable, table},
+        mixins::scrollwheel::ScrollAxisFlags,
     },
-    uicore::HView,
+    uicore::{HView, SizeTraits, ViewFlags},
     pal,
 };
 
