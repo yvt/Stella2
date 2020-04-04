@@ -136,7 +136,11 @@ impl<'a> Ctx<'a> {
     }
 }
 
-pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> {
+pub fn gen_comp(
+    ctx: &Ctx,
+    scoping_mod_name: &str,
+    diag: &mut Diag<'_>,
+) -> Result<String, EmittedError> {
     let comp = ctx.cur_comp;
 
     if comp.flags.contains(sem::CompFlags::PROTOTYPE_ONLY) {
@@ -145,9 +149,23 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
         )"#.to_string());
     }
 
+    // This code is inserted to the macro's calling position. Paths in it are
+    // resolved unpredictably, so they must be absolute paths.
     let mut out = String::new();
 
+    // `scoped_out` includes the code to be enclosed in `mod` to have paths
+    // resolved by the `use` items from `comp.import_scope`. However, if items
+    // such as `struct` were defined there, user code won't be able to use them
+    // because the enclosing module name is unknown.
+    let mut scoped_out = String::new();
+
+    for item in comp.import_scope.iter_use_items() {
+        writeln!(scoped_out, "#[allow(unused_imports)]").unwrap();
+        writeln!(scoped_out, "{}", item.to_token_stream()).unwrap();
+    }
+
     let comp_ident = &comp.ident.sym;
+    let comp_path = &comp.path;
 
     // String → index into `comp.items`
     // This also checks duplicate item names.
@@ -217,10 +235,16 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
     .unwrap();
     writeln!(out, "}}").unwrap();
 
-    writeln!(out, "impl {} {{", CompTy(comp_ident)).unwrap();
+    writeln!(scoped_out, "impl {} {{", CompTy(comp_path)).unwrap();
     // `ComponentType::__commit`
-    initgen::gen_commit(&analysis, &dep_analysis, ctx, &item_meta2sem_map, &mut out);
-    writeln!(out, "}}").unwrap();
+    initgen::gen_commit(
+        &analysis,
+        &dep_analysis,
+        ctx,
+        &item_meta2sem_map,
+        &mut scoped_out,
+    );
+    writeln!(scoped_out, "}}").unwrap();
 
     // `struct WeakComponentType`
     // -------------------------------------------------------------------
@@ -315,13 +339,13 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
 
     writeln!(out, "}}").unwrap();
 
-    writeln!(out, "impl {} {{", CompSharedTy(comp_ident)).unwrap();
+    writeln!(scoped_out, "impl {} {{", CompSharedTy(comp_path)).unwrap();
     // `ComponentTypeShared::set_dirty_flags`
-    initgen::gen_set_dirty_flags(&dep_analysis, ctx, &mut out);
-    writeln!(out, "}}").unwrap();
+    initgen::gen_set_dirty_flags(&dep_analysis, ctx, &mut scoped_out);
+    writeln!(scoped_out, "}}").unwrap();
 
     // `<ComponentTypeShared as Drop>::drop`
-    dropgen::gen_shared_drop(ctx, &dep_analysis, &mut out);
+    dropgen::gen_shared_drop(ctx, &dep_analysis, &mut scoped_out);
 
     // `struct ComponentTypeState`
     // -------------------------------------------------------------------
@@ -367,11 +391,14 @@ pub fn gen_comp(ctx: &Ctx, diag: &mut Diag<'_>) -> Result<String, EmittedError> 
         &item_meta2sem_map,
         diag,
         &mut out,
+        &mut scoped_out,
     );
 
     // Setters and getters
     // -------------------------------------------------------------------
     accessorgen::gen_accessors(&dep_analysis, ctx, &mut out);
+
+    writeln!(out, "mod {} {{\n{}}}", scoping_mod_name, scoped_out).unwrap();
 
     Ok(out)
 }

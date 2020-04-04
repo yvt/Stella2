@@ -1,0 +1,16 @@
+use tcw3::pal;
+use crate::misc::exprpath::submod::doit;
+
+comp crate::misc::exprpath::Comp1 {
+    on (init) doit(42);
+}
+
+comp crate::misc::exprpath::Comp2 {
+    const c: () = doit(42);
+}
+
+comp crate::misc::exprpath::Comp3 {
+    const wm: pal::Wm { set; }
+    prop p: u32 = 42;
+    wire w: () = doit(get!(p));
+}

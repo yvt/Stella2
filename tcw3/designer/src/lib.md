@@ -30,11 +30,6 @@ difference:
  - Relative paths aren't supported because each `.tcwdl` file is not
    associated with a particular module.
 
-Note that paths in dynamic expressions are copied verbatim to the generated
-code, so they are not resolved by `use` items defined in a `*.tcwdl` file.
-They are instead resolved by the Rust compiler in the scope in which the
-`designer_impl!` macro is executed.
-
 ## Imports: `use crate::path`
 
 `use` items behave in the same way as in Rust.
@@ -426,6 +421,46 @@ struct ComponentState {
     value_prop1: u32,
     value_wire1: u32,
     /* ...*/
+}
+```
+
+## Scoping
+
+Paths in dynamic expressions are not expanded to absolute paths. This is because
+the code generator doesn't have sufficient information to figure out which part
+of macro expressions in a dynamic expression constitute a path and a macro
+expression may even generate new paths.
+
+Simply copying the expressions to `designer_impl!`'s location would result in
+unintuitive path resolution because they would be resolved by existing `use`
+items in the `.rs` file, while everything else in the same `.tcwdl` file would
+be resolved by `use` items in the `.tcwdl` file.
+To ensure `use` items in `.tcwdl` files are used for path resolution, the
+generated `impl` blocks are enclosed in a module, to which all `use` items from
+the containing `.tcwdl` file are copied.
+
+Each component receives its own module. If a single `.tcwdl` file contains
+multiple modules, all `use` items in the file are repeated for each module.
+
+```text
+use std::time::SystemTime;
+
+comp crate::ComponentName {
+    on(init) println!("{}", SystemTime::now());
+}
+```
+
+```rust,no_compile
+// The illustration of the generated code
+mod __m0 {
+    use std::time::SystemTime;
+
+    impl crate::ComponentName {
+        pub fn new() -> Self {
+            println!("{}", SystemTime::now());
+            // [...]
+        }
+    }
 }
 ```
 

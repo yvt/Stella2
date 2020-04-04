@@ -23,6 +23,7 @@ mod interop {
 }
 
 mod misc {
+    mod exprpath;
     mod weakref;
 }
 

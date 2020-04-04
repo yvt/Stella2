@@ -872,7 +872,7 @@ fn analyze_dep(
 }
 
 /// Generates construction code for a component. The generated expression
-/// evaluates to the type named `CompTy(comp_ident)`.
+/// evaluates to the type named `CompTy(comp_path)`.
 ///
 /// Assumes settable fields are in `self` of type `xxxBuilder`.
 pub fn gen_construct(
@@ -883,7 +883,7 @@ pub fn gen_construct(
     out: &mut String,
 ) {
     let comp = ctx.cur_comp;
-    let comp_ident = &comp.ident.sym;
+    let comp_path = &comp.path;
 
     let nodes = &dep_analysis.nodes[..];
     let item2node_map = &dep_analysis.item2node_map[..];
@@ -935,7 +935,7 @@ pub fn gen_construct(
                 assert_eq!(var.0, var_this.0);
 
                 // `struct ComponentTypeState`
-                writeln!(out, "let {} = {} {{", var_state, CompStateTy(&comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_state, CompStateTy(&comp_path)).unwrap();
                 for (i, item) in comp.items.iter().enumerate() {
                     let val = TempVar(item2node_map[i]);
                     match item {
@@ -957,7 +957,7 @@ pub fn gen_construct(
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentTypeShared`
-                writeln!(out, "let {} = {} {{", var_shared, CompSharedTy(&comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_shared, CompSharedTy(&comp_path)).unwrap();
                 for (i, item) in comp.items.iter().enumerate() {
                     let val = TempVar(item2node_map[i]);
                     match item {
@@ -1030,7 +1030,7 @@ pub fn gen_construct(
                 writeln!(out, "}};").unwrap();
 
                 // `struct ComponentType`
-                writeln!(out, "let {} = {} {{", var_this, CompTy(&comp_ident)).unwrap();
+                writeln!(out, "let {} = {} {{", var_this, CompTy(&comp_path)).unwrap();
                 writeln!(
                     out,
                     "    {field}: {rc}::new({shared})",
@@ -1282,7 +1282,7 @@ pub fn gen_construct(
                     out,
                     "    let {this} = {ty} {{ {field}: {shared} }};",
                     this = var_this,
-                    ty = CompTy(comp_ident),
+                    ty = CompTy(comp_path),
                     field = fields::SHARED,
                     shared = var_shared,
                 )
@@ -1581,7 +1581,7 @@ fn gen_obj_init(
 
 /// Generate `xxxShared::set_dirty_flags` (`methods::SET_DIRTY_FLAGS`).
 pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut String) {
-    let comp_ident = &ctx.cur_comp.ident.sym;
+    let comp_path = &ctx.cur_comp.path;
 
     if dep_analysis.cdf2triggerset.is_empty() {
         // The component has no dirty flags
@@ -1596,7 +1596,7 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut 
 
     writeln!(
         out,
-        "    fn {meth}({this}: &{rc}<Self>, {arg}: {ty}) {{",
+        "    pub(super) fn {meth}({this}: &{rc}<Self>, {arg}: {ty}) {{",
         meth = methods::SET_DIRTY_FLAGS,
         this = arg_this,
         rc = paths::RC,
@@ -1644,7 +1644,7 @@ pub fn gen_set_dirty_flags(dep_analysis: &DepAnalysis, ctx: &Ctx<'_>, out: &mut 
     writeln!(
         out,
         "                    {ty} {{ {field}: {this} }}.{meth}();",
-        ty = CompTy(comp_ident),
+        ty = CompTy(comp_path),
         field = fields::SHARED,
         this = var_shared,
         meth = methods::COMMIT
@@ -2084,7 +2084,7 @@ pub fn gen_activate_trigger(
     expr_shared: &impl std::fmt::Display,
     out: &mut String,
 ) {
-    let comp_ident = &ctx.cur_comp.ident.sym;
+    let comp_path = &ctx.cur_comp.path;
 
     let bit_i_list: Vec<_> = bit_i_list_for_trigger(dep_analysis, trigger).collect();
 
@@ -2095,7 +2095,7 @@ pub fn gen_activate_trigger(
     writeln!(
         out,
         "{ty}::{set_dirty_flags}({shared}, {flags});",
-        ty = CompSharedTy(comp_ident),
+        ty = CompSharedTy(comp_path),
         set_dirty_flags = methods::SET_DIRTY_FLAGS,
         shared = expr_shared,
         flags = dep_analysis.cdf_ty.gen_multi(bit_i_list),

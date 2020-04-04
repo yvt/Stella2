@@ -131,6 +131,21 @@ impl DocAttr {
     }
 }
 
+/// Represents a set of `use` items which are used to resolve paths in
+/// dynamic expressions.
+pub struct ImportScope<'a> {
+    file: &'a parser::File,
+}
+
+impl<'a> ImportScope<'a> {
+    pub fn iter_use_items(&self) -> impl Iterator<Item = &'a syn::ItemUse> + '_ {
+        self.file
+            .items
+            .iter()
+            .filter_map(|item| try_match!(parser::Item::Use(x) = item).ok())
+    }
+}
+
 pub struct CompDef<'a> {
     pub flags: CompFlags,
     pub vis: Visibility,
@@ -140,6 +155,7 @@ pub struct CompDef<'a> {
     pub ident: Ident,
     pub items: Vec<CompItemDef<'a>>,
     pub syn: &'a parser::Comp,
+    pub import_scope: ImportScope<'a>,
 }
 
 pub use crate::metadata::CompFlags;
@@ -358,6 +374,7 @@ pub struct ObjInitField {
 /// comments to figure out what is done and what is not.
 pub fn analyze_comp<'a>(
     comp: &'a parser::Comp,
+    parser_file: &'a parser::File,
     file: &codemap::File,
     diag: &mut Diag,
 ) -> CompDef<'a> {
@@ -366,7 +383,7 @@ pub fn analyze_comp<'a>(
         diag,
         next_input_index: 0,
     }
-    .analyze_comp(comp)
+    .analyze_comp(comp, ImportScope { file: parser_file })
 }
 
 struct AnalyzeCtx<'a, 'b> {
@@ -392,7 +409,11 @@ impl CompReloc {
 }
 
 impl AnalyzeCtx<'_, '_> {
-    fn analyze_comp<'a>(&mut self, comp: &'a parser::Comp) -> CompDef<'a> {
+    fn analyze_comp<'a>(
+        &mut self,
+        comp: &'a parser::Comp,
+        import_scope: ImportScope<'a>,
+    ) -> CompDef<'a> {
         let mut lifted_fields = Vec::new();
         let mut relocs = Vec::new();
 
@@ -424,6 +445,7 @@ impl AnalyzeCtx<'_, '_> {
                 })
                 .collect(),
             syn: comp,
+            import_scope,
         };
 
         this.items
