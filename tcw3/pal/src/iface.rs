@@ -269,6 +269,9 @@ impl<'a, T: Wm, TLayer> Default for WndAttrs<'a, T, TLayer> {
 bitflags! {
     pub struct WndFlags: u32 {
         const RESIZABLE = 1;
+
+        /// Hides the window decoration entirely. This flag shouldn't be
+        /// specified at the same time with `FULL_SIZE_CONTENT`.
         const BORDERLESS = 1 << 1;
 
         /// Makes the window background transparent and enables the "blur
@@ -279,6 +282,11 @@ bitflags! {
         /// flag is set, layers with a `BACKDROP_BLUR` flag also count as
         /// opaque contents (even if they don't have actual contents).
         const TRANSPARENT_BACKDROP_BLUR = 1 << 2;
+
+        /// Hides the titlebar, but preserves the window border and its
+        /// resizing behavior. This flag will be ignored if not supported by
+        /// the system.
+        const FULL_SIZE_CONTENT = 1 << 3;
     }
 }
 
