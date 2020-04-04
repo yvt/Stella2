@@ -286,6 +286,10 @@ bitflags! {
         /// Hides the titlebar, but preserves the window border and its
         /// resizing behavior. This flag will be ignored if not supported by
         /// the system.
+        ///
+        /// When you specify this flag, the user can no longer move the window
+        /// by dragging the titlebar. Thus, it's recommended that you implement
+        /// [`WndListener::nc_hit_test`] to add a draggable region.
         const FULL_SIZE_CONTENT = 1 << 3;
     }
 }
@@ -497,6 +501,18 @@ pub trait WndListener<T: Wm> {
     /// The mouse pointer has left a window.
     fn mouse_leave(&self, _: T, _: &T::HWnd) {}
 
+    /// Determine how to respond to the mouse drag gesture that started at
+    /// `loc`.
+    ///
+    /// The default implementation returns `NcHit::Client`, which will cause
+    /// `mouse_drag` to be called immediately.
+    /// The implementor can override this method to return a different value,
+    /// e.g., `NcHit::Grab` to allow the user to move a window by dragging
+    /// inside the content region.
+    fn nc_hit_test(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) -> NcHit {
+        NcHit::Client
+    }
+
     /// Get event handlers for handling the mouse drag gesture initiated by
     /// a mouse down event described by `loc` and `button`.
     ///
@@ -539,6 +555,24 @@ pub trait WndListener<T: Wm> {
 
 /// A default implementation of [`WndListener`].
 impl<T: Wm> WndListener<T> for () {}
+
+/// Result type of [`WndListener::nc_hit_test`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NcHit {
+    /// Indicates that the application will handle the event.
+    ///
+    /// After the implementor of `WndListener` returns this,
+    /// [`WndListener::mouse_drag`] will be soon called.
+    Client,
+
+    /// Instructs the system to start a grab action on the window.
+    ///
+    /// After the implementor of `WndListener` returns this, the
+    /// application-side handling of a mouse drag event concludes, and the
+    /// system takes over the handling of subsequent events associated with
+    /// the current mouse drag gesture.
+    Grab,
+}
 
 /// Mouse event handlers for mouse drag gestures.
 ///
