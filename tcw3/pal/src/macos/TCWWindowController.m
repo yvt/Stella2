@@ -55,8 +55,13 @@ extern CGSConnection CGSDefaultConnectionForThread();
         self->window.contentView.wantsLayer = YES;
         self->window.contentView.layer.masksToBounds = NO;
 
-        // Remove the titlebar.
+        // Remove the titlebar's background.
         self->window.titlebarAppearsTransparent = YES;
+
+        // When `NSWindowStyleMaskFullSizeContentView` is specified, there's
+        // a cursor rect covering the titlebar, which interferes with our
+        // cursor-updating logic. So, disable cursor rects entirely.
+        [self->window disableCursorRects];
 
         // Enable "blur behind"
         CGSConnection connection = CGSDefaultConnectionForThread();
@@ -136,6 +141,13 @@ extern CGSConnection CGSDefaultConnectionForThread();
         self->window.backgroundColor = [NSColor windowBackgroundColor];
         self->window.opaque = YES;
     }
+
+    if (flags & kTCW3WndFlagsFullSizeContent) {
+        masks |= NSWindowStyleMaskFullSizeContentView;
+    }
+
+    self->window.titleVisibility = (flags & kTCW3WndFlagsFullSizeContent) != 0;
+    self->window.movable = (flags & kTCW3WndFlagsFullSizeContent) == 0;
 
     self->window.styleMask = masks;
 }

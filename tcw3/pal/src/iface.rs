@@ -290,6 +290,9 @@ bitflags! {
         /// When you specify this flag, the user can no longer move the window
         /// by dragging the titlebar. Thus, it's recommended that you implement
         /// [`WndListener::nc_hit_test`] to add a draggable region.
+        ///
+        /// On macOS, the standard window buttons (a.k.a. “stoplight”) are
+        /// displayed.
         const FULL_SIZE_CONTENT = 1 << 3;
     }
 }

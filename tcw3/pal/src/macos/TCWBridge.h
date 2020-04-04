@@ -68,6 +68,7 @@ extern void tcw_scrolllistener_motion(TCWScrollListenerUserData ud,
 #define kTCW3WndFlagsResizable ((uint32_t)(1 << 0))
 #define kTCW3WndFlagsBorderless ((uint32_t)(1 << 1))
 #define kTCW3WndFlagsTransparentBackdropBlur ((uint32_t)(1 << 2))
+#define kTCW3WndFlagsFullSizeContent ((uint32_t)(1 << 3))
 
 // These callbacks are defined in `timer.rs`
 typedef struct _TraitObject {
