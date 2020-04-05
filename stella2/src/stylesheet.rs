@@ -310,7 +310,44 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
 #[cfg(target_os = "windows")]
 fn new_custom_platform_stylesheet() -> impl Stylesheet {
+    const BORDER_COLOR: RGBAF32 = RGBAF32::new(0.7, 0.7, 0.7, 1.0);
+    const BORDER_COLOR_ACT: RGBAF32 = RGBAF32::new(0.5, 0.5, 0.5, 1.0);
     stylesheet! {
+        // Add a border around the window
+        ([#WND]) (priority = 20000) {
+            num_layers: 4,
+            layer_bg_color[0]: BORDER_COLOR,
+            layer_bg_color[1]: BORDER_COLOR,
+            layer_bg_color[2]: BORDER_COLOR,
+            layer_bg_color[3]: BORDER_COLOR,
+            layer_metrics[0]: Metrics {
+                margin: [0.0, 0.0, NAN, 0.0],
+                size: Vector2::new(NAN, 1.0),
+            },
+            layer_metrics[1]: Metrics {
+                margin: [1.0, 0.0, 1.0, NAN],
+                size: Vector2::new(1.0, NAN),
+            },
+            layer_metrics[2]: Metrics {
+                margin: [NAN, 0.0, 0.0, 0.0],
+                size: Vector2::new(NAN, 1.0),
+            },
+            layer_metrics[3]: Metrics {
+                margin: [1.0, NAN, 1.0, 0.0],
+                size: Vector2::new(1.0, NAN),
+            },
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [1.0; 4],
+                ..Metrics::default()
+            },
+        },
+        ([#WND.ACTIVE]) (priority = 20500) {
+            layer_bg_color[0]: BORDER_COLOR_ACT,
+            layer_bg_color[1]: BORDER_COLOR_ACT,
+            layer_bg_color[2]: BORDER_COLOR_ACT,
+            layer_bg_color[3]: BORDER_COLOR_ACT,
+        },
+
         // Remove the rounded corners on Windows
         ([#SEARCH_FIELD]) (priority = 20000) {
             // Focus ring

@@ -39,18 +39,21 @@ comp crate::view::MainView {
 
     pub prop wnd_focused: bool = false;
 
+    pub const view: HView = get!(root.view);
+
     /// The root styling element for the main window. It has the `ACTIVE` class
     /// if the window has focus.
-    const style_elem = theming::Elem::new! {
+    const root = StyledBox::new! {
         style_manager,
         class_set = if get!(wnd_focused) {
             elem_id::WND | ClassSet::ACTIVE
         } else {
             elem_id::WND
         },
+        subview_generic = get!(split_side.view),
+        subelement_generic = get!(style_elem.helem),
     };
-
-    pub const view: HView = get!(split_side.view);
+    const style_elem = theming::Elem::new! { style_manager };
 
     const split_side = Split::new! {
         style_manager,
