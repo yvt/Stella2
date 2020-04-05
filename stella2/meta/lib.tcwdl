@@ -7,7 +7,7 @@ use tcw3::{
         layouts::TableLayout,
         theming::{self, Manager, StyledBox, ClassSet},
     },
-    uicore::HView,
+    uicore::{HView, ViewFlags},
     pal,
 };
 
@@ -35,6 +35,7 @@ comp crate::view::MainView {
 
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
+    pub event close();
 
     pub prop wnd_focused: bool = false;
 
@@ -71,6 +72,7 @@ comp crate::view::MainView {
     const toolbar = crate::view::toolbar::ToolbarView::new! { wm, style_manager, wnd_state };
 
     on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
+    on (toolbar.close) get!(&this).raise_close();
 
     on (init) {
         get!(&style_elem).insert_child(get!(toolbar.style_elem));
@@ -103,6 +105,8 @@ comp crate::view::MainView {
 
     const search_bar_wrap = StyledBox::new! {
         style_manager,
+        // Define a draggable region
+        view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::DRAG_AREA,
         class_set = elem_id::SEARCH_FIELD_WRAP,
         child_generic = get!(&search_bar),
     };
@@ -192,7 +196,6 @@ comp crate::view::MainView {
         style_manager,
         view_flags = {
             // `ACCEPT_MOUSE_OVER`: Make `set_cursor_shape` work
-            use tcw3::uicore::ViewFlags;
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER |
                 ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP
         },

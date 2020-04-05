@@ -195,6 +195,29 @@ impl HWnd {
         self.wnd.set_cursor_shape(cursor_shape);
     }
 
+    /// The core implementation of `pal::WndListener::nc_hit_test`.
+    #[inline]
+    pub(super) fn handle_nc_hit_test(&self, loc: Point2<f32>) -> pal::NcHit {
+        let hit_view = {
+            let content_view = self.wnd.content_view.borrow();
+            content_view.as_ref().unwrap().as_ref().hit_test(
+                loc,
+                ViewFlags::ACCEPT_MOUSE_DRAG,
+                ViewFlags::DENY_MOUSE,
+            )
+        };
+
+        // If the hit testing returns a view with `DRAG_AREA`, return
+        // `NcHit::Grab`.
+        if let Some(view) = hit_view {
+            if view.view.flags.get().contains(ViewFlags::DRAG_AREA) {
+                return pal::NcHit::Grab;
+            }
+        }
+
+        pal::NcHit::Client
+    }
+
     /// The core implementation of `pal::WndListener::mouse_drag`.
     #[inline]
     pub(super) fn handle_mouse_drag(

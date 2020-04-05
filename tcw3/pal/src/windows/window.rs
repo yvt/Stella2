@@ -15,7 +15,7 @@ use winapi::{
         ntdef::LONG,
         windef::{HCURSOR, HICON, HWND, POINT, RECT, SIZE},
     },
-    um::{libloaderapi, winuser},
+    um::{dwmapi, libloaderapi, uxtheme, winuser},
 };
 
 use super::{
@@ -64,6 +64,7 @@ struct Wnd {
     comp_wnd: comp::CompWnd,
     min_size: Cell<[u32; 2]>,
     max_size: Cell<[u32; 2]>,
+    flags: Cell<iface::WndFlags>,
     /// Used by `FrameClockManager` through the trait `FrameClockClient`
     update_ready_pending: Cell<bool>,
 
@@ -81,6 +82,7 @@ impl fmt::Debug for Wnd {
             .field("comp_wnd", &self.comp_wnd)
             .field("min_size", &self.min_size)
             .field("max_size", &self.max_size)
+            .field("flags", &self.flags)
             .finish()
     }
 }
@@ -169,6 +171,7 @@ pub fn new_wnd(wm: Wm, attrs: WndAttrs<'_>) -> HWnd {
             comp_wnd,
             min_size: Cell::new([0; 2]),
             max_size: Cell::new([MAX_WND_SIZE; 2]),
+            flags: Cell::new(iface::WndFlags::default()),
             update_ready_pending: Cell::new(false),
             drag_state: RefCell::new(None),
             text_input_wnd: TextInputWindow::new(),
@@ -235,6 +238,9 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
     }
 
     if let Some(flags) = attrs.flags {
+        let diff = flags ^ pal_hwnd.wnd.flags.get();
+        pal_hwnd.wnd.flags.set(flags);
+
         let style = unsafe { winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) } as DWORD;
 
         let new_style = style
@@ -249,6 +255,10 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
 
         unsafe {
             winuser::SetWindowLongW(hwnd, winuser::GWL_STYLE, new_style as _);
+        }
+
+        if diff.contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+            update_wnd_frame(pal_hwnd);
         }
     }
 
@@ -465,6 +475,62 @@ pub fn request_update_ready_wnd(wm: Wm, pal_hwnd: &HWnd) {
     FRAME_CLOCK_MANAGER.register(wm, pal_hwnd.clone());
 }
 
+fn update_wnd_frame(pal_hwnd: &HWnd) {
+    adjust_dwm_frame(pal_hwnd);
+
+    unsafe {
+        assert_win32_ok(winuser::SetWindowPos(
+            pal_hwnd.expect_hwnd(),
+            null_mut(),
+            0,
+            0,
+            0,
+            0,
+            winuser::SWP_NOZORDER
+                | winuser::SWP_NOMOVE
+                | winuser::SWP_NOSIZE
+                | winuser::SWP_NOACTIVATE
+                | winuser::SWP_NOOWNERZORDER
+                | winuser::SWP_FRAMECHANGED,
+        ));
+        assert_win32_ok(winuser::PostMessageW(
+            pal_hwnd.expect_hwnd(),
+            winuser::WM_SIZE,
+            0,
+            0,
+        ));
+    }
+}
+
+fn adjust_dwm_frame(pal_hwnd: &HWnd) {
+    let hwnd = pal_hwnd.expect_hwnd();
+
+    let margins = if pal_hwnd
+        .wnd
+        .flags
+        .get()
+        .contains(iface::WndFlags::FULL_SIZE_CONTENT)
+    {
+        // The margins must be at least 1 pixel for the shadow to appear
+        uxtheme::MARGINS {
+            cxLeftWidth: 1,
+            cxRightWidth: 1,
+            cyBottomHeight: 1,
+            cyTopHeight: 1,
+        }
+    } else {
+        uxtheme::MARGINS {
+            cxLeftWidth: 0,
+            cxRightWidth: 0,
+            cyBottomHeight: 0,
+            cyTopHeight: 0,
+        }
+    };
+    unsafe {
+        dwmapi::DwmExtendFrameIntoClientArea(hwnd, &margins);
+    }
+}
+
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     let wnd_ptr = unsafe { winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA) } as *const Wnd;
 
@@ -472,6 +538,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
     match msg {
         winuser::WM_CREATE => {
             debug_assert!(wnd_ptr.is_null());
+
             return unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) };
         }
         winuser::WM_DESTROY => {
@@ -502,6 +569,10 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
         winuser::WM_ACTIVATE => {
             let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
             listener.focus(wm, &pal_hwnd);
+
+            // `DwmExtendFrameIntoClientArea` should be called every time
+            // `WM_ACTIVATE` is sent
+            adjust_dwm_frame(&pal_hwnd);
         } // WM_ACTIVATE
 
         winuser::WM_CLOSE => {
@@ -819,6 +890,113 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
             return 0;
         } // WM_MOUSEWHEEL
+
+        winuser::WM_NCHITTEST => {
+            let mut hit = if (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT)
+            {
+                // When we remove the window frame, we have to do non-client hit
+                // testing by ourselves.
+                let lparam = lparam as DWORD;
+                let loc = [
+                    LOWORD(lparam) as i16 as LONG, // `GET_X_LPARAM(lparam) as LONG`
+                    HIWORD(lparam) as i16 as LONG, // `GET_Y_LPARAM(lparam) as LONG`
+                ];
+
+                let rect = {
+                    let mut rect = MaybeUninit::uninit();
+                    assert_win32_ok(unsafe { winuser::GetWindowRect(hwnd, rect.as_mut_ptr()) });
+                    unsafe { rect.assume_init() }
+                };
+
+                let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+                assert_win32_ok(dpi);
+
+                // The idomatic solution would be to use `GetSystemMetricsForDpi`, but
+                // if the user specifies a really large sizing border, it might break
+                // the application's functionality. Thus, we hard-code the width for
+                // now.
+                let width = log_to_phy(5, dpi) as LONG;
+
+                let flags = 0b0001 * (loc[0] < rect.left + width) as u8
+                    | 0b0010 * (loc[1] < rect.top + width) as u8
+                    | 0b0100 * (loc[0] >= rect.right - width) as u8
+                    | 0b1000 * (loc[1] >= rect.bottom - width) as u8;
+
+                match flags {
+                    0b0000 => winuser::HTCLIENT,
+                    0b0001 => winuser::HTLEFT,
+                    0b0010 => winuser::HTTOP,
+                    0b0011 => winuser::HTTOPLEFT,
+                    0b0100 => winuser::HTRIGHT,
+                    0b0101 => winuser::HTRIGHT, // invalid
+                    0b0110 => winuser::HTTOPRIGHT,
+                    0b0111 => winuser::HTTOPRIGHT, // invalid
+                    0b1000 => winuser::HTBOTTOM,
+                    0b1001 => winuser::HTBOTTOMLEFT,
+                    0b1010 => winuser::HTTOP,     // invalid
+                    0b1011 => winuser::HTTOPLEFT, // invalid
+                    0b1100 => winuser::HTBOTTOMRIGHT,
+                    0b1101 => winuser::HTBOTTOMRIGHT, // invalid
+                    0b1110 => winuser::HTTOPRIGHT,    // invalid
+                    0b1111 => winuser::HTTOPRIGHT,    // invalid
+                    _ => unreachable!(),
+                }
+            } else {
+                unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) as _ }
+            };
+
+            if hit == winuser::HTCLIENT {
+                let loc = lparam_to_mouse_loc(hwnd, lparam, true);
+                let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+                match listener.nc_hit_test(wm, &pal_hwnd, loc) {
+                    iface::NcHit::Client => {}
+                    iface::NcHit::Grab => {
+                        hit = winuser::HTCAPTION;
+                    }
+                };
+            }
+
+            return hit as _;
+        }
+
+        winuser::WM_NCCALCSIZE => {
+            if wparam != 0
+                && (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT)
+            {
+                let ncsp = unsafe { &mut *(lparam as *mut winuser::NCCALCSIZE_PARAMS) };
+                // Omit the call to `DefWindowProcW` to remove the default
+                // frame (including the title bar).
+
+                // Adjust the client rect to not spill over monitor edges
+                // when maximized.
+                // (Thanks goes to <https://github.com/melak47/BorderlessWindow>)
+                let is_maximized = unsafe {
+                    let mut placement = MaybeUninit::uninit();
+                    assert_win32_ok(winuser::GetWindowPlacement(hwnd, placement.as_mut_ptr()));
+                    placement.assume_init().showCmd == winuser::SW_MAXIMIZE as _
+                };
+
+                if !is_maximized {
+                    return 0;
+                }
+
+                let monitor =
+                    unsafe { winuser::MonitorFromWindow(hwnd, winuser::MONITOR_DEFAULTTONULL) };
+                if monitor.is_null() {
+                    return 0;
+                }
+
+                let monitor_info = unsafe {
+                    let mut monitor_info: winuser::MONITORINFO = std::mem::zeroed();
+                    monitor_info.cbSize = size_of::<winuser::MONITORINFO>() as _;
+                    assert_win32_ok(winuser::GetMonitorInfoW(monitor, &mut monitor_info));
+                    monitor_info
+                };
+
+                ncsp.rgrc[0] = monitor_info.rcWork;
+                return 0;
+            }
+        }
 
         winuser::WM_SIZE => {
             pal_hwnd.wnd.comp_wnd.handle_resize(hwnd);

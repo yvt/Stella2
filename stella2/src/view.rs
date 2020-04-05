@@ -135,6 +135,7 @@ impl WndView {
             .set_layout(FillLayout::new(main_view.view().clone()));
 
         hwnd.set_caption("Stella 2");
+        Self::update_wnd_style_flags(hwnd.as_ref(), false);
         hwnd.set_visibility(true);
 
         let this = Rc::new(Self {
@@ -157,11 +158,20 @@ impl WndView {
         }));
 
         let this_weak = Rc::downgrade(&this);
+        this.main_view.subscribe_close(Box::new(move || {
+            if let Some(this) = this_weak.upgrade() {
+                this.quit.borrow()();
+            }
+        }));
+
+        let this_weak = Rc::downgrade(&this);
         this.hwnd.subscribe_focus(Box::new(move |_, _| {
             if let Some(this) = this_weak.upgrade() {
                 this.update_focus();
             }
         }));
+
+        this.update_focus();
 
         this
     }
@@ -174,14 +184,20 @@ impl WndView {
         *self.quit.borrow_mut() = Box::new(cb);
     }
 
-    fn update_focus(&self) {
-        let is_focused = self.hwnd.is_focused();
-        if stylesheet::ENABLE_BACKDROP_BLUR {
-            self.hwnd.set_style_flags(if is_focused {
+    fn update_wnd_style_flags(hwnd: HWndRef, is_focused: bool) {
+        hwnd.set_style_flags(
+            if stylesheet::ENABLE_BACKDROP_BLUR && is_focused {
                 WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
             } else {
                 WndStyleFlags::default()
-            });
+            } | WndStyleFlags::FULL_SIZE_CONTENT,
+        );
+    }
+
+    fn update_focus(&self) {
+        let is_focused = self.hwnd.is_focused();
+        if stylesheet::ENABLE_BACKDROP_BLUR {
+            Self::update_wnd_style_flags(self.hwnd.as_ref(), is_focused);
         }
         self.main_view.set_wnd_focused(is_focused);
     }

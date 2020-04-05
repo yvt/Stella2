@@ -41,6 +41,7 @@ struct Wnd {
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
     listener: Rc<dyn iface::WndListener<Wm>>,
+    flags: iface::WndFlags,
 
     /// The last known size of the window.
     size: [i32; 2],
@@ -111,6 +112,7 @@ impl HWnd {
             gtk_wnd,
             gtk_widget,
             comp_wnd,
+            flags: iface::WndFlags::default(),
             listener: Rc::new(()),
             size: [0, 0],
             tick_callback_active: false,
@@ -176,6 +178,19 @@ impl HWnd {
             // TODO: BORDERLESS
             wnd.gtk_wnd
                 .set_resizable(flags.contains(iface::WndFlags::RESIZABLE));
+
+            if (wnd.flags ^ flags).contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+                let titlebar_widget;
+                wnd.gtk_wnd
+                    .set_titlebar(if flags.contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+                        titlebar_widget = gtk::Fixed::new();
+                        Some(&titlebar_widget)
+                    } else {
+                        None
+                    });
+            }
+
+            wnd.flags = flags;
         }
 
         if let Some(layer) = attrs.layer {
@@ -514,6 +529,43 @@ extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: WndPtr) {
     ) {
         listener.dpi_scale_changed(wm, &hwnd);
     }
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_nc_hit_test_handler(wnd_ptr: WndPtr, x: f32, y: f32) -> c_int {
+    log::debug!("nc_hit_test{:?}", (wnd_ptr, x, y));
+
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = wnd_ptr?;
+        let hwnd = HWnd { ptr };
+
+        let loc = Point2::new(x, y);
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Stop any ongoing scroll gesture (just in case)
+        wnds = stop_scroll(wm, wnds, hwnd.clone());
+
+        let wnd = wnds.get_mut(ptr)?;
+
+        if wnd.drag_state.is_some() {
+            // There already is an active drag gesture
+            return Some(0);
+        }
+
+        // Unborrow `WNDS` before calling into user code
+        let listener = Rc::clone(&wnd.listener);
+        drop(wnds);
+
+        let hit = listener.nc_hit_test(wm, &hwnd, loc);
+
+        Some(match hit {
+            iface::NcHit::Client => 0,
+            iface::NcHit::Grab => 1,
+        })
+    })()
+    .unwrap_or(0)
 }
 
 #[no_mangle]

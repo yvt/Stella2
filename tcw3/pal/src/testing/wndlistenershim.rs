@@ -54,6 +54,10 @@ impl iface::WndListener<native::Wm> for NativeWndListener {
         forward!(self.0, mouse_leave, [wm: wm], [hwnd: hwnd])
     }
 
+    fn nc_hit_test(&self, wm: native::Wm, hwnd: &native::HWnd, loc: Point2<f32>) -> iface::NcHit {
+        forward!(self.0, nc_hit_test, [wm: wm], [hwnd: hwnd], loc)
+    }
+
     fn mouse_drag(
         &self,
         wm: native::Wm,

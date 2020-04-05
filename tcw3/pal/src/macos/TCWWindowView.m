@@ -7,12 +7,14 @@
     TCWWindowController __weak *controller;
 
     NSCursor *_Nonnull currentCursor;
+    BOOL mouseOver;
 }
 
 - (id)initWithController:(TCWWindowController *)_controller {
     if (self = [self init]) {
         self->controller = _controller;
         self->currentCursor = [NSCursor arrowCursor];
+        self->mouseOver = NO;
     }
     return self;
 }
@@ -32,7 +34,7 @@
     self->trackingArea = [[NSTrackingArea alloc]
         initWithRect:self.frame
              options:(NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved |
-                      NSTrackingActiveAlways)
+                      NSTrackingActiveAlways | NSTrackingCursorUpdate)
                owner:self
             userInfo:nil];
 
@@ -41,6 +43,8 @@
 
 // Implements `NSResponder`
 - (void)mouseMoved:(NSEvent *)event {
+    self->mouseOver = YES;
+
     if (!self->controller) {
         return;
     }
@@ -53,6 +57,8 @@
 // Implements `NSResponder`
 - (void)mouseExited:(NSEvent *)event {
     (void)event;
+
+    self->mouseOver = NO;
 
     if (!self->controller) {
         return;
@@ -174,7 +180,9 @@
         break;
     }
 
-    [self.window invalidateCursorRectsForView:self];
+    if (self->mouseOver) {
+        [self->currentCursor set];
+    }
 }
 
 + (NSCursor *)undocumentedSystemCursor:(SEL)sel {
@@ -185,9 +193,8 @@
     }
 }
 
-/** Overrides `NSView`'s method. */
-- (void)resetCursorRects {
-    [self addCursorRect:self.bounds cursor:self->currentCursor];
+- (void)cursorUpdate:(NSEvent *)event {
+    [self->currentCursor set];
 }
 
 @end

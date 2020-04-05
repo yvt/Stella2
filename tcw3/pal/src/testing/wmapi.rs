@@ -62,6 +62,8 @@ pub trait TestingWm: 'static {
     /// Trigger `WndListener::mouse_drag`.
     fn raise_mouse_drag(&self, hwnd: &HWnd, loc: Point2<f32>, button: u8) -> Box<dyn MouseDrag>;
 
+    // TODO: `WndListener::nc_hit_test`
+
     /// Trigger `WndListener::scroll_motion`.
     fn raise_scroll_motion(&self, hwnd: &HWnd, loc: Point2<f32>, delta: &iface::ScrollDelta);
 
