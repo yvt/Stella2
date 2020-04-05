@@ -352,9 +352,6 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
             return Err(BuildError::Emitted);
         }
 
-        // TODO: ... which allows us to handle `#[inject] const`
-        // TODO: Now, generate `Crate` again
-
         // Generate implementation code
         let tcw3_path = self.tcw3_path.as_str();
         let designer_runtime_path = self.designer_runtime_path.as_str();

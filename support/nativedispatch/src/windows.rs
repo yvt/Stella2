@@ -63,49 +63,6 @@ static TP_ENV_LIST: AssertSendSync<[TpCallbackEnvironV3; 4]> = AssertSendSync([
         ..TP_ENV_INIT
     },
 ]);
-/*
-lazy_static::lazy_static! {
-    static ref TP_WORK_LIST: AssertSendSync<[winnt::PTP_WORK; 4]> = {
-        let pri_map = [
-            // `QueuePriority::High`
-            winnt::TP_CALLBACK_PRIORITY_HIGH,
-            // `QueuePriority::Medium`
-            winnt::TP_CALLBACK_PRIORITY_DEFAULT
-            // `QueuePriority::Low`
-            winnt::TP_CALLBACK_PRIORITY_LOW,
-            // `QueuePriority::Background`
-            winnt::TP_CALLBACK_PRIORITY_LOW,
-        ];
-
-        /// `InitializeThreadpoolEnvironment`
-        let mut env = TpCallbackEnvironV3 {
-            version: 3,
-            pool: null_mut(),
-            cleanup_group: null_mut(),
-            cleanup_group_cancel_callback: None,
-            race_dll: null_mut(),
-            activation_context:null_mut(),
-            finalization_callback: None,
-            flags: 0,
-            callback_priority: 0,
-            size: std::mem::size_of::<TP_CALLBACK_ENVIRON_V3>() as _,
-        };
-
-        let mut out_list = [null_mut(); 4];
-
-        for (out_tp_work, &pri) in out_list.iter_mut().zip(pri_map.iter()) {
-            let tp_work = assert_win32_nonnull(unsafe {
-                threadpoolapiset::CreateThreadpoolWork(
-                    todo!(),
-                    null_mut(),
-                    &env,
-                )
-            });
-        }
-
-        AssertSendSync(out_list)
-    };
-}*/
 
 #[derive(Debug, Clone, Copy)]
 struct AssertSendSync<T>(T);

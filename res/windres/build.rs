@@ -23,8 +23,6 @@ fn add_windows_resource() {
     copy("stella2.rc", &rc_path).unwrap();
 
     // The appllcation icon
-    // TODO: `icon_baker` pulls too many dependencies. (Three different
-    //       versions of `png`, seriously!?)
     let ico_path = Path::new(&out_dir).join("stella2.ico");
     {
         use icon_baker::{resample, Icon, SvgImage};

@@ -96,9 +96,6 @@ pub use self::native as current;
 //
 // Type aliases for the default backend.
 
-// TODO: A test driver, which replaces the following type aliases, allowing
-//       UI tests to provide stimuli
-
 /// The default window manager type for the target platform.
 pub type Wm = current::Wm;
 

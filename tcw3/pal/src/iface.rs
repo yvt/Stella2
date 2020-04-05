@@ -553,7 +553,6 @@ pub trait WndListener<T: Wm> {
     // TODO: more events
     //  - Pointer device gestures (swipe, zoom, rotate)
     //  - Keyboard
-    //  - Input method
 }
 
 /// A default implementation of [`WndListener`].
@@ -1007,8 +1006,6 @@ pub trait Canvas: Debug {
     /// transformations are not supported and only affine transformations can
     /// be expressed. `m.z.z` must be positive.
     fn mult_transform(&mut self, m: Matrix3<f32>);
-
-    // TODO: text rendering
 
     // TODO: image rendering
 }

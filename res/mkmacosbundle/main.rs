@@ -53,8 +53,6 @@ fn main() {
     }
 
     // The appllcation icon
-    // TODO: `icon_baker` pulls too many dependencies. (Three different
-    //       versions of `png`, seriously!?)
     let ico_path = bundle_path.join("Contents/Resources/stella2.icns");
     {
         use icon_baker::{resample, Icon, SvgImage};
@@ -69,7 +67,6 @@ fn main() {
             .unwrap()
             .into();
 
-        // TODO: Some images get corrupted
         ico.add_entry(resample::linear, &svg_img, 16).unwrap();
         ico.add_entry(resample::linear, &svg_img, 32).unwrap();
         ico.add_entry(resample::linear, &svg_img, 64).unwrap();

@@ -16,7 +16,6 @@ pub struct WndState {
 }
 
 impl AppState {
-    // TODO: Restore session state
     pub fn new() -> Self {
         Self {
             main_wnd: Elem::new(WndState {

@@ -218,8 +218,6 @@ pub fn run_test(cb: impl FnOnce(&dyn TestingWm) + Send + panic::UnwindSafe + 'st
     with_testing_wm(|wm| cb(&wm));
 }
 
-// TODO: Add artificial inputs and outputs
-
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
