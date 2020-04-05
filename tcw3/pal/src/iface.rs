@@ -566,7 +566,7 @@ pub enum NcHit {
     ///
     /// After the implementor of `WndListener` returns this,
     /// [`WndListener::mouse_drag`] will be soon called.
-    Client,
+    Client = 0,
 
     /// Instructs the system to start a grab action on the window.
     ///

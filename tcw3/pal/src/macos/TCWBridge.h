@@ -21,6 +21,7 @@ extern void tcw_wndlistener_update_ready(TCWListenerUserData ud);
 extern void tcw_wndlistener_focus(TCWListenerUserData ud);
 extern void tcw_wndlistener_mouse_motion(TCWListenerUserData ud, NSPoint loc);
 extern void tcw_wndlistener_mouse_leave(TCWListenerUserData ud);
+extern int tcw_wndlistener_nc_hit_test(TCWListenerUserData ud, NSPoint loc);
 extern TCWMouseDragListenerUserData
 tcw_wndlistener_mouse_drag(TCWListenerUserData ud, NSPoint loc, uint8_t button);
 
@@ -116,3 +117,9 @@ typedef enum TCW3CursorShape {
     kTCW3CursorShapeColResize,
     kTCW3CursorShapeRowResize,
 } TCW3CursorShape;
+
+// These variants must be synchronized with `NcHit`
+typedef enum TCW3NcHit {
+    kTCW3NcHitClient,
+    kTCW3NcHitGrab,
+} TCW3NcHit;

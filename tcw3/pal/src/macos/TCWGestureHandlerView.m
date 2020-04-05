@@ -84,6 +84,14 @@ static NSString *coalesceString(id string) {
 
     if (!hasMouseDragListener) {
         // Start a new gesture
+        TCW3NcHit hit =
+            tcw_wndlistener_nc_hit_test(self->controller.listenerUserData, loc);
+
+        if (hit != kTCW3NcHitClient) {
+            [self.window performWindowDragWithEvent:event];
+            return;
+        }
+
         self->mouseDragListener =
             tcw_wndlistener_mouse_drag(self->controller.listenerUserData, loc,
                                        (uint8_t)event.buttonNumber);

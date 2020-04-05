@@ -433,6 +433,18 @@ unsafe extern "C" fn tcw_wndlistener_mouse_leave(ud: TCWListenerUserData) {
 }
 
 #[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_nc_hit_test(ud: TCWListenerUserData, loc: NSPoint) -> c_int {
+    method_impl(ud, |wm, state| {
+        state.listener.borrow().nc_hit_test(
+            wm,
+            &state.hwnd,
+            point2_from_ns_point(loc).cast().unwrap(),
+        )
+    })
+    .unwrap_or(iface::NcHit::Client) as c_int
+}
+
+#[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_mouse_drag(
     ud: TCWListenerUserData,
     loc: NSPoint,
