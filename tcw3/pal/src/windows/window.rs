@@ -917,6 +917,58 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             return 0;
         } // WM_MOUSEWHEEL
 
+        winuser::WM_NCHITTEST => {
+            // When the window frame is removed, we have to do non-client hit
+            // testing by ourselves.
+            if (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+                let lparam = lparam as DWORD;
+                let loc = [
+                    LOWORD(lparam) as i16 as LONG, // `GET_X_LPARAM(lparam) as LONG`
+                    HIWORD(lparam) as i16 as LONG, // `GET_Y_LPARAM(lparam) as LONG`
+                ];
+
+                let rect = {
+                    let mut rect = MaybeUninit::uninit();
+                    assert_win32_ok(unsafe { winuser::GetWindowRect(hwnd, rect.as_mut_ptr()) });
+                    unsafe { rect.assume_init() }
+                };
+
+                let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
+                assert_win32_ok(dpi);
+
+                // The idomatic solution would be to use `GetSystemMetricsForDpi`, but
+                // if the user specifies a really large sizing border, it might break
+                // the application's functionality. Thus, we hard-code the width for
+                // now.
+                let width = log_to_phy(5, dpi) as LONG;
+
+                let flags = 0b0001 * (loc[0] < rect.left + width) as u8
+                    | 0b0010 * (loc[1] < rect.top + width) as u8
+                    | 0b0100 * (loc[0] >= rect.right - width) as u8
+                    | 0b1000 * (loc[1] >= rect.bottom - width) as u8;
+
+                return match flags {
+                    0b0000 => winuser::HTCLIENT,
+                    0b0001 => winuser::HTLEFT,
+                    0b0010 => winuser::HTTOP,
+                    0b0011 => winuser::HTTOPLEFT,
+                    0b0100 => winuser::HTRIGHT,
+                    0b0101 => winuser::HTRIGHT, // invalid
+                    0b0110 => winuser::HTTOPRIGHT,
+                    0b0111 => winuser::HTTOPRIGHT, // invalid
+                    0b1000 => winuser::HTBOTTOM,
+                    0b1001 => winuser::HTBOTTOMLEFT,
+                    0b1010 => winuser::HTTOP,     // invalid
+                    0b1011 => winuser::HTTOPLEFT, // invalid
+                    0b1100 => winuser::HTBOTTOMRIGHT,
+                    0b1101 => winuser::HTBOTTOMRIGHT, // invalid
+                    0b1110 => winuser::HTTOPRIGHT,    // invalid
+                    0b1111 => winuser::HTTOPRIGHT,    // invalid
+                    _ => unreachable!(),
+                } as _;
+            }
+        }
+
         winuser::WM_NCCALCSIZE => {
             if wparam != 0
                 && (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT)
