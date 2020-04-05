@@ -18,6 +18,7 @@ use crate::{
         channellist::ChannelListView,
         logview::LogView,
         splitutils::SplitEventAdapter,
+        tabbar::TabbarView,
         toolbar::ToolbarView,
     },
 };
@@ -26,6 +27,7 @@ import!("view/channellist.tcwdl");
 import!("view/dpiscalewatcher.tcwdl");
 import!("view/logview.tcwdl");
 import!("view/splitutils.tcwdl");
+import!("view/tabbar.tcwdl");
 import!("view/toolbar.tcwdl");
 
 #[widget]
@@ -66,18 +68,27 @@ comp crate::view::MainView {
 
     const central_view = HView::new! {
         layout = TableLayout::stack_vert(
-            ArrayVec::from([get!(toolbar.view), get!(split_editor.view)])
+            ArrayVec::from([
+                get!(tabbar.view),
+                get!(toolbar.view),
+                get!(split_editor.view),
+            ])
                 .into_iter()
                 .map(|view| (view, AlignFlags::JUSTIFY))
         ),
     };
 
+    const tabbar = crate::view::tabbar::TabbarView::new! { wm, style_manager, wnd_state };
+
+    on (tabbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
+    on (tabbar.close) get!(&this).raise_close();
+
     const toolbar = crate::view::toolbar::ToolbarView::new! { wm, style_manager, wnd_state };
 
     on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
-    on (toolbar.close) get!(&this).raise_close();
 
     on (init) {
+        get!(&style_elem).insert_child(get!(tabbar.style_elem));
         get!(&style_elem).insert_child(get!(toolbar.style_elem));
     }
 

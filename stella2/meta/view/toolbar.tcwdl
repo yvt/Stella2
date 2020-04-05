@@ -20,7 +20,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
 
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::WndAction);
-    pub event close();
 
     on (init) get!(&this).init();
 
@@ -39,10 +38,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
                     (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
                     (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(menu_button.view), AlignFlags::JUSTIFY),
-                    #[cfg(not(target_os = "macos"))]
-                    (get!(spacer2.view), AlignFlags::HORZ_JUSTIFY),
-                    #[cfg(not(target_os = "macos"))]
-                    (get!(close_button.view), AlignFlags::JUSTIFY),
                 ])
             ),
         },
@@ -52,7 +47,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     pub const style_elem: HElem = get!(wrapper.style_elem);
 
     const spacer1 = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
-    const spacer2 = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
 
     const separator = StyledBox::new! {
         style_manager,
@@ -89,15 +83,4 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     };
 
     on (menu_button.activated) dbg!();
-
-    // On platforms other than macOS, `WndStyleFlags::FULL_SIZE_CONTENT` removes
-    // standard window buttons, so we have to make them by themselves.
-    // TODO: This is a temporary measure until we add a tab bar.
-    const close_button = Button::new! {
-        style_manager,
-        class_set = theming::ClassSet::BUTTON,
-        caption = "×",
-    };
-
-    on (close_button.activated) get!(&this).raise_close();
 }

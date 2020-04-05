@@ -21,6 +21,7 @@ mod channellist;
 mod dpiscalewatcher;
 mod logview;
 mod splitutils;
+mod tabbar;
 mod toolbar;
 
 pub struct AppView {

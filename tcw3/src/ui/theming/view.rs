@@ -292,6 +292,18 @@ impl StyledBox {
     pub fn set_child_generic(&self, widget: &dyn Widget) {
         self.set_child(Role::Generic, Some(widget));
     }
+
+    pub fn set_subview_bullet(&self, view: impl Into<Option<HView>>) {
+        self.set_subview(Role::Bullet, view.into());
+    }
+
+    pub fn set_subelement_bullet(&self, element: impl Into<Option<HElem>>) {
+        self.set_subelement(Role::Bullet, element.into());
+    }
+
+    pub fn set_child_bullet(&self, widget: &dyn Widget) {
+        self.set_child(Role::Bullet, Some(widget));
+    }
 }
 
 impl Widget for StyledBox {

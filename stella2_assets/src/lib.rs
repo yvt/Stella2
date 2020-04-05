@@ -9,6 +9,7 @@ macro_rules! stvg {
 }
 
 pub static SEARCH: Stvg = stvg!("src/search.svg");
+pub static CLOSE: Stvg = stvg!("src/close.svg");
 
 pub static LIST_GROUP_OPEN: Stvg = stvg!("src/list_group_open.svg");
 

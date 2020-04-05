@@ -1,0 +1,98 @@
+use arrayvec::ArrayVec;
+use harmony::Elem;
+use tcw3::{
+    pal,
+    ui::{
+        AlignFlags,
+        views::{Label, Button},
+        theming::{self, ClassSet, HElem, StyledBox, Manager},
+        layouts::{TableLayout},
+    },
+    uicore::{HView, ViewFlags},
+};
+
+use crate::{model, stylesheet::elem_id};
+
+#[widget]
+pub(crate) comp crate::view::tabbar::TabbarView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+
+    pub prop wnd_state: Elem<model::WndState>;
+    pub event dispatch(action: model::WndAction);
+    pub event close();
+
+    on (init) get!(&this).init();
+
+    const wrapper = StyledBox::new! {
+        style_manager,
+        // Define a draggable region
+        view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::DRAG_AREA,
+        class_set = elem_id::TABBAR,
+        subview_generic = HView::new! {
+            layout = TableLayout::stack_horz(
+                ArrayVec::from([
+                    (get!(tab1.view), AlignFlags::JUSTIFY),
+                    (get!(tab2.view), AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT),
+                    #[cfg(not(target_os = "macos"))]
+                    (get!(close_button.view), AlignFlags::JUSTIFY),
+                ])
+            ),
+        },
+        subelement_generic = get!(tabs_elem.helem),
+    };
+
+    pub const view: HView = get!(wrapper.view);
+    pub const style_elem: HElem = get!(wrapper.style_elem);
+
+    const tabs_elem = theming::Elem::new! { style_manager };
+    on (init) {
+        get!(&tabs_elem).insert_child(get!(tab1.style_elem));
+        get!(&tabs_elem).insert_child(get!(tab2.style_elem));
+        get!(&tabs_elem).insert_child(get!(close_button.style_elem));
+    }
+
+    // TODO: Replace these with real tabs
+    const tab1 = StyledBox::new! {
+        style_manager,
+        view_flags = ViewFlags::ACCEPT_MOUSE_OVER | ViewFlags::ACCEPT_MOUSE_DRAG,
+        class_set = elem_id::TABBAR_TAB | ClassSet::ACTIVE,
+        auto_class_set = ClassSet::HOVER,
+        child_generic = get!(&tab1_caption),
+        child_bullet = get!(&tab1_close),
+    };
+    const tab1_caption = Label::new! {
+        style_manager,
+        text = "#general — randomserver",
+    };
+    const tab1_close = Button::new! {
+        style_manager,
+        class_set = elem_id::TABBAR_TAB_CLOSE,
+    };
+
+    const tab2 = StyledBox::new! {
+        style_manager,
+        view_flags = ViewFlags::ACCEPT_MOUSE_OVER | ViewFlags::ACCEPT_MOUSE_DRAG,
+        class_set = elem_id::TABBAR_TAB,
+        auto_class_set = ClassSet::HOVER,
+        child_generic = get!(&tab2_caption),
+        child_bullet = get!(&tab2_close),
+    };
+    const tab2_caption = Label::new! {
+        style_manager,
+        text = "#random — randomserver",
+    };
+    const tab2_close = Button::new! {
+        style_manager,
+        class_set = elem_id::TABBAR_TAB_CLOSE,
+    };
+
+    // On platforms other than macOS, `WndStyleFlags::FULL_SIZE_CONTENT` removes
+    // standard window buttons, so we have to make them by themselves.
+    const close_button = Button::new! {
+        style_manager,
+        class_set = elem_id::TABBAR_CLOSE,
+    };
+
+    on (close_button.activated) get!(&this).raise_close();
+}

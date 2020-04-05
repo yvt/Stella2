@@ -37,6 +37,11 @@ pub mod elem_id {
                 , SIDEBAR_GROUP_BULLET
                 , SIDEBAR_ITEM
 
+                , TABBAR
+                , TABBAR_TAB
+                , TABBAR_TAB_CLOSE
+                , TABBAR_CLOSE
+
                 , WND
     }
 }
@@ -101,12 +106,27 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
         },
+        ([#TABBAR]) (priority = 10000) {
+            num_layers: 2,
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
+
+            layer_bg_color[1]: RGBAF32::new(0.0, 0.0, 0.0, 0.13),
+            layer_metrics[1]: Metrics {
+                margin: [NAN, 0.0, -0.5, 0.0],
+                size: Vector2::new(NAN, 1.35),
+            },
+        },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // sidebar looks awkward without backdrop blur, so we disable
         // transparency in this case.
         // See also: `self::ENABLE_BACKDROP_BLUR`
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         ([#SIDEBAR] .. [#WND.ACTIVE]) (priority = 10500) {
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
+            layer_flags[0]: LayerFlags::BACKDROP_BLUR,
+        },
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        ([#TABBAR] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
         },
@@ -164,6 +184,111 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
             min_size: Vector2::new(15.0, 15.0),
             allow_grow: [false, true],
+        },
+
+        // Tabbar
+        ([#TABBAR_TAB]) (priority = 10000) {
+            num_layers: 3,
+
+            // Shadow
+            layer_bg_color[0]: RGBAF32::new(0.0, 0.0, 0.0, 0.4),
+            layer_metrics[0]: Metrics {
+                margin: [0.0, -0.5, 0.0, -0.5],
+                ..Metrics::default()
+            },
+            layer_opacity[0]: 0.0,
+
+            // Face
+            layer_bg_color[1]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
+            layer_opacity[1]: 0.0,
+            layer_metrics[1]: Metrics {
+                // Make sure no gap between the tabbar and the toolbar
+                margin: [0.0, 0.0, -1.0, 0.0],
+                ..Metrics::default()
+            },
+
+            // Highlight color
+            layer_bg_color[2]: RGBAF32::new(0.63, 0.07, 0.93, 1.0),
+            layer_opacity[2]: 0.0,
+            layer_metrics[2]: Metrics {
+                margin: [0.0, 0.0, NAN, 0.0],
+                size: Vector2::new(NAN, 3.0),
+            },
+
+            allow_grow: [false, false],
+            min_size: Vector2::new(0.0, 32.0),
+
+            // Label
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [NAN, 32.0, NAN, 10.0],
+                ..Metrics::default()
+            },
+
+            // Close button
+            subview_metrics[Role::Bullet]: Metrics {
+                margin: [NAN, 7.0, NAN, NAN],
+                ..Metrics::default()
+            },
+        },
+        ([#TABBAR_TAB] .. [#WND.ACTIVE]) (priority = 10500) {
+            layer_bg_color[1]: RGBAF32::new(0.9, 0.9, 0.9, 1.0),
+        },
+        ([#TABBAR_TAB.ACTIVE]) (priority = 10500) {
+            layer_opacity[0]: 1.0,
+            layer_opacity[1]: 1.0,
+            layer_opacity[2]: 1.0,
+        },
+        ([#TABBAR_TAB.HOVER:not(.ACTIVE)]) (priority = 10500) {
+            layer_bg_color[1]: RGBAF32::new(0.0, 0.0, 0.0, 0.1),
+            layer_opacity[1]: 1.0,
+        },
+
+        ([#TABBAR_TAB_CLOSE]) (priority = 10000) {
+            num_layers: 2,
+            layer_bg_color[0]: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+            layer_opacity[0]: 0.0,
+            #[dyn] layer_img[1]: Some(
+                himg_from_stvg_col(assets::CLOSE, [0.3, 0.3, 0.3, 1.0].into()),
+            ),
+            layer_metrics[1]: Metrics {
+                margin: [NAN; 4],
+                size: Vector2::new(16.0, 16.0),
+            },
+            min_size: Vector2::new(16.0, 16.0),
+            allow_grow: [false, false],
+        },
+        ([#TABBAR_TAB_CLOSE.HOVER]) (priority = 10500) {
+            layer_opacity[0]: 0.1,
+        },
+        ([#TABBAR_TAB_CLOSE.HOVER.ACTIVE]) (priority = 10500) {
+            layer_opacity[0]: 0.2,
+        },
+
+        #[cfg(not(target_os = "macos"))]
+        ([#TABBAR_CLOSE]) (priority = 10000) {
+            num_layers: 2,
+            layer_bg_color[0]: RGBAF32::new(0.9, 0.06, 0.14, 1.0),
+            layer_opacity[0]: 0.0,
+            #[dyn] layer_img[1]: Some(
+                himg_from_stvg_col(assets::CLOSE, [0.3, 0.3, 0.3, 1.0].into()),
+            ),
+            layer_metrics[1]: Metrics {
+                margin: [NAN; 4],
+                size: Vector2::new(16.0, 16.0),
+            },
+            min_size: Vector2::new(48.0, 0.0),
+            allow_grow: [false, true],
+        },
+        #[cfg(not(target_os = "macos"))]
+        ([#TABBAR_CLOSE.HOVER]) (priority = 10500) {
+            layer_opacity[0]: 1.0,
+            #[dyn] layer_img[1]: Some(
+                himg_from_stvg_col(assets::CLOSE, [1.0, 1.0, 1.0, 1.0].into()),
+            ),
+        },
+        #[cfg(not(target_os = "macos"))]
+        ([#TABBAR_CLOSE.HOVER.ACTIVE]) (priority = 10500) {
+            layer_bg_color[0]: RGBAF32::new(1.0, 0.5, 0.5, 1.0),
         },
 
         // Search field
