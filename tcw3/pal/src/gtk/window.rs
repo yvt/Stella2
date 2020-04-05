@@ -532,6 +532,43 @@ extern "C" fn tcw_wnd_widget_dpi_scale_changed_handler(wnd_ptr: WndPtr) {
 }
 
 #[no_mangle]
+extern "C" fn tcw_wnd_widget_nc_hit_test_handler(wnd_ptr: WndPtr, x: f32, y: f32) -> c_int {
+    log::debug!("nc_hit_test{:?}", (wnd_ptr, x, y));
+
+    (|| {
+        let wm = unsafe { Wm::global_unchecked() };
+        let ptr = wnd_ptr?;
+        let hwnd = HWnd { ptr };
+
+        let loc = Point2::new(x, y);
+
+        let mut wnds = WNDS.get_with_wm(wm).borrow_mut();
+
+        // Stop any ongoing scroll gesture (just in case)
+        wnds = stop_scroll(wm, wnds, hwnd.clone());
+
+        let wnd = wnds.get_mut(ptr)?;
+
+        if wnd.drag_state.is_some() {
+            // There already is an active drag gesture
+            return Some(0);
+        }
+
+        // Unborrow `WNDS` before calling into user code
+        let listener = Rc::clone(&wnd.listener);
+        drop(wnds);
+
+        let hit = listener.nc_hit_test(wm, &hwnd, loc);
+
+        Some(match hit {
+            iface::NcHit::Client => 0,
+            iface::NcHit::Grab => 1,
+        })
+    })()
+    .unwrap_or(0)
+}
+
+#[no_mangle]
 extern "C" fn tcw_wnd_widget_button_handler(
     wnd_ptr: WndPtr,
     x: f32,

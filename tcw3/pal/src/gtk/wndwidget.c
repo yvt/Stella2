@@ -107,6 +107,21 @@ static gboolean tcw_wnd_widget_button_press_event(GtkWidget *widget,
         // `GDK_2BUTTON_PRESS`.
         return TRUE;
     }
+
+    if (event->button == 1 &&
+        tcw_wnd_widget_nc_hit_test_handler(wnd_widget->wnd_ptr, (float)event->x,
+                                           (float)event->y)) {
+        GtkWindow *wnd = GTK_WINDOW(gtk_widget_get_toplevel(widget));
+        if (wnd) {
+            double x = 0.0, y = 0.0;
+            gdk_event_get_root_coords((GdkEvent *)event, &x, &y);
+            gtk_window_begin_move_drag(wnd, event->button, (gint)x, (gint)y,
+                                       event->time);
+        }
+
+        return TRUE;
+    }
+
     tcw_wnd_widget_button_handler(wnd_widget->wnd_ptr, (float)event->x,
                                   (float)event->y, 1, (int)event->button - 1);
     return TRUE;
