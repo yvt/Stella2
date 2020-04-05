@@ -376,7 +376,7 @@ impl fmt::Debug for HViewRef<'_> {
 }
 
 bitflags! {
-    pub struct ViewFlags: u8 {
+    pub struct ViewFlags: u16 {
         /// The sublayers are added to the view's associated layer.
         ///
         /// This makes it possible to clip subviews using the layer's border
@@ -422,6 +422,10 @@ bitflags! {
 
         /// Prevents the focus-on-click behavior.
         const NO_FOCUS_ON_CLICK = 1 << 7;
+
+        /// The view defines a draggable area for the containing window. The
+        /// hit testing follows the same rules as mouse drag events.
+        const DRAG_AREA = 1 << 8;
     }
 }
 
