@@ -39,12 +39,13 @@ pub comp crate::ui::views::FixedSpacer {
 
     /// Retrieves `HView` representing the widget.
     pub const view = HView::new! {
-        layout = EmptyLayout::new! {
-            // FIXME: `const` can't use values from `prop`
-            size_traits = {
-                let size = get!(size);
-                crate::uicore::SizeTraits { min: size, max: size, preferred: size }
-            },
+        layout = {
+            let size = get!(size);
+            EmptyLayout::new(SizeTraits {
+                min: size,
+                max: size,
+                preferred: size,
+            })
         },
     };
 }
