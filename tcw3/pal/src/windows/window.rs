@@ -963,8 +963,37 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             if wparam != 0
                 && (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT)
             {
+                let ncsp = unsafe { &mut *(lparam as *mut winuser::NCCALCSIZE_PARAMS) };
                 // Omit the call to `DefWindowProcW` to remove the default
                 // frame (including the title bar).
+
+                // Adjust the client rect to not spill over monitor edges
+                // when maximized.
+                // (Thanks goes to <https://github.com/melak47/BorderlessWindow>)
+                let is_maximized = unsafe {
+                    let mut placement = MaybeUninit::uninit();
+                    assert_win32_ok(winuser::GetWindowPlacement(hwnd, placement.as_mut_ptr()));
+                    placement.assume_init().showCmd == winuser::SW_MAXIMIZE as _
+                };
+
+                if !is_maximized {
+                    return 0;
+                }
+
+                let monitor =
+                    unsafe { winuser::MonitorFromWindow(hwnd, winuser::MONITOR_DEFAULTTONULL) };
+                if monitor.is_null() {
+                    return 0;
+                }
+
+                let monitor_info = unsafe {
+                    let mut monitor_info: winuser::MONITORINFO = std::mem::zeroed();
+                    monitor_info.cbSize = size_of::<winuser::MONITORINFO>() as _;
+                    assert_win32_ok(winuser::GetMonitorInfoW(monitor, &mut monitor_info));
+                    monitor_info
+                };
+
+                ncsp.rgrc[0] = monitor_info.rcWork;
                 return 0;
             }
         }
