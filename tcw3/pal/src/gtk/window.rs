@@ -41,6 +41,7 @@ struct Wnd {
     gtk_widget: WndWidget,
     comp_wnd: comp::Wnd,
     listener: Rc<dyn iface::WndListener<Wm>>,
+    flags: iface::WndFlags,
 
     /// The last known size of the window.
     size: [i32; 2],
@@ -111,6 +112,7 @@ impl HWnd {
             gtk_wnd,
             gtk_widget,
             comp_wnd,
+            flags: iface::WndFlags::default(),
             listener: Rc::new(()),
             size: [0, 0],
             tick_callback_active: false,
@@ -176,6 +178,19 @@ impl HWnd {
             // TODO: BORDERLESS
             wnd.gtk_wnd
                 .set_resizable(flags.contains(iface::WndFlags::RESIZABLE));
+
+            if (wnd.flags ^ flags).contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+                let titlebar_widget;
+                wnd.gtk_wnd
+                    .set_titlebar(if flags.contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+                        titlebar_widget = gtk::Fixed::new();
+                        Some(&titlebar_widget)
+                    } else {
+                        None
+                    });
+            }
+
+            wnd.flags = flags;
         }
 
         if let Some(layer) = attrs.layer {
