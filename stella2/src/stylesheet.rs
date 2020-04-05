@@ -80,10 +80,6 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#TOOLBAR]) (priority = 10000) {
             num_layers: 2,
             layer_bg_color[0]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
-            layer_metrics[0]: Metrics {
-                margin: [-100.0, 0.0, 0.0, 0.0],
-                ..Metrics::default()
-            },
 
             layer_bg_color[1]: RGBAF32::new(0.3, 0.3, 0.3, 0.35),
             layer_metrics[1]: Metrics {
@@ -104,10 +100,6 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
-            layer_metrics[0]: Metrics {
-                margin: [-100.0, 0.0, 0.0, 0.0],
-                ..Metrics::default()
-            },
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // sidebar looks awkward without backdrop blur, so we disable
