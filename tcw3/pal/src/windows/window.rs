@@ -82,6 +82,7 @@ impl fmt::Debug for Wnd {
             .field("comp_wnd", &self.comp_wnd)
             .field("min_size", &self.min_size)
             .field("max_size", &self.max_size)
+            .field("flags", &self.flags)
             .finish()
     }
 }
@@ -770,6 +771,32 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 // Unborrow `drag_state_cell` before calling into user code
                 let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
                 drop(drag_state_cell);
+
+                // Perform non-client hit testing
+                let hit = match listener.nc_hit_test(wm, &pal_hwnd, loc) {
+                    iface::NcHit::Client => None,
+                    iface::NcHit::Grab => Some(winuser::HTCAPTION),
+                };
+
+                if let Some(hit) = hit {
+                    let nc_msg = match msg {
+                        winuser::WM_LBUTTONDOWN => winuser::WM_NCLBUTTONDOWN,
+                        winuser::WM_RBUTTONDOWN => winuser::WM_NCRBUTTONDOWN,
+                        winuser::WM_MBUTTONDOWN => winuser::WM_NCMBUTTONDOWN,
+                        winuser::WM_XBUTTONDOWN => winuser::WM_NCXBUTTONDOWN,
+                        _ => unreachable!(),
+                    };
+                    unsafe {
+                        winuser::SendMessageW(
+                            hwnd,
+                            nc_msg,
+                            hit as WPARAM | (wparam & 0xffff0000),
+                            lparam,
+                        );
+                    }
+
+                    return 0;
+                }
 
                 // Create `MouseDragState`
                 let drag_state = MouseDragState {
