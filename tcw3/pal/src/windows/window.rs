@@ -122,7 +122,7 @@ pub unsafe fn set_app_hicon(hicon: HICON) {
 pub(super) fn init(_: Wm) {
     let hinstance = unsafe { libloaderapi::GetModuleHandleW(null_mut()) };
 
-    // Create a window class for the message-only window
+    // Create a window class for application windows
     let wnd_class = winuser::WNDCLASSW {
         style: winuser::CS_HREDRAW | winuser::CS_VREDRAW,
         lpfnWndProc: Some(wnd_proc),
