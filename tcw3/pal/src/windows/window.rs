@@ -772,32 +772,6 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
                 drop(drag_state_cell);
 
-                // Perform non-client hit testing
-                let hit = match listener.nc_hit_test(wm, &pal_hwnd, loc) {
-                    iface::NcHit::Client => None,
-                    iface::NcHit::Grab => Some(winuser::HTCAPTION),
-                };
-
-                if let Some(hit) = hit {
-                    let nc_msg = match msg {
-                        winuser::WM_LBUTTONDOWN => winuser::WM_NCLBUTTONDOWN,
-                        winuser::WM_RBUTTONDOWN => winuser::WM_NCRBUTTONDOWN,
-                        winuser::WM_MBUTTONDOWN => winuser::WM_NCMBUTTONDOWN,
-                        winuser::WM_XBUTTONDOWN => winuser::WM_NCXBUTTONDOWN,
-                        _ => unreachable!(),
-                    };
-                    unsafe {
-                        winuser::SendMessageW(
-                            hwnd,
-                            nc_msg,
-                            hit as WPARAM | (wparam & 0xffff0000),
-                            lparam,
-                        );
-                    }
-
-                    return 0;
-                }
-
                 // Create `MouseDragState`
                 let drag_state = MouseDragState {
                     listener: listener.mouse_drag(wm, &pal_hwnd, loc, button).into(),
@@ -918,9 +892,10 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
         } // WM_MOUSEWHEEL
 
         winuser::WM_NCHITTEST => {
-            // When the window frame is removed, we have to do non-client hit
-            // testing by ourselves.
-            if (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT) {
+            let mut hit = if (pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT)
+            {
+                // When we remove the window frame, we have to do non-client hit
+                // testing by ourselves.
                 let lparam = lparam as DWORD;
                 let loc = [
                     LOWORD(lparam) as i16 as LONG, // `GET_X_LPARAM(lparam) as LONG`
@@ -947,7 +922,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                     | 0b0100 * (loc[0] >= rect.right - width) as u8
                     | 0b1000 * (loc[1] >= rect.bottom - width) as u8;
 
-                return match flags {
+                match flags {
                     0b0000 => winuser::HTCLIENT,
                     0b0001 => winuser::HTLEFT,
                     0b0010 => winuser::HTTOP,
@@ -965,8 +940,23 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                     0b1110 => winuser::HTTOPRIGHT,    // invalid
                     0b1111 => winuser::HTTOPRIGHT,    // invalid
                     _ => unreachable!(),
-                } as _;
+                }
+            } else {
+                unsafe { winuser::DefWindowProcW(hwnd, msg, wparam, lparam) as _ }
+            };
+
+            if hit == winuser::HTCLIENT {
+                let loc = lparam_to_mouse_loc(hwnd, lparam, true);
+                let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+                match listener.nc_hit_test(wm, &pal_hwnd, loc) {
+                    iface::NcHit::Client => {}
+                    iface::NcHit::Grab => {
+                        hit = winuser::HTCAPTION;
+                    }
+                };
             }
+
+            return hit as _;
         }
 
         winuser::WM_NCCALCSIZE => {
