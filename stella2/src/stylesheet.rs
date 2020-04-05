@@ -177,7 +177,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Search field
         ([#SEARCH_FIELD_WRAP]) (priority = 10000) {
             subview_metrics[Role::Generic]: Metrics {
-                margin: [10.0; 4],
+                margin: [30.0, 10.0, 10.0, 10.0],
                 ..Metrics::default()
             },
             allow_grow: [true, false],

@@ -157,6 +157,13 @@ impl WndView {
         }));
 
         let this_weak = Rc::downgrade(&this);
+        this.main_view.subscribe_close(Box::new(move || {
+            if let Some(this) = this_weak.upgrade() {
+                this.quit.borrow()();
+            }
+        }));
+
+        let this_weak = Rc::downgrade(&this);
         this.hwnd.subscribe_focus(Box::new(move |_, _| {
             if let Some(this) = this_weak.upgrade() {
                 this.update_focus();
@@ -177,11 +184,13 @@ impl WndView {
     fn update_focus(&self) {
         let is_focused = self.hwnd.is_focused();
         if stylesheet::ENABLE_BACKDROP_BLUR {
-            self.hwnd.set_style_flags(if is_focused {
-                WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
-            } else {
-                WndStyleFlags::default()
-            });
+            self.hwnd.set_style_flags(
+                if is_focused {
+                    WndStyleFlags::default() | WndStyleFlags::TRANSPARENT_BACKDROP_BLUR
+                } else {
+                    WndStyleFlags::default()
+                } | WndStyleFlags::FULL_SIZE_CONTENT,
+            );
         }
         self.main_view.set_wnd_focused(is_focused);
     }
