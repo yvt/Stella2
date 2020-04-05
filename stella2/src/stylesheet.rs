@@ -69,7 +69,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     stylesheet! {
         ([.SPLITTER]) (priority = 10000) {
             num_layers: 1,
-            layer_bg_color[0]: RGBAF32::new(0.85, 0.85, 0.85, 0.8),
+            layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
             min_size: Vector2::new(1.0, 1.0),
         },
         ([#EDITOR_SPLIT.SPLITTER]) (priority = 10000) {
