@@ -1,12 +1,16 @@
-# ![Stella 2](docs/images/banner.svg)
+# ![Stella 2](https://yvt.jp/files/programs/stella2/banner-with-ss-20200407.jpg)
 
 [![Build Status](https://yvt.visualstudio.com/Stella2/_apis/build/status/yvt.Stella2?branchName=master)](https://yvt.visualstudio.com/Stella2/_build/latest?definitionId=1&branchName=master)
 
 **Work in progress**
 
-This project aims to create a lightweight instant messaging client.
+This project aims to create a lightweight instant messaging client in [the Rust programming language](https://www.rust-lang.org).
 
-TODO
+- [ ] [Widget toolkit](tcw3/src/lib.md) (*in progress*)
+- [x] UI state persistence
+- [ ] UI translation system
+- [ ] Data model
+- [ ] Connectivity
 
 ## Goals
 
