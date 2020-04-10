@@ -94,6 +94,38 @@ pub use self::native as current;
 
 // ============================================================================
 //
+// Define `new_accel`. This is trickier than other items because macros only
+// have crate-level namespaces.
+
+macro_rules! define_new_accel {
+    ($($inner:tt)*) => {
+        /// Create an accelerator table. Expands to an expression of type
+        /// [`HAccel`].
+        #[macro_export]
+        $($inner)*
+    };
+}
+
+define_new_accel! {
+    #[cfg(not(feature = "testing"))]
+    macro_rules! new_accel {
+        ($wm:expr, [$($entries:tt)*] $(,)*) => {
+            compile_error!("TODO!")
+        };
+    }
+}
+
+define_new_accel! {
+    #[cfg(feature = "testing")]
+    macro_rules! new_accel {
+        ($wm:expr, [$($entries:tt)*] $(,)*) => {
+            compile_error!("TODO!")
+        };
+    }
+}
+
+// ============================================================================
+//
 // Type aliases for the default backend.
 
 /// The default window manager type for the target platform.
@@ -125,9 +157,9 @@ pub type TextLayout = current::TextLayout;
 // the default backend.
 
 pub use self::iface::{
-    BadThread, Beam, CursorShape, IndexFromPointFlags, LayerFlags, LineCap, LineJoin, NcHit,
-    RunFlags, RunMetrics, ScrollDelta, SysFontType, TextDecorFlags, TextInputCtxEventFlags,
-    WndFlags, RGBAF32,
+    actions, ActionStatus, BadThread, Beam, CursorShape, IndexFromPointFlags, InterpretEventCtx,
+    LayerFlags, LineCap, LineJoin, NcHit, RunFlags, RunMetrics, ScrollDelta, SysFontType,
+    TextDecorFlags, TextInputCtxEventFlags, WndFlags, RGBAF32,
 };
 
 /// The window handle type of [`Wm`].
@@ -138,6 +170,9 @@ pub type HLayer = <Wm as iface::Wm>::HLayer;
 
 /// The invocation handle type of [`Wm`].
 pub type HInvoke = <Wm as iface::Wm>::HInvoke;
+
+/// The accelerator table handle type of [`Wm`].
+pub type HAccel = <Wm as iface::Wm>::HAccel;
 
 /// The text input context handle type of [`Wm`].
 pub type HTextInputCtx = <Wm as iface::Wm>::HTextInputCtx;

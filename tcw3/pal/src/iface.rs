@@ -38,6 +38,12 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// A text input context handle type.
     type HTextInputCtx: Debug + Clone + PartialEq + Eq + Hash;
 
+    /// An accelerator table handle type.
+    ///
+    /// `Wm` doesn't provide a method for constructing this type. You should use
+    /// the [`new_accel!`](new_accel) macro to create an accelerator table.
+    type HAccel: Debug + Clone + PartialEq + Eq + Hash;
+
     /// A bitmap type.
     type Bitmap: Bitmap;
 
@@ -222,6 +228,11 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     ///
     /// [`TextInputCtxListener::edit`] may be called in this method.
     fn remove_text_input_ctx(self, ctx: &Self::HTextInputCtx);
+
+    // TODO: Add a method to translate a key event using an accelerator table
+
+    /// Delete an accelerator table.
+    fn remove_accel(self, haccel: &Self::HAccel);
 }
 
 /// Returned when a function/method is called from an invalid thread.
@@ -497,6 +508,21 @@ pub trait WndListener<T: Wm> {
     /// The DPI scaling factor of a window has been updated.
     fn dpi_scale_changed(&self, _: T, _: &T::HWnd) {}
 
+    /// Interpret a (prospective) input event using accelerator tables.
+    ///
+    /// The implementation doesn't inspect the event by itself. Instead, it
+    /// provides zero or more accelerator tables, which the backend will use to
+    /// translate the event to an action.
+    fn interpret_event(&self, _: T, _: &T::HWnd, _: &mut dyn InterpretEventCtx<T::HAccel>) {}
+
+    /// Query whether the receiver can handle the given action type.
+    fn validate_action(&self, _: T, _: &T::HWnd, _: ActionId) -> ActionStatus {
+        ActionStatus::empty()
+    }
+
+    /// Perform the specified action.
+    fn perform_action(&self, _: T, _: &T::HWnd, _: ActionId) {}
+
     /// The mouse pointer has moved inside a window when none of the mouse
     /// buttons are pressed (i.e., there is no active mouse drag gesture).
     fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
@@ -557,6 +583,50 @@ pub trait WndListener<T: Wm> {
 
 /// A default implementation of [`WndListener`].
 impl<T: Wm> WndListener<T> for () {}
+
+/// Provides a callback method for [`WndListener::interpret_event`].
+pub trait InterpretEventCtx<HAccel> {
+    /// Use the specified accelerator table to translate the event.
+    fn use_accel(&mut self, haccel: &HAccel);
+}
+
+/// Identifies a type of action.
+///
+/// See [`actions`] for the list of standard actions.
+pub type ActionId = u16;
+
+/// Defines standard actions.
+pub mod actions {
+    use super::ActionId;
+
+    /// The smallest action ID allocated for the system.
+    pub const SYS_START_VALUE: ActionId = 0xf000;
+
+    iota::iota! {
+        pub const UNDO: ActionId = SYS_START_VALUE + iota;
+                , REDO
+                , CUT
+                , COPY
+                , PASTE
+                , PASTE_AS_PLAIN_TEXT
+                , SELECT_ALL
+                , UPPERCASE_WORD
+                , LOWERCASE_WORD
+                , CAPITALIZE_WORD
+    }
+}
+
+bitflags! {
+    pub struct ActionStatus: u8 {
+        /// The action is recognized by the receiver. If this flag is not set,
+        /// other flags are ignored.
+        const VALID = 1;
+        /// The receiver can accept the action in the current state.
+        const ENABLED = 1 << 1;
+        /// The action toggles a on-off state, and the current state is “on”.
+        const CHECKED = 1 << 2;
+    }
+}
 
 /// Result type of [`WndListener::nc_hit_test`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

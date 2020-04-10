@@ -110,6 +110,71 @@ meta crate is [`tcw3_meta`].
 
 ### Keyboard
 
+<!--
+    TODO: Widget-local key bindings are interpreted using an accelerator table
+    as well. There is no platform-neutral way to examine the contents of
+    keyboard events.
+-->
+
+### Actions
+
+Single-shot operations such as copying to clipboard are delivered to widgets as
+*actions*.
+Actions have global identifiers shared by all components, so they are suitable
+for common UI operations and application-wide operations, but not for
+widget-local operations.
+
+Actions are generated through one of the following mechanisms:
+
+ - The application creates one or more *accelerator tables*, which are mappings
+   from key combinations to actions with a platform-specific representation.
+   When the backend needs to interpret an input event, it calls
+   **[`WndListener::interpret_event`]**, which calls a given callback function
+   for each active accelerator table until it finds an applicable mapping.
+
+ - (macOS only) When the user selects an application menu item (the creation of
+   this is out of the scope of TCW3) or inputs its key equivalent, Cocoa sends
+   a Objective C message down a responder chain. If an application object
+   happens to receive it, the TCW3 backend will attempt to translate it to an
+   action. On macOS, accelerator tables define mappings from Objective C
+   selectors to actions in addition to the aforementioned key-to-action
+   mappings.
+
+   Standard widgets from Cocoa use this responder chain as well. You can observe
+   this by opening a standard file dialog and clicking the application's Edit
+   menu, where you will find Cut/Copy/Paste are usable even in the dialog. Also,
+   the user can customize the key equivalents of menu items in the user's system
+   preference. This means you should prefer this mechanism over key-to-action
+   mappings described in the previous bullet point.
+
+[`WndListener::interpret_event`]: tcw3_pal::iface::WndListener::interpret_event
+
+<!-- TODO: The application can programmatically send actions to itself. -->
+
+Actions are identified by 16-bit integers. On Windows, they are directly mapped
+to command IDs. Some ranges are reserved by TCW3 for common UI operations.
+
+<!-- TODO: Application-global listener -->
+
+The `pal` backend calls the following methods of `pal::iface::WndListener` to
+perform an action or to see if an action is valid in the current state:
+
+ - **[`validate_action`]**: Returns flags indicating such as whether the window
+   can perform the action right now or not.
+ - **[`perform_action`]**: Performs the action.
+
+[`validate_action`]: tcw3_pal::iface::WndListener::validate_action
+[`perform_action`]: tcw3_pal::iface::WndListener::perform_action
+
+<!--
+TODO:
+The `uicore` implementation of this trait attempts to handle calls to these
+methods by calling respective listener methods in the following order:
+
+ - First, it tries the `ViewListener` of the currently focused view.
+ - ...
+-->
+
 ### Text Input
 
 ### Headless Backend

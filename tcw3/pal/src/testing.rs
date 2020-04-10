@@ -477,6 +477,7 @@ impl iface::Wm for Wm {
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
+    type HAccel = HAccel;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -827,6 +828,10 @@ impl iface::Wm for Wm {
             _ => unreachable!(),
         }
     }
+
+    fn remove_accel(self, _haccel: &Self::HAccel) {
+        todo!()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -979,6 +984,8 @@ enum HTextInputCtxInner {
     Native(native::HTextInputCtx),
     Testing(textinput::HTextInputCtx),
 }
+
+pub type HAccel = ();
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
 /// are incompatible with the target backend.
