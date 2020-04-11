@@ -9,6 +9,13 @@
         void *__ptr;                                                           \
     }
 
+typedef uint8_t TCW3ActionStatus;
+
+// These flags must be synchronized with `ActionStatus`
+#define kTCW3ActionStatusValid ((TCW3ActionStatus)(1 << 0))
+#define kTCW3ActionStatusEnabled ((TCW3ActionStatus)(1 << 1))
+#define kTCW3ActionStatusChecked ((TCW3ActionStatus)(1 << 2))
+
 // These callbacks are defined in `window.rs`
 typedef OPQAUE_HANDLE TCWListenerUserData;
 typedef OPQAUE_HANDLE TCWMouseDragListenerUserData;
@@ -19,6 +26,14 @@ extern void tcw_wndlistener_resize(TCWListenerUserData ud);
 extern void tcw_wndlistener_dpi_scale_changed(TCWListenerUserData ud);
 extern void tcw_wndlistener_update_ready(TCWListenerUserData ud);
 extern void tcw_wndlistener_focus(TCWListenerUserData ud);
+extern int tcw_wndlistener_key_down(TCWListenerUserData ud, uint16_t mod,
+                                    uint16_t charcode_unmod);
+extern TCW3ActionStatus
+tcw_wndlistener_validate_selector(TCWListenerUserData ud, const char *selector,
+                                  size_t selector_len);
+extern void tcw_wndlistener_perform_selector(TCWListenerUserData ud,
+                                             const char *selector,
+                                             size_t selector_len);
 extern void tcw_wndlistener_mouse_motion(TCWListenerUserData ud, NSPoint loc);
 extern void tcw_wndlistener_mouse_leave(TCWListenerUserData ud);
 extern int tcw_wndlistener_nc_hit_test(TCWListenerUserData ud, NSPoint loc);

@@ -27,7 +27,7 @@ mod timer;
 mod window;
 pub use self::{
     timer::HInvoke,
-    window::{HTextInputCtx, HWnd},
+    window::{AccelTable, ActionKeyBinding, ActionSelBinding, HTextInputCtx, HWnd},
 };
 
 use self::utils::{is_main_thread, IdRef};
@@ -41,8 +41,6 @@ use self::utils::{is_main_thread, IdRef};
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
-
-pub type AccelTable = ();
 
 impl iface::Wm for Wm {
     type HWnd = HWnd;

@@ -5,6 +5,8 @@ use syn::{
     Result, Token,
 };
 
+#[cfg(feature = "macos")]
+mod macos;
 mod testing;
 
 struct MacroInput {
@@ -89,12 +91,12 @@ pub fn accel_table_inner(params: proc_macro::TokenStream) -> proc_macro::TokenSt
             (quote::quote! { &[#(#bindings),*] }).into()
         }
 
+        #[cfg(feature = "macos")]
+        "macos" => macos::gen_accel_table(&input).into(),
+
         // TODO:
         #[cfg(feature = "windows")]
         "windows" => quote::quote! { () }.into(),
-
-        #[cfg(feature = "macos")]
-        "macos" => quote::quote! { () }.into(),
 
         #[cfg(feature = "gtk")]
         "gtk" => quote::quote! { () }.into(),

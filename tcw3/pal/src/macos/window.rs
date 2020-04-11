@@ -321,6 +321,57 @@ impl HTextInputCtx {
 }
 
 // ---------------------------------------------------------------------------
+// Accelerator tables
+//
+// Most of these types are implementation details and thus hidden. They still
+// need to be `pub` because they are instantiated by `accel_table!`.
+
+#[derive(Debug)]
+pub struct AccelTable {
+    #[doc(hidden)]
+    pub key: &'static [ActionKeyBinding],
+    #[doc(hidden)]
+    pub sel: &'static [ActionSelBinding],
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct ActionKeyBinding {
+    pub action: iface::ActionId,
+    pub mod_mask: u16,
+    pub mod_flags: u16,
+    pub charcode: u16,
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct ActionSelBinding {
+    pub action: iface::ActionId,
+    pub sel: &'static str,
+}
+
+impl AccelTable {
+    fn find_action_with_key(&self, mod_flags: u16, charcode_unmod: u16) -> Option<iface::ActionId> {
+        self.key
+            .iter()
+            .filter(move |binding| {
+                (binding.mod_mask & mod_flags) == binding.mod_flags
+                    && charcode_unmod == binding.charcode
+            })
+            .map(|binding| binding.action)
+            .nth(0)
+    }
+
+    fn find_action_with_sel(&self, sel: &[u8]) -> Option<iface::ActionId> {
+        self.sel
+            .iter()
+            .filter(|binding| binding.sel.as_bytes() == sel)
+            .map(|binding| binding.action)
+            .nth(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Utility functions
 
 fn option_deref_to_ptr<T>(x: &Option<impl std::ops::Deref<Target = T>>) -> *const T {
@@ -509,6 +560,130 @@ unsafe extern "C" fn tcw_wndlistener_scroll_gesture(
         Box::into_raw(Box::new(state)) as *const _
     })
     .unwrap_or(std::ptr::null())
+}
+
+// ---------------------------------------------------------------------------
+
+struct EnumAccel<F: FnMut(&AccelTable)>(F);
+
+impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F> {
+    fn use_accel(&mut self, accel: &AccelTable) {
+        (self.0)(accel);
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_key_down(
+    ud: TCWListenerUserData,
+    mod_flags: u16,
+    charcode_unmod: u16,
+) -> c_int {
+    method_impl(ud, |wm, state| {
+        log::trace!("tcw_wndlistener_key_down{:?}", (mod_flags, charcode_unmod));
+
+        let listener = state.listener.borrow();
+
+        let mut action = None;
+        let action_ref = &mut action;
+        listener.interpret_event(
+            wm,
+            &state.hwnd,
+            &mut EnumAccel(move |accel_table| {
+                if action_ref.is_none() {
+                    *action_ref = accel_table.find_action_with_key(mod_flags, charcode_unmod);
+                }
+            }),
+        );
+
+        log::trace!("... action = {:?}", action);
+
+        if let Some(action) = action {
+            // The action was found. Can the window handle it?
+            let status = listener.validate_action(wm, &state.hwnd, action);
+            if !status.contains(flags![iface::ActionStatus::{VALID | ENABLED}]) {
+                return 0;
+            }
+
+            listener.perform_action(wm, &state.hwnd, action);
+
+            1 // Handled
+        } else {
+            0 // Unhandled
+        }
+    })
+    .unwrap_or(0)
+}
+
+fn listener_map_sel(
+    wm: Wm,
+    hwnd: &HWnd,
+    listener: &dyn iface::WndListener<Wm>,
+    sel: &[u8],
+) -> Option<iface::ActionId> {
+    let mut action = None;
+    let action_ref = &mut action;
+    listener.interpret_event(
+        wm,
+        hwnd,
+        &mut EnumAccel(move |accel_table| {
+            if action_ref.is_none() {
+                *action_ref = accel_table.find_action_with_sel(sel);
+            }
+        }),
+    );
+    action
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_validate_selector(
+    ud: TCWListenerUserData,
+    selector: *const c_char,
+    selector_len: usize,
+) -> u8 {
+    method_impl(ud, |wm, state| {
+        let sel = std::slice::from_raw_parts(selector as *const u8, selector_len);
+        log::trace!(
+            "tcw_wndlistener_validate_selector({:?})",
+            std::str::from_utf8(sel)
+        );
+
+        let listener = state.listener.borrow();
+
+        let action = listener_map_sel(wm, &state.hwnd, &**listener, sel);
+        log::trace!("... action = {:?}", action);
+
+        if let Some(action) = action {
+            // The action was found. Can the window handle it?
+            listener.validate_action(wm, &state.hwnd, action).bits()
+        } else {
+            0 // Invalid
+        }
+    })
+    .unwrap_or(0)
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_perform_selector(
+    ud: TCWListenerUserData,
+    selector: *const c_char,
+    selector_len: usize,
+) {
+    method_impl(ud, |wm, state| {
+        let sel = std::slice::from_raw_parts(selector as *const u8, selector_len);
+        log::trace!(
+            "tcw_wndlistener_perform_selector({:?})",
+            std::str::from_utf8(sel)
+        );
+
+        let listener = state.listener.borrow();
+
+        let action = listener_map_sel(wm, &state.hwnd, &**listener, sel);
+        log::trace!("... action = {:?}", action);
+
+        if let Some(action) = action {
+            listener.perform_action(wm, &state.hwnd, action);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
