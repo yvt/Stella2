@@ -1,6 +1,7 @@
+#![allow(unused_parens)]
 use cgmath::{Point2, Vector2};
 
-use super::{native, HWnd, HWndInner, Wm};
+use super::{native, AccelTable, HWnd, HWndInner, Wm};
 use crate::iface;
 
 /// Wraps `WndListener<Wm>` to create a `WndListener<native::Wm>`.
@@ -20,8 +21,8 @@ macro_rules! forward_arg {
     ([wm: $x:expr]) => {
         Wm::from_native_wm($x)
     };
-    ($x:ident) => {
-        $x
+    ($other:tt) => {
+        $other
     };
 }
 
@@ -58,6 +59,29 @@ impl iface::WndListener<native::Wm> for NativeWndListener {
         forward!(self.0, nc_hit_test, [wm: wm], [hwnd: hwnd], loc)
     }
 
+    fn interpret_event(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        ctx: &mut dyn iface::InterpretEventCtx<native::AccelTable>,
+    ) {
+        let mut ctx = TestingInterpretEventCtx(ctx);
+        forward!(self.0, interpret_event, [wm: wm], [hwnd: hwnd], (&mut ctx))
+    }
+
+    fn validate_action(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        action: iface::ActionId,
+    ) -> iface::ActionStatus {
+        forward!(self.0, validate_action, [wm: wm], [hwnd: hwnd], action)
+    }
+
+    fn perform_action(&self, wm: native::Wm, hwnd: &native::HWnd, action: iface::ActionId) {
+        forward!(self.0, perform_action, [wm: wm], [hwnd: hwnd], action)
+    }
+
     fn mouse_drag(
         &self,
         wm: native::Wm,
@@ -89,6 +113,15 @@ impl iface::WndListener<native::Wm> for NativeWndListener {
         let scroll_listener = forward!(self.0, scroll_gesture, [wm: wm], [hwnd: hwnd], loc);
 
         Box::new(NativeScrollListener(scroll_listener))
+    }
+}
+
+/// Wraps `InterpretEventCtx<native::AccelTable>` to create a `InterpretEventCtx<AccelTable>`.
+struct TestingInterpretEventCtx<'a>(&'a mut dyn iface::InterpretEventCtx<native::AccelTable>);
+
+impl iface::InterpretEventCtx<AccelTable> for TestingInterpretEventCtx<'_> {
+    fn use_accel(&mut self, haccel: &AccelTable) {
+        self.0.use_accel(&haccel.native);
     }
 }
 
