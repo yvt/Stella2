@@ -41,8 +41,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     /// An accelerator table handle type.
     ///
     /// `Wm` doesn't provide a method for constructing this type. You should use
-    /// the [`new_accel!`](new_accel) macro to create an accelerator table.
-    type HAccel: Debug + Clone + PartialEq + Eq + Hash;
+    /// the [`accel_table!`](accel_table) macro to create an accelerator table.
+    type AccelTable: Debug + Send + Sync;
 
     /// A bitmap type.
     type Bitmap: Bitmap;
@@ -230,9 +230,6 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     fn remove_text_input_ctx(self, ctx: &Self::HTextInputCtx);
 
     // TODO: Add a method to translate a key event using an accelerator table
-
-    /// Delete an accelerator table.
-    fn remove_accel(self, haccel: &Self::HAccel);
 }
 
 /// Returned when a function/method is called from an invalid thread.
@@ -513,7 +510,7 @@ pub trait WndListener<T: Wm> {
     /// The implementation doesn't inspect the event by itself. Instead, it
     /// provides zero or more accelerator tables, which the backend will use to
     /// translate the event to an action.
-    fn interpret_event(&self, _: T, _: &T::HWnd, _: &mut dyn InterpretEventCtx<T::HAccel>) {}
+    fn interpret_event(&self, _: T, _: &T::HWnd, _: &mut dyn InterpretEventCtx<T::AccelTable>) {}
 
     /// Query whether the receiver can handle the given action type.
     fn validate_action(&self, _: T, _: &T::HWnd, _: ActionId) -> ActionStatus {
@@ -585,9 +582,9 @@ pub trait WndListener<T: Wm> {
 impl<T: Wm> WndListener<T> for () {}
 
 /// Provides a callback method for [`WndListener::interpret_event`].
-pub trait InterpretEventCtx<HAccel> {
+pub trait InterpretEventCtx<AccelTable> {
     /// Use the specified accelerator table to translate the event.
-    fn use_accel(&mut self, haccel: &HAccel);
+    fn use_accel(&mut self, haccel: &AccelTable);
 }
 
 /// Identifies a type of action.

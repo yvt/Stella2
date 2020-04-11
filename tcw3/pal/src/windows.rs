@@ -42,14 +42,14 @@ thread_local! {
     static IS_MAIN_THREAD: Cell<bool> = Cell::new(false);
 }
 
-pub type HAccel = ();
+pub type AccelTable = ();
 
 impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
-    type HAccel = HAccel;
+    type AccelTable = AccelTable;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -155,10 +155,6 @@ impl iface::Wm for Wm {
 
     fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
         textinput::remove_text_input_ctx(self, htictx);
-    }
-
-    fn remove_accel(self, _haccel: &Self::HAccel) {
-        todo!()
     }
 }
 

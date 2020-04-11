@@ -42,14 +42,14 @@ pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
 }
 
-pub type HAccel = ();
+pub type AccelTable = ();
 
 impl iface::Wm for Wm {
     type HWnd = HWnd;
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
-    type HAccel = HAccel;
+    type AccelTable = AccelTable;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -175,9 +175,5 @@ impl iface::Wm for Wm {
 
     fn remove_text_input_ctx(self, htictx: &Self::HTextInputCtx) {
         self.text_input_ctx_set_active(htictx, false)
-    }
-
-    fn remove_accel(self, _haccel: &Self::HAccel) {
-        todo!()
     }
 }

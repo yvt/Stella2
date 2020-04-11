@@ -94,31 +94,31 @@ pub use self::native as current;
 
 // ============================================================================
 //
-// Define `new_accel`. This is trickier than other items because macros only
-// have crate-level namespaces.
+// Define `accel_table`. This is trickier than other items because macros
+// only have crate-level namespaces.
 
-macro_rules! define_new_accel {
+macro_rules! define_accel_table {
     ($($inner:tt)*) => {
-        /// Create an accelerator table. Expands to an expression of type
-        /// [`HAccel`].
+        /// Create an accelerator table. Expands to a constant expression of
+        /// type [`AccelTable`].
         #[macro_export]
         $($inner)*
     };
 }
 
-define_new_accel! {
+define_accel_table! {
     #[cfg(not(feature = "testing"))]
-    macro_rules! new_accel {
-        ($wm:expr, [$($entries:tt)*] $(,)*) => {
+    macro_rules! accel_table {
+        ($($entries:tt)*) => {
             compile_error!("TODO!")
         };
     }
 }
 
-define_new_accel! {
+define_accel_table! {
     #[cfg(feature = "testing")]
-    macro_rules! new_accel {
-        ($wm:expr, [$($entries:tt)*] $(,)*) => {
+    macro_rules! accel_table {
+        ($($entries:tt)*) => {
             compile_error!("TODO!")
         };
     }
@@ -172,7 +172,7 @@ pub type HLayer = <Wm as iface::Wm>::HLayer;
 pub type HInvoke = <Wm as iface::Wm>::HInvoke;
 
 /// The accelerator table handle type of [`Wm`].
-pub type HAccel = <Wm as iface::Wm>::HAccel;
+pub type AccelTable = <Wm as iface::Wm>::AccelTable;
 
 /// The text input context handle type of [`Wm`].
 pub type HTextInputCtx = <Wm as iface::Wm>::HTextInputCtx;
