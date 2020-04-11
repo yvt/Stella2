@@ -981,7 +981,21 @@ enum HTextInputCtxInner {
     Testing(textinput::HTextInputCtx),
 }
 
-pub type AccelTable = ();
+#[derive(Debug)]
+pub struct AccelTable {
+    testing: &'static [wmapi::ActionBinding],
+    native: native::AccelTable,
+}
+
+impl AccelTable {
+    /// The internal function of `accel_table!`.
+    pub const fn __new(
+        testing: &'static [wmapi::ActionBinding],
+        native: native::AccelTable,
+    ) -> Self {
+        Self { testing, native }
+    }
+}
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields
 /// are incompatible with the target backend.

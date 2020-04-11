@@ -9,6 +9,7 @@ members = [
     "tcw3/designer/tests_impl",
     "tcw3/testing",
     "tcw3/pal",
+    "tcw3/pal/macro",
     "tcw3/images",
     "tcw3/meta",
     "harmony",

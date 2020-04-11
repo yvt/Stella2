@@ -146,3 +146,10 @@ impl WndSnapshot {
         Self::default()
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct ActionBinding {
+    pub source: &'static str,
+    pub pattern: &'static str,
+    pub action: iface::ActionId,
+}

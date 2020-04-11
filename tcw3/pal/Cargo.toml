@@ -38,11 +38,14 @@ neo_linked_list = { path = "../../support/neo_linked_list" }
 once_cell = "1.2.0"
 owning_ref = "0.4.0"
 packed_simd = "0.3.0"
+proc-macro-hack = "0.5.11"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
 try_match = "0.2.1"
 utf16count = { path = "../../support/utf16count" }
 zerocopy = "0.3.0"
+
+tcw3_pal_macro = { path = "./macro" }
 
 # testing backend (borrows some implementation from `unix`)
 cairo-rs = { version = "0.8.0", optional = true }
@@ -61,6 +64,8 @@ core-text = "15.0.0"
 dispatch = "0.2.0"
 objc = "0.2.3"
 
+tcw3_pal_macro = { path = "./macro", features = ["macos"] }
+
 # `windows` backend
 [target.'cfg(target_os = "windows")'.dependencies]
 atom2 = { path = "../../support/atom2", features = ["winrt"] }
@@ -68,6 +73,8 @@ directwrite = "0.1.4"
 direct2d = "0.2.0"
 dxgi = "0.1.7"
 wchar = "0.6.0"
+
+tcw3_pal_macro = { path = "./macro", features = ["windows"] }
 
 [target.'cfg(target_os = "windows")'.dependencies.winrt]
 version = "0.6.0"
@@ -101,6 +108,8 @@ pangocairo = "0.9.0"
 pango = "0.8.0"
 pango-sys = "0.9.1"
 rayon = "1.2.0"
+
+tcw3_pal_macro = { path = "./macro", features = ["gtk"] }
 
 [build-dependencies]
 cc = "1.0.35"

@@ -1,0 +1,23 @@
+[package]
+name = "tcw3_pal_macro"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[features]
+macos = []
+windows = []
+gtk = []
+
+[dependencies]
+bitflags = "1.1.0"
+enum-utils = "0.1.2"
+proc-macro-error = "0.3.1"
+proc-macro-hack = "0.5.11"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "1", features = ["full"] }
+
+[lib]
+path = "src/lib.rs"
+proc-macro = true
