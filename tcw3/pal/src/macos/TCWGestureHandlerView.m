@@ -529,28 +529,13 @@ static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
 }
 
 /// Overrides `NSObject`'s method.
-+ (BOOL)resolveInstanceMethod:(SEL)sel {
-    if (![NSThread isMainThread]) {
-        return NO;
+- (BOOL)respondsToSelector:(SEL)sel {
+    if ([super respondsToSelector:sel]) {
+        return YES;
     }
 
-    if (viewInstances) {
-        for (TCWGestureHandlerView *obj in viewInstances) {
-            if ([obj resolveInstanceMethodForThisInstance:sel]) {
-                return YES;
-            }
-        }
-    }
-
-    return NO;
-}
-
-//// Dynamically provide an implementation for `sel` if it's known.
-- (BOOL)resolveInstanceMethodForThisInstance:(SEL)sel {
-    // TODO: The runtime remembers the selectors for which this method returned
-    //       `NO`. This means the application might not be able to change the
-    //       set of valid selectors.
-    // Check if the selector is known
+    // If `sel` can be translated by an accelerator table, dynamically define
+    // a method with this selector.
     TCW3ActionStatus status = [self validateSelector:sel];
 
     if ((status & kTCW3ActionStatusValid) == 0) {
