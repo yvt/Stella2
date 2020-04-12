@@ -205,7 +205,39 @@ pub trait WndListener {
     /// This will not be called if the window was closed programatically (via
     /// `HWnd::close`).
     fn close(&self, _: Wm, _: HWndRef<'_>) {}
+
+    /// Interpret a (prospective) input event using accelerator tables.
+    ///
+    /// The implementation doesn't inspect the event by itself. Instead, it
+    /// provides zero or more accelerator tables, which the backend will use to
+    /// translate the event to an action.
+    ///
+    /// # Example
+    ///
+    ///     use tcw3::{uicore, pal};
+    ///     struct MyWndListener;
+    ///     impl uicore::WndListener for MyWndListener {
+    ///         fn interpret_event(
+    ///             &self,
+    ///             _: pal::Wm,
+    ///             _: uicore::HWndRef<'_>,
+    ///             ctx: &mut uicore::InterpretEventCtx<'_>,
+    ///         ) {
+    ///             ctx.use_accel(&pal::accel_table![
+    ///                 (
+    ///                     pal::actions::COPY,
+    ///                     windows("Ctrl+C"),
+    ///                     gtk("Ctrl+C"),
+    ///                     macos_sel("copy:")
+    ///                 )
+    ///             ]);
+    ///         }
+    ///     };
+    ///
+    fn interpret_event(&self, _: Wm, _: HWndRef<'_>, _: &mut InterpretEventCtx<'_>) {}
 }
+
+pub type InterpretEventCtx<'a> = dyn pal::iface::InterpretEventCtx<pal::AccelTable> + 'a;
 
 /// A no-op implementation of `WndListener`.
 impl WndListener for () {}

@@ -129,8 +129,12 @@ Actions are generated through one of the following mechanisms:
  - The application creates one or more *accelerator tables*, which are mappings
    from key combinations to actions with a platform-specific representation.
    When the backend needs to interpret an input event, it calls
-   **[`WndListener::interpret_event`]**, which calls a given callback function
-   for each active accelerator table until it finds an applicable mapping.
+   **`WndListener::interpret_event`** ([`pal`], [`uicore`]), which calls a given
+   callback function for each active accelerator table until it finds an
+   applicable mapping.
+
+[`pal`]: tcw3_pal::iface::WndListener::interpret_event
+[`uicore`]: crate::uicore::WndListener::interpret_event
 
  - (macOS only) When the user selects an application menu item (the creation of
    this is out of the scope of TCW3) or inputs its key equivalent, Cocoa sends
@@ -146,8 +150,6 @@ Actions are generated through one of the following mechanisms:
    the user can customize the key equivalents of menu items in the user's system
    preference. This means you should prefer this mechanism over key-to-action
    mappings described in the previous bullet point.
-
-[`WndListener::interpret_event`]: tcw3_pal::iface::WndListener::interpret_event
 
 <!-- TODO: The application can programmatically send actions to itself. -->
 
