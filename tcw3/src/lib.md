@@ -151,8 +151,8 @@ Actions are generated through one of the following mechanisms:
 
 <!-- TODO: The application can programmatically send actions to itself. -->
 
-Actions are identified by 16-bit integers. On Windows, they are directly mapped
-to command IDs. Some ranges are reserved by TCW3 for common UI operations.
+Actions are identified by 16-bit integers. Some ranges are reserved by TCW3 for
+common UI operations.
 
 <!-- TODO: Application-global listener -->
 
