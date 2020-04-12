@@ -151,8 +151,11 @@ Actions are generated through one of the following mechanisms:
 
 <!-- TODO: The application can programmatically send actions to itself. -->
 
-Actions are identified by 16-bit integers. Some ranges are reserved by TCW3 for
-common UI operations.
+Actions are identified by 16-bit integers ([`ActionId`]). Some ranges are
+reserved by TCW3 for [common UI operations].
+
+[`ActionId`]: tcw3_pal::ActionId
+[common UI operations]: tcw3_pal::actions
 
 <!-- TODO: Application-global listener -->
 
