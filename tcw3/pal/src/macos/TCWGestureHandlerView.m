@@ -399,6 +399,8 @@ static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
         // Forward the event to the system input manager for interpretation as
         // a text input command.
         [self interpretKeyEvents:@[ event ]];
+    } else {
+        [super keyDown:event];
     }
 }
 
