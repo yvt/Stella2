@@ -83,6 +83,16 @@ pub trait TestingWm: 'static {
         htictx: &HTextInputCtx,
         write: bool,
     ) -> Box<dyn iface::TextInputCtxEdit<crate::Wm>>;
+
+    /// Translate an input event to an action.
+    fn translate_action(&self, hwnd: &HWnd, source: &str, pattern: &str)
+        -> Option<iface::ActionId>;
+
+    /// Trigger `WndListener::validate_action`.
+    fn raise_validate_action(&self, hwnd: &HWnd, action: iface::ActionId) -> iface::ActionStatus;
+
+    /// Trigger `WndListener::perform_action`.
+    fn raise_perform_action(&self, hwnd: &HWnd, action: iface::ActionId);
 }
 
 /// A snapshot of window attributes.

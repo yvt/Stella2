@@ -470,6 +470,32 @@ impl wmapi::TestingWm for Wm {
             .unwrap()
             .raise_edit(*self, write)
     }
+
+    fn translate_action(
+        &self,
+        hwnd: &HWnd,
+        source: &str,
+        pattern: &str,
+    ) -> Option<iface::ActionId> {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .translate_action(*self, hwnd, source, pattern)
+    }
+
+    fn raise_validate_action(&self, hwnd: &HWnd, action: iface::ActionId) -> iface::ActionStatus {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_validate_action(*self, hwnd, action)
+    }
+
+    fn raise_perform_action(&self, hwnd: &HWnd, action: iface::ActionId) {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_perform_action(*self, hwnd, action)
+    }
 }
 
 impl iface::Wm for Wm {

@@ -949,3 +949,88 @@ fn text_input_ctx() {
         assert!(twm.expect_unique_active_text_input_ctx().is_none());
     });
 }
+
+#[test]
+fn wnd_accel_tables() {
+    init_logger();
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        #[derive(Clone)]
+        struct Listener;
+        impl WndListener<pal::Wm> for Listener {
+            fn interpret_event(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                ctx: &mut dyn pal::iface::InterpretEventCtx<pal::AccelTable>,
+            ) {
+                ctx.use_accel(&pal::accel_table![(
+                    42,
+                    macos_sel("solveUltimateQuestion:")
+                )]);
+            }
+        }
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            listener: Some(Box::new(Listener)),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            twm.translate_action(&hwnd, "macos_sel", "solveUltimateQuestion:"),
+            Some(42)
+        );
+    });
+}
+
+#[test]
+fn wnd_actions() {
+    init_logger();
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        let state = Rc::new(Cell::new(1));
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn validate_action(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                action: pal::ActionId,
+            ) -> pal::ActionStatus {
+                if action == 42 {
+                    pal::ActionStatus::VALID | pal::ActionStatus::ENABLED
+                } else {
+                    pal::ActionStatus::empty()
+                }
+            }
+
+            fn perform_action(&self, _: pal::Wm, _: &pal::HWnd, action: pal::ActionId) {
+                assert_eq!(action, 42);
+                self.0.set(2);
+            }
+        }
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            twm.raise_validate_action(&hwnd, 10),
+            pal::ActionStatus::empty()
+        );
+        assert_eq!(
+            twm.raise_validate_action(&hwnd, 42),
+            pal::ActionStatus::VALID | pal::ActionStatus::ENABLED
+        );
+
+        twm.raise_perform_action(&hwnd, 42);
+        assert_eq!(state.get(), 2);
+    });
+}
