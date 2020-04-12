@@ -120,7 +120,9 @@ pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::{MouseDragListener, ScrollListener};
 pub use self::taborder::TabOrderSibling;
 
-pub use crate::pal::{CursorShape, ScrollDelta, WndFlags as WndStyleFlags};
+pub use crate::pal::{
+    actions, ActionId, ActionStatus, CursorShape, ScrollDelta, WndFlags as WndStyleFlags,
+};
 
 /// The maxiumum supported depth of view hierarchy.
 pub const MAX_VIEW_DEPTH: usize = 32;
@@ -235,6 +237,14 @@ pub trait WndListener {
     ///     };
     ///
     fn interpret_event(&self, _: Wm, _: HWndRef<'_>, _: &mut InterpretEventCtx<'_>) {}
+
+    /// Query whether the receiver can handle the given action type.
+    fn validate_action(&self, _: Wm, _: HWndRef<'_>, _: ActionId) -> ActionStatus {
+        ActionStatus::empty()
+    }
+
+    /// Perform the specified action.
+    fn perform_action(&self, _: Wm, _: HWndRef<'_>, _: ActionId) {}
 }
 
 pub type InterpretEventCtx<'a> = dyn pal::iface::InterpretEventCtx<pal::AccelTable> + 'a;
@@ -583,6 +593,14 @@ pub trait ViewListener {
     fn focus_got(&self, _: Wm, _: HViewRef<'_>) {}
     /// The view lost a keyboard focus.
     fn focus_lost(&self, _: Wm, _: HViewRef<'_>) {}
+
+    /// Query whether the receiver can handle the given action type.
+    fn validate_action(&self, _: Wm, _: HViewRef<'_>, _: ActionId) -> ActionStatus {
+        ActionStatus::empty()
+    }
+
+    /// Perform the specified action.
+    fn perform_action(&self, _: Wm, _: HViewRef<'_>, _: ActionId) {}
 }
 
 /// A no-op implementation of `ViewListener`.

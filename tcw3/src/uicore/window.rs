@@ -530,6 +530,20 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
         }
     }
 
+    fn validate_action(&self, _: Wm, _: &pal::HWnd, action: pal::ActionId) -> pal::ActionStatus {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.as_ref().handle_action(action, false)
+        } else {
+            pal::ActionStatus::empty()
+        }
+    }
+
+    fn perform_action(&self, _: Wm, _: &pal::HWnd, action: pal::ActionId) {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.as_ref().handle_action(action, true);
+        }
+    }
+
     fn nc_hit_test(&self, _: Wm, _: &pal::HWnd, loc: Point2<f32>) -> pal::NcHit {
         if let Some(hwnd) = self.hwnd() {
             hwnd.handle_nc_hit_test(loc)

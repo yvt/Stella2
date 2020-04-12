@@ -171,14 +171,14 @@ perform an action or to see if an action is valid in the current state:
 [`validate_action`]: tcw3_pal::iface::WndListener::validate_action
 [`perform_action`]: tcw3_pal::iface::WndListener::perform_action
 
-<!--
-TODO:
-The `uicore` implementation of this trait attempts to handle calls to these
-methods by calling respective listener methods in the following order:
+The `uicore` implementation of this trait forwards the calls to these methods to
+a view or window. To determine the ultimate receiver, the `uicore`
+implementation of these methods examines the currently focused view, and moves
+up until the `validate_action` method ([`WndListener`], [`ViewListener`])
+returns `ActionStatus::VALID` for the view or window.
 
- - First, it tries the `ViewListener` of the currently focused view.
- - ...
--->
+[`WndListener`]: crate::uicore::WndListener::validate_action
+[`ViewListener`]: crate::uicore::ViewListener::validate_action
 
 ### Text Input
 

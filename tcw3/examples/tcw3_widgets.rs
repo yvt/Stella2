@@ -8,7 +8,7 @@ use tcw3::{
         views::{scrollbar::ScrollbarDragListener, Entry, Label, Scrollbar},
         AlignFlags,
     },
-    uicore::{HWnd, HWndRef, WndListener},
+    uicore::{ActionId, ActionStatus, HWnd, HWndRef, WndListener},
 };
 
 struct MyWndListener;
@@ -16,6 +16,55 @@ struct MyWndListener;
 impl WndListener for MyWndListener {
     fn close(&self, wm: pal::Wm, _: HWndRef<'_>) {
         wm.terminate();
+    }
+
+    fn interpret_event(
+        &self,
+        _: pal::Wm,
+        _: HWndRef<'_>,
+        ctx: &mut tcw3::uicore::InterpretEventCtx<'_>,
+    ) {
+        ctx.use_accel(&pal::accel_table![
+            (
+                pal::actions::SELECT_ALL,
+                windows("Ctrl+A"),
+                gtk("Ctrl+A"),
+                macos("Super+A")
+            ),
+            (
+                pal::actions::COPY,
+                windows("Ctrl+C"),
+                gtk("Ctrl+C"),
+                macos("Super+C")
+            ),
+            (
+                pal::actions::CUT,
+                windows("Ctrl+X"),
+                gtk("Ctrl+X"),
+                macos("Super+X")
+            ),
+            (
+                pal::actions::PASTE,
+                windows("Ctrl+V"),
+                gtk("Ctrl+V"),
+                macos("Super+V")
+            ),
+            (1, windows("Ctrl+Q"), gtk("Ctrl+Q"), macos("Super+Q")),
+        ]);
+    }
+
+    fn validate_action(&self, _: pal::Wm, _: HWndRef<'_>, action: ActionId) -> ActionStatus {
+        if action == 1 {
+            ActionStatus::VALID | ActionStatus::ENABLED
+        } else {
+            ActionStatus::empty()
+        }
+    }
+
+    fn perform_action(&self, wm: pal::Wm, _: HWndRef<'_>, action: ActionId) {
+        if action == 1 {
+            wm.terminate();
+        }
     }
 }
 
