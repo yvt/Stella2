@@ -5,6 +5,8 @@ use syn::{
     Result, Token,
 };
 
+#[cfg(feature = "gtk")]
+mod gtk;
 #[cfg(feature = "macos")]
 mod macos;
 mod testing;
@@ -94,12 +96,12 @@ pub fn accel_table_inner(params: proc_macro::TokenStream) -> proc_macro::TokenSt
         #[cfg(feature = "macos")]
         "macos" => macos::gen_accel_table(&input).into(),
 
+        #[cfg(feature = "gtk")]
+        "gtk" => gtk::gen_accel_table(&input).into(),
+
         // TODO:
         #[cfg(feature = "windows")]
         "windows" => quote::quote! { () }.into(),
-
-        #[cfg(feature = "gtk")]
-        "gtk" => quote::quote! { () }.into(),
 
         unknown_backend => abort!(
             input.backend.span(),

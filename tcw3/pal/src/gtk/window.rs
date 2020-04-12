@@ -1,4 +1,5 @@
 use cgmath::{Point2, Vector2};
+use flags_macro::flags;
 use gdk::prelude::*;
 use glib::{
     glib_object_wrapper, glib_wrapper,
@@ -568,6 +569,65 @@ extern "C" fn tcw_wnd_widget_nc_hit_test_handler(wnd_ptr: WndPtr, x: f32, y: f32
     .unwrap_or(0)
 }
 
+struct EnumAccel<F: FnMut(&AccelTable)>(F);
+
+impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F> {
+    fn use_accel(&mut self, accel: &AccelTable) {
+        (self.0)(accel);
+    }
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_key_press_handler(
+    wnd_ptr: WndPtr,
+    event: *mut gdk_sys::GdkEventKey,
+) -> c_int {
+    let event = unsafe { gdk::EventKey::from_glib_borrow(event) };
+
+    log::debug!(
+        "key_press{:?}",
+        (wnd_ptr, event.get_keyval(), event.get_state())
+    );
+
+    if let Some((wm, hwnd, listener)) = with_wnd_mut(
+        unsafe { Wm::global_unchecked() },
+        wnd_ptr,
+        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
+    ) {
+        let mut action = None;
+        let action_ref = &mut action;
+        let keyval = event.get_keyval();
+        let mod_flags = AccelTable::compress_mod_flags(event.get_state().bits());
+        listener.interpret_event(
+            wm,
+            &hwnd,
+            &mut EnumAccel(move |accel_table| {
+                if action_ref.is_none() {
+                    *action_ref = accel_table.find_action_with_key(keyval, mod_flags);
+                }
+            }),
+        );
+
+        log::trace!("... action = {:?}", action);
+
+        if let Some(action) = action {
+            // The action was found. Can the window handle it?
+            let status = listener.validate_action(wm, &hwnd, action);
+            if !status.contains(flags![iface::ActionStatus::{VALID | ENABLED}]) {
+                return 0;
+            }
+
+            listener.perform_action(wm, &hwnd, action);
+
+            1 // Handled
+        } else {
+            0 // Unhandled
+        }
+    } else {
+        0
+    }
+}
+
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_button_handler(
     wnd_ptr: WndPtr,
@@ -1040,6 +1100,46 @@ fn stop_scroll(wm: Wm, mut wnds: RefMut<'_, WndPool>, hwnd: HWnd) -> RefMut<'_, 
     }
 
     wnds
+}
+
+// ============================================================================
+// Accelerator tables
+//
+// Most of these types are implementation details and thus hidden. They still
+// need to be `pub` because they are instantiated by `accel_table!`.
+
+#[derive(Debug)]
+pub struct AccelTable {
+    #[doc(hidden)]
+    pub key: &'static [ActionKeyBinding],
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct ActionKeyBinding {
+    pub action: iface::ActionId,
+    pub mod_flags: u8,
+    pub keyval: c_uint,
+}
+
+impl AccelTable {
+    const fn compress_mod_flags(x: u32) -> u8 {
+        // let SHIFT, CONTROL, SUPER, and META pass through
+        ((x & 0b101) | ((x >> 23) & 0b101000)) as u8
+    }
+
+    pub const MOD_SHIFT: u8 = Self::compress_mod_flags(gdk_sys::GDK_SHIFT_MASK);
+    pub const MOD_CONTROL: u8 = Self::compress_mod_flags(gdk_sys::GDK_CONTROL_MASK);
+    pub const MOD_SUPER: u8 = Self::compress_mod_flags(gdk_sys::GDK_SUPER_MASK);
+    pub const MOD_META: u8 = Self::compress_mod_flags(gdk_sys::GDK_META_MASK);
+
+    fn find_action_with_key(&self, keyval: u32, mod_flags: u8) -> Option<iface::ActionId> {
+        self.key
+            .iter()
+            .filter(move |binding| mod_flags == binding.mod_flags && keyval == binding.keyval)
+            .map(|binding| binding.action)
+            .nth(0)
+    }
 }
 
 // ============================================================================

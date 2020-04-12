@@ -22,7 +22,16 @@ mod comp;
 mod textinput;
 mod timer;
 mod window;
-pub use self::{comp::HLayer, textinput::HTextInputCtx, timer::HInvoke, window::HWnd};
+pub use self::{
+    comp::HLayer,
+    textinput::HTextInputCtx,
+    timer::HInvoke,
+    window::{AccelTable, ActionKeyBinding, HWnd},
+};
+
+// `accel_table!` needs this
+#[doc(hidden)]
+pub use gdk::enums::key as gdk_keys;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
@@ -31,8 +40,6 @@ pub struct Wm {
 
 static TIMER_POOL: MtLock<RefCell<timer::TimerPool>, Wm> =
     MtLock::new(RefCell::new(timer::TimerPool::new()));
-
-pub type AccelTable = ();
 
 impl iface::Wm for Wm {
     type HWnd = HWnd;
