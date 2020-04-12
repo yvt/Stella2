@@ -1,7 +1,9 @@
 use array::Array2;
+use flags_macro::flags;
 use log::trace;
 use std::{
     cell::{Cell, RefCell},
+    convert::TryInto,
     fmt,
     mem::{size_of, MaybeUninit},
     ptr::null_mut,
@@ -23,7 +25,7 @@ use super::{
     comp, frameclock,
     textinput::TextInputWindow,
     utils::{assert_win32_nonnull, assert_win32_ok},
-    Wm, WndAttrs,
+    AccelTable, Wm, WndAttrs,
 };
 use crate::{iface, prelude::*};
 
@@ -531,6 +533,14 @@ fn adjust_dwm_frame(pal_hwnd: &HWnd) {
     }
 }
 
+struct EnumAccel<F: FnMut(&AccelTable)>(F);
+
+impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F> {
+    fn use_accel(&mut self, accel: &AccelTable) {
+        (self.0)(accel);
+    }
+}
+
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     let wnd_ptr = unsafe { winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA) } as *const Wnd;
 
@@ -698,6 +708,51 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
             return 0;
         } // WM_UNICHAR
+
+        winuser::WM_KEYDOWN => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+
+            log::trace!("WM_KEYDOWN(0x{:x}, 0x{:x})", wparam, lparam);
+
+            // Check the state of the modifier keys
+            let mod_flags = AccelTable::query_mod_flags();
+
+            let mut action = None;
+            let action_ref = &mut action;
+            let key: u16 = if let Ok(x) = wparam.try_into() {
+                x
+            } else {
+                log::warn!(
+                    "... virtual key code is out of range ({:?}), ignoring",
+                    wparam
+                );
+                0 // Invalid virtual key code
+            };
+
+            listener.interpret_event(
+                wm,
+                &pal_hwnd,
+                &mut EnumAccel(move |accel_table| {
+                    if action_ref.is_none() {
+                        *action_ref = accel_table.find_action_with_key(key, mod_flags);
+                    }
+                }),
+            );
+
+            log::trace!("... action = {:?}", action);
+
+            if let Some(action) = action {
+                // The action was found. Can the window handle it?
+                let status = listener.validate_action(wm, &pal_hwnd, action);
+                if !status.contains(flags![iface::ActionStatus::{VALID | ENABLED}]) {
+                    return 0;
+                }
+
+                listener.perform_action(wm, &pal_hwnd, action);
+
+                return 0;
+            }
+        } // WM_KEYDOWN
 
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {

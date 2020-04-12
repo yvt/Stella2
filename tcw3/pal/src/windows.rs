@@ -8,6 +8,7 @@
 use super::iface;
 use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
+mod acceltable;
 mod bitmap;
 mod codecvt;
 mod comp;
@@ -22,6 +23,7 @@ mod winapiext;
 mod window;
 
 pub use self::{
+    acceltable::{AccelTable, ActionKeyBinding},
     bitmap::{Bitmap, BitmapBuilder},
     comp::HLayer,
     eventloop::HInvoke,
@@ -33,6 +35,10 @@ pub use self::{
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
 
+// `accel_table!` needs this
+#[doc(hidden)]
+pub use winapi::um::winuser;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
     _no_send_sync: std::marker::PhantomData<*mut ()>,
@@ -41,8 +47,6 @@ pub struct Wm {
 thread_local! {
     static IS_MAIN_THREAD: Cell<bool> = Cell::new(false);
 }
-
-pub type AccelTable = ();
 
 impl iface::Wm for Wm {
     type HWnd = HWnd;

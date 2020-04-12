@@ -10,6 +10,8 @@ mod gtk;
 #[cfg(feature = "macos")]
 mod macos;
 mod testing;
+#[cfg(feature = "windows")]
+mod windows;
 
 struct MacroInput {
     crate_path: syn::Path,
@@ -99,9 +101,8 @@ pub fn accel_table_inner(params: proc_macro::TokenStream) -> proc_macro::TokenSt
         #[cfg(feature = "gtk")]
         "gtk" => gtk::gen_accel_table(&input).into(),
 
-        // TODO:
         #[cfg(feature = "windows")]
-        "windows" => quote::quote! { () }.into(),
+        "windows" => windows::gen_accel_table(&input).into(),
 
         unknown_backend => abort!(
             input.backend.span(),
