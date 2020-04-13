@@ -18,8 +18,8 @@ use crate::{
         theming::{self, ClassSet, HElem, Prop, PropKindFlags, PropValue, Role, Widget},
     },
     uicore::{
-        CursorShape, HView, HViewRef, HWndRef, MouseDragListener, SizeTraits, UpdateCtx, ViewFlags,
-        ViewListener, WeakHView,
+        actions, ActionId, ActionStatus, CursorShape, HView, HViewRef, HWndRef, MouseDragListener,
+        SizeTraits, UpdateCtx, ViewFlags, ViewListener, WeakHView,
     },
 };
 
@@ -425,6 +425,50 @@ impl ViewListener for EntryCoreListener {
         state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(false));
     }
 
+    fn validate_action(&self, _: pal::Wm, _: HViewRef<'_>, action: ActionId) -> ActionStatus {
+        let mut status = ActionStatus::empty();
+        match action {
+            actions::SELECT_ALL => {
+                status |= ActionStatus::VALID | ActionStatus::ENABLED;
+            }
+            actions::COPY | actions::CUT => {
+                let state = self.inner.state.borrow();
+                if state.sel_range[0] != state.sel_range[1] {
+                    status |= ActionStatus::ENABLED;
+                }
+                status |= ActionStatus::VALID;
+            }
+            actions::PASTE => {
+                // TODO: Check if the clipboard contains a text
+                status |= ActionStatus::VALID;
+            }
+            _ => {}
+        }
+        status
+    }
+
+    fn perform_action(&self, wm: pal::Wm, view: HViewRef<'_>, action: ActionId) {
+        match action {
+            actions::SELECT_ALL => {
+                update_sel_range(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+                    state.sel_range = [0, state.text.len()];
+                });
+            }
+            actions::COPY => {
+                log::warn!("TODO: Copy");
+            }
+            actions::CUT => {
+                log::warn!("TODO: Cut");
+            }
+            actions::PASTE => {
+                log::warn!("TODO: Paste");
+            }
+            unknown_action => {
+                log::warn!("Unknown action: {}", unknown_action);
+            }
+        }
+    }
+
     fn mouse_drag(
         &self,
         _: pal::Wm,
@@ -810,6 +854,52 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 }
 
+/// Update the selection using a given closure. This method mustn't be used
+/// in an implementation of `TextInputCtxEdit` because it calls
+/// `text_input_ctx_on_selection_change`.
+fn update_sel_range(
+    wm: pal::Wm,
+    hview: HViewRef<'_>,
+    inner: RcBorrow<'_, Inner>,
+    f: &mut dyn FnMut(&mut State),
+) {
+    let mut state = inner.state.borrow_mut();
+    let old_sel_range = state.sel_range;
+
+    // Call the given function
+    f(&mut *state);
+
+    // Return early if the selection did not change
+    if old_sel_range == state.sel_range {
+        return;
+    }
+
+    let tictx = state.tictx.clone();
+
+    if (old_sel_range[0] != old_sel_range[1]) || (state.sel_range[0] != state.sel_range[1]) {
+        // A ranged selection is rendered using the `CanvasMixin`, so we
+        // have to set the redraw flag of `CanvasMixin` in addition to just
+        // calling `pend_update` (which is implicitly called by `pend_draw`)
+        state.canvas.pend_draw(hview);
+    } else {
+        hview.pend_update();
+    }
+
+    // Update the caret-blinking timer
+    state.caret_blink = true;
+    state.reset_timer(wm, hview, inner, None);
+
+    // Invalidate the remembered caret position
+    state.caret = None;
+
+    // Unborrow `state` before calling `text_input_ctx_on_selection_change`,
+    // which might request a document lock
+    drop(state);
+    if let Some(tictx) = tictx {
+        wm.text_input_ctx_on_selection_change(&tictx);
+    }
+}
+
 struct EntryCoreDragListener {
     view: HView,
     inner: Rc<Inner>,
@@ -827,41 +917,7 @@ impl EntryCoreDragListener {
     }
 
     fn update_selection(&self, wm: pal::Wm, f: &mut dyn FnMut(&mut State)) {
-        let mut state = self.inner.state.borrow_mut();
-        let old_sel_range = state.sel_range;
-
-        // Call the given function
-        f(&mut *state);
-
-        // Return early if the selection did not change
-        if old_sel_range == state.sel_range {
-            return;
-        }
-
-        let tictx = state.tictx.clone();
-
-        if (old_sel_range[0] != old_sel_range[1]) || (state.sel_range[0] != state.sel_range[1]) {
-            // A ranged selection is rendered using the `CanvasMixin`, so we
-            // have to set the redraw flag of `CanvasMixin` in addition to just
-            // calling `pend_update` (which is implicitly called by `pend_draw`)
-            state.canvas.pend_draw(self.view.as_ref());
-        } else {
-            self.view.pend_update();
-        }
-
-        // Update the caret-blinking timer
-        state.caret_blink = true;
-        state.reset_timer(wm, self.view.as_ref(), RcBorrow::from(&self.inner), None);
-
-        // Invalidate the remembered caret position
-        state.caret = None;
-
-        // Unborrow `state` before calling `text_input_ctx_on_selection_change`,
-        // which might request a document lock
-        drop(state);
-        if let Some(tictx) = tictx {
-            wm.text_input_ctx_on_selection_change(&tictx);
-        }
+        update_sel_range(wm, self.view.as_ref(), RcBorrow::from(&self.inner), f);
     }
 }
 
