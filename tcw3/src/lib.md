@@ -179,7 +179,7 @@ Actions are generated through one of the following mechanisms:
 
  - (macOS only) When the user selects an application menu item (the creation of
    this is out of the scope of TCW3) or inputs its key equivalent, Cocoa sends
-   a Objective C message down a responder chain. If an application object
+   an Objective C message down a responder chain. If an application object
    happens to receive it, the TCW3 backend will attempt to translate it to an
    action. On macOS, accelerator tables define mappings from Objective C
    selectors to actions in addition to the aforementioned key-to-action
