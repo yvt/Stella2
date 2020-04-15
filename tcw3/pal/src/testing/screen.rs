@@ -8,7 +8,7 @@ use super::super::{iface, swrast};
 use super::{
     bitmap::Bitmap,
     uniqpool::{PoolPtr, UniqPool},
-    wmapi, Wm,
+    wmapi, AccelTable, Wm,
 };
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
@@ -391,6 +391,58 @@ impl Screen {
             hwnd: hwnd.into(),
             inner,
         })
+    }
+
+    /// Implements `TestingWm::translate_action`.
+    pub(super) fn translate_action(
+        &self,
+        wm: Wm,
+        hwnd: &HWnd,
+        source: &str,
+        pattern: &str,
+    ) -> Option<iface::ActionId> {
+        let listener = self.wnd_listener(hwnd).unwrap();
+
+        struct EnumAccel<F: FnMut(&AccelTable)>(F);
+        impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F> {
+            fn use_accel(&mut self, accel: &AccelTable) {
+                (self.0)(accel);
+            }
+        }
+
+        let mut action = None;
+        listener.interpret_event(
+            wm,
+            &hwnd.into(),
+            &mut EnumAccel(|accel_table| {
+                if action.is_none() {
+                    action = accel_table
+                        .testing
+                        .iter()
+                        .find(|binding| (binding.source, binding.pattern) == (source, pattern))
+                        .map(|binding| binding.action);
+                }
+            }),
+        );
+
+        action
+    }
+
+    /// Implements `TestingWm::raise_validate_action`.
+    pub(super) fn raise_validate_action(
+        &self,
+        wm: Wm,
+        hwnd: &HWnd,
+        action: iface::ActionId,
+    ) -> iface::ActionStatus {
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.validate_action(wm, &hwnd.into(), action)
+    }
+
+    /// Implements `TestingWm::raise_perform_action`.
+    pub(super) fn raise_perform_action(&self, wm: Wm, hwnd: &HWnd, action: iface::ActionId) {
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.perform_action(wm, &hwnd.into(), action);
     }
 }
 

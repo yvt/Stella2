@@ -94,6 +94,90 @@ pub use self::native as current;
 
 // ============================================================================
 //
+// Define `accel_table`. This is trickier than other items because macros
+// only have crate-level namespaces.
+
+// `#[proc_macro_hack]` makes it possible to use this procedural macro in
+// expression position without relying on an unstable rustc feature, but with
+// some restrictions. See `proc_macro_hack`'s documentation for more.
+#[doc(hidden)]
+#[proc_macro_hack::proc_macro_hack]
+pub use tcw3_pal_macro::accel_table_inner;
+
+// The implementation of `native_accel_table` is chosen based on the target
+// backend.
+#[doc(hidden)]
+#[macro_export]
+#[cfg(target_os = "macos")]
+macro_rules! native_accel_table {
+    ($($entries:tt)*) => {
+        $crate::accel_table_inner!($crate, "macos", [$($entries)*])
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(target_os = "windows")]
+macro_rules! native_accel_table {
+    ($($entries:tt)*) => {
+        $crate::accel_table_inner!($crate, "windows", [$($entries)*])
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+macro_rules! native_accel_table {
+    ($($entries:tt)*) => {
+        $crate::accel_table_inner!($crate, "gtk", [$($entries)*])
+    };
+}
+
+// Finally, choose the implementation of `accel_table` based on whether
+// `testing` is enabled.
+
+macro_rules! define_accel_table {
+    ($($inner:tt)*) => {
+        /// Create an accelerator table. Expands to a constant expression of
+        /// type [`AccelTable`].
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// use tcw3_pal::{accel_table, AccelTable, actions};
+        /// static ACCEL_TABLE: AccelTable = accel_table![
+        ///     (actions::COPY, windows("Ctrl+C"), macos("Super+C"), gtk("Ctrl+C"),
+        ///         macos_sel("copy:")),
+        /// ];
+        /// ```
+        #[macro_export]
+        $($inner)*
+    };
+}
+
+define_accel_table! {
+    #[cfg(not(feature = "testing"))]
+    macro_rules! accel_table {
+        ($($entries:tt)*) => {
+            $crate::native_accel_table!($($entries)*)
+        };
+    }
+}
+
+define_accel_table! {
+    #[cfg(feature = "testing")]
+    macro_rules! accel_table {
+        ($($entries:tt)*) => {
+            $crate::testing::AccelTable::__new(
+                $crate::accel_table_inner!($crate, "testing", [$($entries)*]),
+                $crate::native_accel_table!($($entries)*),
+            )
+        };
+    }
+}
+
+// ============================================================================
+//
 // Type aliases for the default backend.
 
 /// The default window manager type for the target platform.
@@ -125,9 +209,9 @@ pub type TextLayout = current::TextLayout;
 // the default backend.
 
 pub use self::iface::{
-    BadThread, Beam, CursorShape, IndexFromPointFlags, LayerFlags, LineCap, LineJoin, NcHit,
-    RunFlags, RunMetrics, ScrollDelta, SysFontType, TextDecorFlags, TextInputCtxEventFlags,
-    WndFlags, RGBAF32,
+    actions, ActionId, ActionStatus, BadThread, Beam, CursorShape, IndexFromPointFlags,
+    InterpretEventCtx, LayerFlags, LineCap, LineJoin, NcHit, RunFlags, RunMetrics, ScrollDelta,
+    SysFontType, TextDecorFlags, TextInputCtxEventFlags, WndFlags, RGBAF32,
 };
 
 /// The window handle type of [`Wm`].
@@ -138,6 +222,9 @@ pub type HLayer = <Wm as iface::Wm>::HLayer;
 
 /// The invocation handle type of [`Wm`].
 pub type HInvoke = <Wm as iface::Wm>::HInvoke;
+
+/// The accelerator table handle type of [`Wm`].
+pub type AccelTable = <Wm as iface::Wm>::AccelTable;
 
 /// The text input context handle type of [`Wm`].
 pub type HTextInputCtx = <Wm as iface::Wm>::HTextInputCtx;

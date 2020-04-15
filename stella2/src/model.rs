@@ -36,7 +36,7 @@ pub enum AppAction {
 pub enum WndAction {
     SetSidebarWidth(f32),
     SetEditorHeight(f32),
-    ToggleSidebar(bool),
+    ToggleSidebar,
 }
 
 impl AppState {
@@ -61,8 +61,8 @@ impl WndState {
                 editor_height: *x,
                 ..this
             },
-            WndAction::ToggleSidebar(x) => set_field! {
-                sidebar_visible: *x,
+            WndAction::ToggleSidebar => set_field! {
+                sidebar_visible: !this.sidebar_visible,
                 ..this
             },
         }

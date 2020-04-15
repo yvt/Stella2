@@ -14,7 +14,8 @@
  * other events. Meanwhile a new instance of `TCWGestureHandlerView` is created
  * to capture the non-gesture events.
  */
-@interface TCWGestureHandlerView : NSView<NSTextInputClient>
+@interface TCWGestureHandlerView
+    : NSView <NSTextInputClient, NSMenuItemValidation>
 
 - (id)initWithController:(TCWWindowController *)controller;
 

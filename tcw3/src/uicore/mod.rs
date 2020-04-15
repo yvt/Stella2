@@ -120,7 +120,9 @@ pub use self::layout::{Layout, LayoutCtx, SizeTraits};
 pub use self::mouse::{MouseDragListener, ScrollListener};
 pub use self::taborder::TabOrderSibling;
 
-pub use crate::pal::{CursorShape, ScrollDelta, WndFlags as WndStyleFlags};
+pub use crate::pal::{
+    actions, ActionId, ActionStatus, CursorShape, ScrollDelta, WndFlags as WndStyleFlags,
+};
 
 /// The maxiumum supported depth of view hierarchy.
 pub const MAX_VIEW_DEPTH: usize = 32;
@@ -205,7 +207,47 @@ pub trait WndListener {
     /// This will not be called if the window was closed programatically (via
     /// `HWnd::close`).
     fn close(&self, _: Wm, _: HWndRef<'_>) {}
+
+    /// Interpret a (prospective) input event using accelerator tables.
+    ///
+    /// The implementation doesn't inspect the event by itself. Instead, it
+    /// provides zero or more accelerator tables, which the backend will use to
+    /// translate the event to an action.
+    ///
+    /// # Example
+    ///
+    ///     use tcw3::{uicore, pal};
+    ///     struct MyWndListener;
+    ///     impl uicore::WndListener for MyWndListener {
+    ///         fn interpret_event(
+    ///             &self,
+    ///             _: pal::Wm,
+    ///             _: uicore::HWndRef<'_>,
+    ///             ctx: &mut uicore::InterpretEventCtx<'_>,
+    ///         ) {
+    ///             ctx.use_accel(&pal::accel_table![
+    ///                 (
+    ///                     pal::actions::COPY,
+    ///                     windows("Ctrl+C"),
+    ///                     gtk("Ctrl+C"),
+    ///                     macos_sel("copy:")
+    ///                 )
+    ///             ]);
+    ///         }
+    ///     };
+    ///
+    fn interpret_event(&self, _: Wm, _: HWndRef<'_>, _: &mut InterpretEventCtx<'_>) {}
+
+    /// Query whether the receiver can handle the given action type.
+    fn validate_action(&self, _: Wm, _: HWndRef<'_>, _: ActionId) -> ActionStatus {
+        ActionStatus::empty()
+    }
+
+    /// Perform the specified action.
+    fn perform_action(&self, _: Wm, _: HWndRef<'_>, _: ActionId) {}
 }
+
+pub type InterpretEventCtx<'a> = dyn pal::iface::InterpretEventCtx<pal::AccelTable> + 'a;
 
 /// A no-op implementation of `WndListener`.
 impl WndListener for () {}
@@ -551,6 +593,14 @@ pub trait ViewListener {
     fn focus_got(&self, _: Wm, _: HViewRef<'_>) {}
     /// The view lost a keyboard focus.
     fn focus_lost(&self, _: Wm, _: HViewRef<'_>) {}
+
+    /// Query whether the receiver can handle the given action type.
+    fn validate_action(&self, _: Wm, _: HViewRef<'_>, _: ActionId) -> ActionStatus {
+        ActionStatus::empty()
+    }
+
+    /// Perform the specified action.
+    fn perform_action(&self, _: Wm, _: HViewRef<'_>, _: ActionId) {}
 }
 
 /// A no-op implementation of `ViewListener`.

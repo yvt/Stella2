@@ -1,4 +1,5 @@
 #include <math.h>
+#include <objc/runtime.h>
 
 #import "TCWGestureHandlerView.h"
 #import "TCWWindowController.h"
@@ -29,6 +30,23 @@ static NSString *coalesceString(id string) {
     }
 }
 
+/**
+ * Returns the character code if the given string consists of a single character
+ * in Unicode BMP. Otherwise, returns `0`.
+ */
+static unichar singleCharcterCodeOfString(NSString *string) {
+    if (string.length == 1) {
+        return [string characterAtIndex:0];
+    } else {
+        return 0;
+    }
+}
+
+static void dynamicActionHandler(TCWGestureHandlerView *self, SEL sel,
+                                 id sender);
+
+static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
+
 @implementation TCWGestureHandlerView {
     TCWWindowController __weak *controller;
 
@@ -56,6 +74,11 @@ static NSString *coalesceString(id string) {
         }
 
         self.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+        if (!viewInstances) {
+            viewInstances = [[NSMutableSet alloc] init];
+        }
+        [viewInstances addObject:self];
     }
     return self;
 }
@@ -338,6 +361,8 @@ static NSString *coalesceString(id string) {
 - (void)cancelGesture {
     self->controller = nil;
 
+    [viewInstances removeObject:self];
+
     if (self->hasMouseDragListener) {
         self->hasMouseDragListener = NO;
         tcw_mousedraglistener_cancel(self->mouseDragListener);
@@ -357,10 +382,25 @@ static NSString *coalesceString(id string) {
         return;
     }
 
+    unichar charcodeUnmodified =
+        singleCharcterCodeOfString(event.charactersIgnoringModifiers);
+    int handled = tcw_wndlistener_key_down(
+        self->controller.listenerUserData,
+        (uint16_t)(event.modifierFlags >> 16), charcodeUnmodified);
+    if (handled) {
+        return;
+    }
+
+    if (!self->controller) {
+        return;
+    }
+
     if (tcw_wnd_has_text_input_ctx(self->controller.listenerUserData)) {
         // Forward the event to the system input manager for interpretation as
         // a text input command.
         [self interpretKeyEvents:@[ event ]];
+    } else {
+        [super keyDown:event];
     }
 }
 
@@ -490,4 +530,68 @@ static NSString *coalesceString(id string) {
                                              point);
 }
 
+/// Overrides `NSObject`'s method.
+- (BOOL)respondsToSelector:(SEL)sel {
+    if ([super respondsToSelector:sel]) {
+        return YES;
+    }
+
+    // If `sel` can be translated by an accelerator table, dynamically define
+    // a method with this selector.
+    TCW3ActionStatus status = [self validateSelector:sel];
+
+    if ((status & kTCW3ActionStatusValid) == 0) {
+        return NO;
+    }
+
+    // Create an implementation
+    class_addMethod([self class], sel, (IMP)dynamicActionHandler, "v@:@");
+
+    return YES;
+}
+
+/// Implements `NSMenuItemValidation`.
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+    TCW3ActionStatus status = [self validateSelector:menuItem.action];
+
+    menuItem.state = (status & kTCW3ActionStatusChecked)
+                         ? NSControlStateValueOn
+                         : NSControlStateValueOff;
+
+    return (status & (kTCW3ActionStatusValid | kTCW3ActionStatusEnabled)) ==
+           (kTCW3ActionStatusValid | kTCW3ActionStatusEnabled);
+}
+
+/** @private */
+- (TCW3ActionStatus)validateSelector:(SEL)sel {
+    if (!self->controller) {
+        return 0;
+    }
+
+    const char *selName = sel_getName(sel);
+    size_t selLength = strlen(selName);
+
+    return tcw_wndlistener_validate_selector(self->controller.listenerUserData,
+                                             selName, selLength);
+}
+
+/** @private */
+- (void)performSelectorDynamic:(SEL)sel {
+    if (!self->controller) {
+        return;
+    }
+
+    const char *selName = sel_getName(sel);
+    size_t selLength = strlen(selName);
+
+    tcw_wndlistener_perform_selector(self->controller.listenerUserData, selName,
+                                     selLength);
+}
+
 @end
+
+static void dynamicActionHandler(TCWGestureHandlerView *self, SEL sel,
+                                 id sender) {
+    (void)sender;
+    [self performSelectorDynamic:sel];
+}

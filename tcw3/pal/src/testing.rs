@@ -470,6 +470,32 @@ impl wmapi::TestingWm for Wm {
             .unwrap()
             .raise_edit(*self, write)
     }
+
+    fn translate_action(
+        &self,
+        hwnd: &HWnd,
+        source: &str,
+        pattern: &str,
+    ) -> Option<iface::ActionId> {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .translate_action(*self, hwnd, source, pattern)
+    }
+
+    fn raise_validate_action(&self, hwnd: &HWnd, action: iface::ActionId) -> iface::ActionStatus {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_validate_action(*self, hwnd, action)
+    }
+
+    fn raise_perform_action(&self, hwnd: &HWnd, action: iface::ActionId) {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_perform_action(*self, hwnd, action)
+    }
 }
 
 impl iface::Wm for Wm {
@@ -477,6 +503,7 @@ impl iface::Wm for Wm {
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
+    type AccelTable = AccelTable;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {
@@ -978,6 +1005,22 @@ impl From<textinput::HTextInputCtx> for HTextInputCtx {
 enum HTextInputCtxInner {
     Native(native::HTextInputCtx),
     Testing(textinput::HTextInputCtx),
+}
+
+#[derive(Debug)]
+pub struct AccelTable {
+    testing: &'static [wmapi::ActionBinding],
+    native: native::AccelTable,
+}
+
+impl AccelTable {
+    /// The internal function of `accel_table!`.
+    pub const fn __new(
+        testing: &'static [wmapi::ActionBinding],
+        native: native::AccelTable,
+    ) -> Self {
+        Self { testing, native }
+    }
 }
 
 /// Convert `WndAttrs<'_>` to `screen::WndAttrs<'_>`. Panics if some fields

@@ -11,7 +11,6 @@ impl ToolbarView {
     /// Handle `toggle_sidebar_button.activate` event.
     fn toggle_sidebar(&self) {
         // Toggle the sidebar
-        let visible = self.wnd_state().sidebar_visible;
-        self.raise_dispatch(model::WndAction::ToggleSidebar(!visible));
+        self.raise_dispatch(model::WndAction::ToggleSidebar);
     }
 }

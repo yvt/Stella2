@@ -8,6 +8,7 @@
 use super::iface;
 use std::{cell::Cell, marker::PhantomData, ops::Range, time::Duration};
 
+mod acceltable;
 mod bitmap;
 mod codecvt;
 mod comp;
@@ -22,6 +23,7 @@ mod winapiext;
 mod window;
 
 pub use self::{
+    acceltable::{AccelTable, ActionKeyBinding},
     bitmap::{Bitmap, BitmapBuilder},
     comp::HLayer,
     eventloop::HInvoke,
@@ -32,6 +34,10 @@ pub use self::{
 
 pub type WndAttrs<'a> = iface::WndAttrs<'a, Wm, HLayer>;
 pub type LayerAttrs = iface::LayerAttrs<Bitmap, HLayer>;
+
+// `accel_table!` needs this
+#[doc(hidden)]
+pub use winapi::um::winuser;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Wm {
@@ -47,6 +53,7 @@ impl iface::Wm for Wm {
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
+    type AccelTable = AccelTable;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {

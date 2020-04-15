@@ -27,7 +27,7 @@ mod timer;
 mod window;
 pub use self::{
     timer::HInvoke,
-    window::{HTextInputCtx, HWnd},
+    window::{AccelTable, ActionKeyBinding, ActionSelBinding, HTextInputCtx, HWnd},
 };
 
 use self::utils::{is_main_thread, IdRef};
@@ -47,6 +47,7 @@ impl iface::Wm for Wm {
     type HLayer = HLayer;
     type HInvoke = HInvoke;
     type HTextInputCtx = HTextInputCtx;
+    type AccelTable = AccelTable;
     type Bitmap = Bitmap;
 
     unsafe fn global_unchecked() -> Wm {

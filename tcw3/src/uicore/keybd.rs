@@ -2,7 +2,7 @@
 use arrayvec::ArrayVec;
 use log::trace;
 
-use super::{HView, HViewRef, HWndRef, ViewFlags, Wnd};
+use super::{ActionId, ActionStatus, HView, HViewRef, HWndRef, ViewFlags, Wnd};
 use crate::pal::Wm;
 
 impl HWndRef<'_> {
@@ -150,6 +150,49 @@ impl HWndRef<'_> {
                 hview.invoke_focus_lost_leave_for_ancestors(self.wnd.wm);
             }
         }
+    }
+
+    /// The core implementation of `pal::WndListener::{validate_action, perform_action}`.
+    pub(super) fn handle_action(self, action: ActionId, perform: bool) -> ActionStatus {
+        let mut focused_view = self.wnd.focused_view.borrow().clone();
+        let wm = self.wnd.wm;
+
+        while let Some(hview) = focused_view {
+            let listener = hview.view.listener.borrow();
+
+            // Does this view recognize the action?
+            let status = listener.validate_action(wm, hview.as_ref(), action);
+            if status.contains(ActionStatus::VALID) {
+                if perform && status.contains(ActionStatus::ENABLED) {
+                    listener.perform_action(wm, hview.as_ref(), action);
+                }
+                return status;
+            }
+
+            drop(listener);
+
+            // Get the parent of the view
+            focused_view = hview
+                .view
+                .superview
+                .borrow()
+                // If it's a superview...
+                .view()
+                // Get a strong reference to the view
+                .and_then(|weak| weak.upgrade())
+                // Form `HView`, the public handle type
+                .map(|view| HView { view });
+        }
+
+        // Does this window recognize the action?
+        let listener = self.wnd.listener.borrow();
+        let status = listener.validate_action(wm, self, action);
+        if status.contains(ActionStatus::VALID) {
+            if perform && status.contains(ActionStatus::ENABLED) {
+                listener.perform_action(wm, self, action);
+            }
+        }
+        status
     }
 }
 
