@@ -9,7 +9,7 @@ use tcw3::{
     pal::prelude::*,
     ui::layouts::FillLayout,
     ui::theming,
-    uicore::{HWnd, HWndRef, WndListener, WndStyleFlags},
+    uicore::{ActionId, ActionStatus, HWnd, HWndRef, WndListener, WndStyleFlags},
 };
 
 use crate::{
@@ -19,6 +19,7 @@ use crate::{
 
 mod channellist;
 mod dpiscalewatcher;
+mod global;
 mod logview;
 mod splitutils;
 mod tabbar;
@@ -41,6 +42,8 @@ impl AppView {
         state = viewpersistence::restore_state(profile, state);
 
         let persist_sched = viewpersistence::PersistenceScheduler::new(&state);
+
+        global::set_main_menu(wm);
 
         let main_wnd = WndView::new(wm, Elem::clone(&state.main_wnd));
 
@@ -118,6 +121,7 @@ struct WndView {
     hwnd: HWnd,
     dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
     quit: RefCell<Box<dyn Fn()>>,
+    wnd_state: RefCell<Elem<model::WndState>>,
     main_view: MainView,
 }
 
@@ -143,6 +147,7 @@ impl WndView {
             hwnd,
             dispatch: RefCell::new(Box::new(|_| {})),
             quit: RefCell::new(Box::new(|| {})),
+            wnd_state: RefCell::new(wnd_state),
             main_view,
         });
 
@@ -204,6 +209,8 @@ impl WndView {
     }
 
     fn poll(&self, new_wnd_state: &Elem<model::WndState>) {
+        *self.wnd_state.borrow_mut() = new_wnd_state.clone();
+
         self.main_view.set_wnd_state(new_wnd_state.clone());
     }
 }
@@ -216,6 +223,53 @@ impl WndListener for WndViewWndListener {
     fn close(&self, _: pal::Wm, _: HWndRef<'_>) {
         if let Some(owner) = self.owner.upgrade() {
             owner.quit.borrow()();
+        }
+    }
+
+    fn interpret_event(
+        &self,
+        _: pal::Wm,
+        _: HWndRef<'_>,
+        ctx: &mut tcw3::uicore::InterpretEventCtx<'_>,
+    ) {
+        global::interpret_event(ctx);
+    }
+
+    fn validate_action(&self, _: pal::Wm, _: HWndRef<'_>, action: ActionId) -> ActionStatus {
+        let mut status = ActionStatus::empty();
+        match action {
+            global::QUIT => {
+                status = ActionStatus::VALID | ActionStatus::ENABLED;
+            }
+            global::TOGGLE_SIDEBAR => {
+                status = ActionStatus::VALID | ActionStatus::ENABLED;
+                if let Some(owner) = self.owner.upgrade() {
+                    status.set(
+                        ActionStatus::CHECKED,
+                        owner.wnd_state.borrow().sidebar_visible,
+                    );
+                }
+            }
+            _ => {}
+        }
+        status
+    }
+
+    fn perform_action(&self, _: pal::Wm, _: HWndRef<'_>, action: ActionId) {
+        let owner = if let Some(owner) = self.owner.upgrade() {
+            owner
+        } else {
+            return;
+        };
+
+        match action {
+            global::TOGGLE_SIDEBAR => {
+                owner.dispatch.borrow()(model::WndAction::ToggleSidebar);
+            }
+            global::QUIT => {
+                owner.quit.borrow()();
+            }
+            _ => {}
         }
     }
 }
