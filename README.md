@@ -2,7 +2,7 @@
 
 [![Build Status](https://yvt.visualstudio.com/Stella2/_apis/build/status/yvt.Stella2?branchName=master)](https://yvt.visualstudio.com/Stella2/_build/latest?definitionId=1&branchName=master)
 
-**Work in progress**
+**Work in progress** — [Nightly builds](https://yvt.visualstudio.com/Stella2/_build?definitionId=3)
 
 This project aims to create a lightweight instant messaging client in [the Rust programming language](https://www.rust-lang.org).
 
