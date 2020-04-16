@@ -1,0 +1,7 @@
+use tcw3::pal;
+
+comp crate::misc::genericresolve::Comp {
+    // Paths in generic arguments should be resolved and expanded to
+    // a full path, too.
+    const hoge: Vec<pal::Wm> { set; }
+}

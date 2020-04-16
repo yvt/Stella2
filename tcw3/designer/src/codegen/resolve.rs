@@ -93,6 +93,10 @@ pub fn resolve_paths(
         }
 
         fn visit_path_mut(&mut self, i: &mut Path) {
+            // Pathes may have generic arguments, which in turn may contain
+            // even more pathes
+            syn::visit_mut::visit_path_mut(self, i);
+
             let mut applied_map_list: Vec<(&Ident, &Alias)> = Vec::new();
             let path_span = span_to_codemap(i.span(), self.codemap_file);
 

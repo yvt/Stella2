@@ -1,5 +1,3 @@
-use crate::model;
-
 stella2_meta::designer_impl! {
     crate::view::tabbar::TabbarView
 }

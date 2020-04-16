@@ -24,6 +24,7 @@ mod interop {
 
 mod misc {
     mod exprpath;
+    mod genericresolve;
     mod weakref;
 }
 
