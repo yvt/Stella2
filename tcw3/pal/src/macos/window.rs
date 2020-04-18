@@ -36,12 +36,12 @@ use std::{
 };
 use utf16count::{find_utf16_pos, utf16_len};
 
-use super::super::iface::{self, Wm as _};
 use super::{
     drawutils::{ns_rect_from_box2, point2_from_ns_point},
     utils::with_autorelease_pool,
     HLayer, IdRef, Wm, WndAttrs,
 };
+use crate::iface::{self, actions, Wm as _};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HWnd {
@@ -678,6 +678,199 @@ unsafe extern "C" fn tcw_wndlistener_perform_selector(
         let listener = state.listener.borrow();
 
         let action = listener_map_sel(wm, &state.hwnd, &**listener, sel);
+        log::trace!("... action = {:?}", action);
+
+        if let Some(action) = action {
+            listener.perform_action(wm, &state.hwnd, action);
+        }
+    });
+}
+
+static TEXT_INPUT_ACCEL: AccelTable = accel_table_inner!(
+    crate,
+    "macos",
+    [
+        (actions::SELECT_ALL, macos_sel("selectAll:")),
+        (actions::SELECT_LINE, macos_sel("selectLine:")),
+        (actions::SELECT_PARAGRAPH, macos_sel("selectParagraph:")),
+        (actions::SELECT_WORD, macos_sel("selectWord:")),
+        (actions::UPPERCASE_WORD, macos_sel("uppercaseWord:")),
+        (actions::LOWERCASE_WORD, macos_sel("lowercaseWord:")),
+        (actions::CAPITALIZE_WORD, macos_sel("capitalizeWord:")),
+        (actions::DELETE_BACKWARD, macos_sel("deleteBackward:")),
+        (
+            actions::DELETE_BACKWARD_DECOMPOSING,
+            macos_sel("deleteBackwardByDecomposingPreviousCharacter:")
+        ),
+        (
+            actions::DELETE_BACKWARD_WORD,
+            macos_sel("deleteWordBackward:")
+        ),
+        (actions::DELETE_FORWARD, macos_sel("deleteForward:")),
+        (
+            actions::DELETE_FORWARD_WORD,
+            macos_sel("deleteWordForward:")
+        ),
+        (actions::INSERT_LINE_BREAK, macos_sel("insertLineBreak:")),
+        (actions::INSERT_PARAGRAPH_BREAK, macos_sel("insertNewline:")),
+        (
+            actions::INSERT_PARAGRAPH_BREAK,
+            macos_sel("insertParagraphSeparator:")
+        ),
+        (actions::INSERT_TAB, macos_sel("insertTab:")),
+        (actions::INSERT_BACKTAB, macos_sel("insertBacktab:")),
+        (actions::MOVE_BACKWARD, macos_sel("moveBackward:")),
+        (actions::MOVE_FORWARD, macos_sel("moveForward:")),
+        (actions::MOVE_LEFT, macos_sel("moveLeft:")),
+        (actions::MOVE_RIGHT, macos_sel("moveRight:")),
+        (actions::MOVE_BACKWARD_WORD, macos_sel("moveWordBackward:")),
+        (actions::MOVE_FORWARD_WORD, macos_sel("moveWordForward:")),
+        (actions::MOVE_LEFT_WORD, macos_sel("moveWordLeft:")),
+        (actions::MOVE_RIGHT_WORD, macos_sel("moveWordRight:")),
+        (
+            actions::MOVE_START_OF_LINE,
+            macos_sel("moveToBeginningOfLine:")
+        ),
+        (actions::MOVE_END_OF_LINE, macos_sel("moveToEndOfLine:")),
+        (
+            actions::MOVE_LEFT_END_OF_LINE,
+            macos_sel("moveToLeftEndOfLine:")
+        ),
+        (
+            actions::MOVE_RIGHT_END_OF_LINE,
+            macos_sel("moveToRightEndOfLine:")
+        ),
+        (
+            actions::MOVE_START_OF_PARAGRAPH,
+            macos_sel("moveToBeginningOfParagraph:")
+        ),
+        (
+            actions::MOVE_END_OF_PARAGRAPH,
+            macos_sel("moveToEndOfParagraph:")
+        ),
+        (
+            actions::MOVE_START_OF_DOCUMENT,
+            macos_sel("moveToBeginningOfDocument:")
+        ),
+        (
+            actions::MOVE_END_OF_DOCUMENT,
+            macos_sel("moveToEndOfDocument:")
+        ),
+        (actions::MOVE_UP, macos_sel("moveUp:")),
+        (actions::MOVE_DOWN, macos_sel("moveDown:")),
+        (actions::MOVE_UP_PAGE, macos_sel("pageUp:")),
+        (actions::MOVE_DOWN_PAGE, macos_sel("pageDown:")),
+        (
+            actions::MOVE_BACKWARD_SELECTING,
+            macos_sel("moveBackwardAndModifySelection:")
+        ),
+        (
+            actions::MOVE_FORWARD_SELECTING,
+            macos_sel("moveForwardAndModifySelection:")
+        ),
+        (
+            actions::MOVE_LEFT_SELECTING,
+            macos_sel("moveLeftAndModifySelection:")
+        ),
+        (
+            actions::MOVE_RIGHT_SELECTING,
+            macos_sel("moveRightAndModifySelection:")
+        ),
+        (
+            actions::MOVE_BACKWARD_WORD_SELECTING,
+            macos_sel("moveBackwardAndModifySelection:")
+        ),
+        (
+            actions::MOVE_FORWARD_WORD_SELECTING,
+            macos_sel("moveForwardAndModifySelection:")
+        ),
+        (
+            actions::MOVE_LEFT_WORD_SELECTING,
+            macos_sel("moveWordLeftAndModifySelection:")
+        ),
+        (
+            actions::MOVE_RIGHT_WORD_SELECTING,
+            macos_sel("moveWordRightAndModifySelection:")
+        ),
+        (
+            actions::MOVE_START_OF_LINE_SELECTING,
+            macos_sel("moveToBeginningOfLineAndModifySelection:")
+        ),
+        (
+            actions::MOVE_END_OF_LINE_SELECTING,
+            macos_sel("moveToEndOfLineAndModifySelection:")
+        ),
+        (
+            actions::MOVE_LEFT_END_OF_LINE_SELECTING,
+            macos_sel("moveToLeftEndOfLineAndModifySelection:")
+        ),
+        (
+            actions::MOVE_RIGHT_END_OF_LINE_SELECTING,
+            macos_sel("moveToRightEndOfLineAndModifySelection:")
+        ),
+        (
+            actions::MOVE_START_OF_PARAGRAPH_SELECTING,
+            macos_sel("moveToBeginningOfParagraphAndModifySelection:")
+        ),
+        (
+            actions::MOVE_END_OF_PARAGRAPH_SELECTING,
+            macos_sel("moveToEndOfParagraphAndModifySelection:")
+        ),
+        (
+            actions::MOVE_START_OF_DOCUMENT_SELECTING,
+            macos_sel("moveToBeginningOfDocumentAndModifySelection:")
+        ),
+        (
+            actions::MOVE_END_OF_DOCUMENT_SELECTING,
+            macos_sel("moveToEndOfDocumentAndModifySelection:")
+        ),
+        (
+            actions::MOVE_UP_SELECTING,
+            macos_sel("moveUpAndModifySelection:")
+        ),
+        (
+            actions::MOVE_DOWN_SELECTING,
+            macos_sel("moveDownAndModifySelection:")
+        ),
+        (
+            actions::MOVE_UP_PAGE_SELECTING,
+            macos_sel("pageUpAndModifySelection:")
+        ),
+        (
+            actions::MOVE_DOWN_PAGE_SELECTING,
+            macos_sel("pageDownAndModifySelection:")
+        ),
+        (actions::SCROLL_UP, macos_sel("scrollLineUp:")),
+        (actions::SCROLL_DOWN, macos_sel("scrollLineDown:")),
+        (actions::SCROLL_UP_PAGE, macos_sel("scrollPageUp:")),
+        (actions::SCROLL_DOWN_PAGE, macos_sel("scrollPageDown:")),
+        (
+            actions::SCROLL_START_OF_DOCUMENT,
+            macos_sel("scrollToBeginningOfDocument:")
+        ),
+        (
+            actions::SCROLL_END_OF_DOCUMENT,
+            macos_sel("scrollToEndOfDocument:")
+        ),
+    ]
+);
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wnd_perform_text_input_selector(
+    ud: TCWListenerUserData,
+    selector: *const c_char,
+    selector_len: usize,
+) {
+    method_impl(ud, |wm, state| {
+        let sel = std::slice::from_raw_parts(selector as *const u8, selector_len);
+        log::trace!(
+            "tcw_wnd_perform_text_input_selector({:?})",
+            std::str::from_utf8(sel)
+        );
+
+        let listener = state.listener.borrow();
+
+        let action = TEXT_INPUT_ACCEL.find_action_with_sel(sel);
         log::trace!("... action = {:?}", action);
 
         if let Some(action) = action {

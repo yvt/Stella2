@@ -21,6 +21,7 @@ use winapi::{
 };
 
 use super::{
+    acceltable,
     codecvt::str_to_c_wstr,
     comp, frameclock,
     textinput::TextInputWindow,
@@ -680,20 +681,9 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
         winuser::WM_CHAR => {
             log::trace!("WM_CHAR {:?}", (wparam, lparam));
-            match wparam {
-                8 => {
-                    log::warn!("WM_CHAR: TODO: handle backspace");
-                    return 0;
-                }
-                10 => {
-                    log::trace!("WM_CHAR: Ignoring a linefeed");
-                    return 0;
-                }
-                27 => {
-                    log::warn!("WM_CHAR: TODO: handle escape");
-                    return 0;
-                }
-                _ => {}
+            if wparam < 32 {
+                log::trace!("WM_CHAR: Ignoring a control character");
+                return 0;
             }
             pal_hwnd.wnd.text_input_wnd.on_char(wm, wparam as _);
             return 0;
@@ -728,16 +718,22 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                 );
                 0 // Invalid virtual key code
             };
+            let mut interpret_event_ctx = EnumAccel(move |accel_table| {
+                if action_ref.is_none() {
+                    *action_ref = accel_table.find_action_with_key(key, mod_flags);
+                }
+            });
 
-            listener.interpret_event(
-                wm,
-                &pal_hwnd,
-                &mut EnumAccel(move |accel_table| {
-                    if action_ref.is_none() {
-                        *action_ref = accel_table.find_action_with_key(key, mod_flags);
-                    }
-                }),
-            );
+            listener.interpret_event(wm, &pal_hwnd, &mut interpret_event_ctx);
+
+            // Interpret text input actions. Do this after calling `interpret_event`
+            // so that they can be shadowed by custom accelerator tables.
+            if pal_hwnd.wnd.text_input_wnd.is_active() {
+                iface::InterpretEventCtx::use_accel(
+                    &mut interpret_event_ctx,
+                    &acceltable::TEXT_INPUT_ACCEL,
+                );
+            }
 
             log::trace!("... action = {:?}", action);
 

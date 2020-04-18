@@ -128,7 +128,9 @@ having different goals and purposes:
  - Define an accelerator table similarly, but use it in a view's keyboard event
    handler to interpret the event. (*This is not implemented yet.*)
 
- - Use the text input API.
+ - Use the text input API. The system processes input events and tells the
+   application what to do by interfacing with the abstract text storage exposed
+   via a text input context or by generating actions.
 
 ```text
                   Keyboard Event
@@ -140,21 +142,23 @@ having different goals and purposes:
           |             |             ,-----------------,  ,------------,
           |             |             | Key equivalents |  | Text input |
           |             |             '-----------------'  '------------'
-          |             |                      | SEL             |
-          |             |     ,----------------+                 |
-System    |             |     |                |                 |
-- - - - - | - - - - - - | - - | - - - ,        v            , - -|- - - -
-App       |             v     v       , ,-----------------, ,    v
-          |     ,-----------------,   , | Other UI (e.g., | ,    ⋮
-          |     |  WndListener::  |   , |  "open" dialog  | ,
-          |     | interpret_event |   , '-----------------' ,
-          |     '-----------------'    - - - - - - - - - - -
-          |             | Action ID
-- - - - - | - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - -
-Widgets   v             v
-        (TODO)     ,---------------------,
-                   | *Listener::*_action |
-                   '---------------------'
+          |             |                      | SEL           |   |
+          |             |     ,----------------+               |   |
+System    |             |     |                |               |   |
+- - - - - | - - - - - - | - - | - - - ,        v            , -|- -|- - -
+App       |             v     v       , ,-----------------, ,  |   |
+          |     ,-----------------,   , | Other UI (e.g., | ,  |   |
+          |     |  WndListener::  |   , |  "open" dialog  | ,  |   |
+          |     | interpret_event |   , '-----------------' ,  |   |
+          |     '-----------------'    - - - - - - - - - - -   |   |
+          |             | Action ID                            |   |
+- - - - - | - - - - - - | - - - - - - - - - - - - - - - - - - -|- -|- - -
+Widgets   |             |           ,--------------------------'   |
+          |             |           |                              |
+          v             v           v                              v
+        (TODO)     ,---------------------,       ,----------------------,
+                   | *Listener::*_action |       | TextInputCtxListener |
+                   '---------------------'       '----------------------'
 ```
 
 ### Actions
@@ -176,6 +180,12 @@ Actions are generated through one of the following mechanisms:
 
 [`pal`]: tcw3_pal::iface::WndListener::interpret_event
 [`uicore`]: crate::uicore::WndListener::interpret_event
+
+ - When a text input context is active, the system sends some commands as
+   actions. See [`tcw3::pal::actions`] for the list of the commands that can be
+   generated through this mechanism.
+
+[`tcw3::pal::actions`]: tcw3_pal::actions
 
  - (macOS only) When the user selects an application menu item (the creation of
    this is out of the scope of TCW3) or inputs its key equivalent, Cocoa sends

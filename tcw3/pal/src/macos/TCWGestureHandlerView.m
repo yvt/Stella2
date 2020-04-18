@@ -418,9 +418,16 @@ static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
 }
 
 /// Implements `NSTextInputClient`'s method.
-- (void)doCommandBySelector:(SEL)selector {
-    (void)selector;
-    NSLog(@"doCommandBySelector:%s TODO!", sel_getName(selector));
+- (void)doCommandBySelector:(SEL)sel {
+    if (!self->controller) {
+        return;
+    }
+
+    const char *selName = sel_getName(sel);
+    size_t selLength = strlen(selName);
+
+    tcw_wnd_perform_text_input_selector(self->controller.listenerUserData,
+                                        selName, selLength);
 }
 
 /// Implements `NSTextInputClient`'s method.
