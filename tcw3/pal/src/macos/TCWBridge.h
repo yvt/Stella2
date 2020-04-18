@@ -55,6 +55,9 @@ extern NSRect tcw_wnd_get_text_rect(TCWListenerUserData ud, size_t start,
                                     size_t len, NSRange *actual_range);
 extern NSUInteger tcw_wnd_get_char_index_from_point(TCWListenerUserData ud,
                                                     NSPoint loc);
+extern void tcw_wnd_perform_text_input_selector(TCWListenerUserData ud,
+                                                const char *selector,
+                                                size_t selector_len);
 
 extern void tcw_mousedraglistener_release(TCWMouseDragListenerUserData ud);
 extern void tcw_mousedraglistener_cancel(TCWMouseDragListenerUserData ud);
