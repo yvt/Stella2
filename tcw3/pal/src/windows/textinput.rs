@@ -211,6 +211,10 @@ impl TextInputWindow {
         }
     }
 
+    pub(super) fn is_active(&self) -> bool {
+        cell_get_by_clone(&self.active_ctx).is_some()
+    }
+
     /// Invalidatte all text input contexts for the window. Must be called
     /// before destroying the window.
     pub(super) fn invalidate(&self, wm: Wm) {
