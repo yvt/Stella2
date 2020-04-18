@@ -616,8 +616,11 @@ pub type ActionId = u16;
 /// They also can shadow the system key bindings by defining conflicting key
 /// bindings, but care must be taken not to hinder the functionalities which are
 /// crucial for the user to properly type texts. For example, re-mapping the
-/// <kbd>↑</kbd> and <kbd>↓</kbd> keys would be acceptable for single-line text
-/// fields, but would be problematic for multi-line text fields.
+/// <kbd>↑</kbd> and <kbd>↓</kbd> keys would be problematic even for single-line
+/// text fields because some input methods need them. (Note: Some backends don't
+/// let this happen, so application developers shouldn't rely on a particular
+/// backend's behavior to test this.) On the other hand, re-mapping
+/// <kbd>Ctrl</kbd>+<kbd>Up</kbd> would be acceptable in most situations.
 ///
 /// **Caveat:** The system doesn't define a key binding for `SELECT_ALL` by
 /// default. The application **must include** one in its accelerator table and
