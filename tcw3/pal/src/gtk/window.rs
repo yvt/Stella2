@@ -16,7 +16,7 @@ use std::{
 };
 
 use super::{comp, Wm, WndAttrs};
-use crate::{iface, prelude::*, MtSticky};
+use crate::{actions, iface, prelude::*, MtSticky};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HWnd {
@@ -589,24 +589,35 @@ extern "C" fn tcw_wnd_widget_key_press_handler(
         (wnd_ptr, event.get_keyval(), event.get_state())
     );
 
-    if let Some((wm, hwnd, listener)) = with_wnd_mut(
+    if let Some((wm, hwnd, listener, is_im_ctx_active)) = with_wnd_mut(
         unsafe { Wm::global_unchecked() },
         wnd_ptr,
-        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
+        |wnd, hwnd, wm| {
+            (
+                wm,
+                hwnd,
+                Rc::clone(&wnd.listener),
+                wnd.gtk_widget.is_im_ctx_active(),
+            )
+        },
     ) {
         let mut action = None;
         let action_ref = &mut action;
         let keyval = event.get_keyval();
         let mod_flags = AccelTable::compress_mod_flags(event.get_state().bits());
-        listener.interpret_event(
-            wm,
-            &hwnd,
-            &mut EnumAccel(move |accel_table| {
-                if action_ref.is_none() {
-                    *action_ref = accel_table.find_action_with_key(keyval, mod_flags);
-                }
-            }),
-        );
+
+        let mut interpret_event_ctx = EnumAccel(move |accel_table| {
+            if action_ref.is_none() {
+                *action_ref = accel_table.find_action_with_key(keyval, mod_flags);
+            }
+        });
+        listener.interpret_event(wm, &hwnd, &mut interpret_event_ctx);
+
+        // Interpret text input actions. Do this after calling `interpret_event`
+        // so that they can be shadowed by custom accelerator tables.
+        if is_im_ctx_active {
+            iface::InterpretEventCtx::use_accel(&mut interpret_event_ctx, &TEXT_INPUT_ACCEL);
+        }
 
         log::trace!("... action = {:?}", action);
 
@@ -1142,6 +1153,61 @@ impl AccelTable {
     }
 }
 
+static TEXT_INPUT_ACCEL: AccelTable = accel_table_inner!(
+    crate,
+    "gtk",
+    [
+        (actions::DELETE_BACKWARD, gtk("Backspace")),
+        (actions::DELETE_BACKWARD_WORD, gtk("Ctrl+Backspace")),
+        (actions::DELETE_FORWARD, gtk("Delete")),
+        (actions::DELETE_FORWARD_WORD, gtk("Ctrl+Delete")),
+        (actions::INSERT_LINE_BREAK, gtk("Shift+Return")),
+        (actions::INSERT_PARAGRAPH_BREAK, gtk("Return")),
+        (actions::INSERT_TAB, gtk("Tab")),
+        (actions::INSERT_BACKTAB, gtk("Shift+Tab")),
+        (actions::MOVE_LEFT, gtk("Left")),
+        (actions::MOVE_RIGHT, gtk("Right")),
+        (actions::MOVE_LEFT_WORD, gtk("Ctrl+Left")),
+        (actions::MOVE_RIGHT_WORD, gtk("Ctrl+Right")),
+        (actions::MOVE_START_OF_LINE, gtk("Home")),
+        (actions::MOVE_END_OF_LINE, gtk("End")),
+        (actions::MOVE_START_OF_PARAGRAPH, gtk("Ctrl+Up")),
+        (actions::MOVE_END_OF_PARAGRAPH, gtk("Ctrl+Down")),
+        (actions::MOVE_START_OF_DOCUMENT, gtk("Ctrl+Home")),
+        (actions::MOVE_END_OF_DOCUMENT, gtk("Ctrl+End")),
+        (actions::MOVE_UP, gtk("Up")),
+        (actions::MOVE_DOWN, gtk("Down")),
+        (actions::MOVE_UP_PAGE, gtk("PageUp")),
+        (actions::MOVE_DOWN_PAGE, gtk("PageDown")),
+        (actions::MOVE_LEFT_SELECTING, gtk("Shift+Left")),
+        (actions::MOVE_RIGHT_SELECTING, gtk("Shift+Right")),
+        (actions::MOVE_LEFT_WORD_SELECTING, gtk("Shift+Ctrl+Left")),
+        (actions::MOVE_RIGHT_WORD_SELECTING, gtk("Shift+Ctrl+Right")),
+        (actions::MOVE_START_OF_LINE_SELECTING, gtk("Shift+Home")),
+        (actions::MOVE_END_OF_LINE_SELECTING, gtk("Shift+End")),
+        (
+            actions::MOVE_START_OF_PARAGRAPH_SELECTING,
+            gtk("Shift+Ctrl+Up")
+        ),
+        (
+            actions::MOVE_END_OF_PARAGRAPH_SELECTING,
+            gtk("Shift+Ctrl+Down")
+        ),
+        (
+            actions::MOVE_START_OF_DOCUMENT_SELECTING,
+            gtk("Shift+Ctrl+Home")
+        ),
+        (
+            actions::MOVE_END_OF_DOCUMENT_SELECTING,
+            gtk("Shift+Ctrl+End")
+        ),
+        (actions::MOVE_UP_SELECTING, gtk("Shift+Up")),
+        (actions::MOVE_DOWN_SELECTING, gtk("Shift+Down")),
+        (actions::MOVE_UP_PAGE_SELECTING, gtk("Shift+PageUp")),
+        (actions::MOVE_DOWN_PAGE_SELECTING, gtk("Shift+PageDown")),
+    ]
+);
+
 // ============================================================================
 
 // These type are not actually `pub`, but `pub` is required by `glib_wrapper!`
@@ -1213,6 +1279,13 @@ impl WndWidget {
                 this.im_ctx.set(new);
                 gobject_sys::g_object_ref(new as _);
             }
+        }
+    }
+
+    fn is_im_ctx_active(&self) -> bool {
+        unsafe {
+            let this = &*self.as_ptr();
+            !this.im_ctx.get().is_null()
         }
     }
 }
