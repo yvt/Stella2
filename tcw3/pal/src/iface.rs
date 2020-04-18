@@ -608,16 +608,20 @@ pub type ActionId = u16;
 ///
 /// [a text input context]: crate::iface::TextInputCtxListener
 ///
-/// The system will automatically enable platform-specific key bindings for
-/// these actions. Application developers don't have to define the key bindings
-/// in an accelerator table. However, they still can still do that if they wish
-/// to use these actions outside a text input context.
+/// The system will automatically enable platform-specific key bindings for most
+/// of these actions. Application developers don't have to define the key
+/// bindings in an accelerator table. However, they still can still do that if
+/// they wish to use these actions outside a text input context.
 ///
 /// They also can shadow the system key bindings by defining conflicting key
 /// bindings, but care must be taken not to hinder the functionalities which are
 /// crucial for the user to properly type texts. For example, re-mapping the
 /// <kbd>↑</kbd> and <kbd>↓</kbd> keys would be acceptable for single-line text
 /// fields, but would be problematic for multi-line text fields.
+///
+/// **Caveat:** The system doesn't define a key binding for `SELECT_ALL` by
+/// default. The application **must include** one in its accelerator table and
+/// in the main main (on macOS).
 pub mod actions {
     use super::ActionId;
 
