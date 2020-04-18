@@ -42,7 +42,7 @@ fn gen_key_binding<'a>(
     // Pre-defined virtual key code
     let lookup_vk = |name: &str| {
         let name = syn::Ident::new(name, trigger.pattern.span());
-        quote::quote! { #crate_path::windows::winuser::#name }
+        quote::quote! { #crate_path::windows::winuser::#name as u16 }
     };
 
     let vk = match pat.key {
