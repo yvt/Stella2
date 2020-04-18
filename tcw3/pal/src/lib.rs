@@ -21,9 +21,9 @@ pub mod iface;
 pub mod prelude {
     pub use super::cells::MtLazyStatic;
     pub use super::iface::{
-        Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, MouseDragListener,
-        ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout, Wm as WmTrait,
-        WndListener,
+        Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, KeyEvent,
+        MouseDragListener, ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout,
+        Wm as WmTrait, WndListener,
     };
 
     pub use super::futuresext::WmFuturesExt;
