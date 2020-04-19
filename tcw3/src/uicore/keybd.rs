@@ -2,7 +2,7 @@
 use arrayvec::ArrayVec;
 use log::trace;
 
-use super::{ActionId, ActionStatus, HView, HViewRef, HWndRef, ViewFlags, Wnd};
+use super::{ActionId, ActionStatus, HView, HViewRef, HWndRef, KeyEvent, ViewFlags, Wnd};
 use crate::pal::Wm;
 
 impl HWndRef<'_> {
@@ -193,6 +193,48 @@ impl HWndRef<'_> {
             }
         }
         status
+    }
+
+    /// The core implementation of `pal::WndListener::{key_down, key_up}`.
+    pub(super) fn handle_key(self, e: &KeyEvent<'_>, up: bool) -> bool {
+        let mut focused_view = self.wnd.focused_view.borrow().clone();
+        let wm = self.wnd.wm;
+
+        while let Some(hview) = focused_view {
+            let listener = hview.view.listener.borrow();
+
+            let handled = if up {
+                listener.key_up(wm, hview.as_ref(), e)
+            } else {
+                listener.key_down(wm, hview.as_ref(), e)
+            };
+
+            if handled {
+                return true;
+            }
+
+            drop(listener);
+
+            // Get the parent of the view
+            focused_view = hview
+                .view
+                .superview
+                .borrow()
+                // If it's a superview...
+                .view()
+                // Get a strong reference to the view
+                .and_then(|weak| weak.upgrade())
+                // Form `HView`, the public handle type
+                .map(|view| HView { view });
+        }
+
+        // Does this window recognize the event?
+        let listener = self.wnd.listener.borrow();
+        if up {
+            listener.key_up(wm, self, e)
+        } else {
+            listener.key_down(wm, self, e)
+        }
     }
 }
 

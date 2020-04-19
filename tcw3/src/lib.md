@@ -129,6 +129,11 @@ having different goals and purposes:
    keyboard event handler `*Listener::key_*` ([`pal::iface::WndListener`],
    [`uicore::WndListener`], [`uicore::ViewListener`]) to interpret the event.
 
+   `uicore` delivers key events to a view or window. To determine the ultimate
+   receiver, the `uicore` implementation of these methods examines the currently
+   focused view, and moves up until the `key_down` or `key_up` methods
+   ([`WndListener`], [`ViewListener`]) returns `true` for the view or window.
+
 4. Use the text input API. The system processes input events and tells the
    application what to do by interfacing with the abstract text storage exposed
    via a text input context or by generating actions.
@@ -141,6 +146,8 @@ strictly defined, but it usually looks like the following: 4 (modal only) → 2 
 [`pal::iface::WndListener`]: tcw3_pal::iface::WndListener::key_down
 [`uicore::WndListener`]: crate::uicore::WndListener::key_down
 [`uicore::ViewListener`]: crate::uicore::ViewListener::key_down
+[`WndListener`]: crate::uicore::WndListener::key_down
+[`ViewListener`]: crate::uicore::ViewListener::key_down
 
 ```text
                     Keyboard Event

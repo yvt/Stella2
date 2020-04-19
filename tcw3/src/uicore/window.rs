@@ -517,6 +517,32 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
         });
     }
 
+    fn key_down(
+        &self,
+        _: pal::Wm,
+        _: &pal::HWnd,
+        e: &dyn pal::iface::KeyEvent<pal::AccelTable>,
+    ) -> bool {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.as_ref().handle_key(e, false)
+        } else {
+            false
+        }
+    }
+
+    fn key_up(
+        &self,
+        _: pal::Wm,
+        _: &pal::HWnd,
+        e: &dyn pal::iface::KeyEvent<pal::AccelTable>,
+    ) -> bool {
+        if let Some(hwnd) = self.hwnd() {
+            hwnd.as_ref().handle_key(e, true)
+        } else {
+            false
+        }
+    }
+
     fn interpret_event(
         &self,
         wm: Wm,
