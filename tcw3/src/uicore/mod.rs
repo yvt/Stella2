@@ -208,6 +208,24 @@ pub trait WndListener {
     /// `HWnd::close`).
     fn close(&self, _: Wm, _: HWndRef<'_>) {}
 
+    /// Called when a key is pressed.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// See [`ViewListener::key_down`] for more.
+    fn key_down(&self, _: Wm, _: HWndRef<'_>, _: &KeyEvent<'_>) -> bool {
+        false
+    }
+
+    /// Called when a key is released.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// See [`ViewListener::key_up`] for more.
+    fn key_up(&self, _: Wm, _: HWndRef<'_>, _: &KeyEvent<'_>) -> bool {
+        false
+    }
+
     /// Interpret a (prospective) input event using accelerator tables.
     ///
     /// The implementation doesn't inspect the event by itself. Instead, it
@@ -248,6 +266,8 @@ pub trait WndListener {
 }
 
 pub type InterpretEventCtx<'a> = dyn pal::iface::InterpretEventCtx<pal::AccelTable> + 'a;
+
+pub type KeyEvent<'a> = dyn pal::iface::KeyEvent<pal::AccelTable> + 'a;
 
 /// A no-op implementation of `WndListener`.
 impl WndListener for () {}
@@ -354,7 +374,6 @@ impl Wnd {
 }
 
 // TODO: mouse motion events
-// TODO: keyboard events
 
 /// A view handle type.
 #[derive(Clone)]
@@ -527,6 +546,28 @@ pub trait ViewListener {
     ///
     /// [`Wm::update_wnd`]: crate::pal::iface::Wm::update_wnd
     fn update(&self, _: Wm, _: HViewRef<'_>, _: &mut UpdateCtx<'_>) {}
+
+    /// Called when a key is pressed.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// This method will not be called if the event was handled by other
+    /// mechanisms such as `interpret_event`.
+    fn key_down(&self, _: Wm, _: HViewRef<'_>, _: &KeyEvent<'_>) -> bool {
+        false
+    }
+
+    /// Called when a key is released.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// It's not guaranteed that there are always corresponding calls to
+    /// `key_down` and `key_up`. Missing calls are likely to be caused
+    /// especially when key down events are handled by `interpret_event` or by a
+    /// text input context.
+    fn key_up(&self, _: Wm, _: HViewRef<'_>, _: &KeyEvent<'_>) -> bool {
+        false
+    }
 
     /// Get event handlers for handling the mouse drag gesture initiated by
     /// a mouse down event described by `loc` and `button`.

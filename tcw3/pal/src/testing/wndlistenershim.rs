@@ -47,6 +47,26 @@ impl iface::WndListener<native::Wm> for NativeWndListener {
         forward!(self.0, dpi_scale_changed, [wm: wm], [hwnd: hwnd])
     }
 
+    fn key_down(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        evt: &dyn iface::KeyEvent<native::AccelTable>,
+    ) -> bool {
+        let event = TestingKeyEvent(evt);
+        forward!(self.0, key_down, [wm: wm], [hwnd: hwnd], (&event))
+    }
+
+    fn key_up(
+        &self,
+        wm: native::Wm,
+        hwnd: &native::HWnd,
+        evt: &dyn iface::KeyEvent<native::AccelTable>,
+    ) -> bool {
+        let event = TestingKeyEvent(evt);
+        forward!(self.0, key_up, [wm: wm], [hwnd: hwnd], (&event))
+    }
+
     fn mouse_motion(&self, wm: native::Wm, hwnd: &native::HWnd, loc: Point2<f32>) {
         forward!(self.0, mouse_motion, [wm: wm], [hwnd: hwnd], loc)
     }
@@ -122,6 +142,15 @@ struct TestingInterpretEventCtx<'a>(&'a mut dyn iface::InterpretEventCtx<native:
 impl iface::InterpretEventCtx<AccelTable> for TestingInterpretEventCtx<'_> {
     fn use_accel(&mut self, haccel: &AccelTable) {
         self.0.use_accel(&haccel.native);
+    }
+}
+
+/// Wraps `KeyEvent<native::AccelTable>` to create a `KeyEvent<AccelTable>`.
+struct TestingKeyEvent<'a>(&'a dyn iface::KeyEvent<native::AccelTable>);
+
+impl iface::KeyEvent<AccelTable> for TestingKeyEvent<'_> {
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<iface::ActionId> {
+        self.0.translate_accel(&accel_table.native)
     }
 }
 

@@ -228,8 +228,6 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     ///
     /// [`TextInputCtxListener::edit`] may be called in this method.
     fn remove_text_input_ctx(self, ctx: &Self::HTextInputCtx);
-
-    // TODO: Add a method to translate a key event using an accelerator table
 }
 
 /// Returned when a function/method is called from an invalid thread.
@@ -520,6 +518,28 @@ pub trait WndListener<T: Wm> {
     /// Perform the specified action.
     fn perform_action(&self, _: T, _: &T::HWnd, _: ActionId) {}
 
+    /// Called when a key is pressed.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// This method will not be called if the event was handled by other
+    /// mechanisms such as `interpret_event`.
+    fn key_down(&self, _: T, _: &T::HWnd, _: &dyn KeyEvent<T::AccelTable>) -> bool {
+        false
+    }
+
+    /// Called when a key is released.
+    ///
+    /// Returns `true` if the event was handled.
+    ///
+    /// It's not guaranteed that there are always corresponding calls to
+    /// `key_down` and `key_up`. Missing calls are likely to be caused
+    /// especially when key down events are handled by `interpret_event` or by a
+    /// text input context.
+    fn key_up(&self, _: T, _: &T::HWnd, _: &dyn KeyEvent<T::AccelTable>) -> bool {
+        false
+    }
+
     /// The mouse pointer has moved inside a window when none of the mouse
     /// buttons are pressed (i.e., there is no active mouse drag gesture).
     fn mouse_motion(&self, _: T, _: &T::HWnd, _loc: Point2<f32>) {}
@@ -575,11 +595,16 @@ pub trait WndListener<T: Wm> {
 
     // TODO: more events
     //  - Pointer device gestures (swipe, zoom, rotate)
-    //  - Keyboard
 }
 
 /// A default implementation of [`WndListener`].
 impl<T: Wm> WndListener<T> for () {}
+
+/// Represents a key event.
+pub trait KeyEvent<AccelTable> {
+    /// Interpret the event using an accelerator table.
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<ActionId>;
+}
 
 /// Provides a callback method for [`WndListener::interpret_event`].
 pub trait InterpretEventCtx<AccelTable> {

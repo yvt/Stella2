@@ -404,6 +404,24 @@ static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
     }
 }
 
+/// Overrides `NSResponder`'s method.
+- (void)keyUp:(NSEvent *)event {
+    if (!self->controller) {
+        return;
+    }
+
+    unichar charcodeUnmodified =
+        singleCharcterCodeOfString(event.charactersIgnoringModifiers);
+    int handled = tcw_wndlistener_key_up(self->controller.listenerUserData,
+                                         (uint16_t)(event.modifierFlags >> 16),
+                                         charcodeUnmodified);
+    if (handled) {
+        return;
+    }
+
+    [super keyUp:event];
+}
+
 /// Implements `NSTextInputClient`'s method.
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
     if (!self->controller) {

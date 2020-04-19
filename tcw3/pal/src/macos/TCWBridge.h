@@ -28,6 +28,8 @@ extern void tcw_wndlistener_update_ready(TCWListenerUserData ud);
 extern void tcw_wndlistener_focus(TCWListenerUserData ud);
 extern int tcw_wndlistener_key_down(TCWListenerUserData ud, uint16_t mod,
                                     uint16_t charcode_unmod);
+extern int tcw_wndlistener_key_up(TCWListenerUserData ud, uint16_t mod,
+                                  uint16_t charcode_unmod);
 extern TCW3ActionStatus
 tcw_wndlistener_validate_selector(TCWListenerUserData ud, const char *selector,
                                   size_t selector_len);

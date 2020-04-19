@@ -496,6 +496,36 @@ impl wmapi::TestingWm for Wm {
             .get_with_wm(*self)
             .raise_perform_action(*self, hwnd, action)
     }
+
+    fn raise_key_down(&self, hwnd: &HWnd, source: &str, pattern: &str) -> bool {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_key_down(*self, hwnd, source, pattern)
+    }
+
+    fn raise_key_up(&self, hwnd: &HWnd, source: &str, pattern: &str) -> bool {
+        let hwnd = hwnd.testing_hwnd_ref().unwrap();
+        SCREEN
+            .get_with_wm(*self)
+            .raise_key_up(*self, hwnd, source, pattern)
+    }
+
+    fn simulate_key(&self, hwnd: &HWnd, source: &str, pattern: &str) {
+        if let Some(action) = self
+            .translate_action(hwnd, source, pattern)
+            .filter(|&action| {
+                self.raise_validate_action(hwnd, action)
+                    .contains(iface::ActionStatus::VALID | iface::ActionStatus::ENABLED)
+            })
+        {
+            self.raise_perform_action(hwnd, action);
+        } else {
+            self.raise_key_down(hwnd, source, pattern);
+        }
+
+        self.raise_key_up(hwnd, source, pattern);
+    }
 }
 
 impl iface::Wm for Wm {
