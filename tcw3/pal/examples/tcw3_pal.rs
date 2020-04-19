@@ -1,7 +1,41 @@
 use cggeom::{box2, prelude::*};
 use cgmath::{Point2, Vector2};
 use log::info;
+use std::convert::TryFrom;
 use tcw3_pal::{self as pal, prelude::*};
+
+static KNOWN_KEYS: pal::AccelTable = pal::accel_table![
+    ('A' as _, windows("A"), macos("A"), gtk("A")),
+    ('B' as _, windows("B"), macos("B"), gtk("B")),
+    ('C' as _, windows("C"), macos("C"), gtk("C")),
+    ('D' as _, windows("D"), macos("D"), gtk("D")),
+    ('E' as _, windows("E"), macos("E"), gtk("E")),
+    ('F' as _, windows("F"), macos("F"), gtk("F")),
+    ('G' as _, windows("G"), macos("G"), gtk("G")),
+    ('H' as _, windows("H"), macos("H"), gtk("H")),
+    ('I' as _, windows("I"), macos("I"), gtk("I")),
+    ('J' as _, windows("J"), macos("J"), gtk("J")),
+    ('K' as _, windows("K"), macos("K"), gtk("K")),
+    ('L' as _, windows("L"), macos("L"), gtk("L")),
+    ('M' as _, windows("M"), macos("M"), gtk("M")),
+    ('N' as _, windows("N"), macos("N"), gtk("N")),
+    ('O' as _, windows("O"), macos("O"), gtk("O")),
+    ('P' as _, windows("P"), macos("P"), gtk("P")),
+    ('Q' as _, windows("Q"), macos("Q"), gtk("Q")),
+    ('R' as _, windows("R"), macos("R"), gtk("R")),
+    ('S' as _, windows("S"), macos("S"), gtk("S")),
+    ('T' as _, windows("T"), macos("T"), gtk("T")),
+    ('U' as _, windows("U"), macos("U"), gtk("U")),
+    ('V' as _, windows("V"), macos("V"), gtk("V")),
+    ('W' as _, windows("W"), macos("W"), gtk("W")),
+    ('X' as _, windows("X"), macos("X"), gtk("X")),
+    ('Y' as _, windows("Y"), macos("Y"), gtk("Y")),
+    ('Z' as _, windows("Z"), macos("Z"), gtk("Z")),
+    ('↑' as _, windows("Up"), macos("Up"), gtk("Up")),
+    ('↓' as _, windows("Down"), macos("Down"), gtk("Down")),
+    ('←' as _, windows("Left"), macos("Left"), gtk("Left")),
+    ('→' as _, windows("Right"), macos("Right"), gtk("Right")),
+];
 
 struct Listener {
     flex_layer: pal::HLayer,
@@ -33,6 +67,34 @@ impl WndListener<pal::Wm> for Listener {
             },
         );
         wm.update_wnd(hwnd);
+    }
+
+    fn key_down(
+        &self,
+        _: pal::Wm,
+        _: &pal::HWnd,
+        e: &dyn pal::iface::KeyEvent<pal::AccelTable>,
+    ) -> bool {
+        if let Some(code) = e.translate_accel(&KNOWN_KEYS) {
+            info!("key_down({:?})", char::try_from(code as u32).unwrap());
+            true
+        } else {
+            false
+        }
+    }
+
+    fn key_up(
+        &self,
+        _: pal::Wm,
+        _: &pal::HWnd,
+        e: &dyn pal::iface::KeyEvent<pal::AccelTable>,
+    ) -> bool {
+        if let Some(code) = e.translate_accel(&KNOWN_KEYS) {
+            info!("key_up({:?})", char::try_from(code as u32).unwrap());
+            true
+        } else {
+            false
+        }
     }
 
     fn interpret_event(
