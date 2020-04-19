@@ -444,6 +444,18 @@ impl Screen {
         let listener = self.wnd_listener(hwnd).unwrap();
         listener.perform_action(wm, &hwnd.into(), action);
     }
+
+    /// Implements `TestingWm::raise_key_down`.
+    pub(super) fn raise_key_down(&self, wm: Wm, hwnd: &HWnd, source: &str, pattern: &str) -> bool {
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.key_down(wm, &hwnd.into(), &SimulatedKeyEvent { source, pattern })
+    }
+
+    /// Implements `TestingWm::raise_key_up`.
+    pub(super) fn raise_key_up(&self, wm: Wm, hwnd: &HWnd, source: &str, pattern: &str) -> bool {
+        let listener = self.wnd_listener(hwnd).unwrap();
+        listener.key_up(wm, &hwnd.into(), &SimulatedKeyEvent { source, pattern })
+    }
 }
 
 #[derive(Debug)]
@@ -511,5 +523,20 @@ impl wmapi::ScrollGesture for ScrollGesture {
     }
     fn cancel(&self) {
         self.inner.cancel(self.wm, &self.hwnd)
+    }
+}
+
+struct SimulatedKeyEvent<'a> {
+    source: &'a str,
+    pattern: &'a str,
+}
+
+impl iface::KeyEvent<AccelTable> for SimulatedKeyEvent<'_> {
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<iface::ActionId> {
+        accel_table
+            .testing
+            .iter()
+            .find(|binding| (binding.source, binding.pattern) == (self.source, self.pattern))
+            .map(|binding| binding.action)
     }
 }

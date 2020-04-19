@@ -93,6 +93,26 @@ pub trait TestingWm: 'static {
 
     /// Trigger `WndListener::perform_action`.
     fn raise_perform_action(&self, hwnd: &HWnd, action: iface::ActionId);
+
+    /// Trigger `WndListener::key_down`.
+    fn raise_key_down(&self, hwnd: &HWnd, source: &str, pattern: &str) -> bool;
+
+    /// Trigger `WndListener::key_up`.
+    fn raise_key_up(&self, hwnd: &HWnd, source: &str, pattern: &str) -> bool;
+
+    /// Simulate a key stroke.
+    ///
+    /// This method call one or more of the following methods to simulate a
+    /// full key stroke:
+    ///
+    ///  - [`WndListener::interpret_event`](crate::iface::WndListener::interpret_event)
+    ///  - [`WndListener::validate_action`](crate::iface::WndListener::validate_action)
+    ///  - [`WndListener::perform_action`](crate::iface::WndListener::perform_action)
+    ///  - [`WndListener::key_down`](crate::iface::WndListener::key_down)
+    ///  - [`WndListener::key_up`](crate::iface::WndListener::key_up)
+    ///
+    /// It doesn't simulate the pressing and releasing of modifier keys, though.
+    fn simulate_key(&self, hwnd: &HWnd, source: &str, pattern: &str);
 }
 
 /// A snapshot of window attributes.

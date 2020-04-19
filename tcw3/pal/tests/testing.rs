@@ -1034,3 +1034,52 @@ fn wnd_actions() {
         assert_eq!(state.get(), 2);
     });
 }
+
+#[test]
+fn wnd_key_events() {
+    init_logger();
+    testing::run_test(|twm| {
+        let wm = twm.wm();
+
+        static ACCEL: pal::AccelTable = pal::accel_table![(42, windows("Ctrl+S"))];
+        let state = Rc::new(Cell::new(1));
+
+        #[derive(Clone)]
+        struct Listener(Rc<Cell<u8>>);
+        impl WndListener<pal::Wm> for Listener {
+            fn key_down(
+                &self,
+                _: pal::Wm,
+                _: &pal::HWnd,
+                e: &dyn KeyEvent<pal::AccelTable>,
+            ) -> bool {
+                if e.translate_accel(&ACCEL) == Some(42) {
+                    assert_eq!(self.0.get(), 1);
+                    self.0.set(2);
+                    true
+                } else {
+                    false
+                }
+            }
+
+            fn key_up(&self, _: pal::Wm, _: &pal::HWnd, e: &dyn KeyEvent<pal::AccelTable>) -> bool {
+                if e.translate_accel(&ACCEL) == Some(42) {
+                    assert_eq!(self.0.get(), 2);
+                    self.0.set(3);
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+
+        let hwnd = wm.new_wnd(pal::WndAttrs {
+            visible: Some(true),
+            listener: Some(Box::new(Listener(Rc::clone(&state)))),
+            ..Default::default()
+        });
+
+        twm.simulate_key(&hwnd, "windows", "Ctrl+S");
+        assert_eq!(state.get(), 3);
+    });
+}
