@@ -572,6 +572,17 @@ impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F
     }
 }
 
+struct KeyEvent {
+    mod_flags: u16,
+    charcode_unmod: u16,
+}
+
+impl iface::KeyEvent<AccelTable> for KeyEvent {
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<iface::ActionId> {
+        accel_table.find_action_with_key(self.mod_flags, self.charcode_unmod)
+    }
+}
+
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_key_down(
     ud: TCWListenerUserData,
@@ -606,10 +617,46 @@ unsafe extern "C" fn tcw_wndlistener_key_down(
 
             listener.perform_action(wm, &state.hwnd, action);
 
-            1 // Handled
-        } else {
-            0 // Unhandled
+            return 1; // Handled
         }
+
+        let handled = listener.key_down(
+            wm,
+            &state.hwnd,
+            &KeyEvent {
+                mod_flags,
+                charcode_unmod,
+            },
+        );
+        log::trace!("... key_down(...) = {:?}", handled);
+
+        handled as _
+    })
+    .unwrap_or(0)
+}
+
+#[no_mangle]
+unsafe extern "C" fn tcw_wndlistener_key_up(
+    ud: TCWListenerUserData,
+    mod_flags: u16,
+    charcode_unmod: u16,
+) -> c_int {
+    method_impl(ud, |wm, state| {
+        log::trace!("tcw_wndlistener_key_up{:?}", (mod_flags, charcode_unmod));
+
+        let listener = state.listener.borrow();
+
+        let handled = listener.key_up(
+            wm,
+            &state.hwnd,
+            &KeyEvent {
+                mod_flags,
+                charcode_unmod,
+            },
+        );
+        log::trace!("... key_up(...) = {:?}", handled);
+
+        handled as _
     })
     .unwrap_or(0)
 }
