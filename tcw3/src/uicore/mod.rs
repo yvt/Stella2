@@ -374,7 +374,6 @@ impl Wnd {
 }
 
 // TODO: mouse motion events
-// TODO: keyboard events
 
 /// A view handle type.
 #[derive(Clone)]

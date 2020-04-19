@@ -228,8 +228,6 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     ///
     /// [`TextInputCtxListener::edit`] may be called in this method.
     fn remove_text_input_ctx(self, ctx: &Self::HTextInputCtx);
-
-    // TODO: Add a method to translate a key event using an accelerator table
 }
 
 /// Returned when a function/method is called from an invalid thread.
@@ -597,7 +595,6 @@ pub trait WndListener<T: Wm> {
 
     // TODO: more events
     //  - Pointer device gestures (swipe, zoom, rotate)
-    //  - Keyboard
 }
 
 /// A default implementation of [`WndListener`].
