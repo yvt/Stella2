@@ -542,6 +542,17 @@ impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F
     }
 }
 
+struct KeyEvent {
+    key: u16,
+    mod_flags: u8,
+}
+
+impl iface::KeyEvent<AccelTable> for KeyEvent {
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<iface::ActionId> {
+        accel_table.find_action_with_key(self.key, self.mod_flags)
+    }
+}
+
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     let wnd_ptr = unsafe { winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA) } as *const Wnd;
 
@@ -748,7 +759,40 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
 
                 return 0;
             }
+
+            let handled = listener.key_down(wm, &pal_hwnd, &KeyEvent { key, mod_flags });
+            log::trace!("... key_down(...) = {:?}", handled);
+
+            if handled {
+                return 0;
+            }
         } // WM_KEYDOWN
+
+        winuser::WM_KEYUP => {
+            let listener = Rc::clone(&pal_hwnd.wnd.listener.borrow());
+
+            log::trace!("WM_KEYUP(0x{:x}, 0x{:x})", wparam, lparam);
+
+            // Check the state of the modifier keys
+            let mod_flags = AccelTable::query_mod_flags();
+
+            let key: u16 = if let Ok(x) = wparam.try_into() {
+                x
+            } else {
+                log::warn!(
+                    "... virtual key code is out of range ({:?}), ignoring",
+                    wparam
+                );
+                0 // Invalid virtual key code
+            };
+
+            let handled = listener.key_up(wm, &pal_hwnd, &KeyEvent { key, mod_flags });
+            log::trace!("... key_up(...) = {:?}", handled);
+
+            if handled {
+                return 0;
+            }
+        } // WM_KEYUP
 
         winuser::WM_SETCURSOR => {
             if lparam & 0xffff == winuser::HTCLIENT {
