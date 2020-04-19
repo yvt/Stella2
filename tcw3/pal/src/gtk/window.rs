@@ -577,6 +577,17 @@ impl<F: FnMut(&AccelTable)> iface::InterpretEventCtx<AccelTable> for EnumAccel<F
     }
 }
 
+struct KeyEvent {
+    keyval: u32,
+    mod_flags: u8,
+}
+
+impl iface::KeyEvent<AccelTable> for KeyEvent {
+    fn translate_accel(&self, accel_table: &AccelTable) -> Option<iface::ActionId> {
+        accel_table.find_action_with_key(self.keyval, self.mod_flags)
+    }
+}
+
 #[no_mangle]
 extern "C" fn tcw_wnd_widget_key_press_handler(
     wnd_ptr: WndPtr,
@@ -630,10 +641,42 @@ extern "C" fn tcw_wnd_widget_key_press_handler(
 
             listener.perform_action(wm, &hwnd, action);
 
-            1 // Handled
-        } else {
-            0 // Unhandled
+            return 1; // Handled
         }
+
+        let handled = listener.key_down(wm, &hwnd, &KeyEvent { keyval, mod_flags });
+        log::trace!("... key_down(...) = {:?}", handled);
+
+        handled as _
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+extern "C" fn tcw_wnd_widget_key_release_handler(
+    wnd_ptr: WndPtr,
+    event: *mut gdk_sys::GdkEventKey,
+) -> c_int {
+    let event = unsafe { gdk::EventKey::from_glib_borrow(event) };
+
+    log::debug!(
+        "key_release{:?}",
+        (wnd_ptr, event.get_keyval(), event.get_state())
+    );
+
+    if let Some((wm, hwnd, listener)) = with_wnd_mut(
+        unsafe { Wm::global_unchecked() },
+        wnd_ptr,
+        |wnd, hwnd, wm| (wm, hwnd, Rc::clone(&wnd.listener)),
+    ) {
+        let keyval = event.get_keyval();
+        let mod_flags = AccelTable::compress_mod_flags(event.get_state().bits());
+
+        let handled = listener.key_up(wm, &hwnd, &KeyEvent { keyval, mod_flags });
+        log::trace!("... key_up(...) = {:?}", handled);
+
+        handled as _
     } else {
         0
     }

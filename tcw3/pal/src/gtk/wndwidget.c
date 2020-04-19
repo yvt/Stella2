@@ -204,6 +204,10 @@ static gboolean tcw_wnd_widget_key_release_event(GtkWidget *widget,
                                                  GdkEventKey *event) {
     TcwWndWidget *wnd_widget = TCW_WND_WIDGET(widget);
 
+    if (tcw_wnd_widget_key_release_handler(wnd_widget->wnd_ptr, event)) {
+        return TRUE;
+    }
+
     if (wnd_widget->im_ctx &&
         gtk_im_context_filter_keypress(wnd_widget->im_ctx, event)) {
         return TRUE;
