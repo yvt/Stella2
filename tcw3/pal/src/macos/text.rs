@@ -2,9 +2,10 @@ use alt_fp::FloatOrd;
 use atom2::SetOnceAtom;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{vec2, Point2};
+use cocoa::{base::id, foundation::NSUInteger};
 use core_foundation::{
     array::{CFArray, CFArrayRef},
-    attributed_string::CFMutableAttributedString,
+    attributed_string::{CFMutableAttributedString, CFMutableAttributedStringRef},
     base::{CFIndex, CFRange, TCFType},
     number::CFNumber,
     string::{CFString, CFStringRef},
@@ -27,14 +28,16 @@ use core_text::{
     string_attributes,
 };
 use lazy_static::lazy_static;
+use objc::{msg_send, runtime::BOOL, sel, sel_impl};
 use std::{
     f32::{INFINITY, NEG_INFINITY},
+    fmt,
     mem::MaybeUninit,
     ops::Range,
     os::raw::c_void,
     slice,
 };
-use utf16count::{find_utf16_pos_in_utf8_str, utf16_len_of_utf8_str};
+use utf16count::{find_utf16_pos_in_utf8_str, rfind_utf16_pos_in_utf8_str, utf16_len_of_utf8_str};
 
 use super::super::{
     iface,
@@ -93,17 +96,29 @@ impl iface::CharStyle for CharStyle {
     }
 }
 
-#[derive(Debug)]
 pub struct TextLayout {
     frame: CTFrame,
     height: f32,
     text: String,
+    attr_str: CFMutableAttributedString,
     line_boundaries: SetOnceAtom<Box<Box<[usize]>>>,
     line_origins: Box<[CGPoint]>,
 }
 
 unsafe impl Send for TextLayout {}
 unsafe impl Sync for TextLayout {}
+
+impl fmt::Debug for TextLayout {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("TextLayout")
+            .field("frame", &self.frame)
+            .field("height", &self.height)
+            .field("text", &self.text)
+            .field("line_boundaries", &self.line_boundaries)
+            .field("line_origins", &self.line_origins)
+            .finish()
+    }
+}
 
 impl iface::TextLayout for TextLayout {
     type CharStyle = CharStyle;
@@ -160,6 +175,7 @@ impl iface::TextLayout for TextLayout {
             frame,
             height: frame_size.height as f32,
             text: text.to_owned(),
+            attr_str,
             line_boundaries: SetOnceAtom::empty(),
             line_origins: line_origins.into(),
         }
@@ -582,6 +598,67 @@ impl iface::TextLayout for TextLayout {
 
         out_run_metrics
     }
+
+    fn next_char(&self, i: usize, forward: bool) -> usize {
+        debug_assert!(
+            self.text.get(i..self.text.len()).is_some(),
+            "i is not on a UTF-8 codepoint boundary"
+        );
+
+        let text = &self.text.as_bytes();
+
+        if forward {
+            if i >= text.len() {
+                return i;
+            }
+        } else {
+            if i == 0 {
+                return 0;
+            }
+        }
+
+        let st = cfattributedstring_get_string(&self.attr_str);
+        let i_u16 = utf16_len_of_utf8_str(&text[..i]);
+
+        if forward {
+            // Find the grapheme cluster containing the UTF-16 unit
+            // following `i_u16`
+            let range = cfstring_get_range_of_composed_characters_at_index(&st, i_u16);
+            let next_i_u16 = range.end;
+
+            debug_assert!(next_i_u16 > i_u16);
+
+            i + find_utf16_pos_in_utf8_str(next_i_u16 - i_u16, &text[i..]).utf8_cursor
+        } else {
+            // Find the grapheme cluster containing the UTF-16 unit
+            // preceding `i_u16`
+            let range = cfstring_get_range_of_composed_characters_at_index(&st, i_u16 - 1);
+            let next_i_u16 = range.start;
+
+            debug_assert!(next_i_u16 < i_u16);
+
+            rfind_utf16_pos_in_utf8_str(i_u16 - next_i_u16, &text[..i]).utf8_cursor
+        }
+    }
+
+    fn next_word(&self, i: usize, forward: bool) -> usize {
+        debug_assert!(
+            self.text.get(i..self.text.len()).is_some(),
+            "i is not on a UTF-8 codepoint boundary"
+        );
+
+        let text = &self.text.as_bytes();
+        let i_u16 = utf16_len_of_utf8_str(&text[..i]);
+
+        // Find the next word boundary
+        let next_i_u16 = cfattributedstring_next_word_from_index(&self.attr_str, i_u16, forward);
+
+        if next_i_u16 > i_u16 {
+            i + find_utf16_pos_in_utf8_str(next_i_u16 - i_u16, &text[i..]).utf8_cursor
+        } else {
+            rfind_utf16_pos_in_utf8_str(i_u16 - next_i_u16, &text[..i]).utf8_cursor
+        }
+    }
 }
 
 impl iface::CanvasText<TextLayout> for BitmapBuilder {
@@ -593,6 +670,12 @@ impl iface::CanvasText<TextLayout> for BitmapBuilder {
         layout.frame.draw(&self.cg_context);
         self.cg_context.restore();
     }
+}
+
+extern "C" {
+    fn CFAttributedStringGetString(astr: CFMutableAttributedStringRef) -> CFStringRef;
+
+    fn CFStringGetRangeOfComposedCharactersAtIndex(string: CFStringRef, index: CFIndex) -> CFRange;
 }
 
 #[link(name = "CoreText", kind = "framework")]
@@ -859,4 +942,47 @@ fn ctrun_get_all_string_indices<'a>(
     }
 
     &buffer[..]
+}
+
+fn cfattributedstring_next_word_from_index(
+    this: &CFMutableAttributedString,
+    location: usize,
+    forward: bool,
+) -> usize {
+    use std::convert::TryInto;
+
+    let location: NSUInteger = location.try_into().expect("integer overflow");
+    let forward: BOOL = forward as _;
+    let next_location: NSUInteger = unsafe {
+        // By toll-free bridging, `this` can be treated as `NSAttributedString`
+        msg_send![
+            this.as_concrete_TypeRef() as id,
+            nextWordFromIndex: location
+                      forward: forward
+        ]
+    };
+    next_location.try_into().expect("integer overflow")
+}
+
+fn cfattributedstring_get_string(this: &CFMutableAttributedString) -> CFString {
+    unsafe {
+        let st = CFAttributedStringGetString(this.as_concrete_TypeRef());
+        TCFType::wrap_under_get_rule(st)
+    }
+}
+
+fn cfstring_get_range_of_composed_characters_at_index(
+    this: &CFString,
+    index: usize,
+) -> Range<usize> {
+    use std::convert::TryInto;
+
+    let index: CFIndex = index.try_into().expect("integer overflow");
+
+    let range =
+        unsafe { CFStringGetRangeOfComposedCharactersAtIndex(this.as_concrete_TypeRef(), index) };
+
+    let location: usize = range.location.try_into().expect("integer overflow");
+    let length: usize = range.length.try_into().expect("integer overflow");
+    location..length.checked_add(location).expect("integer overflow")
 }
