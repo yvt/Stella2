@@ -7,11 +7,19 @@ use directwrite::{
     factory::Factory,
     text_layout::metrics::{HitTestMetrics, LineMetrics},
 };
-use std::{convert::TryFrom, fmt, ops::Range};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    mem::MaybeUninit,
+    ops::Range,
+};
 use utf16count::{find_utf16_pos, find_utf16_pos_in_utf8_str, utf16_len_of_utf8_str};
 use winapi::shared::winerror::S_OK;
 
-use super::utils::panic_hresult;
+use super::{
+    codecvt::str_to_c_wstr,
+    utils::{assert_hresult_ok, panic_hresult},
+};
 use crate::iface;
 
 lazy_static::lazy_static! {
@@ -196,15 +204,24 @@ impl iface::TextLayout for TextLayout {
     type CharStyle = CharStyle;
 
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
-        assert!(u32::try_from(text.len()).is_ok(), "text is too long");
+        assert!(u32::try_from(text.len()).is_ok(), "string too long");
 
-        let dwrite_layout = directwrite::TextLayout::create(&G.dwrite)
-            .with_text(text)
-            .with_width(width.unwrap_or(std::f32::INFINITY).fmax(0.0))
-            .with_height(0.0)
-            .with_font(&style.to_dwrite_format())
-            .build()
-            .unwrap();
+        let text_u16 = str_to_c_wstr(text);
+
+        let dwrite_layout = unsafe {
+            let mut dwrite_layout = MaybeUninit::uninit();
+            let width = width.unwrap_or(std::f32::INFINITY).fmax(0.0);
+            let height = 0.0;
+            assert_hresult_ok((&*G.dwrite.get_raw()).CreateTextLayout(
+                text_u16.as_ptr(),
+                (text_u16.len() - 1).try_into().expect("string too long"),
+                style.to_dwrite_format().get_raw(),
+                width,
+                height,
+                dwrite_layout.as_mut_ptr(),
+            ));
+            directwrite::TextLayout::from_raw(dwrite_layout.assume_init())
+        };
 
         if style.decor.contains(iface::TextDecorFlags::UNDERLINE) {
             dwrite_layout.set_underline(true, ..).unwrap();
