@@ -1412,7 +1412,9 @@ pub trait TextLayout: Send + Sync + Sized {
     /// following the first word, but the behavior must be consistent for each
     /// combination of the current backend and the value of `forward`.
     ///
-    /// `i` must lie on a UTF-8 codepoint boundary.
+    /// `i` must lie on a character boundary defined by [`next_char`].
+    ///
+    /// [`next_char`]: TextLayout::next_char
     ///
     /// # Complexity
     ///

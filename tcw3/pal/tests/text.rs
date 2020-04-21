@@ -295,11 +295,18 @@ fn test_text_layout_invariants() {
         assert_eq!(text_layout.next_char(0, false), 0);
         assert_eq!(text_layout.next_char(text.len(), true), text.len());
 
+        let char_boundaries: Vec<usize> = is_char_boundary
+            .iter()
+            .enumerate()
+            .filter(|x| *x.1)
+            .map(|x| x.0)
+            .collect();
+
         // The set of boundaries defined by `next_word` must be consistent for
         // all invocations to `next_word` with the same input string and the
         // same value of `forward`
         let mut next_boundary = 0;
-        for (i, _) in text.char_indices() {
+        for &i in char_boundaries[..char_boundaries.len() - 1].iter() {
             let next_i = text_layout.next_word(i, true); // forward
             log::trace!("    next_word{:?} = {:?}", (i, true), next_i);
             assert!(next_i > i);
@@ -313,8 +320,7 @@ fn test_text_layout_invariants() {
         assert_eq!(next_boundary, text.len());
 
         next_boundary = text.len();
-        for (i, s) in text.char_indices().rev() {
-            let i = i + s.len_utf8();
+        for &i in char_boundaries[1..].iter().rev() {
             let next_i = text_layout.next_word(i, false); // backward
             log::trace!("    next_word{:?} = {:?}", (i, false), next_i);
             assert!(next_i < i);
