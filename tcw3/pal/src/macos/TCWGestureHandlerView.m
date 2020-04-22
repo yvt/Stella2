@@ -430,6 +430,13 @@ static NSMutableSet<TCWGestureHandlerView *> *viewInstances = nil;
 
     NSString *theString = coalesceString(string);
 
+    if ([theString isEqualToString:@"\b"]) {
+        // Kotoeri generates a backspace character when the user hits
+        // the backspace key.
+        [self doCommandBySelector:@selector(deleteBackward:)];
+        return;
+    }
+
     tcw_wnd_insert_text(self->controller.listenerUserData, theString.UTF8String,
                         (size_t)replacementRange.location,
                         (size_t)replacementRange.length);
