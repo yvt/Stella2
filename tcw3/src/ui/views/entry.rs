@@ -356,6 +356,48 @@ impl EntryCoreListener {
     fn new(inner: Rc<Inner>) -> Self {
         Self { inner }
     }
+
+    fn handle_delete(
+        &self,
+        wm: pal::Wm,
+        view: HViewRef<'_>,
+        get_range: fn(usize, &pal::TextLayout, &str) -> usize,
+    ) {
+        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+            state.ensure_text_layout(&self.inner.style_elem);
+            let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
+            let [mut start, mut end] = state.sel_range;
+
+            if start == end {
+                log::trace!(
+                    "... there's no selection text. Deriving the deletion \
+                    range based on the cursor position ({:?})",
+                    start,
+                );
+
+                // If nothing is selected, derive the deletion range using
+                // the given function
+                end = get_range(start, layout, &state.text);
+            } else {
+                log::trace!("... deleting the selection at {:?}", start..end);
+            }
+
+            log::trace!("... deletion range = {:?}", start..end);
+
+            if start == end {
+                // There's nothing to delete
+                return UpdateStateFlags::empty();
+            }
+
+            if start > end {
+                std::mem::swap(&mut start, &mut end);
+            }
+            state.text.replace_range(start..end, "");
+            state.sel_range = [start, start];
+
+            UpdateStateFlags::ANY
+        });
+    }
 }
 
 impl ViewListener for EntryCoreListener {
@@ -431,7 +473,12 @@ impl ViewListener for EntryCoreListener {
             actions::SELECT_ALL
             | actions::SELECT_LINE
             | actions::SELECT_PARAGRAPH
-            | actions::SELECT_WORD => {
+            | actions::SELECT_WORD
+            | actions::DELETE_BACKWARD
+            | actions::DELETE_BACKWARD_DECOMPOSING
+            | actions::DELETE_BACKWARD_WORD
+            | actions::DELETE_FORWARD
+            | actions::DELETE_FORWARD_WORD => {
                 status |= ActionStatus::VALID | ActionStatus::ENABLED;
             }
             actions::COPY | actions::CUT => {
@@ -487,6 +534,26 @@ impl ViewListener for EntryCoreListener {
             }
             actions::PASTE => {
                 log::warn!("TODO: Paste");
+            }
+            actions::DELETE_BACKWARD => {
+                log::trace!("Handling DELETE_BACKWARD");
+                self.handle_delete(wm, view, |i, layout, _| layout.next_char(i, false));
+            }
+            actions::DELETE_BACKWARD_DECOMPOSING => {
+                log::trace!("Handling DELETE_BACKWARD_DECOMPOSING");
+                self.handle_delete(wm, view, |i, _, text| utf8_prev(text.as_bytes(), i));
+            }
+            actions::DELETE_BACKWARD_WORD => {
+                log::trace!("Handling DELETE_BACKWARD_WORD");
+                self.handle_delete(wm, view, |i, layout, _| layout.next_word(i, false));
+            }
+            actions::DELETE_FORWARD => {
+                log::trace!("Handling DELETE_FORWARD");
+                self.handle_delete(wm, view, |i, layout, _| layout.next_char(i, true));
+            }
+            actions::DELETE_FORWARD_WORD => {
+                log::trace!("Handling DELETE_FORWARD_WORD");
+                self.handle_delete(wm, view, |i, layout, _| layout.next_word(i, true));
             }
             unknown_action => {
                 log::warn!("Unknown action: {}", unknown_action);
@@ -698,6 +765,20 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
     ) {
         self.inner.tictx_event_mask.set(flags);
     }
+}
+
+fn is_utf8_continuation(x: u8) -> bool {
+    (x as i8) < -0x40
+}
+
+fn utf8_prev(s: &[u8], mut i: usize) -> usize {
+    if i > 0 {
+        while {
+            i -= 1;
+            i > 0 && is_utf8_continuation(s[i])
+        } {}
+    }
+    i
 }
 
 /// Implements `TextInputCtxEdit`.
@@ -928,6 +1009,10 @@ fn update_state(
     }
 
     let tictx = state.tictx.clone();
+
+    if flags.contains(UpdateStateFlags::ANY) {
+        state.invalidate_text_layout();
+    }
 
     if flags.contains(UpdateStateFlags::ANY)
         || (old_sel_range[0] != old_sel_range[1])
