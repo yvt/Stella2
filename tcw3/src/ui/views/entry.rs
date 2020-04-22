@@ -352,6 +352,8 @@ struct EntryCoreListener {
     inner: Rc<Inner>,
 }
 
+type MoveHandler = fn([usize; 2], &pal::TextLayout, &str) -> usize;
+
 impl EntryCoreListener {
     fn new(inner: Rc<Inner>) -> Self {
         Self { inner }
@@ -396,6 +398,39 @@ impl EntryCoreListener {
             state.sel_range = [start, start];
 
             UpdateStateFlags::ANY
+        });
+    }
+
+    fn handle_move(
+        &self,
+        wm: pal::Wm,
+        view: HViewRef<'_>,
+        selecting: bool,
+        get_new_pos: MoveHandler,
+    ) {
+        update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
+            log::trace!("... original sel_range = {:?}", state.sel_range);
+
+            state.ensure_text_layout(&self.inner.style_elem);
+            let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
+
+            if selecting {
+                // Move `state.sel_range[1]`.
+                state.sel_range[1] = get_new_pos([state.sel_range[1]; 2], layout, &state.text);
+            } else {
+                // Pass the current selection to `get_new_pos`. If the range is
+                // empty, the behavior is obvious (just move it around). If the
+                // range has a non-zero length, how to handle it is up to
+                // `get_new_pos`.
+                let [mut start, mut end] = state.sel_range;
+                if start > end {
+                    std::mem::swap(&mut start, &mut end);
+                }
+
+                state.sel_range = [get_new_pos([start, end], layout, &state.text); 2];
+            }
+
+            log::trace!("... new sel_range = {:?}", state.sel_range);
         });
     }
 }
@@ -478,7 +513,47 @@ impl ViewListener for EntryCoreListener {
             | actions::DELETE_BACKWARD_DECOMPOSING
             | actions::DELETE_BACKWARD_WORD
             | actions::DELETE_FORWARD
-            | actions::DELETE_FORWARD_WORD => {
+            | actions::DELETE_FORWARD_WORD
+            | actions::MOVE_BACKWARD
+            | actions::MOVE_FORWARD
+            | actions::MOVE_LEFT
+            | actions::MOVE_RIGHT
+            | actions::MOVE_BACKWARD_WORD
+            | actions::MOVE_FORWARD_WORD
+            | actions::MOVE_LEFT_WORD
+            | actions::MOVE_RIGHT_WORD
+            | actions::MOVE_START_OF_LINE
+            | actions::MOVE_END_OF_LINE
+            | actions::MOVE_LEFT_END_OF_LINE
+            | actions::MOVE_RIGHT_END_OF_LINE
+            | actions::MOVE_START_OF_PARAGRAPH
+            | actions::MOVE_END_OF_PARAGRAPH
+            | actions::MOVE_START_OF_DOCUMENT
+            | actions::MOVE_END_OF_DOCUMENT
+            | actions::MOVE_UP
+            | actions::MOVE_DOWN
+            | actions::MOVE_UP_PAGE
+            | actions::MOVE_DOWN_PAGE
+            | actions::MOVE_BACKWARD_SELECTING
+            | actions::MOVE_FORWARD_SELECTING
+            | actions::MOVE_LEFT_SELECTING
+            | actions::MOVE_RIGHT_SELECTING
+            | actions::MOVE_BACKWARD_WORD_SELECTING
+            | actions::MOVE_FORWARD_WORD_SELECTING
+            | actions::MOVE_LEFT_WORD_SELECTING
+            | actions::MOVE_RIGHT_WORD_SELECTING
+            | actions::MOVE_START_OF_LINE_SELECTING
+            | actions::MOVE_END_OF_LINE_SELECTING
+            | actions::MOVE_LEFT_END_OF_LINE_SELECTING
+            | actions::MOVE_RIGHT_END_OF_LINE_SELECTING
+            | actions::MOVE_START_OF_PARAGRAPH_SELECTING
+            | actions::MOVE_END_OF_PARAGRAPH_SELECTING
+            | actions::MOVE_START_OF_DOCUMENT_SELECTING
+            | actions::MOVE_END_OF_DOCUMENT_SELECTING
+            | actions::MOVE_UP_SELECTING
+            | actions::MOVE_DOWN_SELECTING
+            | actions::MOVE_UP_PAGE_SELECTING
+            | actions::MOVE_DOWN_PAGE_SELECTING => {
                 status |= ActionStatus::VALID | ActionStatus::ENABLED;
             }
             actions::COPY | actions::CUT => {
@@ -498,6 +573,34 @@ impl ViewListener for EntryCoreListener {
     }
 
     fn perform_action(&self, wm: pal::Wm, view: HViewRef<'_>, action: ActionId) {
+        let move_backward: MoveHandler = |sel, layout, _| {
+            if sel[0] == sel[1] {
+                layout.next_char(sel[0], false)
+            } else {
+                sel[0]
+            }
+        };
+        let move_forward: MoveHandler = |sel, layout, _| {
+            if sel[0] == sel[1] {
+                layout.next_char(sel[1], true)
+            } else {
+                sel[1]
+            }
+        };
+        let move_forward_word: MoveHandler = |sel, layout, _| layout.next_word(sel[1], true);
+        let move_backward_word: MoveHandler = |sel, layout, _| layout.next_word(sel[0], false);
+
+        let move_start: MoveHandler = |_, _, _| 0;
+        let move_end: MoveHandler = |_, _, text| text.len();
+
+        // TODO: Use the primary writing direction
+        let move_left = move_backward;
+        let move_right = move_forward;
+        let move_left_word = move_backward_word;
+        let move_right_word = move_forward_word;
+        let move_left_end = move_start;
+        let move_right_end = move_end;
+
         match action {
             actions::SELECT_ALL | actions::SELECT_LINE | actions::SELECT_PARAGRAPH => {
                 log::trace!("Handling a 'select all' command (SELECT_ALL, etc.)");
@@ -555,6 +658,137 @@ impl ViewListener for EntryCoreListener {
                 log::trace!("Handling DELETE_FORWARD_WORD");
                 self.handle_delete(wm, view, |i, layout, _| layout.next_word(i, true));
             }
+
+            actions::MOVE_BACKWARD => {
+                log::trace!("Handling MOVE_BACKWARD");
+                self.handle_move(wm, view, false, move_backward);
+            }
+            actions::MOVE_BACKWARD_SELECTING => {
+                log::trace!("Handling MOVE_BACKWARD_SELECTING");
+                self.handle_move(wm, view, true, move_backward);
+            }
+            actions::MOVE_FORWARD => {
+                log::trace!("Handling MOVE_FORWARD");
+                self.handle_move(wm, view, false, move_forward);
+            }
+            actions::MOVE_FORWARD_SELECTING => {
+                log::trace!("Handling MOVE_FORWARD_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_forward);
+            }
+            actions::MOVE_LEFT => {
+                log::trace!("Handling MOVE_LEFT");
+                self.handle_move(wm, view, false, move_left);
+            }
+            actions::MOVE_LEFT_SELECTING => {
+                log::trace!("Handling MOVE_LEFT_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_left);
+            }
+            actions::MOVE_RIGHT => {
+                log::trace!("Handling MOVE_RIGHT");
+                self.handle_move(wm, view, false, move_right);
+            }
+            actions::MOVE_RIGHT_SELECTING => {
+                log::trace!("Handling MOVE_RIGHT_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_right);
+            }
+
+            actions::MOVE_BACKWARD_WORD => {
+                log::trace!("Handling MOVE_BACKWARD_WORD");
+                self.handle_move(wm, view, false, move_backward_word);
+            }
+            actions::MOVE_BACKWARD_WORD_SELECTING => {
+                log::trace!("Handling MOVE_BACKWARD_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_backward_word);
+            }
+            actions::MOVE_FORWARD_WORD => {
+                log::trace!("Handling MOVE_FORWARD_WORD");
+                self.handle_move(wm, view, false, move_forward_word);
+            }
+            actions::MOVE_FORWARD_WORD_SELECTING => {
+                log::trace!("Handling MOVE_FORWARD_WORD_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_forward_word);
+            }
+            actions::MOVE_LEFT_WORD => {
+                log::trace!("Handling MOVE_LEFT_WORD");
+                self.handle_move(wm, view, false, move_left_word);
+            }
+            actions::MOVE_LEFT_WORD_SELECTING => {
+                log::trace!("Handling MOVE_LEFT_WORD_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_left_word);
+            }
+            actions::MOVE_RIGHT_WORD => {
+                log::trace!("Handling MOVE_RIGHT_WORD");
+                self.handle_move(wm, view, false, move_right_word);
+            }
+            actions::MOVE_RIGHT_WORD_SELECTING => {
+                log::trace!("Handling MOVE_RIGHT_WORD_WORD_SELECTING");
+                self.handle_move(wm, view, true, move_right_word);
+            }
+
+            actions::MOVE_UP
+            | actions::MOVE_UP_PAGE
+            | actions::MOVE_START_OF_LINE
+            | actions::MOVE_START_OF_PARAGRAPH
+            | actions::MOVE_START_OF_DOCUMENT => {
+                log::trace!(
+                    "Handling a 'move to start' command \
+                    (MOVE_START_OF_LINE, etc.)"
+                );
+                self.handle_move(wm, view, false, move_start);
+            }
+            actions::MOVE_UP_SELECTING
+            | actions::MOVE_UP_PAGE_SELECTING
+            | actions::MOVE_START_OF_LINE_SELECTING
+            | actions::MOVE_START_OF_PARAGRAPH_SELECTING
+            | actions::MOVE_START_OF_DOCUMENT_SELECTING => {
+                log::trace!(
+                    "Handling a 'move to start and modify selection' \
+                    command (MOVE_START_OF_LINE_SELECTING, etc.)"
+                );
+                self.handle_move(wm, view, true, move_start);
+            }
+
+            actions::MOVE_DOWN
+            | actions::MOVE_DOWN_PAGE
+            | actions::MOVE_END_OF_LINE
+            | actions::MOVE_END_OF_PARAGRAPH
+            | actions::MOVE_END_OF_DOCUMENT => {
+                log::trace!(
+                    "Handling a 'move to end' command \
+                    (MOVE_END_OF_LINE, etc.)"
+                );
+                self.handle_move(wm, view, false, move_end);
+            }
+            actions::MOVE_DOWN_SELECTING
+            | actions::MOVE_DOWN_PAGE_SELECTING
+            | actions::MOVE_END_OF_LINE_SELECTING
+            | actions::MOVE_END_OF_PARAGRAPH_SELECTING
+            | actions::MOVE_END_OF_DOCUMENT_SELECTING => {
+                log::trace!(
+                    "Handling a 'move to end and modify selection' \
+                    command (MOVE_END_OF_LINE_SELECTING, etc.)"
+                );
+                self.handle_move(wm, view, true, move_end);
+            }
+
+            actions::MOVE_LEFT_END_OF_LINE => {
+                log::trace!("Handling MOVE_LEFT_END_OF_LINE");
+                self.handle_move(wm, view, false, move_left_end);
+            }
+            actions::MOVE_LEFT_END_OF_LINE_SELECTING => {
+                log::trace!("Handling MOVE_LEFT_END_OF_LINE_SELECTING");
+                self.handle_move(wm, view, true, move_left_end);
+            }
+
+            actions::MOVE_RIGHT_END_OF_LINE => {
+                log::trace!("Handling MOVE_RIGHT_END_OF_LINE");
+                self.handle_move(wm, view, false, move_right_end);
+            }
+            actions::MOVE_RIGHT_END_OF_LINE_SELECTING => {
+                log::trace!("Handling MOVE_RIGHT_END_OF_LINE_SELECTING");
+                self.handle_move(wm, view, true, move_right_end);
+            }
+
             unknown_action => {
                 log::warn!("Unknown action: {}", unknown_action);
             }
