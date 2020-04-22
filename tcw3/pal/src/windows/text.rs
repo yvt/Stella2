@@ -7,11 +7,24 @@ use directwrite::{
     factory::Factory,
     text_layout::metrics::{HitTestMetrics, LineMetrics},
 };
-use std::{convert::TryFrom, fmt, ops::Range};
-use utf16count::{find_utf16_pos, find_utf16_pos_in_utf8_str, utf16_len_of_utf8_str};
-use winapi::shared::winerror::S_OK;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    mem::MaybeUninit,
+    ops::Range,
+};
+use utf16count::{
+    find_utf16_pos, find_utf16_pos_in_utf8_str, rfind_utf16_pos_in_utf8_str, utf16_len_of_utf8_str,
+};
+use winapi::{
+    shared::{minwindef::BYTE, winerror::S_OK},
+    um::usp10,
+};
 
-use super::utils::panic_hresult;
+use super::{
+    codecvt::str_to_c_wstr,
+    utils::{assert_hresult_ok, panic_hresult},
+};
 use crate::iface;
 
 lazy_static::lazy_static! {
@@ -97,13 +110,19 @@ pub struct TextLayout {
     pub(super) dwrite_layout: directwrite::TextLayout,
     pub(super) color: Option<iface::RGBAF32>,
     text: String,
+    text_u16: Box<[u16]>,
     metrics: SetOnceAtom<Box<LayoutMetrics>>,
+    break_analysis: SetOnceAtom<Box<BreakAnalysis>>,
 }
 
 struct LayoutMetrics {
     line_boundaries: Box<[LineBoundary]>,
     line_positions: Box<[f32]>,
     line_metrics_list: Vec<LineMetrics>,
+}
+
+struct BreakAnalysis {
+    logattrs: Box<[usp10::SCRIPT_LOGATTR]>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -131,6 +150,12 @@ impl fmt::Debug for LayoutMetrics {
             .field("line_boundaries", &self.line_boundaries)
             .field("line_positions", &self.line_positions)
             .finish()
+    }
+}
+
+impl fmt::Debug for BreakAnalysis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BreakAnalysis").finish()
     }
 }
 
@@ -190,21 +215,101 @@ impl TextLayout {
             })
             .0
     }
+
+    fn ensure_break_analysis(&self) -> &BreakAnalysis {
+        self.break_analysis
+            .get_or_racy_insert_with(|| {
+                let len = (self.text_u16.len() - 1)
+                    .try_into()
+                    .expect("string too long");
+
+                // Specify to skip shaping and various extra processing.
+                let script_analysis: usp10::SCRIPT_ANALYSIS = unsafe { std::mem::zeroed() };
+
+                let logattrs = if len == 0 {
+                    Box::new([])
+                } else {
+                    unsafe {
+                        let mut logattrs = Vec::with_capacity(len as usize);
+                        assert_hresult_ok(usp10::ScriptBreak(
+                            self.text_u16.as_ptr(),
+                            len,
+                            &script_analysis,
+                            logattrs.as_mut_ptr(),
+                        ));
+                        logattrs.set_len(len as usize);
+                        logattrs.into_boxed_slice()
+                    }
+                };
+
+                Box::new(BreakAnalysis { logattrs })
+            })
+            .0
+    }
+
+    /// Find the first character after or before the given UTF-8 offset having
+    /// `SCRIPT_LOGATTR` intersecting with `flag`.
+    fn next_char_with_logattr(&self, i: usize, forward: bool, flag: BYTE) -> usize {
+        let text = self.text.as_bytes();
+
+        // Get the analysis data.
+        let logattrs = &self.ensure_break_analysis().logattrs[..];
+
+        // Each element in `logattrs` corresponds to a UTF-16 unit;
+        // So, we need to convert `i` to a UTF-16 offset.
+        let i_chars = utf16_len_of_utf8_str(&text[0..i]);
+
+        if forward {
+            let chars = if i_chars >= logattrs.len() {
+                0
+            } else {
+                logattrs[i_chars + 1..]
+                    .iter()
+                    .take_while(|a| (a.bit_fields & flag) == 0)
+                    .count()
+                    + 1
+            };
+
+            i + find_utf16_pos_in_utf8_str(chars, &text[i..]).utf8_cursor
+        } else {
+            let chars = if i_chars == 0 {
+                0
+            } else {
+                logattrs[0..i_chars]
+                    .iter()
+                    .rev()
+                    .take_while(|a| (a.bit_fields & flag) == 0)
+                    .count()
+                    + 1
+            };
+
+            rfind_utf16_pos_in_utf8_str(chars, &text[..i]).utf8_cursor
+        }
+    }
 }
 
 impl iface::TextLayout for TextLayout {
     type CharStyle = CharStyle;
 
     fn from_text(text: &str, style: &Self::CharStyle, width: Option<f32>) -> Self {
-        assert!(u32::try_from(text.len()).is_ok(), "text is too long");
+        assert!(u32::try_from(text.len()).is_ok(), "string too long");
 
-        let dwrite_layout = directwrite::TextLayout::create(&G.dwrite)
-            .with_text(text)
-            .with_width(width.unwrap_or(std::f32::INFINITY).fmax(0.0))
-            .with_height(0.0)
-            .with_font(&style.to_dwrite_format())
-            .build()
-            .unwrap();
+        let text_u16 = str_to_c_wstr(text);
+
+        let dwrite_layout = unsafe {
+            let mut dwrite_layout = MaybeUninit::uninit();
+            let width = width.unwrap_or(std::f32::INFINITY).fmax(0.0);
+            let height = 0.0;
+            assert_hresult_ok((&*G.dwrite.get_raw()).CreateTextLayout(
+                text_u16.as_ptr(),
+                (text_u16.len() - 1).try_into().expect("string too long"),
+                style.to_dwrite_format().get_raw(),
+                width,
+                height,
+                dwrite_layout.as_mut_ptr(),
+            ));
+            directwrite::TextLayout::from_raw(dwrite_layout.assume_init())
+        };
 
         if style.decor.contains(iface::TextDecorFlags::UNDERLINE) {
             dwrite_layout.set_underline(true, ..).unwrap();
@@ -218,7 +323,9 @@ impl iface::TextLayout for TextLayout {
             dwrite_layout,
             color: style.color,
             text: text.to_owned(),
+            text_u16,
             metrics: SetOnceAtom::empty(),
+            break_analysis: SetOnceAtom::empty(),
         }
     }
 
@@ -501,7 +608,18 @@ impl iface::TextLayout for TextLayout {
 
         out_run_metrics
     }
+
+    fn next_char(&self, i: usize, forward: bool) -> usize {
+        self.next_char_with_logattr(i, forward, SCRIPT_LOGATTR_CHAR_STOP)
+    }
+
+    fn next_word(&self, i: usize, forward: bool) -> usize {
+        self.next_char_with_logattr(i, forward, SCRIPT_LOGATTR_WORD_STOP)
+    }
 }
+
+const SCRIPT_LOGATTR_CHAR_STOP: BYTE = 1 << 2;
+const SCRIPT_LOGATTR_WORD_STOP: BYTE = 1 << 3;
 
 trait TextLayoutExt {
     fn hit_test_text_range_2(

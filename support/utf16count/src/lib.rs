@@ -35,6 +35,22 @@ const NIBBLE_TO_UTF16_LEN_U8X16: u8x16 = u8x16::new(
     nibble_to_utf16_len(15),
 );
 
+/// Mapping from the hi-nibbles of UTF-8-encoded bytes to continuation byte
+/// counts.
+//
+//                                          ┌ 1110 (U+0800–U+FFFF)
+//                                          │     ┌ 10?? (continuation bytes)
+//                                          ╧═    ╧═══════
+const NIBBLE_TO_CONTINUATION_LEN: u32 = 0b11100101000000000000000000000000;
+//                                        ╤═  ╤═══        ╤═══════════════
+//                                        │   │           └ 0???? (U+0000–U+007F)
+//                                        │   └ 110? (U+0080–U+07FF)
+//                                        └ 1111 (U+10000–U+10FFFF)
+
+const fn nibble_to_continuation_len(x: u8) -> u8 {
+    ((NIBBLE_TO_CONTINUATION_LEN >> (x * 2)) & 0b11) as u8
+}
+
 /// Copied from [`Shuffle1Dyn`'s `cfg` attributes]. `true` means the target
 /// architecture natively supports `u8x16::shuffle1_dyn`.
 ///
@@ -231,6 +247,120 @@ pub fn find_utf16_pos(utf16_pos: usize, s: &str) -> FindUtf16PosResult {
     find_utf16_pos_in_utf8_str(utf16_pos, s.as_bytes())
 }
 
+/// Convert the given UTF-16 index to a UTF-8 index This method traverses the
+/// input string in a reverse direction.
+///
+/// The result can be one of the following:
+///
+///  - `FindUtf16PosResult { utf8_cursor: i, utf16_extra: 0 }`: The position
+///    corresponding to `utf16_pos` was found in `s` and the position is
+///     `i`. Use [`FindUtf16PosResult::utf8_pos`] if you are only interested
+///    in handling this case.
+///
+///  - `FindUtf16PosResult { utf8_cursor: i, utf16_extra: 1 } if i < s.len()`:
+///    `utf16_pos` falls between a surrogate pair created from the UTF-8
+///    sequence at `s[i..i + 4]`.
+///
+///  - `FindUtf16PosResult { utf8_cursor: 0, utf16_extra: i } if i > 0`:
+///    The corresponding position was not found in `s` because `s` contains
+///    only `utf16_pos - i` UTF-16 units.
+///
+/// # Examples
+///
+///     use utf16count::{rfind_utf16_pos, FindUtf16PosResult};
+///
+///     assert_eq!(rfind_utf16_pos(0, "рыба"), FindUtf16PosResult {
+///         utf8_cursor: 8,
+///         utf16_extra: 0,
+///     });
+///     assert_eq!(rfind_utf16_pos(2, "рыба"), FindUtf16PosResult {
+///         utf8_cursor: 4,
+///         utf16_extra: 0,
+///     });
+///     assert_eq!(rfind_utf16_pos(4, "рыба"), FindUtf16PosResult {
+///         utf8_cursor: 0,
+///         utf16_extra: 0,
+///     });
+///
+///     // Out of bounds
+///     assert_eq!(rfind_utf16_pos(7, "рыба"), FindUtf16PosResult {
+///         utf8_cursor: 0,
+///         utf16_extra: 3,
+///     });
+///
+///     // 👨‍👩‍👦 starts with a surrogate pair
+///     assert_eq!(rfind_utf16_pos(0, "👨‍👩‍👦"), FindUtf16PosResult {
+///         utf8_cursor: 18,
+///         utf16_extra: 0,
+///     });
+///     assert_eq!(rfind_utf16_pos(1, "👨‍👩‍👦"), FindUtf16PosResult {
+///         utf8_cursor: 18,
+///         utf16_extra: 1,
+///     });
+///     assert_eq!(rfind_utf16_pos(2, "👨‍👩‍👦"), FindUtf16PosResult {
+///         utf8_cursor: 14,
+///         utf16_extra: 0,
+///     });
+///
+pub fn rfind_utf16_pos_in_utf8_str(mut utf16_pos: usize, mut s: &[u8]) -> FindUtf16PosResult {
+    if HAS_U8X16_SHUFFLE1_DYN {
+        while s.len() >= 64 {
+            let plot = &s[s.len() - 64..];
+            let accum = {
+                let s16 = u8x16::from_slice_unaligned(&plot[0..]);
+                NIBBLE_TO_UTF16_LEN_U8X16.shuffle1_dyn(s16 >> 4)
+            } + {
+                let s16 = u8x16::from_slice_unaligned(&plot[16..]);
+                NIBBLE_TO_UTF16_LEN_U8X16.shuffle1_dyn(s16 >> 4)
+            } + {
+                let s16 = u8x16::from_slice_unaligned(&plot[32..]);
+                NIBBLE_TO_UTF16_LEN_U8X16.shuffle1_dyn(s16 >> 4)
+            } + {
+                let s16 = u8x16::from_slice_unaligned(&plot[48..]);
+                NIBBLE_TO_UTF16_LEN_U8X16.shuffle1_dyn(s16 >> 4)
+            };
+
+            let chunk_u16len = accum.wrapping_sum() as usize;
+
+            if chunk_u16len > utf16_pos {
+                break;
+            }
+
+            s = &s[..s.len() - 64];
+            utf16_pos -= chunk_u16len;
+        }
+    }
+
+    let mut utf8_cursor = s.len();
+
+    while let Some((&plot, torso)) = s.split_last() {
+        let u16len = nibble_to_utf16_len(plot >> 4) as usize;
+
+        if u16len > utf16_pos {
+            // Vomit back the continuation bytes.
+            utf8_cursor += nibble_to_continuation_len(plot >> 4) as usize;
+            break;
+        }
+
+        // Eat the current byte
+        utf16_pos -= u16len;
+        s = torso;
+        utf8_cursor -= 1;
+    }
+
+    FindUtf16PosResult {
+        utf8_cursor,
+        utf16_extra: utf16_pos,
+    }
+}
+
+/// Convert the given UTF-16 index to a UTF-8 index.
+///
+/// See [`rfind_utf16_pos_in_utf8_str`] for more.
+pub fn rfind_utf16_pos(utf16_pos: usize, s: &str) -> FindUtf16PosResult {
+    rfind_utf16_pos_in_utf8_str(utf16_pos, s.as_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,6 +404,31 @@ mod tests {
             find_utf16_pos(u16_len + extra, &st),
             FindUtf16PosResult {
                 utf8_cursor: st.len(),
+                utf16_extra: extra
+            }
+        );
+
+        true
+    }
+
+    #[quickcheck]
+    fn test_rfind_utf16_pos(v: Vec<u8>, extra: usize) -> bool {
+        let st = mk_random_str(&v);
+        log::debug!("st = {:?}", st);
+
+        let u16_len = utf16_len(&st);
+
+        for i in 0..=u16_len {
+            let ret = rfind_utf16_pos(i, &st);
+            if i - ret.utf16_extra != utf16_len(&st[ret.utf8_cursor..]) {
+                return false;
+            }
+        }
+
+        assert_eq!(
+            rfind_utf16_pos(u16_len + extra, &st),
+            FindUtf16PosResult {
+                utf8_cursor: 0,
                 utf16_extra: extra
             }
         );

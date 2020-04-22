@@ -1,9 +1,11 @@
 use alt_fp::FloatOrd;
 use cggeom::{box2, Box2};
 use cgmath::Point2;
+use flags_macro::flags;
 use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
+use pango_sys::PangoLogAttr;
 use rgb::RGBA16;
-use std::ops::Range;
+use std::{convert::TryInto, mem::MaybeUninit, ops::Range, os::raw::c_uint};
 
 use super::super::iface;
 
@@ -425,6 +427,104 @@ impl iface::TextLayout for TextLayout {
 
         out_run_metrics
     }
+
+    fn next_char(&self, i: usize, forward: bool) -> usize {
+        self.next_char_with_log_attr(
+            i,
+            forward,
+            flags![LogAttrFlags::{MANDATORY_BREAK | CURSOR_POSITION | WORD_START | WORD_END}],
+        )
+    }
+
+    fn next_word(&self, i: usize, forward: bool) -> usize {
+        self.next_char_with_log_attr(
+            i,
+            forward,
+            if forward {
+                flags![LogAttrFlags::{MANDATORY_BREAK | WORD_END}]
+            } else {
+                flags![LogAttrFlags::{MANDATORY_BREAK | WORD_START}]
+            },
+        )
+    }
+}
+
+impl TextLayout {
+    /// Find the first character after or before the given UTF-8 offset having
+    /// `LogAttrFlags` intersecting with `flag`.
+    fn next_char_with_log_attr(&self, mut i: usize, forward: bool, flag: LogAttrFlags) -> usize {
+        let layout = self.lock_layout();
+
+        // Get the analysis data. The last element corresponds to the
+        // one-past-end position and is not needed here.
+        let log_attrs = layout.get_log_attrs_readonly().split_last().unwrap().1;
+
+        // First, we get the source string. These methods are actually supposed
+        // to be `unsafe` (see the discussion in `run_metrics_of_range`).
+        let text = layout.get_text().unwrap();
+        let text = text.as_str();
+
+        if forward {
+            if i >= text.len() {
+                return i;
+            }
+        } else {
+            if i == 0 {
+                return i;
+            }
+        }
+
+        // Each element in `log_attrs` corresponds to a Unicode scalar.
+        // So, we need to convert `i` to a number of Unicode scalars.
+        let mut i_chars = num_scalars_in_utf8_str(&text.as_bytes()[0..i]);
+
+        if forward {
+            while {
+                i = utf8_next(text.as_bytes(), i);
+                i_chars += 1;
+
+                i_chars < log_attrs.len() && !log_attrs[i_chars].intersects(flag)
+            } {}
+        } else {
+            while {
+                i = utf8_prev(text.as_bytes(), i);
+                i_chars = i_chars.wrapping_sub(1);
+
+                i_chars < log_attrs.len() && !log_attrs[i_chars].intersects(flag)
+            } {}
+        }
+
+        i
+    }
+}
+
+fn is_utf8_continuation(x: u8) -> bool {
+    (x as i8) < -0x40
+}
+
+fn utf8_next(s: &[u8], mut i: usize) -> usize {
+    if i < s.len() {
+        while {
+            i += 1;
+            i < s.len() && is_utf8_continuation(s[i])
+        } {}
+    }
+    i
+}
+
+fn utf8_prev(s: &[u8], mut i: usize) -> usize {
+    if i > 0 {
+        while {
+            i -= 1;
+            i > 0 && is_utf8_continuation(s[i])
+        } {}
+    }
+    i
+}
+
+fn num_scalars_in_utf8_str(s: &[u8]) -> usize {
+    // Count the non-continuation bytes
+    s.iter().filter(|&&i| !is_utf8_continuation(i)).count()
 }
 
 fn pango_for_each_run_in_line(iter: &mut pango::LayoutIter, mut f: impl FnMut(pango::LayoutRun)) {
@@ -450,6 +550,28 @@ fn pango_rect_to_box2_f32(x: pango::Rectangle) -> Box2<f32> {
 fn point_to_pango_xy(x: Point2<f32>) -> [i32; 2] {
     let scale = pango::SCALE as f32;
     [(x.x * scale) as i32, (x.y * scale) as i32]
+}
+
+trait LayoutExt {
+    fn get_log_attrs_readonly(&self) -> &[PangoLogAttr];
+}
+
+impl LayoutExt for Layout {
+    fn get_log_attrs_readonly(&self) -> &[PangoLogAttr] {
+        use glib::translate::ToGlibPtr;
+        unsafe {
+            let mut count = MaybeUninit::uninit();
+            let attrs = pango_sys::pango_layout_get_log_attrs_readonly(
+                self.to_glib_full(),
+                count.as_mut_ptr(),
+            );
+
+            let count = count.assume_init().try_into().expect("integer overflow");
+            debug_assert_ne!(count, 0);
+
+            std::slice::from_raw_parts(attrs, count)
+        }
+    }
 }
 
 trait LayoutLineExt {
@@ -505,5 +627,48 @@ impl GlyphStringExt for pango::GlyphString {
             );
             x_pos.assume_init()
         }
+    }
+}
+
+trait PangoLogAttrExt {
+    fn intersects(&self, flags: LogAttrFlags) -> bool;
+}
+
+impl PangoLogAttrExt for pango_sys::PangoLogAttr {
+    fn intersects(&self, flags: LogAttrFlags) -> bool {
+        (self.is_line_break & flags.bits() as c_uint) != 0
+    }
+}
+
+// <https://developer.gnome.org/pango/stable/pango-Text-Processing.html#PangoLogAttr>
+bitflags::bitflags! {
+    struct LogAttrFlags: u32 {
+        const MANDATORY_BREAK = 1 << 1;
+        const CURSOR_POSITION = 1 << 4;
+        const WORD_START = 1 << 5;
+        const WORD_END = 1 << 6;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck_macros::quickcheck;
+    use std::convert::TryFrom;
+
+    fn mk_random_str(v: &[u8]) -> String {
+        v.chunks_exact(4)
+            .map(|c| (u32::from_le_bytes([c[0], c[1], c[2], c[3]]) % 0x20000) >> (c[3] % 16))
+            .filter_map(|c| char::try_from(c).ok())
+            .collect()
+    }
+
+    #[quickcheck]
+    fn test_num_scalars_in_utf8_str(encoded: Vec<u8>) -> bool {
+        let st = mk_random_str(&encoded);
+        log::debug!("st = {:?}", st);
+
+        assert_eq!(num_scalars_in_utf8_str(&st.as_bytes()), st.chars().count());
+        true
     }
 }

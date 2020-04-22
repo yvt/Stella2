@@ -16,6 +16,7 @@ fn test_text_layout_invariants() {
         "\r",
         "\r\r",
         "книга",
+        "good apple cider",
         "✨🦄✨",
         "🇳🇮",
         // TODO: "🇳🇮\r",
@@ -253,6 +254,88 @@ fn test_text_layout_invariants() {
                 i = i_end;
             }
         } // line_ranges.iter().enumerate()
+
+        // The set of boundaries defined by `next_char` must be consistent for
+        // all invocations to `next_char` with the same input string
+        let mut is_char_boundary: Vec<bool> = (0..=text.len()).map(|_| false).collect();
+        {
+            let mut i = 0;
+            while i < text.len() {
+                is_char_boundary[i] = true;
+                let next_i = text_layout.next_char(i, true);
+                assert!(next_i > i);
+                i = next_i;
+            }
+            is_char_boundary[i] = true;
+        }
+        log::debug!("  is_char_boundary = {:?}", is_char_boundary);
+
+        for (i, _) in text.char_indices() {
+            let next_i = text_layout.next_char(i, true); // forward
+            log::trace!("    next_char{:?} = {:?}", (i, true), next_i);
+            assert!(next_i > i);
+
+            // `next_i` must be the next boundary
+            assert!(is_char_boundary[next_i]);
+            assert!(is_char_boundary[i + 1..next_i].iter().all(|b| !b));
+        }
+
+        for (i, s) in text.char_indices() {
+            let i = i + s.len_utf8();
+            let next_i = text_layout.next_char(i, false); // backward
+            log::trace!("    next_char{:?} = {:?}", (i, false), next_i);
+            assert!(next_i < i);
+
+            // `next_i` must be the previous boundary
+            assert!(is_char_boundary[next_i]);
+            assert!(is_char_boundary[next_i + 1..i].iter().all(|b| !b));
+        }
+
+        // `next_char` stops at the endpoints
+        assert_eq!(text_layout.next_char(0, false), 0);
+        assert_eq!(text_layout.next_char(text.len(), true), text.len());
+
+        let char_boundaries: Vec<usize> = is_char_boundary
+            .iter()
+            .enumerate()
+            .filter(|x| *x.1)
+            .map(|x| x.0)
+            .collect();
+
+        // The set of boundaries defined by `next_word` must be consistent for
+        // all invocations to `next_word` with the same input string and the
+        // same value of `forward`
+        let mut next_boundary = 0;
+        for &i in char_boundaries[..char_boundaries.len() - 1].iter() {
+            let next_i = text_layout.next_word(i, true); // forward
+            log::trace!("    next_word{:?} = {:?}", (i, true), next_i);
+            assert!(next_i > i);
+
+            if i == next_boundary {
+                next_boundary = next_i;
+            } else {
+                assert_eq!(next_boundary, next_i);
+            }
+        }
+        assert_eq!(next_boundary, text.len());
+
+        next_boundary = text.len();
+        for &i in char_boundaries[1..].iter().rev() {
+            let next_i = text_layout.next_word(i, false); // backward
+            log::trace!("    next_word{:?} = {:?}", (i, false), next_i);
+            assert!(next_i < i);
+
+            if i == next_boundary {
+                next_boundary = next_i;
+            } else {
+                assert_eq!(next_boundary, next_i);
+            }
+        }
+        assert_eq!(next_boundary, 0);
+
+        // `next_word` stops at the endpoints
+        assert_eq!(text_layout.next_word(0, false), 0);
+        assert_eq!(text_layout.next_word(text.len(), true), text.len());
     }
 }
 
