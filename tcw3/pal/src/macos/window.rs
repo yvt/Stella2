@@ -1144,8 +1144,13 @@ unsafe extern "C" fn tcw_wnd_set_marked_text(
         // Update the composition range
         let new_marked_range =
             old_marked_range.start..old_marked_range.end - replace_range.len() + st.len();
-        edit.set_composition_range(Some(new_marked_range.clone()));
-        state.marked_range.set(Some(new_marked_range));
+        let new_marked_range = if new_marked_range.len() == 0 {
+            None
+        } else {
+            Some(new_marked_range)
+        };
+        edit.set_composition_range(new_marked_range.clone());
+        state.marked_range.set(new_marked_range);
 
         // Update the selection
         let sel_range = {
