@@ -4,6 +4,31 @@
 
 ## Architectural Overview
 
+```text
+             ┌────────────────────────┐┌──────────────────────────┐
+           ┌─┤       Unit Tests       ││        Application       │
+           │ └────────────────────────┘└───────────────────┬───┬──┘
+  Simulate │ ╔═══════════════════╗ ┌────────────────────┐  │   │
+    Events │ ║ tcw3::ui::views   ║ │   Custom Widgets   │  │   │
+           │ ║      ╔════════════╝ └────────────┐       │  │ Initialization
+         ┌─│─╢      ║ ╔═══════════════════════╗ │       │  │   │
+Drawing, │ │ ║      ║ ║   tcw3::ui::theming   ║ │       │  │   │ Platform-
+ layers, │ │ ╚══════╝ ╚═══════════════════════╝ └───────┘  │   │ specific
+    etc. │ │ ╔═══════════════════════╗ ╔════════════════╗  │   │ operations
+         │ │ ║     tcw3::uicore      ║ ║  tcw3::images  ║  │   │ (e.g., creating
+         │ │ ╚═══════════════════════╝ ╚════════════════╝  ↓   │ a main menu on
+         │ │ ╔═══════════════════════════════════════════════╗ │ Cocoa)
+         └─│→║                  tcw3::pal                    ║ │
+           │ ╟───────────────────────────────────────────────╢ │
+           └→║             testing (optional)                ║ │
+             ╟───────────────┬───────────────┬───────────┐   ║ │
+   Backends: ║    windows    │     macos     │    gtk    │   ║ │
+             ╚═══════════════╧═══════════════╧═══════════╧═══╝ ↓
+             ┌────────────────────────────────────────────────────┐
+             │     Win32, WinRT, Cocoa, GTK, GLib, Pango, ...     │
+             └────────────────────────────────────────────────────┘
+```
+
 **[`tcw3::pal`]** abstracts the underlying window system and
 graphics libraries. It defines the concept of main thread and a trait
 [`Wm`] for compile-time thread checking. `Wm` also provides several entry
@@ -63,7 +88,7 @@ windows to appropriate views.
 
 `uicore` is by no means meant to be a complete widget toolkit by itself. The
 appearance of views is not defined at all by `uicore`. Also, `uicore`
-doesn't completely abstract `pal`, so widgets and applications occasionally
+doesn't completely hide `pal`, so TCW3 widgets and applications occasionally
 have to use `pal` directly.
 
 **[`tcw3::ui`]** is an assortment of libraries built on top of `uicore`.
@@ -94,17 +119,90 @@ meta crate is [`tcw3_meta`].
 
 ### Main Thread
 
+TCW3 relies on the concept of main thread. A main thread is defined by the
+possession of an instance of a non-`Send`-able marker type [`tcw3::pal::Wm`].
+
+[`tcw3::pal::Wm`]: tcw3_pal::Wm
+
 ### Event Loop
+
+A TCW3 application enters a main event loop by calling [`Wm::enter_main_loop`].
+The event loop monitors for events sent by the target window system, processes
+them, and calls application-provided event listeners (such as those in
+[`tcw3::pal::iface::WndListener`]) as needed.
+
+[`Wm::enter_main_loop`]: tcw3_pal::iface::Wm::enter_main_loop
+[`tcw3::pal::iface::WndListener`]: tcw3_pal::iface::WndListener
+
+You can use [`Wm::invoke`] and similar methods to have a custom closure called
+inside the main event loop. The following list summarizes the methods in this
+category:
+
+ - `Wm::invoke` enqueues a closure to the event queue. This is a low-level
+   method that `uicore` relies on, and application developers should prefer
+   `uicore::WmExt::invoke_on_update` over this.
+
+ - [`Wm::invoke_on_main_thread`] is similar to above, but can be called by any
+   thread.
+
+ - [`Wm::invoke_after`] enqueues a closure to be called after a given delay.
+
+ - [`uicore::WmExt::invoke_on_update`] is similar to `Wm::invoke`, but ensures
+   the closure is called before `uicore` updates window contents.
+
+ - [`uicore::HWnd::invoke_on_next_frame`] is similar to `Wm::invoke`, but calls
+   are synchronized to the refresh rate of the display where the given `HWnd`
+   is currently located. You should use this method to schedule screen updates
+   for animation.
+
+[`Wm::invoke`]: tcw3_pal::iface::Wm::invoke
+[`Wm::invoke_on_main_thread`]: tcw3_pal::iface::Wm::invoke_on_main_thread
+[`Wm::invoke_after`]: tcw3_pal::iface::Wm::invoke_after
+[`uicore::WmExt::invoke_on_update`]: crate::uicore::WmExt::invoke_on_update
+[`uicore::HWnd::invoke_on_next_frame`]: crate::uicore::HWnd::invoke_on_next_frame
+
+[`Wm::terminate`] instructs the system to stop the main event loop, process all
+remaining events, and exit the application.
+
+[`Wm::terminate`]: tcw3_pal::iface::Wm::terminate
 
 ### 2D Graphics
 
+Follow these steps to create a bitmap:
+
+ 1. Use [`tcw3::pal::BitmapBuilder`]​[`::new`] to start constructing a bitmap.
+
+ 2. `BitmapBuilder` implements the trait [`tcw3::pal::iface::Canvas`]. Use the
+    methods from this trait to issue 2D drawing commands.
+
+ 3. Finally, call [`tcw3::pal::BitmapBuilder::into_bitmap`] to convert the
+    `BitmapBuilder` into an immutable [`tcw3::pal::Bitmap`].
+
+[`tcw3::pal::BitmapBuilder`]: tcw3_pal::BitmapBuilder
+[`::new`]: tcw3_pal::iface::BitmapBuilderNew::new
+[`tcw3::pal::iface::Canvas`]: tcw3_pal::iface::Canvas
+[`tcw3::pal::BitmapBuilder::into_bitmap`]: tcw3_pal::iface::BitmapBuilder::into_bitmap
+[`tcw3::pal::Bitmap`]: tcw3_pal::Bitmap
+
+### Text layout/rendering
+
+*To be filled*
+
 ### Windows
+
+*To be filled*
 
 ### Per-Monitor DPI
 
+*To be filled*
+
 ### Composition Layers
 
+*To be filled*
+
 ### Views
+
+*To be filled*
 
 ### Layouting Algorithm
 
@@ -123,9 +221,11 @@ the following steps:
 
 ### Mouse
 
+*To be filled*
+
 ### Keyboard
 
-There are multiple ways for the application to handle keyboard events, each
+There are multiple ways for a TCW3 application to handle keyboard events, each
 having different goals and purposes:
 
 1. Define one or more *accelerator tables* (precompiled mapping from key
@@ -264,6 +364,8 @@ returns `ActionStatus::VALID` for the view or window.
 [`ViewListener`]: crate::uicore::ViewListener::validate_action
 
 ### Text Input
+
+*To be filled*
 
 ### Tab Order
 
