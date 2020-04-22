@@ -454,7 +454,7 @@ impl ViewListener for EntryCoreListener {
         match action {
             actions::SELECT_ALL | actions::SELECT_LINE | actions::SELECT_PARAGRAPH => {
                 log::trace!("Handling a 'select all' command (SELECT_ALL, etc.)");
-                update_sel_range(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+                update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
                     log::trace!("... original sel_range = {:?}", state.sel_range);
                     state.sel_range = [0, state.text.len()];
                     log::trace!("... new sel_range = {:?}", state.sel_range);
@@ -462,7 +462,7 @@ impl ViewListener for EntryCoreListener {
             }
             actions::SELECT_WORD => {
                 log::trace!("Handling SELECT_WORD");
-                update_sel_range(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+                update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
                     state.ensure_text_layout(&self.inner.style_elem);
                     let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
                     let [mut start, mut end] = state.sel_range;
@@ -879,6 +879,14 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 }
 
+bitflags::bitflags! {
+    struct UpdateStateFlags: u8 {
+        /// The selection might have changed.
+        const SEL = 1;
+        const ANY = 1 << 1;
+    }
+}
+
 /// Update the selection using a given closure. This method mustn't be used
 /// in an implementation of `TextInputCtxEdit` because it calls
 /// `text_input_ctx_on_selection_change`.
@@ -886,22 +894,45 @@ fn update_sel_range(
     wm: pal::Wm,
     hview: HViewRef<'_>,
     inner: RcBorrow<'_, Inner>,
-    f: &mut dyn FnMut(&mut State),
+    mut f: impl FnMut(&mut State),
+) {
+    update_state(wm, hview, inner, &mut move |state| {
+        f(state);
+        UpdateStateFlags::SEL
+    });
+}
+
+/// Update the text and/or selection using a given closure. This method mustn't
+/// be used in an implementation of `TextInputCtxEdit` because it calls
+/// `text_input_ctx_on_selection_change` and/or `text_input_ctx_reset`.
+fn update_state(
+    wm: pal::Wm,
+    hview: HViewRef<'_>,
+    inner: RcBorrow<'_, Inner>,
+    f: &mut dyn FnMut(&mut State) -> UpdateStateFlags,
 ) {
     let mut state = inner.state.borrow_mut();
     let old_sel_range = state.sel_range;
 
     // Call the given function
-    f(&mut *state);
+    let mut flags = f(&mut *state);
 
-    // Return early if the selection did not change
+    // Clear `UpdateStateFlags::SEL` if the selection did not change.
     if old_sel_range == state.sel_range {
+        flags.set(UpdateStateFlags::SEL, false);
+    }
+
+    // Return early if nothing has changed
+    if flags.is_empty() {
         return;
     }
 
     let tictx = state.tictx.clone();
 
-    if (old_sel_range[0] != old_sel_range[1]) || (state.sel_range[0] != state.sel_range[1]) {
+    if flags.contains(UpdateStateFlags::ANY)
+        || (old_sel_range[0] != old_sel_range[1])
+        || (state.sel_range[0] != state.sel_range[1])
+    {
         // A ranged selection is rendered using the `CanvasMixin`, so we
         // have to set the redraw flag of `CanvasMixin` in addition to just
         // calling `pend_update` (which is implicitly called by `pend_draw`)
@@ -921,7 +952,11 @@ fn update_sel_range(
     // which might request a document lock
     drop(state);
     if let Some(tictx) = tictx {
-        wm.text_input_ctx_on_selection_change(&tictx);
+        if flags.contains(UpdateStateFlags::ANY) {
+            wm.text_input_ctx_reset(&tictx);
+        } else {
+            wm.text_input_ctx_on_selection_change(&tictx);
+        }
     }
 }
 
@@ -941,14 +976,14 @@ impl EntryCoreDragListener {
         }
     }
 
-    fn update_selection(&self, wm: pal::Wm, f: &mut dyn FnMut(&mut State)) {
+    fn update_selection(&self, wm: pal::Wm, f: impl FnMut(&mut State)) {
         update_sel_range(wm, self.view.as_ref(), RcBorrow::from(&self.inner), f);
     }
 }
 
 impl MouseDragListener for EntryCoreDragListener {
     fn mouse_down(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
-        self.update_selection(wm, &mut |state| {
+        self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
                 let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
                 state.sel_range = [i, i];
@@ -957,7 +992,7 @@ impl MouseDragListener for EntryCoreDragListener {
     }
 
     fn mouse_motion(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
-        self.update_selection(wm, &mut |state| {
+        self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
                 let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
                 state.sel_range[1] = i;
@@ -967,7 +1002,7 @@ impl MouseDragListener for EntryCoreDragListener {
 
     fn cancel(&self, wm: pal::Wm, _: HViewRef<'_>) {
         let orig_sel_range = &self.orig_sel_range;
-        self.update_selection(wm, &mut |state| {
+        self.update_selection(wm, |state| {
             // Before resetting the selection, make sure `orig_sel_range` is
             // still a valid selection range
             let start = orig_sel_range[0].min(orig_sel_range[0]);
