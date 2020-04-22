@@ -50,6 +50,14 @@ impl WndListener for MyWndListener {
                 macos("Super+V")
             ),
             (1, windows("Ctrl+Q"), gtk("Ctrl+Q"), macos("Super+Q")),
+            (
+                // `SELECT_WORD` is not in the default key bindings of any
+                // target platforms
+                pal::actions::SELECT_WORD,
+                windows("Ctrl+W"),
+                gtk("Ctrl+W"),
+                macos("Super+W")
+            ),
         ]);
     }
 

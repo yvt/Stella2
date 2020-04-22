@@ -428,7 +428,10 @@ impl ViewListener for EntryCoreListener {
     fn validate_action(&self, _: pal::Wm, _: HViewRef<'_>, action: ActionId) -> ActionStatus {
         let mut status = ActionStatus::empty();
         match action {
-            actions::SELECT_ALL => {
+            actions::SELECT_ALL
+            | actions::SELECT_LINE
+            | actions::SELECT_PARAGRAPH
+            | actions::SELECT_WORD => {
                 status |= ActionStatus::VALID | ActionStatus::ENABLED;
             }
             actions::COPY | actions::CUT => {
@@ -449,9 +452,31 @@ impl ViewListener for EntryCoreListener {
 
     fn perform_action(&self, wm: pal::Wm, view: HViewRef<'_>, action: ActionId) {
         match action {
-            actions::SELECT_ALL => {
+            actions::SELECT_ALL | actions::SELECT_LINE | actions::SELECT_PARAGRAPH => {
+                log::trace!("Handling a 'select all' command (SELECT_ALL, etc.)");
                 update_sel_range(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+                    log::trace!("... original sel_range = {:?}", state.sel_range);
                     state.sel_range = [0, state.text.len()];
+                    log::trace!("... new sel_range = {:?}", state.sel_range);
+                });
+            }
+            actions::SELECT_WORD => {
+                log::trace!("Handling SELECT_WORD");
+                update_sel_range(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+                    state.ensure_text_layout(&self.inner.style_elem);
+                    let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
+                    let [mut start, mut end] = state.sel_range;
+                    log::trace!("... original sel_range = {:?}", state.sel_range);
+                    if start > end {
+                        std::mem::swap(&mut start, &mut end);
+                    }
+
+                    // Expand the selection to a word
+                    let start = layout.next_word(layout.next_char(start, true), false);
+                    let end = layout.next_word(layout.next_char(end, false), true);
+
+                    state.sel_range = [start, end];
+                    log::trace!("... new sel_range = {:?}", state.sel_range);
                 });
             }
             actions::COPY => {
