@@ -440,10 +440,11 @@ impl ViewListener for EntryCoreListener {
         let mut state = self.inner.state.borrow_mut();
         state.canvas.mount(wm, view, wnd);
         state.caret_layers = Some(Array::from_fn(|_| wm.new_layer(Default::default())));
+
+        // `new_text_input_ctx` may get a document lock, so
+        // unborrow `state` first
         drop(state);
 
-        // TODO: Does `new_text_input_ctx` get a document lock? This should be
-        //       documented
         let tictx = wm.new_text_input_ctx(&wnd.pal_hwnd().unwrap(), Box::new(self.clone()));
 
         self.inner.state.borrow_mut().tictx = Some(tictx);

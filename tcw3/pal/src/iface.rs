@@ -183,6 +183,8 @@ pub trait Wm: Clone + Copy + Sized + Debug + 'static {
     fn remove_layer(self, layer: &Self::HLayer);
 
     /// Create a text input context.
+    ///
+    /// This method may call [`TextInputCtxListener::edit`].
     fn new_text_input_ctx(
         self,
         hwnd: &Self::HWnd,
