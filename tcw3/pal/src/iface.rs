@@ -14,10 +14,6 @@ use std::{borrow::Cow, fmt, fmt::Debug, hash::Hash, ops::Range, time::Duration};
 
 pub type RGBAF32 = RGBA<f32>;
 
-// FIXME: Our API might not be a perfect fit for some platforms. This is because
-//        the API was originally built around Cocoa (macOS's system API). It's
-//        perfectly okay to modify it.
-
 /// A trait for window managers.
 ///
 /// All methods are reentrant with some exceptions.
