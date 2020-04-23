@@ -1,7 +1,9 @@
+use alt_fp::FloatOrd;
 use array::{Array, Array2};
 use arrayvec::ArrayVec;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Vector2};
+use flags_macro::flags;
 use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell, RefMut},
@@ -109,6 +111,7 @@ struct Inner {
 struct State {
     text: String,
     text_layout_info: Option<TextLayoutInfo>,
+    scroll: f32,
     canvas: CanvasMixin,
     tictx: Option<pal::HTextInputCtx>,
     sel_range: [usize; 2],
@@ -155,6 +158,7 @@ impl EntryCore {
                 state: RefCell::new(State {
                     text: String::new(),
                     text_layout_info: None,
+                    scroll: 0.0,
                     canvas: CanvasMixin::new(),
                     tictx: None,
                     sel_range: [0; 2],
@@ -302,24 +306,51 @@ impl State {
             },
         )
     }
+
+    fn scroll_cursor_into_view(&mut self, hview: HViewRef<'_>, elem: &theming::Elem) -> bool {
+        let cursor_i = self.sel_range[1];
+        let layout_info = self.ensure_text_layout(elem);
+        let cursor_x = layout_info.text_layout.cursor_pos(cursor_i)[0].x;
+        let text_width = layout_info.layout_bounds.max.x;
+        let viewport_width = hview.frame().size().x - HORZ_MARGIN * 2.0;
+
+        let new_scroll = self
+            .scroll
+            .fmax(cursor_x - viewport_width)
+            .fmin(cursor_x)
+            .fmin((text_width - viewport_width).fmax(0.0));
+
+        if new_scroll != self.scroll {
+            self.scroll = new_scroll;
+            true
+        } else {
+            false
+        }
+    }
 }
 
+// TODO: Stop hard-coding the margin
+const HORZ_MARGIN: f32 = 3.0;
+
 impl TextLayoutInfo {
-    fn text_origin(&self, view: HViewRef<'_>) -> Vector2<f32> {
+    fn text_origin(&self, view: HViewRef<'_>, scroll: f32) -> Vector2<f32> {
         let baseline = self.text_layout.line_baseline(0);
         let height = view.frame().size().y;
-        // TODO: Stop hard-coding the margin
-        [3.0, (height + self.line_height) * 0.5 - baseline].into()
+        [
+            HORZ_MARGIN - scroll,
+            (height + self.line_height) * 0.5 - baseline,
+        ]
+        .into()
     }
 
-    fn text_origin_global(&self, view: HViewRef<'_>) -> Vector2<f32> {
+    fn text_origin_global(&self, view: HViewRef<'_>, scroll: f32) -> Vector2<f32> {
         let global_loc: [f32; 2] = view.global_frame().min.into();
-        self.text_origin(view) + Vector2::from(global_loc)
+        self.text_origin(view, scroll) + Vector2::from(global_loc)
     }
 
-    fn cursor_index_from_global_point(&self, x: f32, view: HViewRef<'_>) -> usize {
+    fn cursor_index_from_global_point(&self, view: HViewRef<'_>, scroll: f32, x: f32) -> usize {
         self.text_layout
-            .cursor_index_from_point([x - self.text_origin_global(view).x, 0.0].into())
+            .cursor_index_from_point([x - self.text_origin_global(view, scroll).x, 0.0].into())
     }
 }
 
@@ -814,7 +845,15 @@ impl ViewListener for EntryCoreListener {
     }
 
     fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
-        self.inner.state.borrow_mut().canvas.position(wm, view);
+        let mut state = self.inner.state.borrow_mut();
+        state.canvas.position(wm, view);
+
+        if state.scroll_cursor_into_view(view, &self.inner.style_elem) {
+            state.canvas.pend_draw(view);
+        }
+
+        // Unborrow `state` before calling `text_input_ctx_on_layout_change`
+        drop(state);
 
         if (self.inner.tictx_event_mask.get()).contains(pal::TextInputCtxEventFlags::LAYOUT_CHANGE)
         {
@@ -839,7 +878,8 @@ impl ViewListener for EntryCoreListener {
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
         let sel_range = &state.sel_range;
         let comp_range = &state.comp_range;
-        let text_origin = text_layout_info.text_origin(view);
+        let scroll = state.scroll;
+        let text_origin = text_layout_info.text_origin(view, scroll);
         let is_focused = view.improper_subview_is_focused();
 
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
@@ -943,7 +983,9 @@ impl ViewListener for EntryCoreListener {
 
             // Hide the caret if it's out of view or `caret_blink == false`
             for i in 0..2 {
-                if !state.caret_blink || !(0.0..global_frame.size().x).contains(&pos[i].x) {
+                if !state.caret_blink
+                    || !(0.0..global_frame.size().x).contains(&(pos[i].x + text_origin.x))
+                {
                     layer_attrs[i].opacity = Some(0.0);
                 }
             }
@@ -1033,6 +1075,17 @@ impl Edit<'_> {
             range,
             len
         );
+    }
+}
+
+impl Drop for Edit<'_> {
+    fn drop(&mut self) {
+        if self
+            .state
+            .scroll_cursor_into_view(self.view.as_ref(), &self.inner.style_elem)
+        {
+            self.state.canvas.pend_draw(self.view.as_ref());
+        }
     }
 }
 
@@ -1134,9 +1187,10 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     fn slice_bounds(&mut self, range: Range<usize>) -> (Box2<f32>, usize) {
         self.check_range(&range);
 
+        let scroll = self.state.scroll;
         let text_layout_info = self.state.ensure_text_layout(&self.inner.style_elem);
         let text_layout = &text_layout_info.text_layout;
-        let text_origin = text_layout_info.text_origin(self.view.as_ref());
+        let text_origin = text_layout_info.text_origin(self.view.as_ref(), scroll);
 
         let offset: [f32; 2] = self.view.global_frame().min.into();
         let mut offset: cgmath::Vector2<f32> = offset.into();
@@ -1199,7 +1253,8 @@ bitflags::bitflags! {
     struct UpdateStateFlags: u8 {
         /// The selection might have changed.
         const SEL = 1;
-        const ANY = 1 << 1;
+        const LAYOUT = 1 << 1;
+        const ANY = 1 << 2;
     }
 }
 
@@ -1249,7 +1304,14 @@ fn update_state(
         state.invalidate_text_layout();
     }
 
-    if flags.contains(UpdateStateFlags::ANY)
+    if flags.intersects(flags![UpdateStateFlags::{ANY | SEL}]) {
+        let scroll_changed = state.scroll_cursor_into_view(hview, &inner.style_elem);
+        if scroll_changed {
+            flags |= UpdateStateFlags::LAYOUT;
+        }
+    }
+
+    if flags.intersects(flags![UpdateStateFlags::{ANY | LAYOUT}])
         || (old_sel_range[0] != old_sel_range[1])
         || (state.sel_range[0] != state.sel_range[1])
     {
@@ -1275,7 +1337,12 @@ fn update_state(
         if flags.contains(UpdateStateFlags::ANY) {
             wm.text_input_ctx_reset(&tictx);
         } else {
-            wm.text_input_ctx_on_selection_change(&tictx);
+            if flags.contains(UpdateStateFlags::LAYOUT) {
+                wm.text_input_ctx_on_layout_change(&tictx);
+            }
+            if flags.contains(UpdateStateFlags::SEL) {
+                wm.text_input_ctx_on_selection_change(&tictx);
+            }
         }
     }
 }
@@ -1305,7 +1372,7 @@ impl MouseDragListener for EntryCoreDragListener {
     fn mouse_down(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
         self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
-                let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
+                let i = text_layout_info.cursor_index_from_global_point(hview, state.scroll, loc.x);
                 state.sel_range = [i, i];
             }
         });
@@ -1314,7 +1381,7 @@ impl MouseDragListener for EntryCoreDragListener {
     fn mouse_motion(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
         self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
-                let i = text_layout_info.cursor_index_from_global_point(loc.x, hview);
+                let i = text_layout_info.cursor_index_from_global_point(hview, state.scroll, loc.x);
                 state.sel_range[1] = i;
             }
         });
