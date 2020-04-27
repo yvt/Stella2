@@ -107,13 +107,14 @@ pub struct CoalescingState<Text> {
 /// Represents a transaction in [`CoalescingState`].
 ///
 /// Use [`CoalescingState::start_transaction`] to start a transaction.
-pub struct CoalescingStateTx<'a, Text> {
-    state: &'a mut CoalescingState<Text>,
-
+pub struct CoalescingStateTx<Text> {
     composition_active: bool,
 
     /// `true` if a new `Edit` has been created for this transaction.
     has_edit: bool,
+
+    /// In case I change my mind...
+    _phantom: std::marker::PhantomData<Text>,
 }
 
 /// Callback methods for [the history coalescing algorithm], through which it
@@ -192,18 +193,21 @@ impl<Text: TextTrait> CoalescingState<Text> {
     }
 
     /// Start a transaction.
-    pub fn start_transaction(&mut self) -> CoalescingStateTx<'_, Text> {
+    pub fn start_transaction(&mut self) -> CoalescingStateTx<Text> {
         CoalescingStateTx {
             composition_active: self.composition_active,
             has_edit: self.has_edit,
-            state: self,
+            _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<Text: TextTrait> CoalescingStateTx<'_, Text> {
+impl<Text: TextTrait> CoalescingStateTx<Text> {
     /// End the current transaction.
-    pub fn finish(mut self, mut cb: impl CoalescingCb<Text>) {
+    ///
+    /// `state` must be the `CoalescingState` from which this transaction was
+    /// started.
+    pub fn finish(self, state: &mut CoalescingState<Text>, mut cb: impl CoalescingCb<Text>) {
         if self.has_edit && !self.composition_active {
             let edit = (|| {
                 // We'll try to merge the latest `Edit` to the second last one.
@@ -211,7 +215,7 @@ impl<Text: TextTrait> CoalescingStateTx<'_, Text> {
                 // `push_edit`, so the following `unwrap` must succeed
                 let edit = cb.pop_edit().unwrap();
 
-                if self.state.num_coalescable_edits == 0 {
+                if state.num_coalescable_edits == 0 {
                     // There is no `Edit` to merge into
                     return Some(edit);
                 }
@@ -294,14 +298,13 @@ impl<Text: TextTrait> CoalescingStateTx<'_, Text> {
             // If the edit couldn't be merged, put it back to the history.
             if let Some(edit) = edit {
                 cb.push_edit(edit);
-                self.state.num_coalescable_edits =
-                    self.state.num_coalescable_edits.saturating_add(1);
+                state.num_coalescable_edits = state.num_coalescable_edits.saturating_add(1);
             }
         }
 
         // Remember the latest composition state
-        self.state.composition_active = self.composition_active;
-        self.state.has_edit = self.composition_active && self.has_edit;
+        state.composition_active = self.composition_active;
+        state.has_edit = self.composition_active && self.has_edit;
     }
 
     /// Specifies whether there is an ongoing composition session or not.
@@ -524,14 +527,14 @@ mod tests {
                 match next_cmd() {
                     Some(Cmd::Reset) => {
                         log::debug!("  reset");
-                        tx.finish(mk_cb!());
+                        tx.finish(&mut state, mk_cb!());
                         state.reset();
                         composition_active = false;
                         break 'transaction_loop;
                     }
                     Some(Cmd::BreakTransaction) => {
                         log::debug!("  break transition");
-                        tx.finish(mk_cb!());
+                        tx.finish(&mut state, mk_cb!());
                         break 'transaction_loop;
                     }
                     Some(Cmd::ToggleComposition) => {
@@ -570,7 +573,7 @@ mod tests {
                     }
                     None => {
                         log::debug!("  end of command stream");
-                        tx.finish(mk_cb!());
+                        tx.finish(&mut state, mk_cb!());
                         break 'outer;
                     }
                 }
@@ -720,7 +723,7 @@ mod tests {
                 let mut tx = state.start_transaction();
                 match cmd {
                     Cmd::Reset => {
-                        tx.finish(mk_cb!());
+                        tx.finish(&mut state, mk_cb!());
                         state.reset();
                         continue;
                     }
@@ -732,7 +735,7 @@ mod tests {
                         text.replace_range(range.clone(), new_text);
                     }
                 }
-                tx.finish(mk_cb!());
+                tx.finish(&mut state, mk_cb!());
             }
 
             // Replay `history` and verify that it's identical to `expected_history`
