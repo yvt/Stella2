@@ -49,6 +49,18 @@ impl WndListener for MyWndListener {
                 gtk("Ctrl+V"),
                 macos("Super+V")
             ),
+            (
+                pal::actions::UNDO,
+                windows("Ctrl+Z"),
+                gtk("Ctrl+Z"),
+                macos("Super+Z")
+            ),
+            (
+                pal::actions::REDO,
+                windows("Ctrl+Y"),
+                gtk("Ctrl+Shift+Z"),
+                macos("Super+Y")
+            ),
             (1, windows("Ctrl+Q"), gtk("Ctrl+Q"), macos("Super+Q")),
             (
                 // `SELECT_WORD` is not in the default key bindings of any
