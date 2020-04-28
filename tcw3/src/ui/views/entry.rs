@@ -25,6 +25,7 @@ use crate::{
     },
 };
 
+mod history;
 #[cfg(test)]
 mod tests;
 
@@ -122,6 +123,7 @@ struct State {
     caret_layers: Option<[pal::HLayer; 2]>,
     caret_blink: bool,
     caret_blink_timer: Option<pal::HInvoke>,
+    history: history::History,
 }
 
 #[derive(Debug)]
@@ -167,6 +169,7 @@ impl EntryCore {
                     caret_layers: None,
                     caret_blink: true,
                     caret_blink_timer: None,
+                    history: history::History::new(),
                 }),
                 style_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
@@ -425,6 +428,15 @@ impl EntryCoreListener {
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
+
+            // Record the change to the undo history
+            {
+                let mut tx = state.history.start_transaction();
+                tx.replace_range(&mut state.history, &state.text, start..end, String::new());
+                tx.finish(&mut state.history, &state.text);
+            }
+
+            // Update `text`
             state.text.replace_range(start..end, "");
             state.sel_range = [start, start];
 
@@ -461,7 +473,47 @@ impl EntryCoreListener {
                 state.sel_range = [get_new_pos([start, end], layout, &state.text); 2];
             }
 
+            state.history.mark_logical_op_break();
+
             log::trace!("... new sel_range = {:?}", state.sel_range);
+        });
+    }
+
+    fn handle_undo(&self, wm: pal::Wm, view: HViewRef<'_>) {
+        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+            if let Some(edit) = state.history.undo() {
+                log::debug!("Undoing {:?}", edit);
+
+                // Revert `edit`
+                debug_assert_eq!(state.text[edit.range_new()], edit.new[..]);
+                state.text.replace_range(edit.range_new(), &edit.old);
+
+                let sel_range = edit.range_old();
+                state.sel_range = [sel_range.start, sel_range.end];
+
+                UpdateStateFlags::ANY
+            } else {
+                UpdateStateFlags::empty()
+            }
+        });
+    }
+
+    fn handle_redo(&self, wm: pal::Wm, view: HViewRef<'_>) {
+        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+            if let Some(edit) = state.history.redo() {
+                log::debug!("Redoing {:?}", edit);
+
+                // Re-apply `edit`
+                debug_assert_eq!(state.text[edit.range_old()], edit.old[..]);
+                state.text.replace_range(edit.range_old(), &edit.new);
+
+                let sel_range = edit.range_new();
+                state.sel_range = [sel_range.start, sel_range.end];
+
+                UpdateStateFlags::ANY
+            } else {
+                UpdateStateFlags::empty()
+            }
         });
     }
 }
@@ -516,6 +568,9 @@ impl ViewListener for EntryCoreListener {
         // will think the view is not focused yet. Override this behavior by
         // specifying `override_focus = Some(true)`.
         state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(true));
+
+        // Introduce a breakpoint in history coalescing
+        state.history.mark_logical_op_break();
     }
 
     fn focus_leave(&self, wm: pal::Wm, hview: HViewRef<'_>) {
@@ -597,6 +652,18 @@ impl ViewListener for EntryCoreListener {
             }
             actions::PASTE => {
                 // TODO: Check if the clipboard contains a text
+                status |= ActionStatus::VALID;
+            }
+            actions::UNDO => {
+                if self.inner.state.borrow().history.can_undo() {
+                    status |= ActionStatus::ENABLED;
+                }
+                status |= ActionStatus::VALID;
+            }
+            actions::REDO => {
+                if self.inner.state.borrow().history.can_redo() {
+                    status |= ActionStatus::ENABLED;
+                }
                 status |= ActionStatus::VALID;
             }
             _ => {}
@@ -821,6 +888,15 @@ impl ViewListener for EntryCoreListener {
                 self.handle_move(wm, view, true, move_right_end);
             }
 
+            actions::UNDO => {
+                log::trace!("Handling UNDO");
+                self.handle_undo(wm, view);
+            }
+            actions::REDO => {
+                log::trace!("Handling REDO");
+                self.handle_redo(wm, view);
+            }
+
             unknown_action => {
                 log::warn!("Unknown action: {}", unknown_action);
             }
@@ -1031,6 +1107,7 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
             state: self.inner.state.borrow_mut(),
             view: self.inner.view.upgrade().unwrap(),
             inner: RcBorrow::from(&self.inner),
+            history_tx: None,
         })
     }
 
@@ -1064,6 +1141,7 @@ struct Edit<'a> {
     state: RefMut<'a, State>,
     inner: RcBorrow<'a, Inner>,
     view: HView,
+    history_tx: Option<history::HistoryTx>,
 }
 
 impl Edit<'_> {
@@ -1076,10 +1154,24 @@ impl Edit<'_> {
             len
         );
     }
+
+    /// Start a transaction of updating the undo history if it hasn't started
+    /// yet.
+    fn ensure_history_tx(&mut self) {
+        if self.history_tx.is_none() {
+            self.history_tx = Some(self.state.history.start_transaction());
+        }
+    }
 }
 
 impl Drop for Edit<'_> {
     fn drop(&mut self) {
+        let state = &mut *self.state; // enable split borrow
+
+        if let Some(history_tx) = self.history_tx.take() {
+            history_tx.finish(&mut state.history, &state.text);
+        }
+
         if self
             .state
             .scroll_cursor_into_view(self.view.as_ref(), &self.inner.style_elem)
@@ -1121,12 +1213,31 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         }
         self.state.comp_range = range;
         self.state.canvas.pend_draw(self.view.as_ref());
+
+        self.ensure_history_tx();
+        self.history_tx
+            .as_mut()
+            .unwrap()
+            .set_composition_active(range.is_some());
     }
 
     fn replace(&mut self, range: Range<usize>, text: &str) {
         self.check_range(&range);
 
-        for i in self.state.sel_range.iter_mut() {
+        self.ensure_history_tx();
+
+        let state = &mut *self.state; // enable split borrow
+
+        // Record the change to the undo history
+        self.history_tx.as_mut().unwrap().replace_range(
+            &mut state.history,
+            &state.text,
+            range.clone(),
+            text.to_owned(),
+        );
+
+        // Update the selection
+        for i in state.sel_range.iter_mut() {
             if *i >= range.end {
                 *i = *i - range.len() + text.len();
             } else if *i >= range.start {
@@ -1134,15 +1245,15 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
             }
         }
 
-        self.state.text.replace_range(range, text);
+        // Update `text`
+        state.text.replace_range(range, text);
 
-        self.state.invalidate_text_layout();
-        self.state.canvas.pend_draw(self.view.as_ref());
+        state.invalidate_text_layout();
+        state.canvas.pend_draw(self.view.as_ref());
 
         // Reset the timer's phase
-        self.state
-            .reset_timer(self.wm, self.view.as_ref(), self.inner, None);
-        self.state.caret_blink = true;
+        state.reset_timer(self.wm, self.view.as_ref(), self.inner, None);
+        state.caret_blink = true;
     }
 
     fn slice(&mut self, range: Range<usize>) -> String {
@@ -1276,6 +1387,9 @@ fn update_sel_range(
 /// Update the text and/or selection using a given closure. This method mustn't
 /// be used in an implementation of `TextInputCtxEdit` because it calls
 /// `text_input_ctx_on_selection_change` and/or `text_input_ctx_reset`.
+///
+/// If the provided closure modifies the text, it is responsible for updating
+/// the undo history accordingly.
 fn update_state(
     wm: pal::Wm,
     hview: HViewRef<'_>,
@@ -1363,8 +1477,16 @@ impl EntryCoreDragListener {
         }
     }
 
-    fn update_selection(&self, wm: pal::Wm, f: impl FnMut(&mut State)) {
-        update_sel_range(wm, self.view.as_ref(), RcBorrow::from(&self.inner), f);
+    fn update_selection(&self, wm: pal::Wm, mut f: impl FnMut(&mut State)) {
+        update_sel_range(
+            wm,
+            self.view.as_ref(),
+            RcBorrow::from(&self.inner),
+            move |state| {
+                state.history.mark_logical_op_break();
+                f(state);
+            },
+        );
     }
 }
 

@@ -61,6 +61,11 @@ mod scrolling {
     pub mod tableremap;
 }
 
+/// Text editing support
+pub mod editing {
+    pub mod history;
+}
+
 /// Re-exports some traits from the `ui` module.
 pub mod prelude {
     pub use super::views::table::{TableModelEdit, TableModelEditExt};

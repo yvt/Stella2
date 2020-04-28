@@ -21,6 +21,18 @@ pub fn interpret_event(ctx: &mut InterpretEventCtx<'_>) {
             macos_sel("selectAll:")
         ),
         (
+            sys::UNDO,
+            windows("Ctrl+Z"),
+            gtk("Ctrl+Z"),
+            macos_sel("undo:")
+        ),
+        (
+            sys::REDO,
+            windows("Ctrl+Y"),
+            gtk("Ctrl+Shift+Z"),
+            macos_sel("redo:")
+        ),
+        (
             sys::COPY,
             windows("Ctrl+C"),
             gtk("Ctrl+C"),
