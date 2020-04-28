@@ -41,6 +41,14 @@ impl<Text: TextTrait> Edit<Text> {
     fn end_new(&self) -> usize {
         self.start + self.new.len()
     }
+
+    pub fn range_old(&self) -> Range<usize> {
+        self.start..self.end_old()
+    }
+
+    pub fn range_new(&self) -> Range<usize> {
+        self.start..self.end_new()
+    }
 }
 
 /// Trait for abstract text fragments.
@@ -152,7 +160,7 @@ pub trait CoalescingCb<Text> {
     fn last_edit_mut(&mut self) -> Option<&mut Edit<Text>>;
 }
 
-impl<T: ?Sized, Text> CoalescingCb<Text> for &'_ mut T {
+impl<T: ?Sized + CoalescingCb<Text>, Text> CoalescingCb<Text> for &'_ mut T {
     fn slice(&mut self, range: Range<usize>) -> Text {
         (*self).slice(range)
     }
