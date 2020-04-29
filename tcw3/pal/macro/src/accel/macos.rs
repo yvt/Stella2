@@ -84,7 +84,13 @@ fn gen_key_binding(
         // <https://developer.apple.com/documentation/appkit/1540619-common_unicode_characters>
         Key::Backspace => 0x0008,
         Key::Return => 0x0003,
-        Key::Tab => 0x0009,
+        Key::Tab => {
+            if pat.mod_flags.contains(ModFlags::SHIFT) {
+                0x0019
+            } else {
+                0x0009
+            }
+        }
         Key::Delete => 0x007f,
         Key::Left => 0xf702,
         Key::Up => 0xf700,
