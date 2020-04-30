@@ -3,7 +3,7 @@ use arrayvec::ArrayVec;
 use log::trace;
 
 use super::{ActionId, ActionStatus, HView, HViewRef, HWndRef, KeyEvent, ViewFlags, Wnd};
-use crate::pal::Wm;
+use crate::{pal, pal::Wm};
 
 impl HWndRef<'_> {
     /// Focus the specified view.
@@ -230,11 +230,80 @@ impl HWndRef<'_> {
 
         // Does this window recognize the event?
         let listener = self.wnd.listener.borrow();
-        if up {
+        let handled = if up {
             listener.key_up(wm, self, e)
         } else {
             listener.key_down(wm, self, e)
+        };
+        drop(listener);
+        if handled {
+            return true;
         }
+
+        // Check tab key only if it's a key-down event
+        if up {
+            return false;
+        }
+
+        // Check tab key
+        const TAB_FORWARD: ActionId = 0;
+        const TAB_BACKWARD: ActionId = 1;
+        static TAB_ACCEL_TABLE: pal::AccelTable = pal::accel_table![
+            (TAB_FORWARD, windows("Tab"), macos("Tab"), gtk("Tab")),
+            (
+                TAB_BACKWARD,
+                windows("Shift+Tab"),
+                macos("Shift+Tab"),
+                gtk("Shift+Tab")
+            ),
+        ];
+        if let Some(code) = e.translate_accel(&TAB_ACCEL_TABLE) {
+            trace!(
+                "Interpreted the unhandled key event as {}",
+                ["TAB_FORWARD", "TAB_BACKWARD"][code as usize]
+            );
+
+            let mut focused_view = self.wnd.focused_view.borrow().clone();
+            let root_view = self.content_view();
+
+            trace!("... The currently focused view is {:?}", focused_view);
+
+            match code {
+                TAB_FORWARD => {
+                    if let Some(view) = focused_view {
+                        focused_view = view.tab_order_next_view();
+                    }
+
+                    // If there are no more views in the tab order or we didn't
+                    // have a focused view in the first place, start over
+                    if focused_view.is_none() {
+                        focused_view = root_view.tab_order_first_view();
+                    }
+                }
+                TAB_BACKWARD => {
+                    if let Some(view) = focused_view {
+                        focused_view = view.tab_order_prev_view();
+                    }
+
+                    // If there are no more views in the tab order or we didn't
+                    // have a focused view in the first place, start over
+                    if focused_view.is_none() {
+                        focused_view = root_view.tab_order_last_view();
+                    }
+                }
+                _ => unreachable!(),
+            }
+
+            if let Some(view) = focused_view {
+                trace!("... Transferring the keyboard focus to {:?}", view);
+                view.focus();
+                return true;
+            } else {
+                trace!("... Couldn't find a view to transfer the keyboard focus to");
+            }
+        }
+
+        false
     }
 }
 
