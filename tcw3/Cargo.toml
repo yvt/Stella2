@@ -33,6 +33,7 @@ rc-borrow = "1.0.0"
 rob = "0.1"
 rope = { path = "../support/rope" }
 sorted_diff = { path = "../support/sorted_diff" }
+stvg_tcw3 = { path = "../stvg/tcw3" }
 subscriber_list = { path = "../support/subscriber_list" }
 svgbobdoc = "0.2"
 try_match = "0.2.1"

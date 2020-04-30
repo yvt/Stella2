@@ -2,10 +2,8 @@
 use cggeom::prelude::*;
 use cgmath::Matrix3;
 use stvg_io::{Cmd, CmdDecoder};
-use tcw3::{
-    images::{himg_from_paint_fn, HImg},
-    pal::{iface::Canvas, RGBAF32},
-};
+use tcw3_images::{himg_from_paint_fn, HImg};
+use tcw3_pal::{iface::Canvas, RGBAF32};
 
 /// An extension trait for `Canvas` that provides methods for drawing
 /// StellaVG images.

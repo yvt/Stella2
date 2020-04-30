@@ -2489,6 +2489,8 @@ dependencies = [
  "stvg_io",
  "stvg_macro",
  "tcw3",
+ "tcw3_images",
+ "tcw3_pal",
 ]
 
 [[package]]
@@ -2617,6 +2619,7 @@ dependencies = [
  "rope",
  "sorted_diff",
  "structopt",
+ "stvg_tcw3",
  "subscriber_list",
  "svgbobdoc",
  "tcw3_designer_runtime",
