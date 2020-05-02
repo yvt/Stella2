@@ -26,7 +26,6 @@ miniserde = "0.1.12"
 nativedispatch = { path = "../support/nativedispatch" }
 stella2_assets = { path = "../stella2_assets" }
 stella2_meta = { path = "meta" }
-stvg_tcw3 = { path = "../stvg/tcw3" }
 subscriber_list = { path = "../support/subscriber_list" }
 tcw3 = { path = "../tcw3" }
 

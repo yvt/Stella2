@@ -2,10 +2,8 @@
 use cggeom::prelude::*;
 use cgmath::Matrix3;
 use stvg_io::{Cmd, CmdDecoder};
-use tcw3::{
-    images::{himg_from_paint_fn, HImg},
-    pal::{iface::Canvas, RGBAF32},
-};
+use tcw3_images::{himg_from_paint_fn, HImg};
+use tcw3_pal::{iface::Canvas, RGBAF32};
 
 /// An extension trait for `Canvas` that provides methods for drawing
 /// StellaVG images.
@@ -121,12 +119,12 @@ where
     ///
     /// ```
     /// static STVG_IMAGE: (&[u8], [f32; 2]) =
-    ///     stvg_macro::include_stvg!("../tests/tiger.svgz");
+    ///     stvg_macro::include_stvg!("../tests/horse.svgz");
     ///
-    /// use stvg_tcw3::StvgImg;
+    /// use tcw3_stvg::StvgImg;
     ///
-    /// # #[tcw3::testing::use_testing_wm]
-    /// # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
+    /// # #[tcw3_testing::use_testing_wm(testing = "tcw3_testing")]
+    /// # fn inner(twm: &dyn tcw3_pal::testing::TestingWm) {
     /// let himg = StvgImg::new(STVG_IMAGE).into_himg();
     /// # }
     /// # inner();
@@ -159,12 +157,12 @@ where
 ///
 /// ```
 /// static STVG_IMAGE: (&[u8], [f32; 2]) =
-///     stvg_macro::include_stvg!("../tests/tiger.svgz");
+///     stvg_macro::include_stvg!("../tests/horse.svgz");
 ///
-/// use stvg_tcw3::{StvgImg, replace_color};
+/// use tcw3_stvg::{StvgImg, replace_color};
 ///
-/// # #[tcw3::testing::use_testing_wm]
-/// # fn inner(twm: &dyn tcw3::pal::testing::TestingWm) {
+/// # #[tcw3_testing::use_testing_wm(testing = "tcw3_testing")]
+/// # fn inner(twm: &dyn tcw3_pal::testing::TestingWm) {
 /// let himg = StvgImg::new(STVG_IMAGE)
 ///     .with_color_xform(replace_color([0.4, 0.5, 0.6, 1.0]))
 ///     .into_himg();

@@ -59,7 +59,7 @@ fn main() {
         let mut ico = icon_baker::Icns::new();
 
         // placeholder
-        let svgz = include_bytes!("../../stvg/tests/horse.svgz");
+        let svgz = include_bytes!("../../tcw3/tests/horse.svgz");
         let svg_text_stream = libflate::gzip::Decoder::new(&svgz[..]).unwrap();
         let mut svg_text = String::new();
         { svg_text_stream }.read_to_string(&mut svg_text).unwrap();

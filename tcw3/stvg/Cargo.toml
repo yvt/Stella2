@@ -1,0 +1,20 @@
+[package]
+name = "tcw3_stvg"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+license = "MIT"
+
+[features]
+testing = ["tcw3_testing/testing"]
+
+[dependencies]
+tcw3_pal = { path = "../pal" }
+tcw3_images = { path = "../images" }
+stvg_io = { path = "../../stvg/io" }
+cgmath = "0.17.0"
+cggeom = { path = "../../support/cggeom" }
+
+[dev-dependencies]
+stvg_macro = { path = "../../stvg/macro" }
+tcw3_testing = { path = "../testing" }
