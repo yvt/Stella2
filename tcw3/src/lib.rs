@@ -11,6 +11,7 @@
 pub use tcw3_designer_runtime as designer_runtime;
 pub use tcw3_images as images;
 pub use tcw3_pal as pal;
+pub use tcw3_stvg as stvg;
 pub use tcw3_testing as testing;
 
 #[macro_use]

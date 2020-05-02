@@ -2378,7 +2378,6 @@ dependencies = [
  "stella2_assets",
  "stella2_meta",
  "stella2_windres",
- "stvg_tcw3",
  "subscriber_list",
  "tcw3",
  "winapi",
@@ -2478,19 +2477,6 @@ dependencies = [
  "stvg_io",
  "syn",
  "usvg",
-]
-
-[[package]]
-name = "stvg_tcw3"
-version = "0.1.0"
-dependencies = [
- "cggeom",
- "cgmath",
- "stvg_io",
- "stvg_macro",
- "tcw3",
- "tcw3_images",
- "tcw3_pal",
 ]
 
 [[package]]
@@ -2619,13 +2605,14 @@ dependencies = [
  "rope",
  "sorted_diff",
  "structopt",
- "stvg_tcw3",
+ "stvg_macro",
  "subscriber_list",
  "svgbobdoc",
  "tcw3_designer_runtime",
  "tcw3_images",
  "tcw3_meta",
  "tcw3_pal",
+ "tcw3_stvg",
  "tcw3_testing",
  "try_match",
 ]
@@ -2778,6 +2765,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tcw3_stvg"
+version = "0.1.0"
+dependencies = [
+ "cggeom",
+ "cgmath",
+ "stvg_io",
+ "stvg_macro",
+ "tcw3_images",
+ "tcw3_pal",
+ "tcw3_testing",
 ]
 
 [[package]]

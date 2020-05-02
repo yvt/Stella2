@@ -29,7 +29,7 @@ fn add_windows_resource() {
         let mut ico = icon_baker::Ico::new();
 
         // placeholder
-        let svgz = read("../../stvg/tests/horse.svgz").unwrap();
+        let svgz = read("../../tcw3/tests/horse.svgz").unwrap();
         let svg_text_stream = libflate::gzip::Decoder::new(&svgz[..]).unwrap();
         let mut svg_text = String::new();
         { svg_text_stream }.read_to_string(&mut svg_text).unwrap();

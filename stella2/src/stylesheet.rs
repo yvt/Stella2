@@ -2,11 +2,11 @@ use cggeom::box2;
 use cgmath::{Rad, Vector2};
 use std::f32::{consts::PI, NAN};
 use stella2_assets as assets;
-use stvg_tcw3::StvgImg;
 #[allow(unused_imports)]
 use tcw3::{
     images::{himg_figures, HImg},
     pal::{LayerFlags, SysFontType, RGBAF32},
+    stvg::StvgImg,
     stylesheet,
     ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
 };
@@ -59,7 +59,7 @@ fn himg_from_stvg(data: &(&'static [u8], [f32; 2])) -> HImg {
 #[allow(dead_code)]
 fn himg_from_stvg_col(data: (&'static [u8], [f32; 2]), c: tcw3::pal::RGBAF32) -> HImg {
     StvgImg::new(data)
-        .with_color_xform(stvg_tcw3::replace_color(c))
+        .with_color_xform(tcw3::stvg::replace_color(c))
         .into_himg()
 }
 

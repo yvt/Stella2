@@ -14,7 +14,7 @@ use tcw3::{
     },
 };
 
-static STVG_IMAGE: (&[u8], [f32; 2]) = stvg_macro::include_stvg!("../tests/horse.svgz");
+static STVG_IMAGE: (&[u8], [f32; 2]) = stvg_macro::include_stvg!("tests/horse.svgz");
 
 struct MyViewListener {
     canvas: RefCell<CanvasMixin>,
@@ -50,7 +50,7 @@ impl ViewListener for MyViewListener {
             let scale = (size.x / img_size.x).min(size.y / img_size.y);
             let scaled_img_size = img_size * scale;
 
-            use stvg_tcw3::{CanvasStvgExt, Options};
+            use tcw3::stvg::{CanvasStvgExt, Options};
 
             c.mult_transform(
                 Matrix3::from_translation((size - scaled_img_size) * 0.5)
