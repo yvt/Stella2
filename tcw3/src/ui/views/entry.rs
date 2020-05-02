@@ -1249,11 +1249,11 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.state.text[range].to_owned()
     }
 
-    fn floor_index(&mut self, mut i: usize) -> usize {
+    fn floor_index(&mut self, i: usize) -> usize {
         str_floor(&self.state.text, i)
     }
 
-    fn ceil_index(&mut self, mut i: usize) -> usize {
+    fn ceil_index(&mut self, i: usize) -> usize {
         str_ceil(&self.state.text, i)
     }
 
