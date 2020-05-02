@@ -1,8 +1,23 @@
 //! Provides functions for measuring strings by the number of Unicode scalar
 //! values.
+use packed_simd::{i8x32, m8x32, u8x32, FromCast};
+
+const HAS_U8X16: bool = cfg!(all(
+    any(target_arch = "x86", target_arch = "x86_64"),
+    target_feature = "sse2"
+)) || cfg!(all(target_aarch = "aarch64", target_feature = "neon"))
+    || cfg!(all(
+        target_aarch = "arm",
+        target_feature = "v7",
+        target_feature = "neon"
+    ));
 
 fn is_utf8_continuation(x: u8) -> bool {
     (x as i8) < -0x40
+}
+
+fn is_not_utf8_continuation_u8x32(x: u8x32) -> m8x32 {
+    i8x32::from_cast(x).ge(i8x32::splat(-0x40))
 }
 
 /// Find the byte offset of the first scalar value after `i` in a given UTF-8
@@ -71,6 +86,22 @@ pub fn str_floor(s: &str, i: usize) -> usize {
     utf8_str_floor(s.as_bytes(), i)
 }
 
+/// Mapping from the hi-nibbles of UTF-8-encoded bytes to continuation byte
+/// counts.
+//
+//                                          ┌ 1110 (U+0800–U+FFFF)
+//                                          │     ┌ 10?? (continuation bytes)
+//                                          ╧═    ╧═══════
+const NIBBLE_TO_CONTINUATION_LEN: u32 = 0b11100101000000000000000000000000;
+//                                        ╤═  ╤═══        ╤═══════════════
+//                                        │   │           └ 0???? (U+0000–U+007F)
+//                                        │   └ 110? (U+0080–U+07FF)
+//                                        └ 1111 (U+10000–U+10FFFF)
+
+const fn nibble_to_continuation_len(x: u8) -> u8 {
+    ((NIBBLE_TO_CONTINUATION_LEN >> (x * 2)) & 0b11) as u8
+}
+
 /// Find the byte offset of the first scalar value after `i` in a given byte
 /// slice assumed to be a UTF-8 string. Returns `s.len()` if there is no such
 /// scalar value.
@@ -80,12 +111,17 @@ pub fn utf8_str_next(s: &[u8], mut i: usize) -> usize {
     debug_assert!(i <= s.len());
     if i < s.len() {
         // `i` must be on a scalar boundary
-        debug_assert!(!is_utf8_continuation(s[i]));
+        debug_assert!(
+            !is_utf8_continuation(s[i]),
+            "`i` is not on a scalar boundary"
+        );
 
-        while {
-            i += 1;
-            i < s.len() && is_utf8_continuation(s[i])
-        } {}
+        i += nibble_to_continuation_len(s[i] >> 4) as usize + 1;
+
+        debug_assert!(
+            i <= s.len(),
+            "cursor went past the end - `s` may be malformed"
+        );
     }
     i
 }
@@ -158,11 +194,26 @@ pub fn num_scalars_in_str(s: &str) -> usize {
 
 /// Calculate the number of scalar values in a given byte slice assumed to be a
 /// UTF-8 string.
-pub fn num_scalars_in_utf8_str(s: &[u8]) -> usize {
-    // TODO: Manually vectorize this function. LLVM can automatically vectorize
-    //       this, but the result doesn't look good.
+pub fn num_scalars_in_utf8_str(mut s: &[u8]) -> usize {
+    let mut count = 0usize;
+
+    // Native `u8x16` support is enough for emulating `u8x32`
+    if HAS_U8X16 {
+        // Count the non-continuation bytes
+        while s.len() >= 32 {
+            let s32 = u8x32::from_slice_unaligned(&s[0..32]);
+            count += is_not_utf8_continuation_u8x32(s32).bitmask().count_ones() as usize;
+            s = &s[32..];
+        }
+    }
+
     // Count the non-continuation bytes
-    s.iter().filter(|&&i| !is_utf8_continuation(i)).count()
+    //
+    // Actually, LLVM can auto-vectorize this loop, though the compiled code
+    // is large and doesn't look pretty.
+    count += s.iter().filter(|&&i| !is_utf8_continuation(i)).count();
+
+    count
 }
 
 #[cfg(test)]
@@ -181,7 +232,7 @@ mod tests {
     #[quickcheck]
     fn test_num_scalars_in_str(encoded: Vec<u8>) -> bool {
         let st = mk_random_str(&encoded);
-        log::debug!("st = {:?}", st);
+        log::debug!("st = {:?} ({:x?})", st, st.as_bytes());
 
         assert_eq!(num_scalars_in_str(&st), st.chars().count());
         true
