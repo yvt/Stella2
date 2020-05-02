@@ -5,10 +5,10 @@ use tcw3::{
     ui::{
         layouts::TableLayout,
         theming,
-        views::{scrollbar::ScrollbarDragListener, Entry, Label, Scrollbar},
+        views::{scrollbar::ScrollbarDragListener, Button, Entry, Label, Scrollbar, Spacer},
         AlignFlags,
     },
-    uicore::{ActionId, ActionStatus, HWnd, HWndRef, WndListener},
+    uicore::{ActionId, ActionStatus, HView, HWnd, HWndRef, WndListener},
 };
 
 struct MyWndListener;
@@ -122,14 +122,39 @@ fn main() {
 
     let entry = Entry::new(style_manager);
 
-    let cells = vec![
-        (label.view(), [0, 0], AlignFlags::JUSTIFY),
-        (scrollbar.view(), [0, 1], AlignFlags::JUSTIFY),
-        (entry.view(), [0, 2], AlignFlags::JUSTIFY),
-    ];
+    let button = Button::new(style_manager);
+    button.set_caption("Please don't touch this button");
 
-    wnd.content_view()
-        .set_layout(TableLayout::new(cells).with_uniform_margin(20.0));
+    let h_layout = {
+        let view = HView::new(Default::default());
+        view.set_layout(TableLayout::stack_horz(vec![(
+            button.view(),
+            AlignFlags::VERT_JUSTIFY,
+        )]));
+        view
+    };
+
+    wnd.content_view().set_layout(
+        TableLayout::stack_vert(vec![
+            (label.view(), AlignFlags::VERT_JUSTIFY),
+            (
+                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
+                AlignFlags::VERT_JUSTIFY,
+            ),
+            (scrollbar.view(), AlignFlags::JUSTIFY),
+            (
+                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
+                AlignFlags::VERT_JUSTIFY,
+            ),
+            (entry.view(), AlignFlags::JUSTIFY),
+            (
+                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
+                AlignFlags::VERT_JUSTIFY,
+            ),
+            (h_layout.clone(), AlignFlags::JUSTIFY),
+        ])
+        .with_uniform_margin(20.0),
+    );
 
     wm.enter_main_loop();
 }
