@@ -10,6 +10,7 @@ use std::{
     ops::Range,
     rc::Rc,
 };
+use unicount::{str_ceil, str_floor, str_prev};
 
 use crate::{
     pal,
@@ -743,7 +744,7 @@ impl ViewListener for EntryCoreListener {
             }
             actions::DELETE_BACKWARD_DECOMPOSING => {
                 log::trace!("Handling DELETE_BACKWARD_DECOMPOSING");
-                self.handle_delete(wm, view, |i, _, text| utf8_prev(text.as_bytes(), i));
+                self.handle_delete(wm, view, |i, _, text| str_prev(text, i));
             }
             actions::DELETE_BACKWARD_WORD => {
                 log::trace!("Handling DELETE_BACKWARD_WORD");
@@ -1121,20 +1122,6 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
     }
 }
 
-fn is_utf8_continuation(x: u8) -> bool {
-    (x as i8) < -0x40
-}
-
-fn utf8_prev(s: &[u8], mut i: usize) -> usize {
-    if i > 0 {
-        while {
-            i -= 1;
-            i > 0 && is_utf8_continuation(s[i])
-        } {}
-    }
-    i
-}
-
 /// Implements `TextInputCtxEdit`.
 struct Edit<'a> {
     wm: pal::Wm,
@@ -1263,19 +1250,11 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 
     fn floor_index(&mut self, mut i: usize) -> usize {
-        let text = &self.state.text[..];
-        while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
-            i -= 1;
-        }
-        i
+        str_floor(&self.state.text, i)
     }
 
     fn ceil_index(&mut self, mut i: usize) -> usize {
-        let text = &self.state.text[..];
-        while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
-            i += 1;
-        }
-        i
+        str_ceil(&self.state.text, i)
     }
 
     fn len(&mut self) -> usize {

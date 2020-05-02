@@ -6,6 +6,7 @@ use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
 use pango_sys::PangoLogAttr;
 use rgb::RGBA16;
 use std::{convert::TryInto, mem::MaybeUninit, ops::Range, os::raw::c_uint};
+use unicount::{num_scalars_in_utf8_str, str_next, str_prev};
 
 use super::super::iface;
 
@@ -237,10 +238,7 @@ impl iface::TextLayout for TextLayout {
                 break;
             }
 
-            i += 1;
-            while i < text.len() && (text.as_bytes()[i] & 0xc0) == 0x80 {
-                i += 1;
-            }
+            i = unicount::str_next(text, i);
         }
 
         debug_assert!(
@@ -480,14 +478,14 @@ impl TextLayout {
 
         if forward {
             while {
-                i = utf8_next(text.as_bytes(), i);
+                i = str_next(text, i);
                 i_chars += 1;
 
                 i_chars < log_attrs.len() && !log_attrs[i_chars].intersects(flag)
             } {}
         } else {
             while {
-                i = utf8_prev(text.as_bytes(), i);
+                i = str_prev(text, i);
                 i_chars = i_chars.wrapping_sub(1);
 
                 i_chars < log_attrs.len() && !log_attrs[i_chars].intersects(flag)
@@ -496,35 +494,6 @@ impl TextLayout {
 
         i
     }
-}
-
-fn is_utf8_continuation(x: u8) -> bool {
-    (x as i8) < -0x40
-}
-
-fn utf8_next(s: &[u8], mut i: usize) -> usize {
-    if i < s.len() {
-        while {
-            i += 1;
-            i < s.len() && is_utf8_continuation(s[i])
-        } {}
-    }
-    i
-}
-
-fn utf8_prev(s: &[u8], mut i: usize) -> usize {
-    if i > 0 {
-        while {
-            i -= 1;
-            i > 0 && is_utf8_continuation(s[i])
-        } {}
-    }
-    i
-}
-
-fn num_scalars_in_utf8_str(s: &[u8]) -> usize {
-    // Count the non-continuation bytes
-    s.iter().filter(|&&i| !is_utf8_continuation(i)).count()
 }
 
 fn pango_for_each_run_in_line(iter: &mut pango::LayoutIter, mut f: impl FnMut(pango::LayoutRun)) {
@@ -647,28 +616,5 @@ bitflags::bitflags! {
         const CURSOR_POSITION = 1 << 4;
         const WORD_START = 1 << 5;
         const WORD_END = 1 << 6;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use quickcheck_macros::quickcheck;
-    use std::convert::TryFrom;
-
-    fn mk_random_str(v: &[u8]) -> String {
-        v.chunks_exact(4)
-            .map(|c| (u32::from_le_bytes([c[0], c[1], c[2], c[3]]) % 0x20000) >> (c[3] % 16))
-            .filter_map(|c| char::try_from(c).ok())
-            .collect()
-    }
-
-    #[quickcheck]
-    fn test_num_scalars_in_utf8_str(encoded: Vec<u8>) -> bool {
-        let st = mk_random_str(&encoded);
-        log::debug!("st = {:?}", st);
-
-        assert_eq!(num_scalars_in_utf8_str(&st.as_bytes()), st.chars().count());
-        true
     }
 }

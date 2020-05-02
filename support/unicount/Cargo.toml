@@ -1,0 +1,17 @@
+[package]
+name = "unicount"
+version = "0.1.0"
+authors = ["yvt <i@yvt.jp>"]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.3"
+log = "0.4"
+quickcheck = "0.9"
+quickcheck_macros = "0.9"
+
+[[bench]]
+name = "bench"
+harness = false

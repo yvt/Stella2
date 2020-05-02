@@ -42,6 +42,7 @@ proc-macro-hack = "0.5.11"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
 try_match = "0.2.1"
+unicount = { path = "../../support/unicount" }
 utf16count = { path = "../../support/utf16count" }
 zerocopy = "0.3.0"
 

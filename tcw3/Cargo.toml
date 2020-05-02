@@ -37,6 +37,7 @@ stvg_macro = { path = "../stvg/macro" }
 subscriber_list = { path = "../support/subscriber_list" }
 svgbobdoc = "0.2"
 try_match = "0.2.1"
+unicount = { path = "../support/unicount" }
 
 tcw3_designer_runtime = { path = "designer_runtime" }
 tcw3_images = { path = "images" }
