@@ -2598,6 +2598,7 @@ dependencies = [
  "ndarray",
  "neo_linked_list",
  "owning_ref",
+ "packed_simd",
  "quickcheck",
  "quickcheck_macros",
  "rc-borrow",

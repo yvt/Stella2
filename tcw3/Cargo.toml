@@ -9,7 +9,7 @@ license = "MIT"
 testing = ["tcw3_pal/testing", "tcw3_testing/testing"]
 
 [dependencies]
-alt_fp = { path = "../support/alt_fp" }
+alt_fp = { path = "../support/alt_fp", features = ["packed_simd"] }
 array = "0.0.1"
 array_intrusive_list = { path = "../support/array_intrusive_list" }
 arrayvec = "0.5"
@@ -29,6 +29,7 @@ minisort = { path = "../support/minisort" }
 ndarray = "0.13.0"
 neo_linked_list = { path = "../support/neo_linked_list" }
 owning_ref = "0.4.0"
+packed_simd = "0.3.0"
 rc-borrow = "1.0.0"
 rob = "0.1"
 rope = { path = "../support/rope" }

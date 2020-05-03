@@ -579,18 +579,25 @@ const FIELD_HEIGHT: f32 = 20.0;
 
 /// Replace blue with a global tint color, and create a `HImg`.
 fn recolor_tint(data: &(&'static [u8], [f32; 2])) -> HImg {
-    fn lerp(a: f32, b: f32, fract: f32) -> f32 {
-        a * (1.0 - fract) + b * fract
-    }
+    use alt_fp::fma;
+    use packed_simd::{f32x4, shuffle};
+    #[inline(never)]
     fn map_color(c: RGBAF32) -> RGBAF32 {
-        let tint: RGBAF32 = [0.2, 0.5, 0.9, 1.0].into();
-        [
-            lerp(c.g, c.b, tint.r),
-            lerp(c.g, c.b, tint.g),
-            lerp(c.g, c.b, tint.b),
-            c.a,
-        ]
-        .into()
+        let tint = f32x4::new(0.2, 0.5, 0.9, 1.0);
+        let c: [f32; 4] = c.into();
+        let c: f32x4 = c.into();
+        // Equivalent to:
+        //
+        //     [
+        //         lerp(c.g, c.b, tint.r),
+        //         lerp(c.g, c.b, tint.g),
+        //         lerp(c.g, c.b, tint.b),
+        //         lerp(c.g, c.a, tint.a), // `tint.a` assumed to be `1`
+        //     ]
+        let c1 = f32x4::splat(c.extract(1));
+        let c2: f32x4 = shuffle!(c, [2, 2, 2, 3]);
+        let out_c = fma![c1 * (1.0 - tint) + (c2 * tint)];
+        <[f32; 4]>::from(out_c).into()
     }
     StvgImg::new(*data).with_color_xform(map_color).into_himg()
 }
