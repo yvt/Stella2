@@ -1,0 +1,34 @@
+use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, pal};
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::views::Checkbox {
+    const style_manager: &Manager { pub set; }
+
+    pub event activated(wm: pal::Wm);
+
+    prop caption: String { pub set; } = unreachable!();
+    prop class_set: ClassSet { pub set; pub get clone; } = unreachable!();
+    prop checked: bool { pub set; pub get clone; } = unreachable!();
+
+    const view: HView { pub get clone; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
+}
+
+#[prototype_only]
+#[widget]
+#[builder(simple)]
+pub comp crate::ui::views::RadioButton {
+    const style_manager: &Manager { pub set; }
+
+    pub event activated(wm: pal::Wm);
+
+    prop caption: String { pub set; } = unreachable!();
+    prop class_set: ClassSet { pub set; pub get clone; } = unreachable!();
+    prop checked: bool { pub set; pub get clone; } = unreachable!();
+
+    const view: HView { pub get clone; } = unreachable!();
+    const style_elem: HElem { pub get clone; } = unreachable!();
+}
+
