@@ -40,6 +40,8 @@ bitflags! {
         const CHECKBOX = 1 << 12;
         /// The element is checked.
         const CHECKED = 1 << 13;
+        /// The element is a radio button widget.
+        const RADIO_BUTTON = 1 << 14;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;

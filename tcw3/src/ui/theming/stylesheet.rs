@@ -564,6 +564,11 @@ mod assets {
     pub static CHECKBOX_LIGHT_ACT: Stvg = stvg!("assets/checkbox_light_act.svg");
     pub static CHECKBOX_LIGHT_CHECKED: Stvg = stvg!("assets/checkbox_light_checked.svg");
     pub static CHECKBOX_LIGHT_CHECKED_ACT: Stvg = stvg!("assets/checkbox_light_checked_act.svg");
+
+    pub static RADIO_LIGHT: Stvg = stvg!("assets/radio_light.svg");
+    pub static RADIO_LIGHT_ACT: Stvg = stvg!("assets/radio_light_act.svg");
+    pub static RADIO_LIGHT_CHECKED: Stvg = stvg!("assets/radio_light_checked.svg");
+    pub static RADIO_LIGHT_CHECKED_ACT: Stvg = stvg!("assets/radio_light_checked_act.svg");
 }
 
 const BUTTON_CORNER_RADIUS: f32 = 2.0;
@@ -664,6 +669,7 @@ lazy_static! {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
         },
 
+        // Checkbox
         ([.CHECKBOX]) (priority = 100) {
             num_layers: 1,
             #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT)),
@@ -690,8 +696,38 @@ lazy_static! {
             #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED_ACT)),
         },
 
+        // Radio button (identical to checkbox except for images)
+        ([.RADIO_BUTTON]) (priority = 100) {
+            num_layers: 1,
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT)),
+            layer_metrics[0]: Metrics {
+                margin: [NAN, NAN, NAN, 4.0],
+                size: CHECKBOX_IMG_SIZE,
+            },
+            layer_opacity[0]: 0.9,
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
+                .. Metrics::default()
+            },
+        },
+        ([.RADIO_BUTTON.HOVER]) (priority = 200) {
+            layer_opacity[0]: 1.0,
+        },
+        ([.RADIO_BUTTON.ACTIVE]) (priority = 200) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_ACT)),
+        },
+        ([.RADIO_BUTTON.CHECKED]) (priority = 300) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED)),
+        },
+        ([.RADIO_BUTTON.ACTIVE.CHECKED]) (priority = 400) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED_ACT)),
+        },
+
         // Checkbox label
         ([] < [.CHECKBOX]) (priority = 100) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+        },
+        ([] < [.RADIO_BUTTON]) (priority = 100) {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
         },
 

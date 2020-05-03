@@ -26,7 +26,7 @@ pub mod views {
     pub mod table;
     pub use self::{
         button::Button,
-        checkbox::Checkbox,
+        checkbox::{Checkbox, RadioButton},
         entry::{Entry, EntryCore},
         label::Label,
         scrollbar::Scrollbar,

@@ -6,7 +6,8 @@ use tcw3::{
         layouts::TableLayout,
         theming,
         views::{
-            scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, Scrollbar, Spacer,
+            scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
+            Scrollbar, Spacer,
         },
         AlignFlags,
     },
@@ -138,11 +139,58 @@ fn main() {
         }));
     }
 
+    let v_layout1 = {
+        let view = HView::new(Default::default());
+        view.set_layout(TableLayout::stack_vert(vec![
+            (button.view(), AlignFlags::CENTER),
+            (checkbox.view(), AlignFlags::CENTER),
+        ]));
+        view
+    };
+
+    let rbuttons = [
+        RadioButton::new(style_manager),
+        RadioButton::new(style_manager),
+        RadioButton::new(style_manager),
+    ];
+    let rbuttons = Rc::new(rbuttons);
+    rbuttons[0].set_caption("Earth");
+    rbuttons[1].set_caption("Pegasi");
+    rbuttons[2].set_caption("Unicorn");
+    for i in 0..3 {
+        let rbuttons_weak = Rc::downgrade(&rbuttons);
+        rbuttons[i].subscribe_activated(Box::new(move |_| {
+            let rbuttons = rbuttons_weak.upgrade().unwrap();
+            for (j, b) in rbuttons.iter().enumerate() {
+                b.set_checked(i == j);
+            }
+        }));
+    }
+
+    let v_layout2 = {
+        let view = HView::new(Default::default());
+        view.set_layout(TableLayout::stack_vert(vec![
+            (
+                rbuttons[0].view(),
+                AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT,
+            ),
+            (
+                rbuttons[1].view(),
+                AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT,
+            ),
+            (
+                rbuttons[2].view(),
+                AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT,
+            ),
+        ]));
+        view
+    };
+
     let h_layout = {
         let view = HView::new(Default::default());
         view.set_layout(TableLayout::stack_horz(vec![
-            (button.view(), AlignFlags::VERT_JUSTIFY),
-            (checkbox.view(), AlignFlags::CENTER),
+            (v_layout1, AlignFlags::VERT_JUSTIFY),
+            (v_layout2, AlignFlags::VERT_JUSTIFY),
         ]));
         view
     };
