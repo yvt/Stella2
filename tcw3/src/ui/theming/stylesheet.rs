@@ -543,14 +543,32 @@ macro_rules! stylesheet {
 // TODO: Make it dynamic (based on the operating system's configuration)
 //
 use crate::{
-    images::{figures, himg_figures, himg_from_figures_with_size},
+    images::{figures, himg_figures, himg_from_figures_with_size, HImg},
     pal::RGBAF32,
+    stvg::StvgImg,
 };
 use cggeom::box2;
 use cgmath::Vector2;
 use std::f32::NAN;
 
+mod assets {
+    pub type Stvg = (&'static [u8], [f32; 2]);
+
+    macro_rules! stvg {
+        ($path:literal) => {
+            stvg_macro::include_stvg!($path)
+        };
+    }
+
+    pub static CHECKBOX_LIGHT: Stvg = stvg!("assets/checkbox_light.svg");
+    pub static CHECKBOX_LIGHT_ACT: Stvg = stvg!("assets/checkbox_light_act.svg");
+    pub static CHECKBOX_LIGHT_CHECKED: Stvg = stvg!("assets/checkbox_light_checked.svg");
+    pub static CHECKBOX_LIGHT_CHECKED_ACT: Stvg = stvg!("assets/checkbox_light_checked_act.svg");
+}
+
 const BUTTON_CORNER_RADIUS: f32 = 2.0;
+
+const CHECKBOX_IMG_SIZE: Vector2<f32> = Vector2::new(16.0, 16.0);
 
 const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
 const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
@@ -558,6 +576,24 @@ const SCROLLBAR_MARGIN: f32 = 6.0;
 const SCROLLBAR_LEN_MIN: f32 = 20.0;
 
 const FIELD_HEIGHT: f32 = 20.0;
+
+/// Replace blue with a global tint color, and create a `HImg`.
+fn recolor_tint(data: &(&'static [u8], [f32; 2])) -> HImg {
+    fn lerp(a: f32, b: f32, fract: f32) -> f32 {
+        a * (1.0 - fract) + b * fract
+    }
+    fn map_color(c: RGBAF32) -> RGBAF32 {
+        let tint: RGBAF32 = [0.2, 0.5, 0.9, 1.0].into();
+        [
+            lerp(c.g, c.b, tint.r),
+            lerp(c.g, c.b, tint.g),
+            lerp(c.g, c.b, tint.b),
+            c.a,
+        ]
+        .into()
+    }
+    StvgImg::new(*data).with_color_xform(map_color).into_himg()
+}
 
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
@@ -618,6 +654,37 @@ lazy_static! {
         },
         // Button label
         ([] < [.BUTTON]) (priority = 100) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+        },
+
+        ([.CHECKBOX]) (priority = 100) {
+            num_layers: 1,
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT)),
+            layer_metrics[0]: Metrics {
+                margin: [NAN, NAN, NAN, 4.0],
+                size: CHECKBOX_IMG_SIZE,
+            },
+            layer_opacity[0]: 0.9,
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
+                .. Metrics::default()
+            },
+        },
+        ([.CHECKBOX.HOVER]) (priority = 200) {
+            layer_opacity[0]: 1.0,
+        },
+        ([.CHECKBOX.ACTIVE]) (priority = 200) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_ACT)),
+        },
+        ([.CHECKBOX.CHECKED]) (priority = 300) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED)),
+        },
+        ([.CHECKBOX.ACTIVE.CHECKED]) (priority = 400) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED_ACT)),
+        },
+
+        // Checkbox label
+        ([] < [.CHECKBOX]) (priority = 100) {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
         },
 

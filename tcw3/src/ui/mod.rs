@@ -17,6 +17,7 @@ pub mod mixins {
 
 pub mod views {
     mod button;
+    mod checkbox;
     mod entry;
     mod label;
     pub mod scrollbar;
@@ -25,6 +26,7 @@ pub mod views {
     pub mod table;
     pub use self::{
         button::Button,
+        checkbox::Checkbox,
         entry::{Entry, EntryCore},
         label::Label,
         scrollbar::Scrollbar,

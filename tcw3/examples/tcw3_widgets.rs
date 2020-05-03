@@ -5,7 +5,9 @@ use tcw3::{
     ui::{
         layouts::TableLayout,
         theming,
-        views::{scrollbar::ScrollbarDragListener, Button, Entry, Label, Scrollbar, Spacer},
+        views::{
+            scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, Scrollbar, Spacer,
+        },
         AlignFlags,
     },
     uicore::{ActionId, ActionStatus, HView, HWnd, HWndRef, WndListener},
@@ -125,12 +127,23 @@ fn main() {
     let button = Button::new(style_manager);
     button.set_caption("Please don't touch this button");
 
+    let checkbox = Checkbox::new(style_manager);
+    let checkbox = Rc::new(checkbox);
+    checkbox.set_caption("Milk");
+    {
+        let checkbox_weak = Rc::downgrade(&checkbox);
+        checkbox.subscribe_activated(Box::new(move |_| {
+            let checkbox = checkbox_weak.upgrade().unwrap();
+            checkbox.set_checked(!checkbox.checked());
+        }));
+    }
+
     let h_layout = {
         let view = HView::new(Default::default());
-        view.set_layout(TableLayout::stack_horz(vec![(
-            button.view(),
-            AlignFlags::VERT_JUSTIFY,
-        )]));
+        view.set_layout(TableLayout::stack_horz(vec![
+            (button.view(), AlignFlags::VERT_JUSTIFY),
+            (checkbox.view(), AlignFlags::CENTER),
+        ]));
         view
     };
 

@@ -36,6 +36,10 @@ bitflags! {
         const SPLITTER = 1 << 10;
         /// The element is a text entry widget.
         const ENTRY = 1 << 11;
+        /// The element is a checkbox widget.
+        const CHECKBOX = 1 << 12;
+        /// The element is checked.
+        const CHECKED = 1 << 13;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;
