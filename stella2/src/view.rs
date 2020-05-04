@@ -1,7 +1,7 @@
 use harmony::Elem;
 use log::trace;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::{Rc, Weak},
 };
 use tcw3::{
@@ -21,6 +21,7 @@ mod channellist;
 mod dpiscalewatcher;
 mod global;
 mod logview;
+mod prefwnd;
 mod splitutils;
 mod tabbar;
 mod toolbar;
@@ -32,6 +33,7 @@ pub struct AppView {
     pending_actions: RefCell<Vec<model::AppAction>>,
     persist_sched: viewpersistence::PersistenceScheduler,
     main_wnd: Rc<WndView>,
+    pref_wnd: Cell<Option<Rc<prefwnd::PrefWndView>>>,
 }
 
 impl AppView {
@@ -54,12 +56,12 @@ impl AppView {
             state: RefCell::new(state),
             pending_actions: RefCell::new(Vec::new()),
             persist_sched,
+            pref_wnd: Cell::new(None),
         });
 
         let this_weak = Rc::downgrade(&this);
-        this.main_wnd.set_dispatch(move |wnd_action| {
-            Self::dispatch_weak(&this_weak, model::AppAction::Wnd(wnd_action))
-        });
+        this.main_wnd
+            .set_dispatch(move |app_action| Self::dispatch_weak(&this_weak, app_action));
 
         let this_weak = Rc::downgrade(&this);
         this.main_wnd.set_quit(move || {
@@ -94,7 +96,7 @@ impl AppView {
         }
     }
 
-    fn poll(&self) {
+    fn poll(self: Rc<Self>) {
         // Update the state
         {
             let mut state = self.state.borrow_mut();
@@ -114,12 +116,28 @@ impl AppView {
         let state = self.state.borrow();
 
         self.main_wnd.poll(&state.main_wnd);
+
+        match (cell_is_some(&self.pref_wnd), state.pref_visible) {
+            (false, true) => {
+                let pref_wnd = prefwnd::PrefWndView::new(self.wm);
+
+                let this_weak = Rc::downgrade(&self);
+                pref_wnd
+                    .set_dispatch(move |app_action| Self::dispatch_weak(&this_weak, app_action));
+
+                self.pref_wnd.set(Some(pref_wnd));
+            }
+            (true, false) => {
+                self.pref_wnd.set(None);
+            }
+            _ => {}
+        }
     }
 }
 
 struct WndView {
     hwnd: HWnd,
-    dispatch: RefCell<Box<dyn Fn(model::WndAction)>>,
+    dispatch: RefCell<Box<dyn Fn(model::AppAction)>>,
     quit: RefCell<Box<dyn Fn()>>,
     wnd_state: RefCell<Elem<model::WndState>>,
     main_view: MainView,
@@ -182,7 +200,7 @@ impl WndView {
         this
     }
 
-    fn set_dispatch(&self, cb: impl Fn(model::WndAction) + 'static) {
+    fn set_dispatch(&self, cb: impl Fn(model::AppAction) + 'static) {
         *self.dispatch.borrow_mut() = Box::new(cb);
     }
 
@@ -238,7 +256,7 @@ impl WndListener for WndViewWndListener {
     fn validate_action(&self, _: pal::Wm, _: HWndRef<'_>, action: ActionId) -> ActionStatus {
         let mut status = ActionStatus::empty();
         match action {
-            global::QUIT => {
+            global::QUIT | global::SHOW_PREF => {
                 status = ActionStatus::VALID | ActionStatus::ENABLED;
             }
             global::TOGGLE_SIDEBAR => {
@@ -264,7 +282,10 @@ impl WndListener for WndViewWndListener {
 
         match action {
             global::TOGGLE_SIDEBAR => {
-                owner.dispatch.borrow()(model::WndAction::ToggleSidebar);
+                owner.dispatch.borrow()(model::AppAction::Wnd(model::WndAction::ToggleSidebar));
+            }
+            global::SHOW_PREF => {
+                owner.dispatch.borrow()(model::AppAction::TogglePref);
             }
             global::QUIT => {
                 owner.quit.borrow()();
@@ -285,4 +306,11 @@ impl MainView {
 
 stella2_meta::designer_impl! {
     crate::view::PlaceholderView
+}
+
+fn cell_is_some<T>(cell: &Cell<Option<T>>) -> bool {
+    let inner = cell.take();
+    let x = inner.is_some();
+    cell.set(inner);
+    x
 }

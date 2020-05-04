@@ -4,6 +4,8 @@ use miniserde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub main_wnd: Elem<WndState>,
+    /// Indicates whether the Preferences window is visible.
+    pub pref_visible: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +25,7 @@ impl AppState {
                 editor_height: 50.0,
                 sidebar_visible: true,
             }),
+            pref_visible: false,
         }
     }
 }
@@ -30,6 +33,10 @@ impl AppState {
 #[derive(Debug, Clone)]
 pub enum AppAction {
     Wnd(WndAction),
+    /// Hides the Preferences window.
+    HidePref,
+    /// Toggles the visibility of the Preferences window.
+    TogglePref,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +51,14 @@ impl AppState {
         match action {
             AppAction::Wnd(wnd_action) => set_field! {
                 main_wnd: WndState::reduce(Elem::clone(&this.main_wnd), wnd_action),
+                ..this
+            },
+            AppAction::HidePref => set_field! {
+                pref_visible: false,
+                ..this
+            },
+            AppAction::TogglePref => set_field! {
+                pref_visible: !this.pref_visible,
                 ..this
             },
         }

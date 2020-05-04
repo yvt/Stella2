@@ -10,6 +10,7 @@ pub use tcw3::uicore::actions as sys;
 iota::iota! {
     pub const QUIT: ActionId = iota + 1;
             , TOGGLE_SIDEBAR
+            , SHOW_PREF
 }
 
 pub fn interpret_event(ctx: &mut InterpretEventCtx<'_>) {
@@ -58,6 +59,7 @@ pub fn interpret_event(ctx: &mut InterpretEventCtx<'_>) {
             macos_sel("terminate:")
         ),
         (TOGGLE_SIDEBAR, macos_sel("toggleSidebar:")),
+        (SHOW_PREF, macos_sel("orderFrontPreferencesPanel:")),
     ]);
 }
 

@@ -42,6 +42,9 @@ pub mod elem_id {
                 , TABBAR_TAB_CLOSE
                 , TABBAR_CLOSE
 
+                , PREF_HEADER
+                , PREF_MAIN
+
                 , WND
     }
 }
@@ -429,6 +432,32 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([.LABEL] < [#SIDEBAR_ITEM.ACTIVE]) (priority = 10000) {
             fg_color: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
+        },
+
+        // -------------------------------------------------------------------
+        // "Preferences" window
+
+        // Header region
+        ([#PREF_HEADER]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
+            min_size: Vector2::new(500.0, 20.0),
+        },
+        // Backdrop blur isn't supported by the GTK backend. The translucent
+        // region looks awkward without backdrop blur, so we disable
+        // transparency in this case.
+        // See also: `self::ENABLE_BACKDROP_BLUR`
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        ([#PREF_HEADER] .. [#WND.ACTIVE]) (priority = 10500) {
+            layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
+            layer_flags[0]: LayerFlags::BACKDROP_BLUR,
+        },
+
+        // Main region background
+        ([#PREF_MAIN]) (priority = 10000) {
+            num_layers: 1,
+            layer_bg_color[0]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
+            min_size: Vector2::new(0.0, 200.0),
         },
     }
 }

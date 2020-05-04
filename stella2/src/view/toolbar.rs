@@ -11,6 +11,13 @@ impl ToolbarView {
     /// Handle `toggle_sidebar_button.activate` event.
     fn toggle_sidebar(&self) {
         // Toggle the sidebar
-        self.raise_dispatch(model::WndAction::ToggleSidebar);
+        self.raise_dispatch(model::AppAction::Wnd(model::WndAction::ToggleSidebar));
+    }
+
+    /// Handle `menu_button.activate` event.
+    fn toggle_pref(&self) {
+        // Show or hide the Preferences window
+        // TODO: Show a dropdown menu
+        self.raise_dispatch(model::AppAction::TogglePref);
     }
 }

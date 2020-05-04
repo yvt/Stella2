@@ -1,0 +1,113 @@
+use arrayvec::ArrayVec;
+use harmony::Elem;
+use tcw3::{
+    ui::{
+        AlignFlags,
+        views::{Label, Button},
+        layouts::{TableLayout, FillLayout},
+        theming::{self, Manager, StyledBox, ClassSet},
+    },
+    uicore::{HView, ViewFlags},
+    pal,
+};
+
+use crate::{
+    model,
+    stylesheet::elem_id,
+};
+
+#[widget]
+comp crate::view::prefwnd::PrefView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+
+    pub event dispatch(action: model::AppAction);
+    pub event close();
+
+    pub prop wnd_focused: bool = false;
+
+    pub const view: HView = get!(root.view);
+
+    /// The root styling element for the main window. It has the `ACTIVE` class
+    /// if the window has focus.
+    const root = StyledBox::new! {
+        style_manager,
+        class_set = if get!(wnd_focused) {
+            elem_id::WND | ClassSet::ACTIVE
+        } else {
+            elem_id::WND
+        },
+        subview_generic = get!(root_split_view),
+        subelement_generic = get!(root_split_elem.helem),
+    };
+
+    // Divide the view into two regions - header and main
+    const root_split_view = HView::new! {
+        layout = TableLayout::stack_vert(
+            ArrayVec::from([
+                get!(header_view.view),
+                get!(main_view.view),
+            ])
+                .into_iter()
+                .map(|view| (view, AlignFlags::JUSTIFY))
+        ),
+    };
+    const root_split_elem = theming::Elem::new! { style_manager };
+    on (init) {
+        get!(&root_split_elem).insert_child(get!(header_view.style_elem));
+        get!(&root_split_elem).insert_child(get!(main_view.style_elem));
+    }
+
+    // Header
+    const header_view = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_HEADER,
+        subview_generic = get!(header_layout_view),
+        subelement_generic = get!(header_layout_elem.helem),
+        // Define a draggable region
+        view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::DRAG_AREA,
+    };
+
+    // The layout of the header
+    const header_layout_view = HView::new! {
+        layout = TableLayout::new(
+            ArrayVec::from([
+                (get!(wnd_title_wrap), [0, 0], AlignFlags::VERT_JUSTIFY),
+                #[cfg(not(target_os = "macos"))]
+                (get!(close_button.view), [0, 0], AlignFlags::VERT_JUSTIFY | AlignFlags::RIGHT),
+
+            ])
+                .into_iter()
+        ),
+    };
+    const header_layout_elem = theming::Elem::new! { style_manager };
+    on (init) {
+        get!(&header_layout_elem).insert_child(get!(wnd_title.style_elem));
+        get!(&header_layout_elem).insert_child(get!(close_button.style_elem));
+    }
+
+    const wnd_title_wrap = HView::new! {
+        layout = FillLayout::new(get!(wnd_title.view))
+            .with_uniform_margin(7.0),
+    };
+
+    const wnd_title = Label::new! {
+        style_manager,
+        text = "Preferences",
+    };
+
+    // On platforms other than macOS, `WndStyleFlags::FULL_SIZE_CONTENT` removes
+    // standard window buttons, so we have to make them by themselves.
+    const close_button = Button::new! {
+        style_manager,
+        class_set = elem_id::TABBAR_CLOSE,
+    };
+
+    on (close_button.activated) get!(&this).raise_close();
+
+    // Main content
+    const main_view = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_MAIN,
+    };
+}

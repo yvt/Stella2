@@ -26,6 +26,7 @@ use crate::{
 import!("view/channellist.tcwdl");
 import!("view/dpiscalewatcher.tcwdl");
 import!("view/logview.tcwdl");
+import!("view/prefwnd.tcwdl");
 import!("view/splitutils.tcwdl");
 import!("view/tabbar.tcwdl");
 import!("view/toolbar.tcwdl");
@@ -36,7 +37,7 @@ comp crate::view::MainView {
     const style_manager: &Manager { pub set; }
 
     pub prop wnd_state: Elem<model::WndState>;
-    pub event dispatch(action: model::WndAction);
+    pub event dispatch(action: model::AppAction);
     pub event close();
 
     pub prop wnd_focused: bool = false;
@@ -80,7 +81,7 @@ comp crate::view::MainView {
 
     const tabbar = crate::view::tabbar::TabbarView::new! { wm, style_manager, wnd_state };
 
-    on (tabbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
+    on (tabbar.dispatch) get!(&this).raise_dispatch(model::AppAction::Wnd(get!(event.action)));
     on (tabbar.close) get!(&this).raise_close();
 
     const toolbar = crate::view::toolbar::ToolbarView::new! { wm, style_manager, wnd_state };
@@ -96,7 +97,7 @@ comp crate::view::MainView {
 
     on (split_side_event_adapter.drag_complete) {
         let new_size = get!(&split_side).value();
-        get!(&this).raise_dispatch(model::WndAction::SetSidebarWidth(new_size));
+        get!(&this).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetSidebarWidth(new_size)));
     }
 
     // Sidebar
@@ -169,7 +170,7 @@ comp crate::view::MainView {
 
     on (split_editor_event_adapter.drag_complete) {
         let new_size = get!(&split_editor).value();
-        get!(&this).raise_dispatch(model::WndAction::SetEditorHeight(new_size));
+        get!(&this).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetEditorHeight(new_size)));
     }
 
     // Chat log
