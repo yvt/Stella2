@@ -2876,11 +2876,11 @@ dependencies = [
 
 [[package]]
 name = "try_match_inner"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b983781238dbca8e432796763f3116015860d2f04b3627f98d44e231f9c5ce58"
+checksum = "b56bbf3dea25dff37a37e1d0074cfef8368939f1ec0e386b1772c63460e2e0df"
 dependencies = [
- "proc-macro-error 0.3.4",
+ "proc-macro-error 1.0.2",
  "proc-macro-hack",
  "proc-macro2",
  "quote",
