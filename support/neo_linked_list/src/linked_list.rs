@@ -177,9 +177,7 @@ impl<T: ?Sized> Node<T> {
     fn box_into_hdr(mut self: Box<Self>) -> NonNull<Hdr> {
         self.set_vtable();
 
-        let mut raw = Box::into_raw_non_null(self);
-
-        NonNull::from(unsafe { &mut raw.as_mut().hdr })
+        NonNull::from(&mut Box::leak(self).hdr)
     }
 
     #[inline]

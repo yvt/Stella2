@@ -1,7 +1,6 @@
 //! Reimplementation of the [atom] library with specialized and extended features.
 //!
 //! [atom]: https://crates.io/crates/atom
-#![feature(box_into_raw_non_null)]
 #![feature(const_fn)] // `const fn` with a constrained type parameter (e.g., `T: PtrSized`)
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -85,7 +84,7 @@ impl<T: PtrSized> PtrSizedExt for T {
 
 unsafe impl<T> PtrSized for Box<T> {
     fn into_raw(this: Self) -> NonNull<()> {
-        unsafe { mem::transmute(Box::into_raw_non_null(this)) }
+        NonNull::from(Box::leak(this)).cast()
     }
     unsafe fn from_raw(ptr: NonNull<()>) -> Self {
         Box::from_raw(ptr.as_ptr() as _)
