@@ -29,7 +29,7 @@ fragile = "1.0.0"
 futures = "0.3"
 iota = "0.2.1"
 iterpool = { path = "../../support/iterpool" }
-itertools = "0.8.0"
+itertools = "0.9.0"
 lazy_static = "1"
 leakypool = { path = "../../support/leakypool" }
 log = "0.4"
