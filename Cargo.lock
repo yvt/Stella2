@@ -1774,64 +1774,14 @@ checksum = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"
 
 [[package]]
 name = "proc-macro-error"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03e202b6302b80433b759eb9314be63521361a6622f6c125fe0dc3f6196e2722"
-dependencies = [
- "proc-macro-error-attr 0.3.4",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "proc-macro-error"
-version = "0.4.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18f33027081eba0a6d8aba6d1b1c3a3be58cbb12106341c2d5759fcd9b5277e7"
-dependencies = [
- "proc-macro-error-attr 0.4.12",
- "proc-macro2",
- "quote",
- "syn",
- "version_check",
-]
-
-[[package]]
-name = "proc-macro-error"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98e9e4b82e0ef281812565ea4751049f1bdcdfccda7d3f459f2e138a40c08678"
 dependencies = [
- "proc-macro-error-attr 1.0.2",
+ "proc-macro-error-attr",
  "proc-macro2",
  "quote",
  "syn",
- "version_check",
-]
-
-[[package]]
-name = "proc-macro-error-attr"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d140e22ca819b3aa3719d1aafbdea40544799e3f901886a4ee72c3ff710de7c9"
-dependencies = [
- "proc-macro2",
- "quote",
- "rustversion",
- "syn",
-]
-
-[[package]]
-name = "proc-macro-error-attr"
-version = "0.4.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a5b4b77fdb63c1eca72173d68d24501c54ab1269409f6b672c85deb18af69de"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "syn-mid",
  "version_check",
 ]
 
@@ -2234,17 +2184,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3bba175698996010c4f6dce5e7f173b6eb781fce25d2cfc45e27091ce0b79f6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2449,7 +2388,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d239ca4b13aee7a2142e6795cbd69e457665ff8037aed33b3effdc430d2f927a"
 dependencies = [
  "heck",
- "proc-macro-error 1.0.2",
+ "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
@@ -2771,7 +2710,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "enum-utils",
- "proc-macro-error 0.3.4",
+ "proc-macro-error",
  "proc-macro-hack",
  "proc-macro2",
  "quote",
@@ -2805,7 +2744,7 @@ dependencies = [
 name = "tcw3_testing_macros"
 version = "0.1.0"
 dependencies = [
- "proc-macro-error 0.4.12",
+ "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
@@ -2880,7 +2819,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b56bbf3dea25dff37a37e1d0074cfef8368939f1ec0e386b1772c63460e2e0df"
 dependencies = [
- "proc-macro-error 1.0.2",
+ "proc-macro-error",
  "proc-macro-hack",
  "proc-macro2",
  "quote",
