@@ -3,7 +3,7 @@ use harmony::Elem;
 use tcw3::{
     ui::{
         AlignFlags,
-        views::{Label, Button, Split, FixedSpacer, EntryCore},
+        views::{Label, Button, Split, EntryCore},
         layouts::TableLayout,
         theming::{self, Manager, StyledBox, ClassSet},
     },
@@ -198,10 +198,9 @@ comp crate::view::MainView {
         layout = TableLayout::stack_horz(
             ArrayVec::from([
                 (get!(editor_field.view), AlignFlags::JUSTIFY),
-                (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
                 (get!(send_button.view), AlignFlags::HORZ_JUSTIFY | AlignFlags::TOP),
             ])
-        ),
+        ).with_uniform_spacing(5.0),
     };
 
     on (init) {
@@ -232,8 +231,6 @@ comp crate::view::MainView {
     on (init) {
         get!(&editor_field.view).set_cursor_shape(Some(tcw3::uicore::CursorShape::Text));
     }
-
-    const spacer1 = FixedSpacer::new! { wm, size = [5.0, 0.0].into() };
 
     const send_button = Button::new! {
         style_manager,

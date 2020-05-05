@@ -7,7 +7,7 @@ use tcw3::{
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
-            Scrollbar, Spacer,
+            Scrollbar,
         },
         AlignFlags,
     },
@@ -198,23 +198,12 @@ fn main() {
     wnd.content_view().set_layout(
         TableLayout::stack_vert(vec![
             (label.view(), AlignFlags::VERT_JUSTIFY),
-            (
-                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
-                AlignFlags::VERT_JUSTIFY,
-            ),
             (scrollbar.view(), AlignFlags::JUSTIFY),
-            (
-                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
-                AlignFlags::VERT_JUSTIFY,
-            ),
             (entry.view(), AlignFlags::JUSTIFY),
-            (
-                Spacer::new().with_fixed([0.0, 10.0]).into_view(),
-                AlignFlags::VERT_JUSTIFY,
-            ),
             (h_layout.clone(), AlignFlags::JUSTIFY),
         ])
-        .with_uniform_margin(20.0),
+        .with_uniform_margin(20.0)
+        .with_uniform_spacing(10.0),
     );
 
     wm.enter_main_loop();

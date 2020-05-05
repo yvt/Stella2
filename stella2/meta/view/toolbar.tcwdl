@@ -3,7 +3,7 @@ use harmony::Elem;
 use tcw3::{
     ui::{
         AlignFlags,
-        views::{Label, Button, FixedSpacer},
+        views::{Label, Button},
         layouts::TableLayout,
         theming::{self, Manager, StyledBox, HElem},
     },
@@ -36,17 +36,21 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
                     (get!(separator.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(topic.view), AlignFlags::LEFT),
                     (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
-                    (get!(spacer1.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(menu_button.view), AlignFlags::JUSTIFY),
                 ])
-            ),
+            )
+                .with_column_spacing(&[
+                    0.0,
+                    0.0,
+                    0.0,
+                    7.0,
+                    7.0,
+                ]),
         },
     };
 
     pub const view: HView = get!(wrapper.view);
     pub const style_elem: HElem = get!(wrapper.style_elem);
-
-    const spacer1 = FixedSpacer::new! { wm, size = [7.0, 0.0].into() };
 
     const separator = StyledBox::new! {
         style_manager,

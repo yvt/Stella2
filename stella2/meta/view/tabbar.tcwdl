@@ -4,7 +4,7 @@ use tcw3::{
     pal,
     ui::{
         AlignFlags,
-        views::{Label, Button, FixedSpacer},
+        views::{Label, Button},
         theming::{self, ClassSet, HElem, StyledBox, Manager},
         layouts::{TableLayout},
     },
@@ -32,14 +32,27 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         subview_generic = HView::new! {
             layout = TableLayout::stack_horz(
                 ArrayVec::from([
-                    #[cfg(target_os = "macos")]
-                    (get!(spacer.view), AlignFlags::HORZ_JUSTIFY),
                     (get!(tab1.view), AlignFlags::JUSTIFY),
                     (get!(tab2.view), AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT),
                     #[cfg(not(target_os = "macos"))]
                     (get!(close_button.view), AlignFlags::JUSTIFY),
                 ])
-            ),
+            )
+                .with_margin([
+                    0.0,
+                    0.0,
+                    0.0,
+                    {
+                        // On macOS, there are standard window buttons on the
+                        // upper left corner. We need to make sure they don't
+                        // overlap with tabs.
+                        // TODO: Slightly lower the buttons so that they are
+                        //       vertically centered within the tabbar.
+                        let avoid_stoplight = cfg!(target_os = "macos") &&
+                            !get!(&wnd_state).sidebar_visible;
+                        if avoid_stoplight { 68.0 } else { 0.0 }
+                    }
+                ]),
         },
         subelement_generic = get!(tabs_elem.helem),
     };
@@ -53,19 +66,6 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         get!(&tabs_elem).insert_child(get!(tab2.style_elem));
         get!(&tabs_elem).insert_child(get!(close_button.style_elem));
     }
-
-    // On macOS, there are standard window buttons on the upper left corner.
-    // We need to make sure they don't overlap with tabs.
-    // TODO: Slightly lower the buttons so that they are vertically centered
-    //       within the tabbar.
-    const spacer = FixedSpacer::new! {
-        wm,
-        size = {
-            let avoid_stoplight = cfg!(target_os = "macos") &&
-                !get!(&wnd_state).sidebar_visible;
-            [if avoid_stoplight { 68.0 } else { 0.0 }, 0.0].into()
-        },
-    };
 
     // TODO: Replace these with real tabs
     const tab1 = StyledBox::new! {
