@@ -456,6 +456,11 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#PREF_HEADER]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
+            layer_metrics[0]: Metrics {
+                // fill the gap between `#PREF_HEADER` and `#PREF_MAIN`
+                margin: [0.0, 0.0, -1.0, 0.0],
+                ..Metrics::default()
+            },
             min_size: Vector2::new(500.0, 20.0),
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
