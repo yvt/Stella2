@@ -44,6 +44,12 @@ pub mod elem_id {
 
                 , PREF_HEADER
                 , PREF_MAIN
+                , PREF_TAB_BAR
+                , PREF_TAB_GENERAL
+                , PREF_TAB_ACCOUNTS
+                , PREF_TAB_CONNECTION
+                , PREF_TAB_ADVANCED
+                , PREF_TAB_ABOUT
 
                 , WND
     }
@@ -59,11 +65,20 @@ fn himg_from_stvg(data: &(&'static [u8], [f32; 2])) -> HImg {
 }
 
 /// Construct a colorized `HImg` from an StVG image.
-#[allow(dead_code)]
 fn himg_from_stvg_col(data: (&'static [u8], [f32; 2]), c: tcw3::pal::RGBAF32) -> HImg {
     StvgImg::new(data)
         .with_color_xform(tcw3::stvg::replace_color(c))
         .into_himg()
+}
+
+/// Construct a `HImg` for a tab icon.
+fn himg_tab_icon(data: &(&'static [u8], [f32; 2])) -> HImg {
+    himg_from_stvg_col(*data, [0.0, 0.0, 0.0, 1.0].into())
+}
+
+/// Construct a `HImg` for an active tab icon.
+fn himg_tab_icon_act(data: &(&'static [u8], [f32; 2])) -> HImg {
+    himg_from_stvg_col(*data, [0.2, 0.5, 0.9, 1.0].into())
 }
 
 fn new_custom_stylesheet() -> impl Stylesheet {
@@ -458,6 +473,117 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
             min_size: Vector2::new(0.0, 200.0),
+        },
+
+        // All tabs - each of them has something like `PREF_TAB_GENERAL`
+        //  - Default: Uncolored, 60% opacity
+        //  - Hover: Default + 80% opacity
+        //  - Active: Default + 100% opacity
+        //  - Selected: Colored, 100% opacity, colored underline
+        //  - Default + inactive window: Uncolored, 40% opacity
+        //  - Default + inactive window: Uncolored, 60% opacity, grayed underline
+        ([] < [#PREF_TAB_BAR]) (priority = 10000) {
+            num_layers: 2,
+
+            // An underline (displayed only when active)
+            layer_bg_color[0]: RGBAF32::new(0.2, 0.5, 0.9, 1.0),
+            layer_opacity[0]: 0.0,
+            layer_metrics[0]: Metrics {
+                margin: [NAN, 12.0, 0.0, 12.0],
+                size: Vector2::new(NAN, 2.0),
+            },
+
+            // layer[1] is used for displaying an icon
+            layer_metrics[1]: Metrics {
+                margin: [11.0, NAN, NAN, NAN],
+                size: Vector2::new(26.0, 26.0),
+            },
+            layer_opacity[1]: 0.6,
+
+            // Label (`[.LABEL] .. [#PREF_TAB_BAR]`)
+            subview_metrics[Role::Generic]: Metrics {
+                margin: [45.0, NAN, 8.0, NAN],
+                ..Metrics::default()
+            },
+
+            min_size: Vector2::new(80.0, 0.0),
+        },
+        ([.HOVER] < [#PREF_TAB_BAR]) (priority = 10100) {
+            layer_opacity[1]: 0.8,
+        },
+        ([.ACTIVE] < [#PREF_TAB_BAR]) (priority = 10200) {
+            layer_opacity[1]: 1.0,
+        },
+        ([.CHECKED] < [#PREF_TAB_BAR]) (priority = 10300) {
+            // Display the underline
+            layer_opacity[0]: 1.0,
+            layer_opacity[1]: 1.0,
+        },
+
+        ([] < [#PREF_TAB_BAR] .. [#WND:not(.ACTIVE)]) (priority = 10400) {
+            // The window is inactive, so gray out the underline
+            layer_bg_color[0]: RGBAF32::new(0.0, 0.0, 0.0, 0.5),
+            layer_opacity[1]: 0.4,
+        },
+        ([.CHECKED] < [#PREF_TAB_BAR] .. [#WND:not(.ACTIVE)]) (priority = 10400) {
+            layer_opacity[1]: 0.6,
+        },
+
+        ([.LABEL] .. [] < [#PREF_TAB_BAR]) (priority = 10000) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.6),
+            font: SysFontType::Small,
+        },
+        ([.LABEL] .. [.HOVER] < [#PREF_TAB_BAR]) (priority = 10100) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.8),
+        },
+        ([.LABEL] .. [.ACTIVE] < [#PREF_TAB_BAR]) (priority = 10200) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+        },
+        ([.LABEL] .. [.CHECKED] < [#PREF_TAB_BAR]) (priority = 10300) {
+            fg_color: RGBAF32::new(0.2, 0.5, 0.9, 1.0),
+        },
+
+        ([.LABEL] .. [] < [#PREF_TAB_BAR] .. [#WND:not(.ACTIVE)]) (priority = 10400) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.4),
+        },
+        ([.LABEL] .. [.CHECKED] < [#PREF_TAB_BAR] .. [#WND:not(.ACTIVE)]) (priority = 10400) {
+            fg_color: RGBAF32::new(0.0, 0.0, 0.0, 0.6),
+        },
+
+        // Individual tabs
+        ([#PREF_TAB_GENERAL] /* < [#PREF_TAB_BAR] */) (priority = 10000) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon(&assets::pref::TAB_GENERAL)),
+        },
+        ([#PREF_TAB_GENERAL.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_GENERAL)),
+        },
+
+        ([#PREF_TAB_ACCOUNTS] /* < [#PREF_TAB_BAR] */) (priority = 10000) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon(&assets::pref::TAB_ACCOUNTS)),
+        },
+        ([#PREF_TAB_ACCOUNTS.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_ACCOUNTS)),
+        },
+
+        ([#PREF_TAB_CONNECTION] /* < [#PREF_TAB_BAR] */) (priority = 10000) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon(&assets::pref::TAB_CONNECTION)),
+        },
+        ([#PREF_TAB_CONNECTION.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_CONNECTION)),
+        },
+
+        ([#PREF_TAB_ADVANCED] /* < [#PREF_TAB_BAR] */) (priority = 10000) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon(&assets::pref::TAB_ADVANCED)),
+        },
+        ([#PREF_TAB_ADVANCED.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_ADVANCED)),
+        },
+
+        ([#PREF_TAB_ABOUT] /* < [#PREF_TAB_BAR] */) (priority = 10000) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon(&assets::pref::TAB_ABOUT)),
+        },
+        ([#PREF_TAB_ABOUT.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
+            #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_ABOUT)),
         },
     }
 }

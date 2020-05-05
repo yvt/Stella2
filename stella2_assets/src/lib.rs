@@ -13,6 +13,16 @@ pub static CLOSE: Stvg = stvg!("src/close.svg");
 
 pub static LIST_GROUP_OPEN: Stvg = stvg!("src/list_group_open.svg");
 
+pub mod pref {
+    use super::*;
+
+    pub static TAB_ABOUT: Stvg = stvg!("src/pref/tab_about.svg");
+    pub static TAB_ACCOUNTS: Stvg = stvg!("src/pref/tab_accounts.svg");
+    pub static TAB_ADVANCED: Stvg = stvg!("src/pref/tab_advanced.svg");
+    pub static TAB_CONNECTION: Stvg = stvg!("src/pref/tab_connection.svg");
+    pub static TAB_GENERAL: Stvg = stvg!("src/pref/tab_general.svg");
+}
+
 pub mod toolbar {
     use super::*;
 

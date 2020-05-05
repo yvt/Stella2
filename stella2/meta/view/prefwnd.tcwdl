@@ -14,6 +14,7 @@ use tcw3::{
 use crate::{
     model,
     stylesheet::elem_id,
+    view::radiolist::RadioListView,
 };
 
 #[widget]
@@ -75,7 +76,7 @@ comp crate::view::prefwnd::PrefView {
                 (get!(wnd_title_wrap), [0, 0], AlignFlags::VERT_JUSTIFY),
                 #[cfg(not(target_os = "macos"))]
                 (get!(close_button.view), [0, 0], AlignFlags::VERT_JUSTIFY | AlignFlags::RIGHT),
-
+                (get!(tab_bar.view), [0, 1], AlignFlags::VERT_JUSTIFY),
             ])
                 .into_iter()
         ),
@@ -84,11 +85,12 @@ comp crate::view::prefwnd::PrefView {
     on (init) {
         get!(&header_layout_elem).insert_child(get!(wnd_title.style_elem));
         get!(&header_layout_elem).insert_child(get!(close_button.style_elem));
+        get!(&header_layout_elem).insert_child(get!(tab_bar.style_elem));
     }
 
     const wnd_title_wrap = HView::new! {
         layout = FillLayout::new(get!(wnd_title.view))
-            .with_uniform_margin(7.0),
+            .with_uniform_margin(4.0),
     };
 
     const wnd_title = Label::new! {
@@ -104,6 +106,26 @@ comp crate::view::prefwnd::PrefView {
     };
 
     on (close_button.activated) get!(&this).raise_close();
+
+    prop current_tab: u32 = 0;
+    const tab_bar = RadioListView::new! {
+        wm, style_manager,
+        items = [
+            ("General", elem_id::PREF_TAB_GENERAL),
+            ("Accounts", elem_id::PREF_TAB_ACCOUNTS),
+            ("Connection", elem_id::PREF_TAB_CONNECTION),
+            ("Advanced", elem_id::PREF_TAB_ADVANCED),
+            ("About", elem_id::PREF_TAB_ABOUT),
+        ]
+            .iter()
+            .enumerate()
+            .map(|(i, &(caption, class_set))| (i as u32, caption.to_owned(), class_set))
+            .collect::<Vec<_>>(),
+        value = get!(current_tab),
+        vertical = false,
+        class_set = elem_id::PREF_TAB_BAR,
+    };
+    on(tab_bar.change) { get!(&this).set_current_tab(get!(event.value)); }
 
     // Main content
     const main_view = StyledBox::new! {
