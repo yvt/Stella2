@@ -22,6 +22,7 @@ mod dpiscalewatcher;
 mod global;
 mod logview;
 mod prefwnd;
+mod radiolist;
 mod splitutils;
 mod tabbar;
 mod toolbar;

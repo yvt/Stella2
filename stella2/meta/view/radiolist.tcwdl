@@ -1,0 +1,100 @@
+use std::cell::Cell;
+use tcw3::{
+    ui::{AlignFlags, theming, views::RadioButton, layouts::TableLayout},
+    uicore::HView,
+    pal,
+};
+
+#[widget]
+pub(crate) comp crate::view::radiolist::RadioListView {
+    const wm: pal::Wm { pub set; }
+    const style_manager: &theming::Manager { pub set; }
+
+    /// Sets or retrieves the current selection.
+    pub prop value: u32 { pub set; pub get clone; }
+    /// Raised when the user clicks a radio button in the view.
+    pub event change(value: u32);
+
+    /// Sets or retrieves the list of radio buttons.
+    ///
+    /// Each tuple is comprised of three values: a tag value used to identify
+    /// each item by `value`, a caption, and a styling class set for the
+    /// corresponding radio button.
+    pub const items: Vec<(u32, String, theming::ClassSet)> { pub set; pub get clone; }
+
+    /// Sets or retrieves the alignment flags for the items.
+    pub const item_align: AlignFlags = AlignFlags::LEFT | AlignFlags::VERT_JUSTIFY;
+
+    /// Sets or retrieves the direction to arrange the items in.
+    pub const vertical: bool { pub set; } = true;
+
+    /// The root view.
+    pub const view = HView::new! {
+        layout = {
+            let [dx, dy] = if get!(vertical) {
+                [0, usize::max_value()]
+            } else {
+                [usize::max_value(), 0]
+            };
+            let coords = (0..).map(|i| [i & dx, i & dy]);
+
+            TableLayout::new(
+                get!(&radio_buttons)
+                    .iter()
+                    .zip(coords)
+                    .map(|(rb, coord)| (rb.view(), coord, get!(item_align)))
+            )
+        },
+    };
+
+    /// The styling element wrapping all radio buttons in the view.
+    pub const style_elem: theming::HElem { pub get clone; } = get!(elem.helem);
+
+    /// Controls the styling class of `style_elem`.
+    pub const class_set: theming::ClassSet { pub set; } = theming::ClassSet::empty();
+
+    // ------------------------------------------------------------------------
+    // Under the hood
+
+    const elem = theming::Elem::new! {
+        style_manager,
+        class_set = get!(class_set),
+        // Child elements are inserted by the initializer of `radio_buttons`.
+    };
+
+    const radio_buttons: Vec<RadioButton> =
+        get!(items)
+            .iter()
+            .map(|&(tag, ref caption, class_set)| {
+                let rb = RadioButton::new(get!(style_manager));
+                rb.set_class_set(class_set);
+                rb.set_caption(caption);
+                // Add `radio_buttons` to the styling element `elem`.
+                get!(&elem).insert_child(rb.style_elem());
+                rb
+            })
+            .collect::<Vec<RadioButton>>();
+
+    on (init) {
+        // Register event handlers. (TCW3 Designer can't automatically hook
+        // up event handlers t components created in other ways than
+        // `Component::new!`)
+        // This can't be done in `radio_buttons` because `get!(&this)` is
+        // unavailable during the field initialization.
+        for (rb, &(tag, _, _)) in get!(&radio_buttons).iter().zip(get!(items).iter()) {
+            let this_weak = get!(&this).downgrade();
+            rb.subscribe_activated(Box::new(move |_| {
+                if let Some(this) = this_weak.upgrade() {
+                    this.raise_change(tag);
+                }
+            }));
+        }
+    }
+
+    on (init, value) {
+        // Check/uncheck items
+        for (rb, &(tag, _, _)) in get!(&radio_buttons).iter().zip(get!(items).iter()) {
+            rb.set_checked(get!(value) == tag);
+        }
+    }
+}
