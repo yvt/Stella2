@@ -124,8 +124,11 @@ fn main() {
         )
     });
 
-    wnd.content_view()
-        .set_layout(TableLayout::new(cells).with_uniform_margin(20.0));
+    wnd.content_view().set_layout(
+        TableLayout::new(cells)
+            .with_uniform_margin(20.0)
+            .with_uniform_spacing(10.0),
+    );
 
     wm.enter_main_loop();
 }

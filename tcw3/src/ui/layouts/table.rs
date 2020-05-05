@@ -17,6 +17,7 @@ pub struct TableLayout {
     subviews: Box<[HView]>,
     items: Box<[Item]>,
     margin: f32,
+    spacing: f32,
 
     columns: Box<[Line]>,
     rows: Box<[Line]>,
@@ -58,7 +59,8 @@ struct LineState {
     size_max: f32,
     size_preferred: f32,
 
-    /// The actual position of the line, calculated by `arrange`.
+    /// The actual position of the right/bottom edge of the line,
+    /// calculated by `arrange`.
     pos: f32,
 }
 
@@ -153,6 +155,7 @@ impl TableLayout {
             subviews,
             items,
             margin: 0.0,
+            spacing: 0.0,
             columns,
             rows,
             state: RefCell::new(State {
@@ -166,6 +169,12 @@ impl TableLayout {
     /// Update the margin value and return a new `TableLayout`, consuming `self`.
     pub fn with_uniform_margin(self, margin: f32) -> Self {
         Self { margin, ..self }
+    }
+
+    /// Update the inter-cell spacing value and return a new `TableLayout`,
+    /// consuming `self`.
+    pub fn with_uniform_spacing(self, spacing: f32) -> Self {
+        Self { spacing, ..self }
     }
 }
 
@@ -222,7 +231,11 @@ impl Layout for TableLayout {
         postproc_line(&mut state.rows, &self.rows);
 
         // Return a `SizeTraits` based on the lines' size traits
-        let extra = vec2(self.margin, self.margin) * 2.0;
+        let extra = vec2(self.margin, self.margin) * 2.0
+            + vec2(
+                self.spacing * (self.columns.len() - 1) as f32,
+                self.spacing * (self.rows.len() - 1) as f32,
+            );
 
         let row_sum: LineState = state.rows.iter().cloned().sum();
         let column_sum: LineState = state.columns.iter().cloned().sum();
@@ -240,19 +253,27 @@ impl Layout for TableLayout {
 
         // Determine the actual size of every column and row
         let origin = self.margin;
-        let extra = self.margin * 2.0;
+        let spacing = self.spacing;
+        let extra = vec2(self.margin, self.margin) * 2.0
+            + vec2(
+                spacing * (self.columns.len() - 1) as f32,
+                spacing * (self.rows.len() - 1) as f32,
+            );
         solve_lines(
             &mut state.columns,
-            size.x - extra,
+            size.x - extra.x,
             origin,
             &mut state.clearances,
         );
         solve_lines(
             &mut state.rows,
-            size.y - extra,
+            size.y - extra.y,
             origin,
             &mut state.clearances,
         );
+
+        apply_spacing(&mut state.columns, spacing);
+        apply_spacing(&mut state.rows, spacing);
 
         // Arrange subviews
         for (view, item) in self.subviews.iter().zip(self.items.iter()) {
@@ -261,11 +282,11 @@ impl Layout for TableLayout {
                 Point2::new(
                     cell[0]
                         .checked_sub(1)
-                        .map(|i| state.columns[i].pos)
+                        .map(|i| state.columns[i].pos + spacing)
                         .unwrap_or(origin),
                     cell[1]
                         .checked_sub(1)
-                        .map(|i| state.rows[i].pos)
+                        .map(|i| state.rows[i].pos + spacing)
                         .unwrap_or(origin),
                 ),
                 Point2::new(state.columns[cell[0]].pos, state.rows[cell[1]].pos),
@@ -385,5 +406,14 @@ fn solve_lines(
     for line in lines.iter_mut() {
         sum += line.pos;
         line.pos = sum;
+    }
+}
+
+/// Apply an inter-cell spacing value.
+fn apply_spacing(lines: &mut [LineState], spacing: f32) {
+    let mut offset = spacing;
+    for line in lines[1..].iter_mut() {
+        line.pos += offset;
+        offset += spacing;
     }
 }
