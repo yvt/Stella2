@@ -15,6 +15,7 @@ array_intrusive_list = { path = "../support/array_intrusive_list" }
 arrayvec = "0.5"
 as_any = { path = "../support/as_any" }
 bitflags = "1.1.0"
+boxed_slice_tools = { path = "../support/boxed_slice_tools" }
 cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 derive_more = "0.99.1"

@@ -1,4 +1,5 @@
 use alt_fp::FloatOrd;
+use boxed_slice_tools::repeating_default;
 use cggeom::Box2;
 use cgmath::{vec2, Point2, Vector2};
 use std::{cell::RefCell, cmp::max};
@@ -147,8 +148,8 @@ impl TableLayout {
         let num_rows = items.iter().map(|item| item.cell[1] + 1).max().unwrap_or(0);
 
         // Count items in each line
-        let mut columns: Box<[_]> = vec![Line::default(); num_columns].into();
-        let mut rows: Box<[_]> = vec![Line::default(); num_rows].into();
+        let mut columns: Box<[Line]> = repeating_default(num_columns);
+        let mut rows: Box<[Line]> = repeating_default(num_rows);
         for item in items.iter() {
             columns[item.cell[0]].num_items += 1;
             rows[item.cell[1]].num_items += 1;
@@ -161,9 +162,9 @@ impl TableLayout {
             columns,
             rows,
             state: RefCell::new(State {
-                columns: vec![LineState::default(); num_columns].into(),
-                rows: vec![LineState::default(); num_rows].into(),
-                clearances: vec![Clearance::default(); max(num_columns, num_rows)].into(),
+                columns: repeating_default(num_columns),
+                rows: repeating_default(num_rows),
+                clearances: repeating_default(max(num_columns, num_rows)),
             }),
         }
     }

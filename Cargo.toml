@@ -21,6 +21,7 @@ members = [
     "support/array_intrusive_list",
     "support/as_any",
     "support/atom2",
+    "support/boxed_slice_tools",
     "support/cggeom",
     "support/demotools",
     "support/iterpool",
