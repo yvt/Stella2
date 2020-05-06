@@ -8,7 +8,7 @@ use tcw3::{
     uicore::{HView, HViewRef},
 };
 
-use crate::stylesheet::elem_id;
+use crate::stylesheet::{elem_id, my_roles};
 
 stella2_meta::designer_impl! {
     crate::view::channellist::ChannelListView
@@ -80,7 +80,7 @@ impl table::TableModelQuery for TableModelQuery {
             // Clear `.BUTTON` and replace with `#SIDEBAR_GROUP_BULLET`
             button.set_class_set(elem_id::SIDEBAR_GROUP_BULLET);
 
-            wrap.set_child(theming::roles::BULLET, Some(&button));
+            wrap.set_child(my_roles::BULLET, Some(&button));
 
             Some(button)
         } else {

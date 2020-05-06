@@ -122,7 +122,6 @@ pub mod roles {
         pub const GENERIC: super::Role = iota;
                 , HORZ_SCROLLBAR
                 , VERT_SCROLLBAR
-                , BULLET  // TODO: Remove - the framework doesn't use this
     }
 }
 

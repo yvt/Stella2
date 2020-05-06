@@ -58,6 +58,25 @@ pub mod elem_id {
 // Import IDs (e.g., `#SHOW_MENU`) into the scope
 use self::elem_id::*;
 
+/// Define role values.
+///
+/// The set of role values must be unique within each `StyledBox`. The
+/// usage of the values follow one of the following rules:
+///
+///  - In most cases, `roles::GENERIC` is the only role you need.
+///
+///  - Use `roles::GENERIC` and some (or all) of the roles in `my_roles`.
+///    Note that `my_roles` can overlap with predefined roles in `roles` except
+///    for `roles::GENERIC`.
+///
+pub mod my_roles {
+    use tcw3::ui::theming::Role;
+
+    iota::iota! {
+        pub const BULLET: Role = iota + 1;
+    }
+}
+
 /// Construct a `HImg` from an StVG image.
 #[inline(never)]
 fn himg_from_stvg(data: &(&'static [u8], [f32; 2])) -> HImg {
@@ -243,7 +262,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Close button
-            subview_metrics[roles::BULLET]: Metrics {
+            subview_metrics[my_roles::BULLET]: Metrics {
                 margin: [NAN, 7.0, NAN, NAN],
                 ..Metrics::default()
             },
@@ -397,7 +416,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 ..Metrics::default()
             },
             // bullet (open/close)
-            subview_metrics[roles::BULLET]: Metrics {
+            subview_metrics[my_roles::BULLET]: Metrics {
                 margin: [NAN, NAN, NAN, 5.0],
                 size: Vector2::new(16.0, 16.0),
             },
