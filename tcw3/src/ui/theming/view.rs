@@ -226,6 +226,17 @@ impl StyledBox {
         }
     }
 
+    /// Set children using `set_subview` and `set_subelement`.
+    pub fn set_children<'a>(&self, children: impl AsRef<[(Role, Option<&'a dyn Widget>)]>) {
+        self.set_children_inner(children.as_ref());
+    }
+
+    fn set_children_inner(&self, children: &[(Role, Option<&dyn Widget>)]) {
+        for &(role, widget) in children.iter() {
+            self.set_child(role, widget);
+        }
+    }
+
     /// Get the class set of the styled element.
     pub fn class_set(&self) -> ClassSet {
         self.shared.style_elem.class_set()
@@ -299,18 +310,6 @@ impl StyledBox {
 
     pub fn set_child_generic(&self, widget: &dyn Widget) {
         self.set_child(roles::GENERIC, Some(widget));
-    }
-
-    pub fn set_subview_bullet(&self, view: impl Into<Option<HView>>) {
-        self.set_subview(roles::BULLET, view.into());
-    }
-
-    pub fn set_subelement_bullet(&self, element: impl Into<Option<HElem>>) {
-        self.set_subelement(roles::BULLET, element.into());
-    }
-
-    pub fn set_child_bullet(&self, widget: &dyn Widget) {
-        self.set_child(roles::BULLET, Some(widget));
     }
 }
 
