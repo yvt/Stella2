@@ -195,6 +195,8 @@ impl HViewRef<'_> {
             let new_size_traits = layout.size_traits(&LayoutCtx {
                 active_view: self,
                 new_layout: None,
+                #[cfg(debug_assertions)]
+                is_arranging: false,
             });
 
             // See if `size_traits` has changed
@@ -228,12 +230,19 @@ impl HViewRef<'_> {
         if dirty.get().intersects(ViewDirtyFlags::SUBVIEWS_FRAME) {
             dirty.set(dirty.get() - ViewDirtyFlags::SUBVIEWS_FRAME);
 
+            #[cfg(debug_assertions)]
+            for hview in layout.subviews().iter() {
+                hview.view.has_frame.set(false);
+            }
+
             // Invoke the `Layout` to reposition the subviews.
             // It'll call `set_subview_frame` and set `DESCENDANT_SUBVIEWS_FRAME`
             // on `self` and `SUBVIEWS_FRAME` on the subviews.
             let mut ctx = LayoutCtx {
                 active_view: self,
                 new_layout: None,
+                #[cfg(debug_assertions)]
+                is_arranging: true,
             };
             layout.arrange(&mut ctx, self.view.frame.get().size());
 
@@ -242,6 +251,15 @@ impl HViewRef<'_> {
                 drop(layout);
                 self.set_layout(new_layout);
                 return;
+            }
+
+            #[cfg(debug_assertions)]
+            for hview in layout.subviews().iter() {
+                assert!(
+                    hview.view.has_frame.get(),
+                    "`arrange` did not call `set_subview_frame` for the view {:?} ",
+                    hview,
+                );
             }
         }
 
@@ -386,6 +404,8 @@ pub struct LayoutCtx<'a> {
     active_view: HViewRef<'a>,
     /// A new layout object, optionally set by `self.set_layout`.
     new_layout: Option<Box<dyn Layout>>,
+    #[cfg(debug_assertions)]
+    is_arranging: bool,
 }
 
 impl<'a> LayoutCtx<'a> {
@@ -400,6 +420,9 @@ impl<'a> LayoutCtx<'a> {
     /// This method only can be called from [`Layout::arrange`].
     pub fn set_subview_frame(&mut self, hview: HViewRef<'_>, frame: Box2<f32>) {
         self.ensure_subview(hview);
+
+        #[cfg(debug_assertions)]
+        assert!(self.is_arranging);
 
         // Local position
         if frame.size() != hview.view.frame.get().size() {
@@ -417,6 +440,9 @@ impl<'a> LayoutCtx<'a> {
         }
 
         hview.view.frame.set(frame);
+
+        #[cfg(debug_assertions)]
+        hview.view.has_frame.set(true);
     }
 
     /// Get the frame previously set by `set_subview_frame`.
@@ -425,6 +451,15 @@ impl<'a> LayoutCtx<'a> {
     /// retrieve must already be set during the same call to `Layout::arrange`.
     pub fn subview_frame(&self, hview: HViewRef<'_>) -> Box2<f32> {
         self.ensure_subview(hview);
+
+        #[cfg(debug_assertions)]
+        assert!(self.is_arranging);
+
+        #[cfg(debug_assertions)]
+        assert!(
+            hview.view.has_frame.get(),
+            "The view {:?} doesn't have a frame set yet"
+        );
 
         hview.view.frame.get()
     }

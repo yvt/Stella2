@@ -621,6 +621,11 @@ struct View {
     frame: Cell<Box2<f32>>,
     global_frame: Cell<Box2<f32>>,
 
+    /// When debug assertions are enabled, this field is used during layouting
+    /// to check invariants.
+    #[cfg(debug_assertions)]
+    has_frame: Cell<bool>,
+
     // Layers
     layers: RefCell<Vec<pal::HLayer>>,
 
@@ -667,6 +672,8 @@ impl View {
             size_traits: Cell::new(SizeTraits::default()),
             frame: Cell::new(Box2::zero()),
             global_frame: Cell::new(Box2::zero()),
+            #[cfg(debug_assertions)]
+            has_frame: Cell::new(false),
             layers: RefCell::new(Vec::new()),
             cursor_shape: Cell::new(None),
             focus_link_override: RefCell::new(None),
