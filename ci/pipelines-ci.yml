@@ -21,6 +21,22 @@ stages:
       job_pre-steps:
         - script: ${{ variables.linuxPrestep }}
           displayName: Install native dependencies
+  - template: ./jobs/cargo-check.yml
+    parameters:
+      rust: ${{ variables.rustVersion }}
+      all: true
+      benches: true
+      job_name: cargo_check_noassert
+      job_displayName: Cargo check (no debug assertions)
+      job_pool:
+        vmImage: ${{ variables.linuxVmImage }}
+      job_pre-steps:
+        - script: ${{ variables.linuxPrestep }}
+          displayName: Install native dependencies
+        - script: |
+            echo "[profile.test]" >> Cargo.toml
+            echo "debug-assertions = false" >> Cargo.toml
+          displayName: Disable debug assertions
   - template: ./jobs/rustfmt.yml
     parameters:
       rust: ${{ variables.rustVersion }}
