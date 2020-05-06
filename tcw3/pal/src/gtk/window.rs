@@ -294,6 +294,9 @@ impl HWnd {
         // Suppress further callbacks
         wnd.gtk_widget.wnd_ptr().set(None);
 
+        // Destroy the window
+        wnd.gtk_wnd.destroy();
+
         COMPOSITOR
             .get_with_wm(wm)
             .borrow_mut()
