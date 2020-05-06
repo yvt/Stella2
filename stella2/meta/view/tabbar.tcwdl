@@ -75,7 +75,7 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         auto_class_set = ClassSet::HOVER,
         children = [
             (theming::roles::GENERIC, Some(get!(&tab1_caption) as &dyn Widget)),
-            (my_roles::BULLET, Some(get!(&tab1_close) as &dyn Widget)),
+            (my_roles::CLOSE, Some(get!(&tab1_close) as &dyn Widget)),
         ],
     };
     const tab1_caption = Label::new! {
@@ -94,7 +94,7 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         auto_class_set = ClassSet::HOVER,
         children = [
             (theming::roles::GENERIC, Some(get!(&tab2_caption) as &dyn Widget)),
-            (my_roles::BULLET, Some(get!(&tab2_close) as &dyn Widget)),
+            (my_roles::CLOSE, Some(get!(&tab2_close) as &dyn Widget)),
         ],
     };
     const tab2_caption = Label::new! {

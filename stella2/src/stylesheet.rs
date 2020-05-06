@@ -74,6 +74,7 @@ pub mod my_roles {
 
     iota::iota! {
         pub const BULLET: Role = iota + 1;
+                , CLOSE
     }
 }
 
@@ -262,7 +263,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             },
 
             // Close button
-            subview_metrics[my_roles::BULLET]: Metrics {
+            subview_metrics[my_roles::CLOSE]: Metrics {
                 margin: [NAN, 7.0, NAN, NAN],
                 ..Metrics::default()
             },
