@@ -20,12 +20,12 @@ cggeom = { path = "../support/cggeom" }
 cgmath = "0.17.0"
 derive_more = "0.99.1"
 flags-macro = "0.1.3"
+iota = "0.2.1"
 iterpool = { path = "../support/iterpool" }
 itertools = "0.9.0"
 lazy_static = "1"
 leakypool = { path = "../support/leakypool" }
 log = "0.4"
-macro_rules_attribute = "0.0.1"
 minisort = { path = "../support/minisort" }
 ndarray = "0.13.0"
 neo_linked_list = { path = "../support/neo_linked_list" }

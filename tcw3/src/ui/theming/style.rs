@@ -104,22 +104,27 @@ pub mod elem_id {
 /// `ClassSet` of an element and its descendants.
 pub type ElemClassPath = [ClassSet];
 
-/// A role of a subview.
-#[macro_rules_attribute::macro_rules_attribute(variant_count!)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Role {
-    /// The default role.
-    Generic = 0,
-    HorizontalScrollbar,
-    VerticalScrollbar,
-    Bullet,
-}
-
-/// The number of roles defined by [`Role`].
+/// Role of a subview.
 ///
-/// The discriminant values of `Role` are guaranteed to range between
-/// `0` and `ROLE_COUNT - 1`.
-pub const ROLE_COUNT: usize = Role::VARIANT_COUNT as usize;
+/// The meaning of specific values is not defined by the framework. The
+/// application developers may assign any values provided that they do not
+/// conflict with each other in the same styling element.
+///
+/// Use [`roles::GENERIC`] when there are no subviews to be distinguished from
+/// another.
+///
+/// [`roles::GENERIC`]: self::roles::GENERIC
+pub type Role = u32;
+
+/// Roles
+pub mod roles {
+    iota::iota! {
+        pub const GENERIC: super::Role = iota;
+                , HORZ_SCROLLBAR
+                , VERT_SCROLLBAR
+                , BULLET  // TODO: Remove - the framework doesn't use this
+    }
+}
 
 /// Represents a single styling property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

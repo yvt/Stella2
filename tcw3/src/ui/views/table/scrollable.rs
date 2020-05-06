@@ -20,7 +20,7 @@ use crate::{
     ui::{
         layouts::FillLayout,
         mixins::scrollwheel::{ScrollAxisFlags, ScrollModel, ScrollWheelMixin},
-        theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
+        theming::{roles, ClassSet, HElem, Manager, StyledBox, Widget},
         views::Scrollbar,
     },
     uicore::{HView, HViewRef, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
@@ -52,9 +52,9 @@ impl ScrollableTable {
             Scrollbar::new(style_manager, true),
         ];
 
-        styled_box.set_subview(Role::Generic, Some(table.view()));
-        styled_box.set_child(Role::HorizontalScrollbar, Some(&scrollbars[0]));
-        styled_box.set_child(Role::VerticalScrollbar, Some(&scrollbars[1]));
+        styled_box.set_subview(roles::GENERIC, Some(table.view()));
+        styled_box.set_child(roles::HORZ_SCROLLBAR, Some(&scrollbars[0]));
+        styled_box.set_child(roles::VERT_SCROLLBAR, Some(&scrollbars[1]));
 
         styled_box.set_class_set(ClassSet::SCROLL_CONTAINER);
 

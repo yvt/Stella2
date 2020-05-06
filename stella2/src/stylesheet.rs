@@ -8,7 +8,7 @@ use tcw3::{
     pal::{LayerFlags, SysFontType, RGBAF32},
     stvg::StvgImg,
     stylesheet,
-    ui::theming::{LayerXform, Manager, Metrics, Role, Stylesheet},
+    ui::theming::{roles, LayerXform, Manager, Metrics, Stylesheet},
 };
 
 /// Define styling ID values.
@@ -110,7 +110,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 size: Vector2::new(NAN, 0.65),
             },
 
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [8.0, 9.0, 8.0, 9.0],
                 ..Metrics::default()
             },
@@ -156,7 +156,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
 
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [5.0; 4],
                 ..Metrics::default()
             },
@@ -237,13 +237,13 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             min_size: Vector2::new(0.0, 32.0),
 
             // Label
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [NAN, 32.0, NAN, 10.0],
                 ..Metrics::default()
             },
 
             // Close button
-            subview_metrics[Role::Bullet]: Metrics {
+            subview_metrics[roles::BULLET]: Metrics {
                 margin: [NAN, 7.0, NAN, NAN],
                 ..Metrics::default()
             },
@@ -311,7 +311,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         // Search field
         ([#SEARCH_FIELD_WRAP]) (priority = 10000) {
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [30.0, 10.0, 10.0, 10.0],
                 ..Metrics::default()
             },
@@ -345,7 +345,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
             min_size: Vector2::new(150.0, TOOLBAR_BTN_MIN_SIZE.y),
 
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [2.0, 2.0, 2.0, 22.0],
                 ..Metrics::default()
             },
@@ -376,7 +376,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0; 4],
                 ..Metrics::default()
             },
@@ -392,12 +392,12 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         // Sidebar
         ([#SIDEBAR_GROUP_HEADER]) (priority = 10000) {
             // label
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [NAN, NAN, NAN, 25.0],
                 ..Metrics::default()
             },
             // bullet (open/close)
-            subview_metrics[Role::Bullet]: Metrics {
+            subview_metrics[roles::BULLET]: Metrics {
                 margin: [NAN, NAN, NAN, 5.0],
                 size: Vector2::new(16.0, 16.0),
             },
@@ -430,7 +430,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
 
         ([#SIDEBAR_ITEM]) (priority = 10000) {
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [NAN, NAN, NAN, 25.0],
                 ..Metrics::default()
             },
@@ -506,7 +506,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             layer_opacity[1]: 0.6,
 
             // Label (`[.LABEL] .. [#PREF_TAB_BAR]`)
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [45.0, NAN, 8.0, NAN],
                 ..Metrics::default()
             },
@@ -621,7 +621,7 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
                 margin: [1.0, NAN, 1.0, 0.0],
                 size: Vector2::new(1.0, NAN),
             },
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [1.0; 4],
                 ..Metrics::default()
             },

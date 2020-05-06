@@ -12,7 +12,7 @@ use std::{
 
 use super::{
     manager::{Elem, HElem, Manager, PropKindFlags},
-    style::{ClassSet, Metrics, Prop, PropValue, Role, ROLE_COUNT},
+    style::{roles, ClassSet, Metrics, Prop, PropValue, Role},
     widget::Widget,
 };
 use crate::{
@@ -81,7 +81,7 @@ struct Shared {
     dirty: Cell<PropKindFlags>,
 
     subviews: RefCell<Vec<(Role, HView)>>,
-    subelems: [Cell<Option<HElem>>; ROLE_COUNT],
+    subelems: RefCell<Vec<(Role, HElem)>>,
     /// `override` is a reserved keyword, so `overrider` is used here
     overrider: RefCell<Rc<dyn StyledBoxOverride>>,
 
@@ -122,7 +122,7 @@ impl StyledBox {
             view: view.clone(),
             auto_class_set: Cell::new(ClassSet::empty()),
             subviews: RefCell::new(subviews),
-            subelems: Default::default(),
+            subelems: RefCell::new(Vec::new()),
             overrider: RefCell::new(overrider),
             style_elem,
             // Already have an up-to-date `Layout`, so exclude it from
@@ -195,16 +195,24 @@ impl StyledBox {
 
     /// Set a subelement for the specified `Role`.
     pub fn set_subelement(&self, role: Role, helem: Option<HElem>) {
-        let elem_cell = &self.shared.subelems[role as usize];
+        let mut subelems = self.shared.subelems.borrow_mut();
 
-        if let Some(e) = elem_cell.get() {
-            self.shared.style_elem.remove_child(e);
-        }
-        if let Some(e) = helem {
-            self.shared.style_elem.insert_child(e);
+        if let Some(i) = subelems.iter().position(|&(r, _)| r == role) {
+            self.shared.style_elem.remove_child(subelems[i].1);
+            if let Some(helem) = helem {
+                subelems[i].1 = helem;
+            } else {
+                subelems.swap_remove(i);
+            }
+        } else {
+            if let Some(helem) = helem {
+                subelems.push((role, helem));
+            }
         }
 
-        elem_cell.set(helem);
+        if let Some(helem) = helem {
+            self.shared.style_elem.insert_child(helem);
+        }
     }
 
     /// Set a child widget using `set_subview` and `set_subelement`.
@@ -282,27 +290,27 @@ impl StyledBox {
 /// Work-arounds the lack of indexed prop support in Designer.
 impl StyledBox {
     pub fn set_subview_generic(&self, view: impl Into<Option<HView>>) {
-        self.set_subview(Role::Generic, view.into());
+        self.set_subview(roles::GENERIC, view.into());
     }
 
     pub fn set_subelement_generic(&self, element: impl Into<Option<HElem>>) {
-        self.set_subelement(Role::Generic, element.into());
+        self.set_subelement(roles::GENERIC, element.into());
     }
 
     pub fn set_child_generic(&self, widget: &dyn Widget) {
-        self.set_child(Role::Generic, Some(widget));
+        self.set_child(roles::GENERIC, Some(widget));
     }
 
     pub fn set_subview_bullet(&self, view: impl Into<Option<HView>>) {
-        self.set_subview(Role::Bullet, view.into());
+        self.set_subview(roles::BULLET, view.into());
     }
 
     pub fn set_subelement_bullet(&self, element: impl Into<Option<HElem>>) {
-        self.set_subelement(Role::Bullet, element.into());
+        self.set_subelement(roles::BULLET, element.into());
     }
 
     pub fn set_child_bullet(&self, widget: &dyn Widget) {
-        self.set_child(Role::Bullet, Some(widget));
+        self.set_child(roles::BULLET, Some(widget));
     }
 }
 

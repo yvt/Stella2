@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use super::{
     manager::PropKindFlags,
-    style::{ClassSet, ElemClassPath, Metrics, Prop, PropValue, Role},
+    style::{roles, ClassSet, ElemClassPath, Metrics, Prop, PropValue},
 };
 
 /// Represents a single stylesheet rule in [`Stylesheet`].
@@ -633,7 +633,7 @@ lazy_static! {
             },
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.8,
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 8.0],
                 .. Metrics::default()
             },
@@ -678,7 +678,7 @@ lazy_static! {
                 size: CHECKBOX_IMG_SIZE,
             },
             layer_opacity[0]: 0.9,
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
                 .. Metrics::default()
             },
@@ -705,7 +705,7 @@ lazy_static! {
                 size: CHECKBOX_IMG_SIZE,
             },
             layer_opacity[0]: 0.9,
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
                 .. Metrics::default()
             },
@@ -747,7 +747,7 @@ lazy_static! {
             // Background
             #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [0.0; 4],
                 size: Vector2::new(NAN, FIELD_HEIGHT),
             },
@@ -773,7 +773,7 @@ lazy_static! {
             layer_opacity[0]: 1.0,
         },
         ([.SCROLLBAR:not(.VERTICAL)]) (priority = 100) {
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(NAN, SCROLLBAR_VISUAL_WIDTH),
             },
@@ -786,7 +786,7 @@ lazy_static! {
             layer_center[0]: box2! { min: [0.5, 0.0], max: [0.5, 1.0] },
         },
         ([.SCROLLBAR.VERTICAL]) (priority = 100) {
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [SCROLLBAR_MARGIN; 4],
                 size: Vector2::new(SCROLLBAR_VISUAL_WIDTH, NAN),
             },
@@ -833,32 +833,32 @@ lazy_static! {
 
         // Scroll container
         ([.SCROLL_CONTAINER]) (priority = 100) {
-            subview_metrics[Role::Generic]: Metrics {
+            subview_metrics[roles::GENERIC]: Metrics {
                 margin: [0.0; 4],
                 .. Metrics::default()
             },
-            subview_metrics[Role::HorizontalScrollbar]: Metrics {
+            subview_metrics[roles::HORZ_SCROLLBAR]: Metrics {
                 // Dock to the bottom side. Avoid the vertical scrollbar
                 margin: [NAN, 16.0, 0.0, 0.0],
                 .. Metrics::default()
             },
-            subview_metrics[Role::VerticalScrollbar]: Metrics {
+            subview_metrics[roles::VERT_SCROLLBAR]: Metrics {
                 // Dock to the right side. Avoid the horizontal scrollbar
                 margin: [0.0, 0.0, 16.0, NAN],
                 .. Metrics::default()
             },
         },
         ([.SCROLL_CONTAINER:not(.HAS_HORIZONTAL_SCROLLBAR)]) (priority = 200) {
-            subview_visibility[Role::HorizontalScrollbar]: false,
-            subview_metrics[Role::VerticalScrollbar]: Metrics {
+            subview_visibility[roles::HORZ_SCROLLBAR]: false,
+            subview_metrics[roles::VERT_SCROLLBAR]: Metrics {
                 // Dock to the right side
                 margin: [0.0, 0.0, 0.0, NAN],
                 .. Metrics::default()
             },
         },
         ([.SCROLL_CONTAINER:not(.HAS_VERTICAL_SCROLLBAR)]) (priority = 200) {
-            subview_visibility[Role::VerticalScrollbar]: false,
-            subview_metrics[Role::HorizontalScrollbar]: Metrics {
+            subview_visibility[roles::VERT_SCROLLBAR]: false,
+            subview_metrics[roles::HORZ_SCROLLBAR]: Metrics {
                 // Dock to the bottom side
                 margin: [NAN, 0.0, 0.0, 0.0],
                 .. Metrics::default()

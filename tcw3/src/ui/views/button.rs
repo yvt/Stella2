@@ -8,7 +8,7 @@ use crate::{
     ui::{
         layouts::FillLayout,
         mixins::ButtonMixin,
-        theming::{ClassSet, HElem, Manager, Role, StyledBox, Widget},
+        theming::{roles, ClassSet, HElem, Manager, StyledBox, Widget},
         views::Label,
     },
     uicore::{HView, HViewRef, Sub, ViewFlags, ViewListener},
@@ -44,7 +44,7 @@ impl Button {
         let label = Label::new(style_manager);
 
         let styled_box = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
-        styled_box.set_child(Role::Generic, Some(&label));
+        styled_box.set_child(roles::GENERIC, Some(&label));
         styled_box.set_class_set(ClassSet::BUTTON);
         styled_box.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
