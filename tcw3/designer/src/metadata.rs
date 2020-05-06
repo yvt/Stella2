@@ -280,6 +280,7 @@ impl Path {
 }
 
 impl PathRef<'_> {
+    #[allow(dead_code)]
     pub fn to_owned(&self) -> Path {
         Path {
             crate_i: self.crate_i,
@@ -287,6 +288,7 @@ impl PathRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn parent(&self) -> Option<Self> {
         if self.idents.is_empty() {
             None
@@ -298,6 +300,7 @@ impl PathRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn starts_with(&self, other: &PathRef<'_>) -> bool {
         self.crate_i == other.crate_i && self.idents.starts_with(other.idents)
     }
