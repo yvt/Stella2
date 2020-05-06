@@ -1,5 +1,5 @@
 use alt_fp::FloatOrd;
-use cggeom::{box2, Box2};
+use cggeom::{box2, prelude::*, Box2};
 use cgmath::Vector2;
 use flags_macro::flags;
 use log::trace;
@@ -346,11 +346,9 @@ impl Shared {
 }
 
 struct SbLayout {
-    subview_layout: Vec<(Role, Metrics)>,
-    subviews: Vec<HView>,
+    inner_layout: Box<dyn Layout>,
     min_size: Vector2<f32>,
     allow_grow: [bool; 2],
-    overrider: Rc<dyn StyledBoxOverride>,
 }
 
 impl SbLayout {
@@ -363,17 +361,10 @@ impl SbLayout {
             }
         });
 
+        let inner_layout = Box::new(AbsInnerLayout::new(subviews_filtered, elem, overrider));
+
         Self {
-            subview_layout: subviews_filtered
-                .clone()
-                .map(
-                    |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
-                        PropValue::Metrics(m) => (role, (*m).clone()),
-                        _ => unreachable!(),
-                    },
-                )
-                .collect(),
-            subviews: subviews_filtered.map(|x| x.1.clone()).collect(),
+            inner_layout,
             min_size: match elem.compute_prop(Prop::MinSize) {
                 PropValue::Vector2(v) => v,
                 _ => unreachable!(),
@@ -382,21 +373,86 @@ impl SbLayout {
                 PropValue::Bool2(v) => v,
                 _ => unreachable!(),
             },
-            overrider,
         }
     }
 }
 
 impl Layout for SbLayout {
     fn subviews(&self) -> &[HView] {
+        self.inner_layout.subviews()
+    }
+
+    fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
+        let mut traits = self.inner_layout.size_traits(ctx);
+
+        traits.min = traits.min.element_wise_max(&self.min_size);
+        traits.max = traits.max.element_wise_max(&traits.min);
+
+        // Restrict the size to minimum for each direction if the corresponding
+        // element of `Prop::AllowGrow` is `false`
+        for i in 0..2 {
+            if !self.allow_grow[i] {
+                traits.max[i] = traits.min[i];
+            }
+        }
+
+        traits.preferred = traits
+            .preferred
+            .element_wise_min(&traits.max)
+            .element_wise_max(&traits.min);
+
+        traits
+    }
+
+    fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
+        self.inner_layout.arrange(ctx, size);
+    }
+
+    fn has_same_subviews(&self, other: &dyn Layout) -> bool {
+        use as_any::Downcast;
+        if let Some(other) = (*other).downcast_ref::<Self>() {
+            self.inner_layout.has_same_subviews(&*other.inner_layout)
+        } else {
+            false
+        }
+    }
+}
+
+struct AbsInnerLayout {
+    subview_layout: Vec<(Role, Metrics)>,
+    subviews: Vec<HView>,
+    overrider: Rc<dyn StyledBoxOverride>,
+}
+
+impl AbsInnerLayout {
+    fn new<'a>(
+        subviews: impl Iterator<Item = &'a (Role, HView)> + Clone,
+        elem: &Elem,
+        overrider: Rc<dyn StyledBoxOverride>,
+    ) -> Self {
+        Self {
+            subview_layout: subviews
+                .clone()
+                .map(
+                    |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
+                        PropValue::Metrics(m) => (role, (*m).clone()),
+                        _ => unreachable!(),
+                    },
+                )
+                .collect(),
+            subviews: subviews.map(|x| x.1.clone()).collect(),
+            overrider,
+        }
+    }
+}
+
+impl Layout for AbsInnerLayout {
+    fn subviews(&self) -> &[HView] {
         &self.subviews
     }
 
     fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
-        let mut traits = SizeTraits {
-            min: self.min_size,
-            ..SizeTraits::default()
-        };
+        let mut traits = SizeTraits::default();
 
         let mut num_pref_x = 0;
         let mut num_pref_y = 0;
@@ -432,14 +488,6 @@ impl Layout for SbLayout {
                 traits.max.y = traits.max.y.fmin(sv_traits.max.y + margin_y);
                 traits.preferred.y += sv_traits.preferred.y + margin_y;
                 num_pref_y += 1;
-            }
-        }
-
-        // Restrict the size to minimum for each direction if the corresponding
-        // element of `Prop::AllowGrow` is `false`
-        for i in 0..2 {
-            if !self.allow_grow[i] {
-                traits.max[i] = traits.min[i];
             }
         }
 
