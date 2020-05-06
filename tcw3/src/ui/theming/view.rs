@@ -12,12 +12,13 @@ use std::{
 
 use super::{
     manager::{Elem, HElem, Manager, PropKindFlags},
-    style::{roles, ClassSet, Metrics, Prop, PropValue, Role},
+    style::{roles, ClassSet, Layouter, Metrics, Prop, PropValue, Role},
     widget::Widget,
 };
 use crate::{
     pal,
     pal::prelude::*,
+    ui::layouts::TableLayout,
     uicore::{
         HView, HViewRef, HWndRef, Layout, LayoutCtx, SizeTraits, Sub, UpdateCtx, ViewFlags,
         ViewListener,
@@ -26,10 +27,26 @@ use crate::{
 
 /// A box styled based on styling properties.
 ///
-/// The following [`Prop`]s are handled: `NumLayers`, `LayerImg`,
-/// `LayerBgColor`, `LayerMetrics`, `LayerOpacity`, `LayerCenter`, `LayerXform`,
-/// `SubviewMetrics`, `SubviewVisibility`, `ClipMetrics`, `MinSize`, and
-/// `AllowGrow`.
+/// `StyledBox` understands the following [`Prop`]s:
+///
+///  - `NumLayers`
+///  - `LayerImg`
+///  - `LayerBgColor`
+///  - `LayerMetrics`
+///  - `LayerOpacity`
+///  - `LayerCenter`
+///  - `LayerXform`
+///  - `SubviewLayouter`
+///  - `SubviewPadding`
+///  - `SubviewMetrics`
+///  - `SubviewTableCell`
+///  - `SubviewTableAlign`
+///  - `SubviewTableColSpacing`
+///  - `SubviewTableRowSpacing`
+///  - `SubviewVisibility`
+///  - `ClipMetrics`
+///  - `MinSize`
+///  - `AllowGrow`
 ///
 /// [`Prop`]: crate::ui::theming::Prop
 #[derive(Debug)]
@@ -361,7 +378,15 @@ impl SbLayout {
             }
         });
 
-        let inner_layout = Box::new(AbsInnerLayout::new(subviews_filtered, elem, overrider));
+        let layouter = match elem.compute_prop(Prop::SubviewLayouter) {
+            PropValue::Layouter(v) => v,
+            _ => unreachable!(),
+        };
+
+        let inner_layout: Box<dyn Layout> = match layouter {
+            Layouter::Abs => Box::new(AbsInnerLayout::new(subviews_filtered, elem, overrider)),
+            Layouter::Table => Box::new(TableInnerLayout::new(subviews_filtered, elem, overrider)),
+        };
 
         Self {
             inner_layout,
@@ -527,6 +552,99 @@ impl Layout for AbsInnerLayout {
         use as_any::Downcast;
         if let Some(other) = (*other).downcast_ref::<Self>() {
             self.subviews == other.subviews
+        } else {
+            false
+        }
+    }
+}
+
+struct TableInnerLayout {
+    inner_layout: TableLayout,
+    roles: Vec<Role>,
+    overrider: Rc<dyn StyledBoxOverride>,
+}
+
+impl TableInnerLayout {
+    fn new<'a>(
+        subviews: impl Iterator<Item = &'a (Role, HView)> + Clone,
+        elem: &Elem,
+        overrider: Rc<dyn StyledBoxOverride>,
+    ) -> Self {
+        let padding = match elem.compute_prop(Prop::SubviewPadding) {
+            PropValue::F32x4(x) => x,
+            _ => unreachable!(),
+        };
+
+        let roles = subviews.clone().map(|e| e.0).collect();
+
+        let mut inner_layout = TableLayout::new(subviews.map(|&(role, ref view)| {
+            let [x, y] = match elem.compute_prop(Prop::SubviewTableCell(role)) {
+                PropValue::U32x2(x) => x,
+                _ => unreachable!(),
+            };
+            let align_flags = match elem.compute_prop(Prop::SubviewTableAlign(role)) {
+                PropValue::AlignFlags(x) => x,
+                _ => unreachable!(),
+            };
+            (view.clone(), [x as _, y as _], align_flags)
+        }))
+        .with_margin(padding);
+
+        for i in (1..inner_layout.num_columns()).map(|i| i - 1) {
+            let spacing = match elem.compute_prop(Prop::SubviewTableColSpacing(i as u32)) {
+                PropValue::Float(x) => x,
+                _ => unreachable!(),
+            };
+            inner_layout.set_column_spacing(i, spacing);
+        }
+
+        for i in (1..inner_layout.num_rows()).map(|i| i - 1) {
+            let spacing = match elem.compute_prop(Prop::SubviewTableRowSpacing(i as u32)) {
+                PropValue::Float(x) => x,
+                _ => unreachable!(),
+            };
+            inner_layout.set_row_spacing(i, spacing);
+        }
+
+        Self {
+            roles,
+            inner_layout,
+            overrider,
+        }
+    }
+}
+
+impl Layout for TableInnerLayout {
+    fn subviews(&self) -> &[HView] {
+        self.inner_layout.subviews()
+    }
+
+    fn size_traits(&self, ctx: &LayoutCtx<'_>) -> SizeTraits {
+        self.inner_layout.size_traits(ctx)
+    }
+
+    fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
+        self.inner_layout.arrange(ctx, size);
+
+        for (&role, sv) in self.roles.iter().zip(self.subviews().iter()) {
+            let sv_traits = ctx.subview_size_traits(sv.as_ref());
+            let mut frame = ctx.subview_frame(sv.as_ref());
+
+            self.overrider.modify_arrangement(ModifyArrangementArgs {
+                role,
+                frame: &mut frame,
+                size: &size,
+                size_traits: &sv_traits,
+            });
+
+            ctx.set_subview_frame(sv.as_ref(), frame);
+        }
+    }
+
+    fn has_same_subviews(&self, other: &dyn Layout) -> bool {
+        use as_any::Downcast;
+        if let Some(other) = (*other).downcast_ref::<Self>() {
+            self.subviews() == other.subviews()
         } else {
             false
         }

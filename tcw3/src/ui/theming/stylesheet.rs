@@ -300,14 +300,34 @@ macro_rules! prop {
     (@dynvalue layer_metrics[$i:expr]: $val:expr) =>
         { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
+    (@prop subview_layouter) => { $crate::ui::theming::Prop::SubviewLayouter };
+    (@value subview_layouter: $val:expr) =>
+        { $crate::ui::theming::PropValue::Layouter($val) };
+
+    (@prop subview_padding) => { $crate::ui::theming::Prop::SubviewPadding };
+    (@value subview_padding: $val:expr) =>
+        { $crate::ui::theming::PropValue::F32x4($val) };
+
     (@prop subview_metrics[$i:expr]) => { $crate::ui::theming::Prop::SubviewMetrics($i) };
     (@value subview_metrics[$i:expr]: $val:expr) =>
         { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
     (@dynvalue subview_metrics[$i:expr]: $val:expr) =>
         { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
 
+    (@prop subview_table_cell[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableCell($i) };
+    (@value subview_table_cell[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::U32x2($val) };
+
+    (@prop subview_table_align[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableAlign($i) };
+    (@value subview_table_align[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::AlignFlags($val) };
+
     (@prop subview_visibility[$i:expr]) => { $crate::ui::theming::Prop::SubviewVisibility($i) };
     (@value subview_visibility[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Bool($val) };
+
+    (@prop subview_table_col_spacing[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableColSpacing($i) };
+    (@value subview_table_col_spacing[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
+
+    (@prop subview_table_row_spacing[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableRowSpacing($i) };
+    (@value subview_table_row_spacing[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
 
     (@prop min_size) => { $crate::ui::theming::Prop::MinSize };
     (@value min_size: $val:expr) => { $crate::ui::theming::PropValue::Vector2($val) };

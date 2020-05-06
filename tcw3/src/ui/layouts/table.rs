@@ -225,6 +225,30 @@ impl TableLayout {
         }
         self
     }
+
+    /// Update the inter-cell spacing value for a column divider in-place.
+    ///
+    /// `i + 1` must be less than the number of the columns in the layout.
+    pub fn set_column_spacing(&mut self, i: usize, spacing: f32) {
+        debug_assert!(i + 1 < self.columns.len());
+        self.columns[i].spacing = spacing;
+    }
+
+    /// Update the inter-cell spacing value for a row divider in-place.
+    ///
+    /// `i + 1` must be less than the number of the rows in the layout.
+    pub fn set_row_spacing(&mut self, i: usize, spacing: f32) {
+        debug_assert!(i + 1 < self.rows.len());
+        self.rows[i].spacing = spacing;
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.rows.len()
+    }
+
+    pub fn num_columns(&self) -> usize {
+        self.columns.len()
+    }
 }
 
 impl Layout for TableLayout {

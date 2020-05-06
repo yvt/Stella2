@@ -3,7 +3,10 @@ use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Rad, Vector2};
 use rob::Rob;
 
-use crate::pal::{LayerFlags, SysFontType, RGBAF32};
+use crate::{
+    pal::{LayerFlags, SysFontType, RGBAF32},
+    ui::AlignFlags,
+};
 
 bitflags! {
     /// A set of styling classes.
@@ -156,8 +159,32 @@ pub enum Prop {
     /// The flags of the `n`-th layer.
     LayerFlags(u32),
 
+    /// The layout algorithm for subviews. Defaults to [`Layouter::Abs`].
+    SubviewLayouter,
+
+    /// The padding for subviews.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewPadding,
+
     /// The [`Metrics`] of a subview.
+    /// Only valid when [`Layouter::Abs`] is the layouter.
     SubviewMetrics(Role),
+
+    /// The table cell to place a subview.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableCell(Role),
+
+    /// The alignment flags of a subview.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableAlign(Role),
+
+    /// The inter-column spacing between two columns `i` and `i + 1`.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableColSpacing(u32),
+
+    /// The inter-row spacing between two rows `i` and `i + 1`.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableRowSpacing(u32),
 
     /// Toggles the visibility of a subview.
     SubviewVisibility(Role),
@@ -184,6 +211,8 @@ pub enum PropValue {
     Bool2([bool; 2]),
     Float(f32),
     Usize(usize),
+    U32x2([u32; 2]),
+    F32x4([f32; 4]),
     Himg(Option<crate::images::HImg>),
     Rgbaf32(RGBAF32),
     Metrics(Rob<'static, Metrics>),
@@ -193,6 +222,8 @@ pub enum PropValue {
     LayerXform(Rob<'static, LayerXform>),
     SysFontType(SysFontType),
     LayerFlags(LayerFlags),
+    Layouter(Layouter),
+    AlignFlags(AlignFlags),
 }
 
 impl PropValue {
@@ -212,7 +243,13 @@ impl PropValue {
                 PropValue::LayerXform(Rob::from_ref(&DEFAULT))
             }
             Prop::LayerFlags(_) => PropValue::LayerFlags(LayerFlags::default()),
+            Prop::SubviewLayouter => PropValue::Layouter(Layouter::Abs),
+            Prop::SubviewPadding => PropValue::F32x4([0.0; 4]),
             Prop::SubviewMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
+            Prop::SubviewTableCell(_) => PropValue::U32x2([0, 0]),
+            Prop::SubviewTableAlign(_) => PropValue::AlignFlags(AlignFlags::CENTER),
+            Prop::SubviewTableColSpacing(_) => PropValue::Float(0.0),
+            Prop::SubviewTableRowSpacing(_) => PropValue::Float(0.0),
             Prop::SubviewVisibility(_) => PropValue::Bool(true),
             Prop::ClipMetrics => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
@@ -221,6 +258,16 @@ impl PropValue {
             Prop::Font => PropValue::SysFontType(SysFontType::Normal),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Layouter {
+    /// Positions subviews using [`Metrics`].
+    Abs,
+    /// Positions subviews using an algorithm similar to [`TableLayout`].
+    ///
+    /// [`TableLayout`]: crate::ui::layouts::TableLayout
+    Table,
 }
 
 /// Describes the placement of a rectangle (e.g., layer) inside a container.
