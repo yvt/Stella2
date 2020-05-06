@@ -419,6 +419,16 @@ impl<'a> LayoutCtx<'a> {
         hview.view.frame.set(frame);
     }
 
+    /// Get the frame previously set by `set_subview_frame`.
+    ///
+    /// This method only can be called from [`Layout::arrange`]. The frame to
+    /// retrieve must already be set during the same call to `Layout::arrange`.
+    pub fn subview_frame(&self, hview: HViewRef<'_>) -> Box2<f32> {
+        self.ensure_subview(hview);
+
+        hview.view.frame.get()
+    }
+
     /// Panic if `hview` is not a subview of the active view and
     /// debug assertions are enabled.
     fn ensure_subview(&self, hview: HViewRef<'_>) {
