@@ -44,6 +44,8 @@ bitflags! {
         /// The element is a radio button widget.
         const RADIO_BUTTON = 1 << 14;
 
+        const USER1 = 1 << 15;
+
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;
     }
