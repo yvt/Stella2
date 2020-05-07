@@ -83,6 +83,7 @@ struct Shared {
     splitter: HView,
     splitter_sb: StyledBox,
     subviews: RefCell<[HView; 2]>,
+    subelements: Cell<[Option<HElem>; 2]>,
     on_drag: RefCell<DragHandler>,
 }
 
@@ -99,6 +100,7 @@ impl fmt::Debug for Shared {
             .field("container", &self.container)
             .field("splitter", &self.splitter)
             .field("subviews", &self.subviews)
+            .field("subelements", &self.subelements)
             .field("on_drag", &())
             .finish()
     }
@@ -144,6 +146,7 @@ impl Split {
                 HView::new(ViewFlags::default()),
                 HView::new(ViewFlags::default()),
             ]),
+            subelements: Cell::new([None, None]),
             on_drag: RefCell::new(Box::new(|_| Box::new(()))),
         });
 
@@ -221,6 +224,26 @@ impl Split {
     pub fn set_subviews(&self, subviews: [HView; 2]) {
         *self.shared.subviews.borrow_mut() = subviews;
         self.shared.container.set_layout(self.shared.layout());
+    }
+
+    /// Set the child styling elements.
+    pub fn set_subelements(&self, subelements: [Option<HElem>; 2]) {
+        use std::convert::identity;
+        let old_elems = self.shared.subelements.take();
+        for old_elem in old_elems.iter().cloned().filter_map(identity) {
+            self.shared.elem.remove_child(old_elem);
+        }
+        self.shared.subelements.set(subelements);
+        for new_elem in subelements.iter().cloned().filter_map(identity) {
+            self.shared.elem.insert_child(new_elem);
+        }
+    }
+
+    /// Set the subviews and child styling elements at once.
+    pub fn set_children(&self, children: [&dyn Widget; 2]) {
+        use array::Array2;
+        self.set_subviews(children.map(|c| c.view_ref().cloned()));
+        self.set_subelements(children.map(|c| c.style_elem()));
     }
 
     /// Set the factory function for gesture event handlers used when the user
