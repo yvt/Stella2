@@ -8,7 +8,10 @@ use tcw3::{
     pal::{LayerFlags, SysFontType, RGBAF32},
     stvg::StvgImg,
     stylesheet,
-    ui::theming::{roles, LayerXform, Manager, Metrics, Stylesheet},
+    ui::{
+        theming::{roles, LayerXform, Layouter, Manager, Metrics, Stylesheet},
+        AlignFlags,
+    },
 };
 
 /// Define styling ID values.
@@ -28,6 +31,7 @@ pub mod elem_id {
 
                 , TOOLBAR
                 , SIDEBAR
+                , CENTRAL
                 , LOG_VIEW
                 , EDITOR
                 , EDITOR_SPLIT
@@ -42,7 +46,9 @@ pub mod elem_id {
                 , TABBAR_TAB_CLOSE
                 , TABBAR_CLOSE
 
+                , PREF
                 , PREF_HEADER
+                , PREF_TITLE_WRAP
                 , PREF_MAIN
                 , PREF_TAB_BAR
                 , PREF_TAB_GENERAL
@@ -62,13 +68,15 @@ use tcw3::ui::theming::elem_id::*;
 /// Define role values.
 ///
 /// The set of role values must be unique within each `StyledBox`. The
-/// usage of the values follow one of the following rules:
+/// usage of the values follow one of the following strategies:
 ///
 ///  - In most cases, `roles::GENERIC` is the only role you need.
 ///
 ///  - Use `roles::GENERIC` and some (or all) of the roles in `my_roles`.
 ///    Note that `my_roles` can overlap with predefined roles in `roles` except
 ///    for `roles::GENERIC`.
+///
+///  - Don't use symbolic role names at all.
 ///
 pub mod my_roles {
     use tcw3::ui::theming::Role;
@@ -132,10 +140,27 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 size: Vector2::new(NAN, 0.65),
             },
 
-            subview_metrics[roles::GENERIC]: Metrics {
-                margin: [8.0, 9.0, 8.0, 9.0],
-                ..Metrics::default()
-            },
+            subview_layouter: Layouter::Table,
+            subview_padding: [8.0, 9.0, 8.0, 9.0],
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::HORZ_JUSTIFY,
+
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::HORZ_JUSTIFY,
+
+            subview_table_cell[2]: [2, 0],
+            subview_table_align[2]: AlignFlags::HORZ_JUSTIFY,
+
+            subview_table_cell[3]: [3, 0],
+            subview_table_align[3]: AlignFlags::LEFT,
+            subview_table_col_spacing[3]: 7.0,
+
+            subview_table_cell[4]: [4, 0],
+            subview_table_align[4]: AlignFlags::JUSTIFY,
+            subview_table_col_spacing[4]: 7.0,
+
+            subview_table_cell[5]: [5, 0],
+            subview_table_align[5]: AlignFlags::JUSTIFY,
         },
         ([#TOOLBAR] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: RGBAF32::new(0.9, 0.9, 0.9, 1.0),
@@ -145,6 +170,13 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#SIDEBAR]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
+
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::JUSTIFY,
+
+            subview_table_cell[1]: [0, 1],
+            subview_table_align[1]: AlignFlags::JUSTIFY,
         },
         ([#TABBAR]) (priority = 10000) {
             num_layers: 2,
@@ -155,6 +187,21 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 margin: [NAN, 0.0, -0.5, 0.0],
                 size: Vector2::new(NAN, 1.35),
             },
+
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::JUSTIFY,
+
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::from_bits_truncate(
+                AlignFlags::VERT_JUSTIFY.bits() | AlignFlags::LEFT.bits()),
+
+            subview_table_cell[2]: [2, 0],
+            subview_table_align[2]: AlignFlags::JUSTIFY,
+        },
+        #[cfg(target_os = "macos")]
+        ([#TABBAR.USER1]) (priority = 10500) {
+            subview_padding: [0.0, 0.0, 0.0, 68.0],
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // sidebar looks awkward without backdrop blur, so we disable
@@ -170,6 +217,20 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
         },
+
+        // Central view
+        ([#CENTRAL]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::JUSTIFY,
+
+            subview_table_cell[1]: [0, 1],
+            subview_table_align[1]: AlignFlags::JUSTIFY,
+
+            subview_table_cell[2]: [0, 2],
+            subview_table_align[2]: AlignFlags::JUSTIFY,
+        },
+
         ([#LOG_VIEW]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(1.0, 1.0, 1.0, 1.0),
@@ -178,10 +239,18 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 1.0),
 
-            subview_metrics[roles::GENERIC]: Metrics {
-                margin: [5.0; 4],
-                ..Metrics::default()
-            },
+            subview_layouter: Layouter::Table,
+            subview_padding: [5.0; 4],
+
+            // Text editor
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::JUSTIFY,
+            subview_table_col_spacing[0]: 5.0,
+
+            // "Send button"
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::from_bits_truncate(
+                AlignFlags::HORZ_JUSTIFY.bits() | AlignFlags::TOP.bits()),
         },
 
         // Toolbar buttons
@@ -398,10 +467,12 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
             layer_center[1]: box2! { point: [0.5, 0.5] },
 
-            subview_metrics[roles::GENERIC]: Metrics {
-                margin: [3.0; 4],
-                ..Metrics::default()
-            },
+            // Text editor
+            subview_layouter: Layouter::Table,
+            subview_padding: [3.0; 4],
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::from_bits_truncate(
+                AlignFlags::TOP.bits() | AlignFlags::LEFT.bits()),
         },
         ([#EDITOR_FIELD.FOCUS]) (priority = 10500) {
             // Focus ring
@@ -473,6 +544,14 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         // -------------------------------------------------------------------
         // "Preferences" window
+        ([#PREF]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::JUSTIFY,
+            subview_table_cell[1]: [0, 1],
+            subview_table_align[1]: AlignFlags::JUSTIFY,
+            allow_grow: [false, false],
+        },
 
         // Header region
         ([#PREF_HEADER]) (priority = 10000) {
@@ -484,6 +563,15 @@ fn new_custom_stylesheet() -> impl Stylesheet {
                 ..Metrics::default()
             },
             min_size: Vector2::new(500.0, 20.0),
+
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::VERT_JUSTIFY,
+            subview_table_cell[1]: [0, 0],
+            subview_table_align[1]: AlignFlags::from_bits_truncate(
+                AlignFlags::VERT_JUSTIFY.bits() | AlignFlags::RIGHT.bits()),
+            subview_table_cell[2]: [0, 1],
+            subview_table_align[2]: AlignFlags::VERT_JUSTIFY,
         },
         // Backdrop blur isn't supported by the GTK backend. The translucent
         // region looks awkward without backdrop blur, so we disable
@@ -493,6 +581,14 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#PREF_HEADER] .. [#WND.ACTIVE]) (priority = 10500) {
             layer_bg_color[0]: RGBAF32::new(0.93, 0.93, 0.93, 0.8),
             layer_flags[0]: LayerFlags::BACKDROP_BLUR,
+        },
+
+        // Title
+        ([#PREF_TITLE_WRAP]) (priority = 10000) {
+            subview_metrics[roles::GENERIC]: Metrics {
+                margin: [4.0; 4],
+                ..Metrics::default()
+            },
         },
 
         // Main region background
