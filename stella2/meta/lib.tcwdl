@@ -54,19 +54,22 @@ comp crate::view::MainView {
         } else {
             elem_id::WND
         },
-        subview_generic = get!(split_side.view),
-        subelement_generic = get!(style_elem.helem),
+        child_generic = get!(&split_side),
     };
-    const style_elem = theming::Elem::new! { style_manager };
 
     const split_side = Split::new! {
         style_manager,
         vertical = false,
         fix = Some(0), // Fix the sidebar
-        subviews = [get!(sidebar_view_wrap.view), get!(central_view)],
+        // TODO: replace `subviews` with `children`
+        children = [get!(&sidebar_view_wrap), get!(&central_widget)],
         value = get!(&wnd_state).sidebar_width,
         zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
     };
+
+    // TODO: Remove this when `central_view` is converted into a stylesheet-based layout
+    const central_widget: (HView, Option<theming::HElem>) =
+        (get!(central_view), Some(get!(central_elem.helem)));
 
     const central_view = HView::new! {
         layout = TableLayout::stack_vert(
@@ -80,6 +83,8 @@ comp crate::view::MainView {
         ),
     };
 
+    const central_elem = theming::Elem::new! { style_manager };
+
     const tabbar = crate::view::tabbar::TabbarView::new! { wm, style_manager, wnd_state };
 
     on (tabbar.dispatch) get!(&this).raise_dispatch(model::AppAction::Wnd(get!(event.action)));
@@ -90,8 +95,9 @@ comp crate::view::MainView {
     on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
 
     on (init) {
-        get!(&style_elem).insert_child(get!(tabbar.style_elem));
-        get!(&style_elem).insert_child(get!(toolbar.style_elem));
+        get!(&central_elem).insert_child(get!(tabbar.style_elem));
+        get!(&central_elem).insert_child(get!(toolbar.style_elem));
+        get!(&central_elem).insert_child(get!(split_editor.style_elem));
     }
 
     const split_side_event_adapter = SplitEventAdapter::new! { view = get!(&split_side) };
@@ -147,7 +153,6 @@ comp crate::view::MainView {
     const channel_list = ChannelListView::new! { wm, style_manager };
 
     on (init) {
-        get!(&style_elem).insert_child(get!(sidebar_view_wrap.style_elem));
         get!(&sidebar_elem).insert_child(get!(channel_list_wrap.style_elem));
         get!(&sidebar_elem).insert_child(get!(search_bar_wrap.style_elem));
     }
@@ -158,14 +163,10 @@ comp crate::view::MainView {
         style_manager,
         vertical = true,
         fix = Some(1), // Fix the editor
-        subviews = [get!(log_view_wrap.view), get!(editor_view_wrap.view)],
+        children = [get!(&log_view_wrap), get!(&editor_view_wrap)],
         value = get!(&wnd_state).editor_height,
         class_set = elem_id::EDITOR_SPLIT,
     };
-
-    on (init) {
-        get!(&style_elem).insert_child(get!(split_editor.style_elem));
-    }
 
     const split_editor_event_adapter = SplitEventAdapter::new! { view = get!(&split_editor) };
 
@@ -183,10 +184,6 @@ comp crate::view::MainView {
     };
     const log_view = LogView::new! { wm, style_manager };
 
-    on (init) {
-        get!(&style_elem).insert_child(get!(log_view_wrap.style_elem));
-    }
-
     // Composing area
     // -----------------------------------------------------------------------
     const editor_view_wrap = StyledBox::new! {
@@ -202,10 +199,6 @@ comp crate::view::MainView {
             ])
         ).with_uniform_spacing(5.0),
     };
-
-    on (init) {
-        get!(&style_elem).insert_child(get!(editor_view_wrap.style_elem));
-    }
 
     const editor_field = StyledBox::new! {
         style_manager,
