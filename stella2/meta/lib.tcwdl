@@ -61,7 +61,6 @@ comp crate::view::MainView {
         style_manager,
         vertical = false,
         fix = Some(0), // Fix the sidebar
-        // TODO: replace `subviews` with `children`
         children = [get!(&sidebar_view_wrap), get!(&central_widget)],
         value = get!(&wnd_state).sidebar_width,
         zoom = [Some(1), None][get!(&wnd_state).sidebar_visible as usize],
