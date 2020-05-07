@@ -160,7 +160,7 @@ comp crate::view::MainView {
         fix = Some(1), // Fix the editor
         subviews = [get!(log_view_wrap.view), get!(editor_view_wrap.view)],
         value = get!(&wnd_state).editor_height,
-        class_set = ClassSet::SPLITTER | ClassSet::VERTICAL | elem_id::EDITOR_SPLIT,
+        class_set = elem_id::EDITOR_SPLIT,
     };
 
     on (init) {

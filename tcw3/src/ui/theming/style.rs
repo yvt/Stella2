@@ -35,8 +35,6 @@ bitflags! {
         const HAS_HORIZONTAL_SCROLLBAR = 1 << 8;
         /// The scrollable container has a vertical scrollbar.
         const HAS_VERTICAL_SCROLLBAR = 1 << 9;
-        /// The element is a splitter.
-        const SPLITTER = 1 << 10;
         /// The element is a text entry widget.
         const ENTRY = 1 << 11;
         /// The element is a checkbox widget.
@@ -100,8 +98,13 @@ impl ClassSet {
 
 /// Styling IDs ([`ClassSet::id`]) reserved for the system.
 pub mod elem_id {
+    use super::*;
     /// The smallest styling ID allocated for the system.
     pub const SYS_START_VALUE: u16 = 0xff80;
+
+    iota::iota! {
+        pub const SPLITTER: ClassSet = ClassSet::id(iota + SYS_START_VALUE);
+    }
 }
 
 /// `ClassSet` of an element and its descendants.

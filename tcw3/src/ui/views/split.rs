@@ -13,7 +13,7 @@ use crate::{
     pal::prelude::*,
     ui::{
         layouts::FillLayout,
-        theming::{ClassSet, HElem, Manager, StyledBox, Widget},
+        theming::{elem_id, ClassSet, Elem, HElem, Manager, StyledBox, Widget},
     },
     uicore::{
         CursorShape, HView, HViewRef, Layout, LayoutCtx, MouseDragListener, SizeTraits, ViewFlags,
@@ -33,7 +33,8 @@ const SPLITTER_TOLERANCE: f32 = 5.0;
 ///
 /// # Styling
 ///
-///  - `parent > .SPLITTER` — The splitter element. The width is controlled by
+///  - `style_elem` - The wrapper. It doesn't support styling.
+///  - `style_elem > #SPLITTER` — The splitter. The width is controlled by
 ///    `min_size`. The element has `.VERTICAL` if `vertical` is `true` (i.e.,
 ///    the region is separated by a horizontal line).
 ///
@@ -77,6 +78,7 @@ struct Shared {
     fix: Option<u8>,
     value: Cell<f32>,
     zoom: Cell<Option<u8>>,
+    elem: Elem,
     container: HView,
     splitter: HView,
     splitter_sb: StyledBox,
@@ -93,6 +95,7 @@ impl fmt::Debug for Shared {
             .field("fix", &self.fix)
             .field("value", &self.value)
             .field("zoom", &self.zoom)
+            .field("elem", &self.elem)
             .field("container", &self.container)
             .field("splitter", &self.splitter)
             .field("subviews", &self.subviews)
@@ -114,10 +117,13 @@ impl Split {
         let splitter_sb = StyledBox::new(style_manager, ViewFlags::default());
 
         splitter_sb.set_class_set(if vertical {
-            ClassSet::SPLITTER | ClassSet::VERTICAL
+            elem_id::SPLITTER | ClassSet::VERTICAL
         } else {
-            ClassSet::SPLITTER
+            elem_id::SPLITTER
         });
+
+        let elem = Elem::new(style_manager);
+        elem.insert_child(splitter_sb.style_elem());
 
         let shared = Rc::new(Shared {
             vertical,
@@ -129,6 +135,7 @@ impl Split {
             },
             value: Cell::new(0.5),
             zoom: Cell::new(None),
+            elem,
             container: container.clone(),
             splitter: splitter.clone(),
             splitter_sb,
@@ -166,20 +173,19 @@ impl Split {
 
     /// Get the styling element of the splitter.
     pub fn style_elem(&self) -> HElem {
-        self.shared.splitter_sb.style_elem()
+        self.shared.elem.helem()
     }
 
-    /// Set the styling class set of the splitter.
+    /// Set the styling class set of the wrapper.
     ///
-    /// It defaults to `ClassSet::SPLITTER` or
-    /// `ClassSet::SPLITTER | ClassSet::VERTICAL`.
+    /// It defaults to `ClassSet::empty()`.
     pub fn set_class_set(&self, class_set: ClassSet) {
-        self.shared.splitter_sb.set_class_set(class_set);
+        self.shared.elem.set_class_set(class_set);
     }
 
-    /// Get the styling class set of the splitter.
+    /// Get the styling class set of the wrapper.
     pub fn class_set(&self) -> ClassSet {
-        self.shared.splitter_sb.class_set()
+        self.shared.elem.class_set()
     }
 
     /// Get a raw (unclipped) value representing the split position.

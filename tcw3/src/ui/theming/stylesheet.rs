@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use super::{
     manager::PropKindFlags,
-    style::{roles, ClassSet, ElemClassPath, Metrics, Prop, PropValue},
+    style::{elem_id, roles, ClassSet, ElemClassPath, Metrics, Prop, PropValue},
 };
 
 /// Represents a single stylesheet rule in [`Stylesheet`].
@@ -627,6 +627,9 @@ fn recolor_tint(data: &(&'static [u8], [f32; 2])) -> HImg {
     StvgImg::new(*data).with_color_xform(map_color).into_himg()
 }
 
+// Import IDs (e.g., `#SHOW_MENU`) into the scope
+use elem_id::*;
+
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
@@ -886,7 +889,7 @@ lazy_static! {
         },
 
         // Splitter
-        ([.SPLITTER]) (priority = 100) {
+        ([#SPLITTER]) (priority = 100) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.5, 0.5, 0.5, 0.8),
             min_size: Vector2::new(1.0, 1.0),

@@ -57,6 +57,7 @@ pub mod elem_id {
 
 // Import IDs (e.g., `#SHOW_MENU`) into the scope
 use self::elem_id::*;
+use tcw3::ui::theming::elem_id::*;
 
 /// Define role values.
 ///
@@ -110,12 +111,13 @@ fn new_custom_stylesheet() -> impl Stylesheet {
     const TOOLBAR_BTN_MIN_SIZE: Vector2<f32> = Vector2::new(34.0, 22.0);
 
     stylesheet! {
-        ([.SPLITTER]) (priority = 10000) {
+        ([#SPLITTER]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
             min_size: Vector2::new(1.0, 1.0),
         },
-        ([#EDITOR_SPLIT.SPLITTER]) (priority = 10000) {
+        ([#SPLITTER] < [#EDITOR_SPLIT]) (priority = 10100) {
+            num_layers: 0,
             min_size: Vector2::new(0.0, 0.0),
         },
 
