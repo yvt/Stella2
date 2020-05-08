@@ -133,84 +133,140 @@ pub mod roles {
     }
 }
 
-/// Represents a single styling property.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Prop {
-    /// The number of layers.
-    NumLayers,
+#[macro_use]
+mod prop_macros; // `def_prop!`
 
-    /// The [`HImg`] of the `n`-th layer.
-    ///
-    /// [`HImg`]: crate::images::HImg
-    LayerImg(u32),
+static DEFAULT_METRICS: Metrics = Metrics::default();
 
-    /// The background color ([`RGBAF32`]) of the `n`-th layer.
-    ///
-    /// [`RGBAF32`]: crate::pal::RGBAF32
-    LayerBgColor(u32),
+def_prop! {
+    /// Represents a single styling property.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Prop {
+        /// The number of layers.
+        #[snake_case(num_layers)]
+        #[default(PropValue::Usize(0))]
+        NumLayers,
 
-    /// The [`Metrics`] of the `n`-th layer.
-    LayerMetrics(u32),
+        /// The [`HImg`] of the `n`-th layer.
+        ///
+        /// [`HImg`]: crate::images::HImg
+        #[snake_case(layer_img)]
+        #[default(PropValue::Himg(None))]
+        LayerImg(u32),
 
-    /// The opacity of the `n`-th layer.
-    LayerOpacity(u32),
+        /// The background color ([`RGBAF32`]) of the `n`-th layer.
+        ///
+        /// [`RGBAF32`]: crate::pal::RGBAF32
+        #[snake_case(layer_bg_color)]
+        #[default(PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 0.0)))]
+        LayerBgColor(u32),
 
-    /// The `content_center` of the `n`-th layer.
-    LayerCenter(u32),
+        /// The [`Metrics`] of the `n`-th layer.
+        #[snake_case(layer_metrics)]
+        #[default(PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)))]
+        LayerMetrics(u32),
 
-    /// The transformation of the `n`-th layer.
-    LayerXform(u32),
+        /// The opacity of the `n`-th layer.
+        #[snake_case(layer_opacity)]
+        #[default(PropValue::Float(1.0))]
+        LayerOpacity(u32),
 
-    /// The flags of the `n`-th layer.
-    LayerFlags(u32),
+        /// The `content_center` of the `n`-th layer.
+        #[snake_case(layer_center)]
+        #[default(PropValue::Box2(box2! {
+            min: [0.0, 0.0], max: [1.0, 1.0]
+        }))]
+        LayerCenter(u32),
 
-    /// The layout algorithm for subviews. Defaults to [`Layouter::Abs`].
-    SubviewLayouter,
+        /// The transformation of the `n`-th layer.
+        #[snake_case(layer_xform)]
+        #[default(PropValue::LayerXform({
+            static DEFAULT: LayerXform = LayerXform::default();
+            Rob::from_ref(&DEFAULT)
+        }))]
+        LayerXform(u32),
 
-    /// The padding for subviews.
-    /// Only valid when [`Layouter::Table`] is the layouter.
-    SubviewPadding,
+        /// The flags of the `n`-th layer.
+        #[snake_case(layer_flags)]
+        #[default(PropValue::LayerFlags(LayerFlags::default()))]
+        LayerFlags(u32),
 
-    /// The [`Metrics`] of a subview.
-    /// Only valid when [`Layouter::Abs`] is the layouter.
-    SubviewMetrics(Role),
+        /// The layout algorithm for subviews. Defaults to [`Layouter::Abs`].
+        #[snake_case(subview_layouter)]
+        #[default(PropValue::Layouter(Layouter::Abs))]
+        SubviewLayouter,
 
-    /// The table cell to place a subview.
-    /// Only valid when [`Layouter::Table`] is the layouter.
-    SubviewTableCell(Role),
+        /// The padding for subviews.
+        /// Only valid when [`Layouter::Table`] is the layouter.
+        #[snake_case(subview_padding)]
+        #[default(PropValue::F32x4([0.0; 4]))]
+        SubviewPadding,
 
-    /// The alignment flags of a subview.
-    /// Only valid when [`Layouter::Table`] is the layouter.
-    SubviewTableAlign(Role),
+        /// The [`Metrics`] of a subview.
+        /// Only valid when [`Layouter::Abs`] is the layouter.
+        #[snake_case(subview_metrics)]
+        #[default(PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)))]
+        SubviewMetrics(Role),
 
-    /// The inter-column spacing between two columns `i` and `i + 1`.
-    /// Only valid when [`Layouter::Table`] is the layouter.
-    SubviewTableColSpacing(u32),
+        /// The table cell to place a subview.
+        /// Only valid when [`Layouter::Table`] is the layouter.
+        #[snake_case(subview_table_cell)]
+        #[default(PropValue::U32x2([0, 0]))]
+        SubviewTableCell(Role),
 
-    /// The inter-row spacing between two rows `i` and `i + 1`.
-    /// Only valid when [`Layouter::Table`] is the layouter.
-    SubviewTableRowSpacing(u32),
+        /// The alignment flags of a subview.
+        /// Only valid when [`Layouter::Table`] is the layouter.
+        #[snake_case(subview_table_align)]
+        #[default(PropValue::AlignFlags(AlignFlags::CENTER))]
+        SubviewTableAlign(Role),
 
-    /// Toggles the visibility of a subview.
-    SubviewVisibility(Role),
+        /// The inter-column spacing between two columns `i` and `i + 1`.
+        /// Only valid when [`Layouter::Table`] is the layouter.
+        #[snake_case(subview_table_col_spacing)]
+        #[default(PropValue::Float(0.0))]
+        SubviewTableColSpacing(u32),
 
-    /// The [`Metrics`] of the layer used to clip subviews.
-    ClipMetrics,
+        /// The inter-row spacing between two rows `i` and `i + 1`.
+        /// Only valid when [`Layouter::Table`] is the layouter.
+        #[snake_case(subview_table_row_spacing)]
+        #[default(PropValue::Float(0.0))]
+        SubviewTableRowSpacing(u32),
 
-    /// The minimum size.
-    MinSize,
+        /// Toggles the visibility of a subview.
+        #[snake_case(subview_visibility)]
+        #[default(PropValue::Bool(true))]
+        SubviewVisibility(Role),
 
-    /// Expandability for each axis.
-    AllowGrow,
+        /// The [`Metrics`] of the layer used to clip subviews.
+        #[snake_case(clip_metrics)]
+        #[default(PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)))]
+        ClipMetrics,
 
-    /// The default foreground color.
-    FgColor,
+        /// The minimum size.
+        #[snake_case(min_size)]
+        #[default(PropValue::Vector2(Vector2::new(0.0, 0.0)))]
+        MinSize,
 
-    /// The default background color.
-    BgColor,
+        /// Expandability for each axis.
+        #[snake_case(allow_grow)]
+        #[default(PropValue::Bool2([true; 2]))]
+        AllowGrow,
 
-    /// The default `SysFontType`.
-    Font,
+        /// The default foreground color.
+        #[snake_case(fg_color)]
+        #[default(PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)))]
+        FgColor,
+
+        /// The default background color.
+        #[snake_case(bg_color)]
+        #[default(PropValue::Rgbaf32(RGBAF32::new(1.0, 1.0, 1.0, 1.0)))]
+        BgColor,
+
+        /// The default `SysFontType`.
+        #[snake_case(font)]
+        #[default(PropValue::SysFontType(SysFontType::Normal))]
+        Font,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -232,41 +288,6 @@ pub enum PropValue {
     LayerFlags(LayerFlags),
     Layouter(Layouter),
     AlignFlags(AlignFlags),
-}
-
-impl PropValue {
-    pub fn default_for_prop(prop: &Prop) -> Self {
-        static DEFAULT_METRICS: Metrics = Metrics::default();
-        match prop {
-            Prop::NumLayers => PropValue::Usize(0),
-            Prop::LayerImg(_) => PropValue::Himg(None),
-            Prop::LayerBgColor(_) => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 0.0)),
-            Prop::LayerMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
-            Prop::LayerOpacity(_) => PropValue::Float(1.0),
-            Prop::LayerCenter(_) => PropValue::Box2(box2! {
-                min: [0.0, 0.0], max: [1.0, 1.0]
-            }),
-            Prop::LayerXform(_) => {
-                static DEFAULT: LayerXform = LayerXform::default();
-                PropValue::LayerXform(Rob::from_ref(&DEFAULT))
-            }
-            Prop::LayerFlags(_) => PropValue::LayerFlags(LayerFlags::default()),
-            Prop::SubviewLayouter => PropValue::Layouter(Layouter::Abs),
-            Prop::SubviewPadding => PropValue::F32x4([0.0; 4]),
-            Prop::SubviewMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
-            Prop::SubviewTableCell(_) => PropValue::U32x2([0, 0]),
-            Prop::SubviewTableAlign(_) => PropValue::AlignFlags(AlignFlags::CENTER),
-            Prop::SubviewTableColSpacing(_) => PropValue::Float(0.0),
-            Prop::SubviewTableRowSpacing(_) => PropValue::Float(0.0),
-            Prop::SubviewVisibility(_) => PropValue::Bool(true),
-            Prop::ClipMetrics => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
-            Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
-            Prop::AllowGrow => PropValue::Bool2([true; 2]),
-            Prop::FgColor => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)),
-            Prop::BgColor => PropValue::Rgbaf32(RGBAF32::new(1.0, 1.0, 1.0, 1.0)),
-            Prop::Font => PropValue::SysFontType(SysFontType::Normal),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

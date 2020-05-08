@@ -45,11 +45,13 @@ pub mod theming {
     mod stylesheet;
     mod view;
     mod widget;
+
     pub use self::{
         manager::{Elem, ElemChangeCb, HElem, Manager, PropKindFlags},
         style::{
-            elem_id, roles, ClassSet, ElemClassPath, LayerXform, Layouter, Metrics, Prop,
-            PropValue, Role,
+            elem_id, mk_prop_by_snake_name, mk_prop_value_by_prop_snake_name,
+            mk_wrap_dynvalue_by_prop_snake_name, mk_wrap_value_by_prop_snake_name, roles, ClassSet,
+            ElemClassPath, LayerXform, Layouter, Metrics, Prop, PropValue, Role,
         },
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},

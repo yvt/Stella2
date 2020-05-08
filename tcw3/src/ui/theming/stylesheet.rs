@@ -270,79 +270,19 @@ macro_rules! prop {
     };
     (@setdynvalue($store_to:expr) $name:ident $($rest:tt)*) => {};
 
-    (@prop num_layers) => { $crate::ui::theming::Prop::NumLayers };
-    (@value num_layers: $val:expr) => { $crate::ui::theming::PropValue::Usize($val) };
-
-    (@prop layer_img[$i:expr]) => { $crate::ui::theming::Prop::LayerImg($i) };
-    (@value layer_img[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Himg($val) };
-
-    (@prop layer_center[$i:expr]) => { $crate::ui::theming::Prop::LayerCenter($i) };
-    (@value layer_center[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Box2($val) };
-
-    (@prop layer_xform[$i:expr]) => { $crate::ui::theming::Prop::LayerXform($i) };
-    (@value layer_xform[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_ref(&$val)) };
-    (@dynvalue layer_xform[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::LayerXform($crate::rob::Rob::from_box(Box::new($val))) };
-
-    (@prop layer_opacity[$i:expr]) => { $crate::ui::theming::Prop::LayerOpacity($i) };
-    (@value layer_opacity[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
-
-    (@prop layer_bg_color[$i:expr]) => { $crate::ui::theming::Prop::LayerBgColor($i) };
-    (@value layer_bg_color[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
-
-    (@prop layer_flags[$i:expr]) => { $crate::ui::theming::Prop::LayerFlags($i) };
-    (@value layer_flags[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::LayerFlags($val) };
-
-    (@prop layer_metrics[$i:expr]) => { $crate::ui::theming::Prop::LayerMetrics($i) };
-    (@value layer_metrics[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
-    (@dynvalue layer_metrics[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
-
-    (@prop subview_layouter) => { $crate::ui::theming::Prop::SubviewLayouter };
-    (@value subview_layouter: $val:expr) =>
-        { $crate::ui::theming::PropValue::Layouter($val) };
-
-    (@prop subview_padding) => { $crate::ui::theming::Prop::SubviewPadding };
-    (@value subview_padding: $val:expr) =>
-        { $crate::ui::theming::PropValue::F32x4($val) };
-
-    (@prop subview_metrics[$i:expr]) => { $crate::ui::theming::Prop::SubviewMetrics($i) };
-    (@value subview_metrics[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_ref(&$val)) };
-    (@dynvalue subview_metrics[$i:expr]: $val:expr) =>
-        { $crate::ui::theming::PropValue::Metrics($crate::rob::Rob::from_box(Box::new($val))) };
-
-    (@prop subview_table_cell[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableCell($i) };
-    (@value subview_table_cell[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::U32x2($val) };
-
-    (@prop subview_table_align[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableAlign($i) };
-    (@value subview_table_align[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::AlignFlags($val) };
-
-    (@prop subview_visibility[$i:expr]) => { $crate::ui::theming::Prop::SubviewVisibility($i) };
-    (@value subview_visibility[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Bool($val) };
-
-    (@prop subview_table_col_spacing[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableColSpacing($i) };
-    (@value subview_table_col_spacing[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
-
-    (@prop subview_table_row_spacing[$i:expr]) => { $crate::ui::theming::Prop::SubviewTableRowSpacing($i) };
-    (@value subview_table_row_spacing[$i:expr]: $val:expr) => { $crate::ui::theming::PropValue::Float($val) };
-
-    (@prop min_size) => { $crate::ui::theming::Prop::MinSize };
-    (@value min_size: $val:expr) => { $crate::ui::theming::PropValue::Vector2($val) };
-
-    (@prop allow_grow) => { $crate::ui::theming::Prop::AllowGrow };
-    (@value allow_grow: $val:expr) => { $crate::ui::theming::PropValue::Bool2($val) };
-
-    (@prop fg_color) => { $crate::ui::theming::Prop::FgColor };
-    (@value fg_color: $val:expr) => { $crate::ui::theming::PropValue::Rgbaf32($val) };
-
-    (@prop font) => { $crate::ui::theming::Prop::Font };
-    (@value font: $val:expr) => { $crate::ui::theming::PropValue::SysFontType($val) };
-
-    // `@dynvalue` falls back to `@value` if boxing is not necessary
-    (@dynvalue $($rest:tt)*) => { $crate::prop!(@value $($rest)*) };
+    (@prop $name:ident$([$param:expr])?) => {
+        $crate::ui::theming::mk_prop_by_snake_name::$name$(($param))?
+    };
+    (@value $name:ident$([$param:expr])?: $val:expr) => {
+        $crate::ui::theming::mk_prop_value_by_prop_snake_name::$name(
+            $crate::ui::theming::mk_wrap_value_by_prop_snake_name::$name(&$val)
+        )
+    };
+    (@dynvalue $name:ident$([$param:expr])?: $val:expr) => {
+        $crate::ui::theming::mk_prop_value_by_prop_snake_name::$name(
+            $crate::ui::theming::mk_wrap_dynvalue_by_prop_snake_name::$name($val)
+        )
+    };
 }
 
 /// Produces an expression of type `Vec<(Prop, PropValue)>`.
