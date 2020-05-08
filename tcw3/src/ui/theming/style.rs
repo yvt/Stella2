@@ -206,6 +206,9 @@ pub enum Prop {
     /// The default foreground color.
     FgColor,
 
+    /// The default background color.
+    BgColor,
+
     /// The default `SysFontType`.
     Font,
 }
@@ -260,6 +263,7 @@ impl PropValue {
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
             Prop::AllowGrow => PropValue::Bool2([true; 2]),
             Prop::FgColor => PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 1.0)),
+            Prop::BgColor => PropValue::Rgbaf32(RGBAF32::new(1.0, 1.0, 1.0, 1.0)),
             Prop::Font => PropValue::SysFontType(SysFontType::Normal),
         }
     }

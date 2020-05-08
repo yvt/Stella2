@@ -425,6 +425,7 @@ bitflags! {
         const LAYOUT = 1 << 9;
         const FONT = 1 << 10;
         const FG_COLOR = 1 << 11;
+        const BG_COLOR = 1 << 12;
     }
 }
 
@@ -451,6 +452,7 @@ impl Prop {
             Prop::AllowGrow => PropKindFlags::LAYOUT,
             Prop::ClipMetrics => PropKindFlags::CLIP_LAYER,
             Prop::FgColor => PropKindFlags::FG_COLOR,
+            Prop::BgColor => PropKindFlags::BG_COLOR,
             Prop::Font => PropKindFlags::FONT,
         }
     }
