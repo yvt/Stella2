@@ -20,8 +20,6 @@ pub(crate) comp crate::view::tabbar::TabbarView {
     pub event dispatch(action: model::WndAction);
     pub event close();
 
-    on (init) get!(&this).init();
-
     const wrapper = StyledBox::new! {
         style_manager,
         // Define a draggable region

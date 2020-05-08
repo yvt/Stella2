@@ -300,15 +300,6 @@ stella2_meta::designer_impl! {
     crate::view::MainView
 }
 
-impl MainView {
-    /// Handle `init` event.
-    fn init(&self) {}
-}
-
-stella2_meta::designer_impl! {
-    crate::view::PlaceholderView
-}
-
 fn cell_is_some<T>(cell: &Cell<Option<T>>) -> bool {
     let inner = cell.take();
     let x = inner.is_some();

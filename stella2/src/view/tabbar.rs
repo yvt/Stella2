@@ -4,11 +4,6 @@ stella2_meta::designer_impl! {
     crate::view::tabbar::TabbarView
 }
 
-impl TabbarView {
-    /// Handle `init` event.
-    fn init(&self) {}
-}
-
 impl theming::Widget for TabbarView {
     fn view_ref(&self) -> HViewRef<'_> {
         self.view().as_ref()

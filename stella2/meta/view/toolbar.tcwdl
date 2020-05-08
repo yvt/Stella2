@@ -19,8 +19,6 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
     pub prop wnd_state: Elem<model::WndState>;
     pub event dispatch(action: model::AppAction);
 
-    on (init) get!(&this).init();
-
     pub const wrapper = StyledBox::new! {
         style_manager,
         // Define a draggable region

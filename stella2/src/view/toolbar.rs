@@ -7,9 +7,6 @@ stella2_meta::designer_impl! {
 }
 
 impl ToolbarView {
-    /// Handle `init` event.
-    fn init(&self) {}
-
     /// Handle `toggle_sidebar_button.activate` event.
     fn toggle_sidebar(&self) {
         // Toggle the sidebar

@@ -191,22 +191,4 @@ comp crate::view::MainView {
         style_manager,
         caption = "Send",
     };
-
-    on (init) get!(&this).init();
-}
-
-use crate::view::PlaceholderView;
-#[widget]
-pub(crate) comp PlaceholderView {
-    const wm: pal::Wm { pub set; }
-    const style_manager: &Manager { pub set; }
-    pub prop text: String;
-
-    pub const view = HView::new! {
-        layout = TableLayout::stack_horz(
-            Some((get!(label.view), AlignFlags::TOP | AlignFlags::LEFT))
-        ),
-    };
-
-    const label = Label::new! { style_manager, text };
 }
