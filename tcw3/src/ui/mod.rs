@@ -47,7 +47,10 @@ pub mod theming {
     mod widget;
     pub use self::{
         manager::{Elem, ElemChangeCb, HElem, Manager, PropKindFlags},
-        style::{elem_id, ClassSet, ElemClassPath, LayerXform, Metrics, Prop, PropValue, Role},
+        style::{
+            elem_id, roles, ClassSet, ElemClassPath, LayerXform, Layouter, Metrics, Prop,
+            PropValue, Role,
+        },
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
         widget::Widget,

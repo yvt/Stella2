@@ -204,6 +204,55 @@ Follow these steps to create a bitmap:
 
 *To be filled*
 
+### Styling Framework
+
+*To be filled*
+
+A view hierarchy and a styling element tree are independent from each other.
+However, there are some points at which there is a one-by-one relationship
+between them. Such points are useful for connecting widgets and thus represented
+by the trait **[`Widget`]**. This trait provides two methods each returning the
+root node of the corresponding type of subtree. The client of this trait can use
+them to embed the widget in outer trees. For example, [`Split`] has a method
+named [`set_children`] that receives two values of `&dyn Widget` and puts them
+on the respective sides of a splitter. `Split` itself implements `Widget`, so
+the user of `Split` can easily place a `Split` inside something that exposes a
+method equivalent to `set_children`.
+
+The following diagram illustrates this model.
+
+```text
+   view hierarchy     styling tree
+
+        window
+     ┌ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+     │ A_view           A_elem ├ Widget A
+     └─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─│─ ─┘
+       ┌──┴──┐             │
+     view  view            │
+             │             │
+            ─│─ ─ ─ ─ ─ ─ ─│─ ─ Widget A may expose this "socket",
+             │             │    to which Widget B can be plugged in
+             │             │
+        ┌─ ─ ┼ ─ ─ ─ ─ ─ ─ ┼ ─ ┐
+        │ B_view        B_elem ├ Widget B
+        └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+```
+
+[`Widget`]: crate::ui::theming::Widget
+[`Split`]: crate::ui::views::Split
+[`set_children`]: crate::ui::views::Split::set_children
+
+Some styling elements (only [`StyledBox`] at the moment, actually) support
+controlling the arrangement of their subviews through the styling framework.
+Subviews are modeled by the styling framework as follows: Each styling element
+is associated with a set of pairs of type `(Role, HView)`. [`Role`] is used
+to identify subviews in stylesheets and to apply styling props to specific
+subviews.
+
+[`StyledBox`]: crate::ui::theming::StyledBox
+[`Role`]: crate::ui::theming::Role
+
 ### Layouting Algorithm
 
 `uicore` uses a two-phase layouting algorithm. The algoritm consists of

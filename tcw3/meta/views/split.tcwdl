@@ -1,5 +1,9 @@
-use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView, pal,
-    ui::views::split::SplitDragListener};
+use crate::{
+    pal,
+    ui::theming::{ClassSet, StyledBox, HElem, Manager, Widget},
+    ui::views::split::SplitDragListener,
+    uicore::HView,
+};
 
 #[prototype_only]
 #[widget]
@@ -33,6 +37,12 @@ pub comp crate::ui::views::Split {
 
     /// Set the views placed in the panels.
     prop subviews: [HView; 2] { pub set; } = unreachable!();
+
+    /// Set the child styling elements.
+    prop subelements: [Option<HElem>; 2] { pub set; } = unreachable!();
+
+    /// Set the subviews and child styling elements at once.
+    prop children: [&dyn Widget; 2] { pub set; } = unreachable!();
 
     /// Set the panel to zoom into. Defaults to `None` (both panels are
     /// displayed). The value must be one of `Some(0)`, `Some(1)`, and `None`.

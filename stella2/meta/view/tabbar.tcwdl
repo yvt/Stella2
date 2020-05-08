@@ -3,15 +3,13 @@ use harmony::Elem;
 use tcw3::{
     pal,
     ui::{
-        AlignFlags,
         views::{Label, Button},
-        theming::{self, ClassSet, HElem, StyledBox, Manager},
-        layouts::{TableLayout},
+        theming::{self, ClassSet, HElem, StyledBox, Manager, Widget},
     },
     uicore::{HView, ViewFlags},
 };
 
-use crate::{model, stylesheet::elem_id};
+use crate::{model, stylesheet::{elem_id, my_roles}};
 
 #[widget]
 pub(crate) comp crate::view::tabbar::TabbarView {
@@ -28,44 +26,31 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         style_manager,
         // Define a draggable region
         view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::DRAG_AREA,
-        class_set = elem_id::TABBAR,
-        subview_generic = HView::new! {
-            layout = TableLayout::stack_horz(
-                ArrayVec::from([
-                    (get!(tab1.view), AlignFlags::JUSTIFY),
-                    (get!(tab2.view), AlignFlags::VERT_JUSTIFY | AlignFlags::LEFT),
-                    #[cfg(not(target_os = "macos"))]
-                    (get!(close_button.view), AlignFlags::JUSTIFY),
-                ])
-            )
-                .with_margin([
-                    0.0,
-                    0.0,
-                    0.0,
-                    {
-                        // On macOS, there are standard window buttons on the
-                        // upper left corner. We need to make sure they don't
-                        // overlap with tabs.
-                        // TODO: Slightly lower the buttons so that they are
-                        //       vertically centered within the tabbar.
-                        let avoid_stoplight = cfg!(target_os = "macos") &&
-                            !get!(&wnd_state).sidebar_visible;
-                        if avoid_stoplight { 68.0 } else { 0.0 }
-                    }
-                ]),
+        class_set = {
+            // On macOS, there are standard window buttons on the
+            // upper left corner. We need to make sure they don't
+            // overlap with tabs.
+            // TODO: Slightly lower the buttons so that they are
+            //       vertically centered within the tabbar.
+            let avoid_stoplight = cfg!(target_os = "macos") &&
+                !get!(&wnd_state).sidebar_visible;
+
+            if avoid_stoplight {
+                elem_id::TABBAR | ClassSet::USER1
+            } else {
+                elem_id::TABBAR
+            }
         },
-        subelement_generic = get!(tabs_elem.helem),
+        children = [
+            (0, Some(get!(&tab1) as &dyn Widget)),
+            (1, Some(get!(&tab2) as &dyn Widget)),
+            #[cfg(not(target_os = "macos"))]
+            (2, Some(get!(&close_button) as &dyn Widget)),
+        ],
     };
 
     pub const view: HView = get!(wrapper.view);
-    pub const style_elem: HElem = get!(wrapper.style_elem);
-
-    const tabs_elem = theming::Elem::new! { style_manager };
-    on (init) {
-        get!(&tabs_elem).insert_child(get!(tab1.style_elem));
-        get!(&tabs_elem).insert_child(get!(tab2.style_elem));
-        get!(&tabs_elem).insert_child(get!(close_button.style_elem));
-    }
+    pub const style_elem: HElem { pub get clone; } = get!(wrapper.style_elem);
 
     // TODO: Replace these with real tabs
     const tab1 = StyledBox::new! {
@@ -73,8 +58,10 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         view_flags = ViewFlags::ACCEPT_MOUSE_OVER | ViewFlags::ACCEPT_MOUSE_DRAG,
         class_set = elem_id::TABBAR_TAB | ClassSet::ACTIVE,
         auto_class_set = ClassSet::HOVER,
-        child_generic = get!(&tab1_caption),
-        child_bullet = get!(&tab1_close),
+        children = [
+            (theming::roles::GENERIC, Some(get!(&tab1_caption) as &dyn Widget)),
+            (my_roles::CLOSE, Some(get!(&tab1_close) as &dyn Widget)),
+        ],
     };
     const tab1_caption = Label::new! {
         style_manager,
@@ -90,8 +77,10 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         view_flags = ViewFlags::ACCEPT_MOUSE_OVER | ViewFlags::ACCEPT_MOUSE_DRAG,
         class_set = elem_id::TABBAR_TAB,
         auto_class_set = ClassSet::HOVER,
-        child_generic = get!(&tab2_caption),
-        child_bullet = get!(&tab2_close),
+        children = [
+            (theming::roles::GENERIC, Some(get!(&tab2_caption) as &dyn Widget)),
+            (my_roles::CLOSE, Some(get!(&tab2_close) as &dyn Widget)),
+        ],
     };
     const tab2_caption = Label::new! {
         style_manager,

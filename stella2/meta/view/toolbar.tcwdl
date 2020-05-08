@@ -2,10 +2,8 @@ use arrayvec::ArrayVec;
 use harmony::Elem;
 use tcw3::{
     ui::{
-        AlignFlags,
         views::{Label, Button},
-        layouts::TableLayout,
-        theming::{self, Manager, StyledBox, HElem},
+        theming::{self, Manager, StyledBox, HElem, Widget},
     },
     uicore::{HView, ViewFlags},
     pal,
@@ -28,29 +26,18 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
         // Define a draggable region
         view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::DRAG_AREA,
         class_set = elem_id::TOOLBAR,
-        subview_generic = HView::new! {
-            layout = TableLayout::stack_horz(
-                ArrayVec::from([
-                    (get!(member_count_icon.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(member_count.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(separator.view), AlignFlags::HORZ_JUSTIFY),
-                    (get!(topic.view), AlignFlags::LEFT),
-                    (get!(toggle_sidebar_button.view), AlignFlags::JUSTIFY),
-                    (get!(menu_button.view), AlignFlags::JUSTIFY),
-                ])
-            )
-                .with_column_spacing(&[
-                    0.0,
-                    0.0,
-                    0.0,
-                    7.0,
-                    7.0,
-                ]),
-        },
+        children = [
+            (0, Some(get!(&member_count_icon) as &dyn Widget)),
+            (1, Some(get!(&member_count) as &dyn Widget)),
+            (2, Some(get!(&separator) as &dyn Widget)),
+            (3, Some(get!(&topic) as &dyn Widget)),
+            (4, Some(get!(&toggle_sidebar_button) as &dyn Widget)),
+            (5, Some(get!(&menu_button) as &dyn Widget)),
+        ],
     };
 
     pub const view: HView = get!(wrapper.view);
-    pub const style_elem: HElem = get!(wrapper.style_elem);
+    pub const style_elem: HElem { pub get clone; } = get!(wrapper.style_elem);
 
     const separator = StyledBox::new! {
         style_manager,

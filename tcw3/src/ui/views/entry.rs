@@ -18,7 +18,7 @@ use crate::{
     ui::{
         layouts::EmptyLayout,
         mixins::CanvasMixin,
-        theming::{self, ClassSet, HElem, Prop, PropKindFlags, PropValue, Role, Widget},
+        theming::{self, roles, ClassSet, HElem, Prop, PropKindFlags, PropValue, Widget},
     },
     uicore::{
         actions, ActionId, ActionStatus, CursorShape, HView, HViewRef, HWndRef, MouseDragListener,
@@ -44,8 +44,8 @@ impl Entry {
         let styled_box = theming::StyledBox::new(style_manager, ViewFlags::default());
         styled_box.set_class_set(ClassSet::ENTRY);
         styled_box.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
-        styled_box.set_subview(Role::Generic, Some(core.view()));
-        styled_box.set_subelement(Role::Generic, Some(core.style_elem()));
+        styled_box.set_subview(roles::GENERIC, Some(core.view()));
+        styled_box.set_subelement(roles::GENERIC, Some(core.style_elem()));
 
         Self { styled_box, core }
     }

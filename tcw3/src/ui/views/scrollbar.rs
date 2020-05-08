@@ -15,7 +15,7 @@ use crate::{
     ui::{
         layouts::FillLayout,
         theming::{
-            ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags, Role, StyledBox,
+            roles, ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags, StyledBox,
             StyledBoxOverride, Widget,
         },
     },
@@ -121,7 +121,7 @@ impl Scrollbar {
         frame.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
         let thumb = StyledBox::new(style_manager, ViewFlags::default());
-        frame.set_child(Role::Generic, Some(&thumb));
+        frame.set_child(roles::GENERIC, Some(&thumb));
 
         let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::NO_FOCUS_ON_CLICK);
         wrapper.set_layout(FillLayout::new(frame.view()));

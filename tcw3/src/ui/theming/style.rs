@@ -3,7 +3,10 @@ use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Rad, Vector2};
 use rob::Rob;
 
-use crate::pal::{LayerFlags, SysFontType, RGBAF32};
+use crate::{
+    pal::{LayerFlags, SysFontType, RGBAF32},
+    ui::AlignFlags,
+};
 
 bitflags! {
     /// A set of styling classes.
@@ -32,8 +35,6 @@ bitflags! {
         const HAS_HORIZONTAL_SCROLLBAR = 1 << 8;
         /// The scrollable container has a vertical scrollbar.
         const HAS_VERTICAL_SCROLLBAR = 1 << 9;
-        /// The element is a splitter.
-        const SPLITTER = 1 << 10;
         /// The element is a text entry widget.
         const ENTRY = 1 << 11;
         /// The element is a checkbox widget.
@@ -42,6 +43,8 @@ bitflags! {
         const CHECKED = 1 << 13;
         /// The element is a radio button widget.
         const RADIO_BUTTON = 1 << 14;
+
+        const USER1 = 1 << 15;
 
         /// The bit mask for ID values. See [`ClassSet::id`] for more.
         const ID_MASK = 0xffff_0000;
@@ -97,29 +100,38 @@ impl ClassSet {
 
 /// Styling IDs ([`ClassSet::id`]) reserved for the system.
 pub mod elem_id {
+    use super::*;
     /// The smallest styling ID allocated for the system.
     pub const SYS_START_VALUE: u16 = 0xff80;
+
+    iota::iota! {
+        pub const SPLITTER: ClassSet = ClassSet::id(iota + SYS_START_VALUE);
+    }
 }
 
 /// `ClassSet` of an element and its descendants.
 pub type ElemClassPath = [ClassSet];
 
-/// A role of a subview.
-#[macro_rules_attribute::macro_rules_attribute(variant_count!)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Role {
-    /// The default role.
-    Generic = 0,
-    HorizontalScrollbar,
-    VerticalScrollbar,
-    Bullet,
-}
-
-/// The number of roles defined by [`Role`].
+/// Role of a subview.
 ///
-/// The discriminant values of `Role` are guaranteed to range between
-/// `0` and `ROLE_COUNT - 1`.
-pub const ROLE_COUNT: usize = Role::VARIANT_COUNT as usize;
+/// The meaning of specific values is not defined by the framework. The
+/// application developers may assign any values provided that they do not
+/// conflict with each other in the same styling element.
+///
+/// Use [`roles::GENERIC`] when there are no subviews to be distinguished from
+/// another.
+///
+/// [`roles::GENERIC`]: self::roles::GENERIC
+pub type Role = u32;
+
+/// Roles
+pub mod roles {
+    iota::iota! {
+        pub const GENERIC: super::Role = iota;
+                , HORZ_SCROLLBAR
+                , VERT_SCROLLBAR
+    }
+}
 
 /// Represents a single styling property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,8 +164,32 @@ pub enum Prop {
     /// The flags of the `n`-th layer.
     LayerFlags(u32),
 
+    /// The layout algorithm for subviews. Defaults to [`Layouter::Abs`].
+    SubviewLayouter,
+
+    /// The padding for subviews.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewPadding,
+
     /// The [`Metrics`] of a subview.
+    /// Only valid when [`Layouter::Abs`] is the layouter.
     SubviewMetrics(Role),
+
+    /// The table cell to place a subview.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableCell(Role),
+
+    /// The alignment flags of a subview.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableAlign(Role),
+
+    /// The inter-column spacing between two columns `i` and `i + 1`.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableColSpacing(u32),
+
+    /// The inter-row spacing between two rows `i` and `i + 1`.
+    /// Only valid when [`Layouter::Table`] is the layouter.
+    SubviewTableRowSpacing(u32),
 
     /// Toggles the visibility of a subview.
     SubviewVisibility(Role),
@@ -180,6 +216,8 @@ pub enum PropValue {
     Bool2([bool; 2]),
     Float(f32),
     Usize(usize),
+    U32x2([u32; 2]),
+    F32x4([f32; 4]),
     Himg(Option<crate::images::HImg>),
     Rgbaf32(RGBAF32),
     Metrics(Rob<'static, Metrics>),
@@ -189,6 +227,8 @@ pub enum PropValue {
     LayerXform(Rob<'static, LayerXform>),
     SysFontType(SysFontType),
     LayerFlags(LayerFlags),
+    Layouter(Layouter),
+    AlignFlags(AlignFlags),
 }
 
 impl PropValue {
@@ -208,7 +248,13 @@ impl PropValue {
                 PropValue::LayerXform(Rob::from_ref(&DEFAULT))
             }
             Prop::LayerFlags(_) => PropValue::LayerFlags(LayerFlags::default()),
+            Prop::SubviewLayouter => PropValue::Layouter(Layouter::Abs),
+            Prop::SubviewPadding => PropValue::F32x4([0.0; 4]),
             Prop::SubviewMetrics(_) => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
+            Prop::SubviewTableCell(_) => PropValue::U32x2([0, 0]),
+            Prop::SubviewTableAlign(_) => PropValue::AlignFlags(AlignFlags::CENTER),
+            Prop::SubviewTableColSpacing(_) => PropValue::Float(0.0),
+            Prop::SubviewTableRowSpacing(_) => PropValue::Float(0.0),
             Prop::SubviewVisibility(_) => PropValue::Bool(true),
             Prop::ClipMetrics => PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)),
             Prop::MinSize => PropValue::Vector2(Vector2::new(0.0, 0.0)),
@@ -217,6 +263,16 @@ impl PropValue {
             Prop::Font => PropValue::SysFontType(SysFontType::Normal),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Layouter {
+    /// Positions subviews using [`Metrics`].
+    Abs,
+    /// Positions subviews using an algorithm similar to [`TableLayout`].
+    ///
+    /// [`TableLayout`]: crate::ui::layouts::TableLayout
+    Table,
 }
 
 /// Describes the placement of a rectangle (e.g., layer) inside a container.
