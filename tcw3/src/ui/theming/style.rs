@@ -138,6 +138,18 @@ mod prop_macros; // `def_prop!`
 
 static DEFAULT_METRICS: Metrics = Metrics::default();
 
+/// Zero-based layer index in range `0..num_layers` (where `num_layers` is the
+/// computed value of the prop [`NumLayers`]).
+///
+/// [`NumLayers`]: self::Prop::NumLayers
+pub type LayerId = u32;
+
+/// Zero-based column index.
+pub type Col = u32;
+
+/// Zero-based row index.
+pub type Row = u32;
+
 def_prop! {
     /// Represents a single styling property.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,31 +164,31 @@ def_prop! {
         /// [`HImg`]: crate::images::HImg
         #[snake_case(layer_img)]
         #[default(PropValue::Himg(None))]
-        LayerImg(u32),
+        LayerImg(LayerId),
 
         /// The background color ([`RGBAF32`]) of the `n`-th layer.
         ///
         /// [`RGBAF32`]: crate::pal::RGBAF32
         #[snake_case(layer_bg_color)]
         #[default(PropValue::Rgbaf32(RGBAF32::new(0.0, 0.0, 0.0, 0.0)))]
-        LayerBgColor(u32),
+        LayerBgColor(LayerId),
 
         /// The [`Metrics`] of the `n`-th layer.
         #[snake_case(layer_metrics)]
         #[default(PropValue::Metrics(Rob::from_ref(&DEFAULT_METRICS)))]
-        LayerMetrics(u32),
+        LayerMetrics(LayerId),
 
         /// The opacity of the `n`-th layer.
         #[snake_case(layer_opacity)]
         #[default(PropValue::Float(1.0))]
-        LayerOpacity(u32),
+        LayerOpacity(LayerId),
 
         /// The `content_center` of the `n`-th layer.
         #[snake_case(layer_center)]
         #[default(PropValue::Box2(box2! {
             min: [0.0, 0.0], max: [1.0, 1.0]
         }))]
-        LayerCenter(u32),
+        LayerCenter(LayerId),
 
         /// The transformation of the `n`-th layer.
         #[snake_case(layer_xform)]
@@ -184,12 +196,12 @@ def_prop! {
             static DEFAULT: LayerXform = LayerXform::default();
             Rob::from_ref(&DEFAULT)
         }))]
-        LayerXform(u32),
+        LayerXform(LayerId),
 
         /// The flags of the `n`-th layer.
         #[snake_case(layer_flags)]
         #[default(PropValue::LayerFlags(LayerFlags::default()))]
-        LayerFlags(u32),
+        LayerFlags(LayerId),
 
         /// The layout algorithm for subviews. Defaults to [`Layouter::Abs`].
         #[snake_case(subview_layouter)]
@@ -224,13 +236,13 @@ def_prop! {
         /// Only valid when [`Layouter::Table`] is the layouter.
         #[snake_case(subview_table_col_spacing)]
         #[default(PropValue::Float(0.0))]
-        SubviewTableColSpacing(u32),
+        SubviewTableColSpacing(Col),
 
         /// The inter-row spacing between two rows `i` and `i + 1`.
         /// Only valid when [`Layouter::Table`] is the layouter.
         #[snake_case(subview_table_row_spacing)]
         #[default(PropValue::Float(0.0))]
-        SubviewTableRowSpacing(u32),
+        SubviewTableRowSpacing(Row),
 
         /// Toggles the visibility of a subview.
         #[snake_case(subview_visibility)]

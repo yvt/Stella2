@@ -20,12 +20,41 @@ macro_rules! def_prop {
             $(,)*
         }
     ) => {
-        $(#[$meta])*
-        pub enum Prop {
-            $(
-                $( #[doc = $doc] )*
-                $name $(($param_ty))?
-            ),*
+        doc_comment! {
+            $(#[$meta])*
+            @[doc = concat!(
+                "\n",
+                // Emit a Markdown table
+                "| `Prop` | [`stylesheet!`] syntax | [`PropValue`] variant |\n",
+                "| ------ | ---------------------- | --------------------- |\n",
+                $(
+                    // `Prop`
+                    "| [`",
+                    stringify!($name),
+                    $( "(", stringify!($param_ty), ")", )?
+                    "`](#variant.",
+                    stringify!($name),
+                    ") ",
+
+                    // `stylesheet!` syntax
+                    "| `",
+                    stringify!($snake_name),
+                    $( "[", stringify!($param_ty), "]", )?
+                    ": value` ",
+
+                    // `PropValue` variant
+                    "| [`", stringify!($val_variant), "`]",
+                    "(PropValue::", stringify!($val_variant), ")",
+
+                    " | \n",
+                )*
+            )]
+            pub enum Prop {
+                $(
+                    $( #[doc = $doc] )*
+                    $name $(($param_ty))?
+                ),*
+            }
         }
 
         impl PropValue {
@@ -80,6 +109,18 @@ macro_rules! def_prop {
             use super::*;
             $( def_wrap_value!(@dynvalue PropValue::$val_variant as $snake_name); )*
         }
+    };
+}
+
+macro_rules! doc_comment {
+    (
+        $(#[$m:meta])*
+        @[doc = $x:expr]
+        $($tt:tt)*
+    ) => {
+        $(#[$m])*
+        #[doc = $x]
+        $($tt)*
     };
 }
 

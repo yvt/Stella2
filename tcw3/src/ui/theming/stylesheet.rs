@@ -431,6 +431,11 @@ macro_rules! rule {
 /// support property values which are determined at runtime. However,
 /// it utilizes `static` as much as possible for the constant part of the data.
 ///
+/// See [`Prop`] for the list of supported styling props. Note that most styled
+/// elements support only a subset of these props.
+///
+/// [`Prop`]: crate::ui::theming::Prop
+///
 /// # Examples
 ///
 ///     use tcw3::{stylesheet, pal::RGBAF32, ui::theming::ClassSet};

@@ -51,7 +51,7 @@ pub mod theming {
         style::{
             elem_id, mk_prop_by_snake_name, mk_prop_value_by_prop_snake_name,
             mk_wrap_dynvalue_by_prop_snake_name, mk_wrap_value_by_prop_snake_name, roles, ClassSet,
-            ElemClassPath, LayerXform, Layouter, Metrics, Prop, PropValue, Role,
+            Col, ElemClassPath, LayerId, LayerXform, Layouter, Metrics, Prop, PropValue, Role, Row,
         },
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
