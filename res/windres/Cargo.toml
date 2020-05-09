@@ -10,7 +10,7 @@ license = "GPL-3.0-or-later"
 [build-dependencies]
 embed-resource = "1.3.0"
 icon_baker = { path = "../../support/icon_baker" }
-libflate = "0.1.27"
+libflate = "1.0.0"
 
 [lib]
 path = "lib.rs"
