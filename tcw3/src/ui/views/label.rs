@@ -7,7 +7,7 @@ use crate::{
     pal,
     pal::prelude::*,
     ui::mixins::CanvasMixin,
-    ui::theming::{ClassSet, Elem, HElem, Manager, Prop, PropKindFlags, PropValue, Widget},
+    ui::theming::{ClassSet, Elem, GetPropValue, HElem, Manager, PropKindFlags, Widget},
     uicore::{
         HView, HViewRef, HWndRef, Layout, LayoutCtx, SizeTraits, UpdateCtx, ViewFlags, ViewListener,
     },
@@ -164,10 +164,7 @@ fn reapply_style(inner: &Rc<Inner>, view: HViewRef<'_>, kind_flags: PropKindFlag
 impl State {
     fn ensure_text_layout(&mut self, elem: &Elem) {
         if self.text_layout_info.is_none() {
-            let font_type = match elem.compute_prop(Prop::Font) {
-                PropValue::SysFontType(value) => value,
-                _ => unreachable!(),
-            };
+            let font_type = elem.computed_values().font();
 
             let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
                 sys: Some(font_type),
@@ -258,10 +255,7 @@ impl ViewListener for LabelListener {
 
         state.ensure_text_layout(&self.inner.style_elem);
 
-        let color = match self.inner.style_elem.compute_prop(Prop::FgColor) {
-            PropValue::Rgbaf32(value) => value,
-            _ => unreachable!(),
-        };
+        let color = self.inner.style_elem.computed_values().fg_color();
 
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
 

@@ -18,7 +18,7 @@ use crate::{
     ui::{
         layouts::EmptyLayout,
         mixins::CanvasMixin,
-        theming::{self, roles, ClassSet, HElem, Prop, PropKindFlags, PropValue, Widget},
+        theming::{self, roles, ClassSet, GetPropValue, HElem, PropKindFlags, Widget},
     },
     uicore::{
         actions, ActionId, ActionStatus, CursorShape, HView, HViewRef, HWndRef, MouseDragListener,
@@ -217,10 +217,7 @@ impl EntryCore {
 impl State {
     fn ensure_text_layout(&mut self, elem: &theming::Elem) -> &mut TextLayoutInfo {
         if self.text_layout_info.is_none() {
-            let font_type = match elem.compute_prop(Prop::Font) {
-                PropValue::SysFontType(value) => value,
-                _ => unreachable!(),
-            };
+            let font_type = elem.computed_values().font();
 
             let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
                 sys: Some(font_type),
@@ -947,10 +944,7 @@ impl ViewListener for EntryCoreListener {
 
         state.ensure_text_layout(&self.inner.style_elem);
 
-        let color = match self.inner.style_elem.compute_prop(Prop::FgColor) {
-            PropValue::Rgbaf32(value) => value,
-            _ => unreachable!(),
-        };
+        let color = self.inner.style_elem.computed_values().fg_color();
 
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
         let sel_range = &state.sel_range;

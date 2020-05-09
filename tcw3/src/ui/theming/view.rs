@@ -12,7 +12,7 @@ use std::{
 
 use super::{
     manager::{Elem, HElem, Manager, PropKindFlags},
-    style::{roles, ClassSet, Layouter, Metrics, Prop, PropValue, Role},
+    style::{roles, ClassSet, GetPropValue, Layouter, Metrics, Role},
     widget::Widget,
 };
 use crate::{
@@ -370,18 +370,15 @@ struct SbLayout {
 
 impl SbLayout {
     fn new(subviews: &[(Role, HView)], elem: &Elem, overrider: Rc<dyn StyledBoxOverride>) -> Self {
-        // Evaluate the layout properties now
-        let subviews_filtered = subviews.iter().filter(|&&(role, _)| {
-            match elem.compute_prop(Prop::SubviewVisibility(role)) {
-                PropValue::Bool(b) => b,
-                _ => unreachable!(),
-            }
-        });
+        // Access the computed styling prop values
+        let props = elem.computed_values();
 
-        let layouter = match elem.compute_prop(Prop::SubviewLayouter) {
-            PropValue::Layouter(v) => v,
-            _ => unreachable!(),
-        };
+        // Evaluate the layout properties now
+        let subviews_filtered = subviews
+            .iter()
+            .filter(|&&(role, _)| props.subview_visibility(role));
+
+        let layouter = props.subview_layouter();
 
         let inner_layout: Box<dyn Layout> = match layouter {
             Layouter::Abs => Box::new(AbsInnerLayout::new(subviews_filtered, elem, overrider)),
@@ -390,14 +387,8 @@ impl SbLayout {
 
         Self {
             inner_layout,
-            min_size: match elem.compute_prop(Prop::MinSize) {
-                PropValue::Vector2(v) => v,
-                _ => unreachable!(),
-            },
-            allow_grow: match elem.compute_prop(Prop::AllowGrow) {
-                PropValue::Bool2(v) => v,
-                _ => unreachable!(),
-            },
+            min_size: props.min_size(),
+            allow_grow: props.allow_grow(),
         }
     }
 }
@@ -455,15 +446,13 @@ impl AbsInnerLayout {
         elem: &Elem,
         overrider: Rc<dyn StyledBoxOverride>,
     ) -> Self {
+        // Access the computed styling prop values
+        let props = elem.computed_values();
+
         Self {
             subview_layout: subviews
                 .clone()
-                .map(
-                    |&(role, _)| match elem.compute_prop(Prop::SubviewMetrics(role)) {
-                        PropValue::Metrics(m) => (role, (*m).clone()),
-                        _ => unreachable!(),
-                    },
-                )
+                .map(|&(role, _)| (role, (*props.subview_metrics(role)).clone()))
                 .collect(),
             subviews: subviews.map(|x| x.1.clone()).collect(),
             overrider,
@@ -570,39 +559,27 @@ impl TableInnerLayout {
         elem: &Elem,
         overrider: Rc<dyn StyledBoxOverride>,
     ) -> Self {
-        let padding = match elem.compute_prop(Prop::SubviewPadding) {
-            PropValue::F32x4(x) => x,
-            _ => unreachable!(),
-        };
+        // Access the computed styling prop values
+        let props = elem.computed_values();
+
+        let padding = props.subview_padding();
 
         let roles = subviews.clone().map(|e| e.0).collect();
 
         let mut inner_layout = TableLayout::new(subviews.map(|&(role, ref view)| {
-            let [x, y] = match elem.compute_prop(Prop::SubviewTableCell(role)) {
-                PropValue::U32x2(x) => x,
-                _ => unreachable!(),
-            };
-            let align_flags = match elem.compute_prop(Prop::SubviewTableAlign(role)) {
-                PropValue::AlignFlags(x) => x,
-                _ => unreachable!(),
-            };
+            let [x, y] = props.subview_table_cell(role);
+            let align_flags = props.subview_table_align(role);
             (view.clone(), [x as _, y as _], align_flags)
         }))
         .with_margin(padding);
 
         for i in (1..inner_layout.num_columns()).map(|i| i - 1) {
-            let spacing = match elem.compute_prop(Prop::SubviewTableColSpacing(i as u32)) {
-                PropValue::Float(x) => x,
-                _ => unreachable!(),
-            };
+            let spacing = props.subview_table_col_spacing(i as u32);
             inner_layout.set_column_spacing(i, spacing);
         }
 
         for i in (1..inner_layout.num_rows()).map(|i| i - 1) {
-            let spacing = match elem.compute_prop(Prop::SubviewTableRowSpacing(i as u32)) {
-                PropValue::Float(x) => x,
-                _ => unreachable!(),
-            };
+            let spacing = props.subview_table_row_spacing(i as u32);
             inner_layout.set_row_spacing(i, spacing);
         }
 
@@ -799,15 +776,7 @@ impl ViewListener for SbListener {
         let layers: &mut Layers = layers.as_mut().unwrap();
 
         let elem = &shared.style_elem;
-
-        macro_rules! compute_prop {
-            ($prop:expr, PropValue::$type:ident) => {
-                match elem.compute_prop($prop) {
-                    PropValue::$type(v) => v,
-                    _ => unreachable!(),
-                }
-            };
-        }
+        let props = elem.computed_values();
 
         let dirty = shared.dirty.get();
         shared
@@ -816,7 +785,7 @@ impl ViewListener for SbListener {
 
         // Adjust the layer count
         if dirty.intersects(PropKindFlags::NUM_LAYERS) {
-            let num_layers = compute_prop!(Prop::NumLayers, PropValue::Usize);
+            let num_layers = props.num_layers();
             let styled = &mut layers.styled;
 
             while num_layers < styled.len() {
@@ -835,13 +804,13 @@ impl ViewListener for SbListener {
                 let mut layer_attrs = pal::LayerAttrs::default();
 
                 if dirty.intersects(PropKindFlags::LAYER_BOUNDS) {
-                    let met = compute_prop!(Prop::LayerMetrics(layer_id), PropValue::Metrics);
+                    let met = props.layer_metrics(layer_id);
                     let bounds = met.arrange(container, Vector2::new(0.0, 0.0));
                     layer_attrs.bounds = Some(bounds);
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_IMG) {
-                    let img = compute_prop!(Prop::LayerImg(layer_id), PropValue::Himg);
+                    let img = props.layer_img(layer_id);
 
                     if let Some(img) = img {
                         let (bmp, content_scale) = img.new_bmp(wm, ctx.hwnd().dpi_scale());
@@ -854,29 +823,25 @@ impl ViewListener for SbListener {
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_BG_COLOR) {
-                    let value = compute_prop!(Prop::LayerBgColor(layer_id), PropValue::Rgbaf32);
-                    layer_attrs.bg_color = Some(value);
+                    layer_attrs.bg_color = Some(props.layer_bg_color(layer_id));
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_OPACITY) {
-                    let value = compute_prop!(Prop::LayerOpacity(layer_id), PropValue::Float);
-                    layer_attrs.opacity = Some(value);
+                    layer_attrs.opacity = Some(props.layer_opacity(layer_id));
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_CENTER) {
-                    let value = compute_prop!(Prop::LayerCenter(layer_id), PropValue::Box2);
-                    layer_attrs.contents_center = Some(value);
+                    layer_attrs.contents_center = Some(props.layer_center(layer_id));
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_FLAGS) {
-                    let value = compute_prop!(Prop::LayerFlags(layer_id), PropValue::LayerFlags);
-                    layer_attrs.flags = Some(value);
+                    layer_attrs.flags = Some(props.layer_flags(layer_id));
                 }
 
                 if dirty.intersects(PropKindFlags::LAYER_XFORM | PropKindFlags::LAYER_BOUNDS) {
-                    let xform = compute_prop!(Prop::LayerXform(layer_id), PropValue::LayerXform);
+                    let xform = props.layer_xform(layer_id);
 
-                    let met = compute_prop!(Prop::LayerMetrics(layer_id), PropValue::Metrics);
+                    let met = props.layer_metrics(layer_id);
                     let bounds = met.arrange(container, Vector2::new(0.0, 0.0));
 
                     let mat = xform.to_matrix3(bounds);
@@ -891,7 +856,7 @@ impl ViewListener for SbListener {
         // Update the clip layer's properties
         if let Some(clip) = &layers.clip {
             if dirty.intersects(PropKindFlags::CLIP_LAYER) {
-                let met = compute_prop!(Prop::ClipMetrics, PropValue::Metrics);
+                let met = props.clip_metrics();
 
                 let bounds = met.arrange(container, Vector2::new(0.0, 0.0));
 
