@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 [dependencies]
 structopt = { version = "0.3.0", default-features = false }
 icon_baker = { path = "../../support/icon_baker" }
-libflate = "0.1.27"
+libflate = "1.0.0"
 
 [[bin]]
 name = "mkmacosbundle"
