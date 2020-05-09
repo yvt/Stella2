@@ -24,7 +24,7 @@ try_match = "0.2.1"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
 [dependencies.syn]
-version = "1.0.8"
+version = "1.0.19"
 default-features = false
 features = ["derive", "full", "parsing", "printing", "visit-mut"]
 
