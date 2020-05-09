@@ -11,7 +11,7 @@ use subscriber_list::{SubscriberList, UntypedSubscription as Sub};
 use tcw3_pal::mt_lazy_static;
 
 use super::{
-    style::{ClassSet, ElemClassPath, Prop, PropValue},
+    style::{ClassSet, ElemClassPath, GetPropValue, Prop, PropValue},
     stylesheet::{DefaultStylesheet, RuleId, Stylesheet},
 };
 use crate::{pal, prelude::*};
@@ -602,10 +602,26 @@ impl Elem {
     }
 
     /// Get the computed value of the specified styling property.
+    ///
+    /// You should use [`computed_values`] instead if the styling property to
+    /// query is known at compilation time.
+    ///
+    /// [`computed_values`]: Elem::computed_values
     pub fn compute_prop(&self, prop: Prop) -> PropValue {
         let manager = self.style_manager;
         let sheet_set = manager.sheet_set();
         self.inner().rules.borrow().compute_prop(&sheet_set, prop)
+    }
+
+    /// Get an accessor for the computed values of styling properties.
+    ///
+    /// You should drop the accessor before returning to the event loop. It's
+    /// unspecified whether the accessor holds a lock on the internal state.
+    pub fn computed_values(&self) -> impl GetPropValue + '_ {
+        // An alternative is to borrow `sheet_set` and `rules` here and
+        // unborrow them in `impl GetPropValue`. There is a complex trade-off in
+        // this choice, which we should evaluate at some point in the future.
+        move |prop| self.compute_prop(prop)
     }
 
     /// Set the class set and update the active rule set.

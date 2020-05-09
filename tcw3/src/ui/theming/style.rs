@@ -136,6 +136,31 @@ pub mod roles {
 #[macro_use]
 mod prop_macros; // `def_prop!`
 
+// `def_prop_value!` produces a call to `macro_rules!`, so it must precede
+// `def_prop!`.
+def_prop_value! {
+    #[derive(Debug, Clone)]
+    pub enum PropValue {
+        Bool(bool),
+        Bool2([bool; 2]),
+        Float(f32),
+        Usize(usize),
+        U32x2([u32; 2]),
+        F32x4([f32; 4]),
+        Himg(Option<crate::images::HImg>),
+        Rgbaf32(RGBAF32),
+        Metrics(Rob<'static, Metrics>),
+        Vector2(Vector2<f32>),
+        Point2(Point2<f32>),
+        Box2(Box2<f32>),
+        LayerXform(Rob<'static, LayerXform>),
+        SysFontType(SysFontType),
+        LayerFlags(LayerFlags),
+        Layouter(Layouter),
+        AlignFlags(AlignFlags),
+    }
+}
+
 static DEFAULT_METRICS: Metrics = Metrics::default();
 
 /// Zero-based layer index in range `0..num_layers` (where `num_layers` is the
@@ -279,27 +304,20 @@ def_prop! {
         #[default(PropValue::SysFontType(SysFontType::Normal))]
         Font,
     }
+
+    /// Provides accessor methods for the computed values of styling props.
+    pub trait GetPropValue {
+        /// Get the computed value of the specified styling property.
+        fn value(&self, prop: Prop) -> PropValue;
+
+        // `def_prop!` defines an accessor method for each prop.
+    }
 }
 
-#[derive(Debug, Clone)]
-pub enum PropValue {
-    Bool(bool),
-    Bool2([bool; 2]),
-    Float(f32),
-    Usize(usize),
-    U32x2([u32; 2]),
-    F32x4([f32; 4]),
-    Himg(Option<crate::images::HImg>),
-    Rgbaf32(RGBAF32),
-    Metrics(Rob<'static, Metrics>),
-    Vector2(Vector2<f32>),
-    Point2(Point2<f32>),
-    Box2(Box2<f32>),
-    LayerXform(Rob<'static, LayerXform>),
-    SysFontType(SysFontType),
-    LayerFlags(LayerFlags),
-    Layouter(Layouter),
-    AlignFlags(AlignFlags),
+impl<T: ?Sized + Fn(Prop) -> PropValue> GetPropValue for T {
+    fn value(&self, prop: Prop) -> PropValue {
+        self(prop)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

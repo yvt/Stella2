@@ -1,5 +1,4 @@
-//! Implements `def_prop!`, which is the macro that defines `Prop` and other
-//! relevant items.
+//! Provides `def_prop!` and `def_prop_value`.
 
 /// Defines `Prop` and relevant items at once.
 macro_rules! def_prop {
@@ -18,6 +17,11 @@ macro_rules! def_prop {
                 $( ($param_ty:ty) )?
             ),*
             $(,)*
+        }
+
+        $(#[$gpv_meta:meta])*
+        pub trait GetPropValue {
+            $($gpv_tt:tt)*
         }
     ) => {
         doc_comment! {
@@ -62,7 +66,7 @@ macro_rules! def_prop {
             pub fn default_for_prop(prop: &Prop) -> Self {
                 match prop {
                     $(
-                        prop_pattern!($name$(($param_ty))?) =>
+                        prop_var!($name$(($param_ty))?, _) =>
                             PropValue::$val_variant($default_val)
                     ),*
                 }
@@ -109,6 +113,31 @@ macro_rules! def_prop {
             use super::*;
             $( def_wrap_value!(@dynvalue PropValue::$val_variant as $snake_name); )*
         }
+
+        $(#[$gpv_meta])*
+        pub trait GetPropValue {
+            // `$gpv_tt` includes `fn value(&self, prop: Prop) -> PropValue;`
+            $($gpv_tt)*
+
+            $(doc_comment!{
+                @[doc = concat!(
+                    "Get the computed value of the styling prop ",
+                    "[`", stringify!($name), "`]",
+                    "(Prop::", stringify!($name), ")",
+                    ".",
+                )]
+                fn $snake_name(
+                    &self $(, i: $param_ty)?
+                ) -> prop_var_to_ty!($val_variant) {
+                    let prop = prop_var!($name$(($param_ty))?, i);
+
+                    match self.value(prop) {
+                        PropValue::$val_variant(value) => value,
+                        _ => unreachable!(),
+                    }
+                }
+            })*
+        }
     };
 }
 
@@ -124,10 +153,14 @@ macro_rules! doc_comment {
     };
 }
 
-/// Map `X` → `Prop::X`, `X(u32)` → `Prop::X(_)`.  Used by `def_prop`.
-macro_rules! prop_pattern {
-    ($name:ident) => { Prop::$name };
-    ($name:ident($t:ty)) => { Prop::$name(_) };
+/// Map `X` → `Prop::X`, `X(u32)` → `Prop::X($p0)`.  Used by `def_prop`.
+macro_rules! prop_var {
+    ($name:ident, $p0:tt) => {
+        Prop::$name
+    };
+    ($name:ident($t:ty), $p0:tt) => {
+        Prop::$name($p0)
+    };
 }
 
 /// Generates a function that preprocesses a value before passing it to
@@ -162,5 +195,26 @@ macro_rules! def_wrap_value {
     };
     (@dynvalue PropValue::$name:ident as $alias:ident) => {
         pub use ::std::convert::identity as $alias;
+    };
+}
+
+/// Defines `PropValue` and relevant items at once.
+macro_rules! def_prop_value {
+    (
+        $(#[$meta:meta])*
+        pub enum PropValue {
+            $( $name:ident($ty:ty) ),*
+            $(,)*
+        }
+    ) => {
+        $(#[$meta])*
+        pub enum PropValue {
+            $( $name($ty) ),*
+        }
+
+        /// Convert the specified prop variant name to its corresponding type.
+        macro_rules! prop_var_to_ty {
+            $( ($name) => {$ty}; )*
+        }
     };
 }

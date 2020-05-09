@@ -51,7 +51,8 @@ pub mod theming {
         style::{
             elem_id, mk_prop_by_snake_name, mk_prop_value_by_prop_snake_name,
             mk_wrap_dynvalue_by_prop_snake_name, mk_wrap_value_by_prop_snake_name, roles, ClassSet,
-            Col, ElemClassPath, LayerId, LayerXform, Layouter, Metrics, Prop, PropValue, Role, Row,
+            Col, ElemClassPath, GetPropValue, LayerId, LayerXform, Layouter, Metrics, Prop,
+            PropValue, Role, Row,
         },
         stylesheet::*,
         view::{ModifyArrangementArgs, StyledBox, StyledBoxOverride},
@@ -75,5 +76,8 @@ pub mod editing {
 
 /// Re-exports some traits from the `ui` module.
 pub mod prelude {
-    pub use super::views::table::{TableModelEdit, TableModelEditExt};
+    pub use super::{
+        theming::GetPropValue,
+        views::table::{TableModelEdit, TableModelEditExt},
+    };
 }
