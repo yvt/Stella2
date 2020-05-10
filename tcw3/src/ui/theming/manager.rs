@@ -426,6 +426,7 @@ bitflags! {
         const FONT = 1 << 10;
         const FG_COLOR = 1 << 11;
         const BG_COLOR = 1 << 12;
+        const PADDING = 1 << 13;
     }
 }
 
@@ -454,6 +455,7 @@ impl Prop {
             Prop::FgColor => PropKindFlags::FG_COLOR,
             Prop::BgColor => PropKindFlags::BG_COLOR,
             Prop::Font => PropKindFlags::FONT,
+            Prop::Padding => PropKindFlags::PADDING,
         }
     }
 }

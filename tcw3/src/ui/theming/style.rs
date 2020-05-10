@@ -303,6 +303,11 @@ def_prop! {
         #[snake_case(font)]
         #[default(PropValue::SysFontType(SysFontType::Normal))]
         Font,
+
+        /// The padding for contents.
+        #[snake_case(padding)]
+        #[default(PropValue::F32x4([0.0; 4]))]
+        Padding,
     }
 
     /// Provides accessor methods for the computed values of styling props.
