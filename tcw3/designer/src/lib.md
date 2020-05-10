@@ -182,8 +182,8 @@ expensive cloning.
 
 Here are some examples (assuming `ComponentName` is the enclosing component):
 
- - `&this` imports `&ComponentName` representing the current component
-   as `this`
+ - `&self` imports `&ComponentName` representing the current component
+   as `self`
  - `field.text` reads the value of `prop text` of `const field` of
    the current component and clones it.
  - `field.event` (`event` refers to an event) does not load any value and
@@ -236,7 +236,7 @@ expressions as needed in a way similar to `const` and `wire`.
 
 ```tcwdl,no_compile
 const button = Button::new! {
-    // equivalent to `style_manager = get!(this.style_manager)`
+    // equivalent to `style_manager = get!(self.style_manager)`
     style_manager,
 
     caption = format!("You pressed this button for {} time(s)!", get!(count)),
@@ -249,14 +249,14 @@ subexpression.
 
 ## Inputs
 
-*Inputs* (e.g., `this.prop` in `wire foo = *get!(&this.prop) + 42`)
+*Inputs* (e.g., `self.prop` in `wire foo = *get!(&self.prop) + 42`)
 represent a value used as an input to calculation as well as specifying
 the trigger of an event handler. They are defined recursively as follows:
 
- - `ϕ` is de-sugared into `this.ϕ` if it does not start with `this.` or
+ - `ϕ` is de-sugared into `self.ϕ` if it does not start with `self.` or
    `event.`.
- - `this` is an input.
- - `this.item` is an input if the enclosing component (the surrounding
+ - `self` is an input.
+ - `self.item` is an input if the enclosing component (the surrounding
    `comp` block) has a field or event named `field`.
  - If `ϕ` is an input representing a `const`¹ field, the field
    stores a component, and the said component has a field or event named
@@ -519,7 +519,7 @@ initialization literal `OtherComp { ... }` or a function `|dep| expr`.
 `Component`.
 A topological order is found and the values are evaluated according to that.
 Note that because none of the component's structs are available at this
-point, **`this` cannot be used as an input to any of the fields** involved
+point, **`self` cannot be used as an input to any of the fields** involved
 here. Obviously, fields that are not initialized at this point cannot be
 used as an input.
 
@@ -530,15 +530,15 @@ handled:
 
 | Position          | Input              | Mode                |
 | ----------------- | ------------------ | ------------------- |
-| `on` trigger      | `this.event`       | Direct              |
-| ↑                 | `this.field.event` | ↑                   |
-| `on` trigger      | `this.field`       | Dirty Flag Internal |
+| `on` trigger      | `self.event`       | Direct              |
+| ↑                 | `self.field.event` | ↑                   |
+| `on` trigger      | `self.field`       | Dirty Flag Internal |
 | `wire`            | ↑                  | ↑                   |
 | obj-init → `prop` | ↑                  | ↑                   |
-| `on` trigger      | `this.field.field` | Dirty Flag External |
+| `on` trigger      | `self.field.field` | Dirty Flag External |
 | `wire`            | ↑                  | ↑                   |
 | obj-init → `prop` | ↑                  | ↑                   |
-| `on` trigger      | `this.field.event` | Dirty Flag External |
+| `on` trigger      | `self.field.event` | Dirty Flag External |
 | `wire`            | ↑                  | ↑                   |
 | obj-init → `prop` | ↑                  | ↑                   |
 

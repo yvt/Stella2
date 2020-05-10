@@ -38,9 +38,9 @@ pub(crate) comp crate::view::logview::LogView {
         view_flags = ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP,
     };
 
-    on (init) get!(&this).init();
+    on (init) get!(&self).init();
 
     on (table.table.prearrange, dpi_scale_watcher.dpi_scale_changed) {
-        get!(&this).update_row_visuals();
+        get!(&self).update_row_visuals();
     }
 }

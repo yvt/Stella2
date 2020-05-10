@@ -1154,7 +1154,7 @@ impl AnalyzeCtx<'_, '_> {
 
     fn analyze_input(&mut self, input: &parser::Input) -> Input {
         let mut selectors = &input.selectors[..];
-        let origin = if selectors[0].is_field_with_ident("this") {
+        let origin = if selectors[0].is_field_with_ident("self") {
             // e.g., `this.prop1`
             selectors = &selectors[1..];
             InputOrigin::This

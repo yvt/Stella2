@@ -68,7 +68,6 @@ pub mod kw {
     syn::custom_keyword!(init);
     syn::custom_keyword!(clone);
     syn::custom_keyword!(borrow);
-    syn::custom_keyword!(this);
     syn::custom_keyword!(event);
 }
 
@@ -607,7 +606,13 @@ impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut selectors = Vec::new();
 
-        let ident: Ident = input.parse()?;
+        let ident: Ident = if let Ok(this) = input.parse::<token::SelfValue>() {
+            // `Ident::parse` doesn't accept `self` but we still want to reject
+            // other keywords, so special-case `self`
+            Ident::new("self", this.span)
+        } else {
+            input.parse()?
+        };
         selectors.push(InputSelector::Field {
             dot_token: None,
             ident,

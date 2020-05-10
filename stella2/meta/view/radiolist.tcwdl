@@ -79,10 +79,10 @@ pub(crate) comp crate::view::radiolist::RadioListView {
         // Register event handlers. (TCW3 Designer can't automatically hook
         // up event handlers t components created in other ways than
         // `Component::new!`)
-        // This can't be done in `radio_buttons` because `get!(&this)` is
+        // This can't be done in `radio_buttons` because `get!(&self)` is
         // unavailable during the field initialization.
         for (rb, &(tag, _, _)) in get!(&radio_buttons).iter().zip(get!(items).iter()) {
-            let this_weak = get!(&this).downgrade();
+            let this_weak = get!(&self).downgrade();
             rb.subscribe_activated(Box::new(move |_| {
                 if let Some(this) = this_weak.upgrade() {
                     this.raise_change(tag);

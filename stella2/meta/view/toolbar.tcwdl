@@ -64,12 +64,12 @@ pub(crate) comp crate::view::toolbar::ToolbarView {
                 [get!(&wnd_state).sidebar_visible as usize],
     };
 
-    on (toggle_sidebar_button.activated) get!(&this).toggle_sidebar();
+    on (toggle_sidebar_button.activated) get!(&self).toggle_sidebar();
 
     const menu_button = Button::new! {
         style_manager,
         class_set = theming::ClassSet::BUTTON | elem_id::SHOW_MENU,
     };
 
-    on (menu_button.activated) get!(&this).toggle_pref();
+    on (menu_button.activated) get!(&self).toggle_pref();
 }

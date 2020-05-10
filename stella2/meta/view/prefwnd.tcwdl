@@ -81,7 +81,7 @@ comp crate::view::prefwnd::PrefView {
         class_set = elem_id::TABBAR_CLOSE,
     };
 
-    on (close_button.activated) get!(&this).raise_close();
+    on (close_button.activated) get!(&self).raise_close();
 
     prop current_tab: u32 = 0;
     const tab_bar = RadioListView::new! {
@@ -101,7 +101,7 @@ comp crate::view::prefwnd::PrefView {
         vertical = false,
         class_set = elem_id::PREF_TAB_BAR,
     };
-    on(tab_bar.change) { get!(&this).set_current_tab(get!(event.value)); }
+    on(tab_bar.change) { get!(&self).set_current_tab(get!(event.value)); }
 
     // Main content
     const main_view = StyledBox::new! {

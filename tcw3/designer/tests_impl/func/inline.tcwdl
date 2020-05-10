@@ -4,7 +4,7 @@ use tcw3::pal;
 comp crate::func::inline::Comp {
     const const1: u32 = 42;
     const const2: u32 = get!(const1) * 2;
-    const const3: u32 = get!(this.const1) * 3;
-    const const4: Vec<u32> = vec![get!(this.const1) * 4, 5];
-    const const5: Vec<Vec<u32>> = vec![vec![1], vec![get!(this.const1) * 4, 5], vec![3]];
+    const const3: u32 = get!(self.const1) * 3;
+    const const4: Vec<u32> = vec![get!(self.const1) * 4, 5];
+    const const5: Vec<Vec<u32>> = vec![vec![1], vec![get!(self.const1) * 4, 5], vec![3]];
 }

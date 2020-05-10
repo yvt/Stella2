@@ -96,5 +96,5 @@ pub(crate) comp crate::view::tabbar::TabbarView {
         class_set = elem_id::TABBAR_CLOSE,
     };
 
-    on (close_button.activated) get!(&this).raise_close();
+    on (close_button.activated) get!(&self).raise_close();
 }

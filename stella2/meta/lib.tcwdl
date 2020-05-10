@@ -78,18 +78,18 @@ comp crate::view::MainView {
 
     const tabbar = crate::view::tabbar::TabbarView::new! { wm, style_manager, wnd_state };
 
-    on (tabbar.dispatch) get!(&this).raise_dispatch(model::AppAction::Wnd(get!(event.action)));
-    on (tabbar.close) get!(&this).raise_close();
+    on (tabbar.dispatch) get!(&self).raise_dispatch(model::AppAction::Wnd(get!(event.action)));
+    on (tabbar.close) get!(&self).raise_close();
 
     const toolbar = crate::view::toolbar::ToolbarView::new! { wm, style_manager, wnd_state };
 
-    on (toolbar.dispatch) get!(&this).raise_dispatch(get!(event.action));
+    on (toolbar.dispatch) get!(&self).raise_dispatch(get!(event.action));
 
     const split_side_event_adapter = SplitEventAdapter::new! { view = get!(&split_side) };
 
     on (split_side_event_adapter.drag_complete) {
         let new_size = get!(&split_side).value();
-        get!(&this).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetSidebarWidth(new_size)));
+        get!(&self).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetSidebarWidth(new_size)));
     }
 
     // Sidebar
@@ -145,7 +145,7 @@ comp crate::view::MainView {
 
     on (split_editor_event_adapter.drag_complete) {
         let new_size = get!(&split_editor).value();
-        get!(&this).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetEditorHeight(new_size)));
+        get!(&self).raise_dispatch(model::AppAction::Wnd(model::WndAction::SetEditorHeight(new_size)));
     }
 
     // Chat log

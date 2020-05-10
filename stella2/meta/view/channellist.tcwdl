@@ -38,7 +38,7 @@ pub(crate) comp crate::view::channellist::ChannelListView {
     };
 
     on (init) {
-        get!(&this).init();
+        get!(&self).init();
         get!(&elem).insert_child(get!(table.style_elem));
     }
 }
