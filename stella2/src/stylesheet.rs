@@ -449,6 +449,9 @@ fn new_custom_stylesheet() -> impl Stylesheet {
             // like a ring
             #[dyn] layer_img[1]: Some(himg_figures![rect([1.0, 1.0, 1.0, 1.0]).radius(3.0)]),
         },
+        ([] < [#SEARCH_FIELD]) (priority = 10000) {
+            padding: [0.0, 3.0, 0.0, 2.0],
+        },
 
         // Composing area
         ([#EDITOR_FIELD]) (priority = 10000) {

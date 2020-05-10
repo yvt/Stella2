@@ -723,9 +723,14 @@ lazy_static! {
         ([.ENTRY.FOCUS]) (priority = 200) {
             layer_opacity[0]: 0.5,
         },
-        // Entry text
+        // Entry text in `Entry`
         ([] < [.ENTRY]) (priority = 100) {
             fg_color: RGBAF32::new(0.0, 0.0, 0.0, 1.0),
+            padding: [0.0, 3.0, 0.0, 3.0],
+        },
+        // Text selection rectangle in a text entry widget
+        ([#TEXT_SELECTION]) (priority = 100) {
+            bg_color: RGBAF32::new(0.3, 0.6, 1.0, 0.5),
         },
 
         // Scrollbar

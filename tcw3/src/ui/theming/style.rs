@@ -106,6 +106,7 @@ pub mod elem_id {
 
     iota::iota! {
         pub const SPLITTER: ClassSet = ClassSet::id(iota + SYS_START_VALUE);
+                , TEXT_SELECTION
     }
 }
 

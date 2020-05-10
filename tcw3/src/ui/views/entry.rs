@@ -18,7 +18,9 @@ use crate::{
     ui::{
         layouts::EmptyLayout,
         mixins::CanvasMixin,
-        theming::{self, roles, ClassSet, GetPropValue, HElem, PropKindFlags, Widget},
+        theming::{
+            self, elem_id, roles, ClassSet, GetPropValue, HElem, Prop, PropKindFlags, Widget,
+        },
     },
     uicore::{
         actions, ActionId, ActionStatus, CursorShape, HView, HViewRef, HWndRef, MouseDragListener,
@@ -95,6 +97,12 @@ impl Widget for Entry {
 }
 
 /// A widget implementing the core functionality of a text input field.
+///
+/// # Styling
+///
+///  - `style_elem` - `FgColor`, `Padding`
+///  - `style_elem > #TEXT_SELECTION` - `BgColor`
+///
 #[derive(Debug)]
 pub struct EntryCore {
     view: HView,
@@ -106,6 +114,7 @@ struct Inner {
     view: WeakHView,
     state: RefCell<State>,
     style_elem: theming::Elem,
+    style_sel_elem: theming::Elem,
     tictx_event_mask: Cell<pal::TextInputCtxEventFlags>,
 }
 
@@ -145,6 +154,9 @@ struct TextLayoutInfo {
 impl EntryCore {
     pub fn new(style_manager: &'static theming::Manager) -> Self {
         let style_elem = theming::Elem::new(style_manager);
+        let style_sel_elem = theming::Elem::new(style_manager);
+        style_sel_elem.set_class_set(elem_id::TEXT_SELECTION);
+        style_elem.insert_child(style_sel_elem.helem());
 
         let view = HView::new(
             ViewFlags::default()
@@ -173,6 +185,7 @@ impl EntryCore {
                     history: history::History::new(),
                 }),
                 style_elem,
+                style_sel_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
             }),
         };
@@ -187,6 +200,16 @@ impl EntryCore {
             .set_on_change(Box::new(move |_, kind_flags| {
                 if let (Some(inner), Some(view)) = (inner.upgrade(), view.upgrade()) {
                     reapply_style(&inner, view.as_ref(), kind_flags);
+                }
+            }));
+
+        let view = this.view.downgrade();
+        let inner = Rc::downgrade(&this.inner);
+        this.inner
+            .style_sel_elem
+            .set_on_change(Box::new(move |_, kind_flags| {
+                if let (Some(inner), Some(view)) = (inner.upgrade(), view.upgrade()) {
+                    reapply_style_sel(&inner, view.as_ref(), kind_flags);
                 }
             }));
 
@@ -312,8 +335,9 @@ impl State {
         let cursor_i = self.sel_range[1];
         let layout_info = self.ensure_text_layout(elem);
         let cursor_x = layout_info.text_layout.cursor_pos(cursor_i)[0].x;
+        let [_, padding_right, _, padding_left] = elem.computed_values().padding();
         let text_width = layout_info.layout_bounds.max.x;
-        let viewport_width = hview.frame().size().x - HORZ_MARGIN * 2.0;
+        let viewport_width = hview.frame().size().x - (padding_right + padding_left);
 
         let new_scroll = self
             .scroll
@@ -330,28 +354,38 @@ impl State {
     }
 }
 
-// TODO: Stop hard-coding the margin
-const HORZ_MARGIN: f32 = 3.0;
-
 impl TextLayoutInfo {
-    fn text_origin(&self, view: HViewRef<'_>, scroll: f32) -> Vector2<f32> {
+    fn text_origin(&self, view: HViewRef<'_>, scroll: f32, elem: &theming::Elem) -> Vector2<f32> {
         let baseline = self.text_layout.line_baseline(0);
         let height = view.frame().size().y;
+        let [padding_top, _, padding_bottom, padding_left] = elem.computed_values().padding();
         [
-            HORZ_MARGIN - scroll,
-            (height + self.line_height) * 0.5 - baseline,
+            padding_left - scroll,
+            (height + self.line_height + padding_top - padding_bottom) * 0.5 - baseline,
         ]
         .into()
     }
 
-    fn text_origin_global(&self, view: HViewRef<'_>, scroll: f32) -> Vector2<f32> {
+    fn text_origin_global(
+        &self,
+        view: HViewRef<'_>,
+        scroll: f32,
+        elem: &theming::Elem,
+    ) -> Vector2<f32> {
         let global_loc: [f32; 2] = view.global_frame().min.into();
-        self.text_origin(view, scroll) + Vector2::from(global_loc)
+        self.text_origin(view, scroll, elem) + Vector2::from(global_loc)
     }
 
-    fn cursor_index_from_global_point(&self, view: HViewRef<'_>, scroll: f32, x: f32) -> usize {
-        self.text_layout
-            .cursor_index_from_point([x - self.text_origin_global(view, scroll).x, 0.0].into())
+    fn cursor_index_from_global_point(
+        &self,
+        view: HViewRef<'_>,
+        scroll: f32,
+        elem: &theming::Elem,
+        x: f32,
+    ) -> usize {
+        self.text_layout.cursor_index_from_point(
+            [x - self.text_origin_global(view, scroll, elem).x, 0.0].into(),
+        )
     }
 }
 
@@ -368,13 +402,19 @@ impl Widget for EntryCore {
 fn reapply_style(inner: &Rc<Inner>, view: HViewRef<'_>, kind_flags: PropKindFlags) {
     let mut state = inner.state.borrow_mut();
 
-    if kind_flags.intersects(PropKindFlags::FG_COLOR) {
+    if kind_flags.intersects(Prop::FgColor.kind_flags() | Prop::Padding.kind_flags()) {
         state.canvas.pend_draw(view);
     }
 
-    if kind_flags.intersects(PropKindFlags::FONT) {
+    if kind_flags.intersects(Prop::Font.kind_flags()) {
         state.invalidate_text_layout();
         state.canvas.pend_draw(view);
+    }
+}
+
+fn reapply_style_sel(inner: &Rc<Inner>, view: HViewRef<'_>, kind_flags: PropKindFlags) {
+    if kind_flags.intersects(Prop::BgColor.kind_flags()) {
+        reapply_style(inner, view, PropKindFlags::FG_COLOR);
     }
 }
 
@@ -945,12 +985,13 @@ impl ViewListener for EntryCoreListener {
         state.ensure_text_layout(&self.inner.style_elem);
 
         let color = self.inner.style_elem.computed_values().fg_color();
+        let sel_color = self.inner.style_sel_elem.computed_values().bg_color();
 
         let text_layout_info: &TextLayoutInfo = state.text_layout_info.as_ref().unwrap();
         let sel_range = &state.sel_range;
         let comp_range = &state.comp_range;
         let scroll = state.scroll;
-        let text_origin = text_layout_info.text_origin(view, scroll);
+        let text_origin = text_layout_info.text_origin(view, scroll, &self.inner.style_elem);
         let is_focused = view.improper_subview_is_focused();
 
         let visual_bounds = Box2::with_size(Point2::new(0.0, 0.0), view.frame().size());
@@ -980,7 +1021,7 @@ impl ViewListener for EntryCoreListener {
                     log::trace!("runs({:?}) = {:?}", sel_range[0]..sel_range[1], runs);
 
                     // Fill the selection
-                    c.set_fill_rgb([0.3, 0.6, 1.0, 0.5].into()); // TODO: derive from stylesheet
+                    c.set_fill_rgb(sel_color);
                     for run in runs.iter() {
                         c.fill_rect(box2! {
                             min: [run.bounds.start, vert_bounds.start],
@@ -1274,7 +1315,8 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         let scroll = self.state.scroll;
         let text_layout_info = self.state.ensure_text_layout(&self.inner.style_elem);
         let text_layout = &text_layout_info.text_layout;
-        let text_origin = text_layout_info.text_origin(self.view.as_ref(), scroll);
+        let text_origin =
+            text_layout_info.text_origin(self.view.as_ref(), scroll, &self.inner.style_elem);
 
         let offset: [f32; 2] = self.view.global_frame().min.into();
         let mut offset: cgmath::Vector2<f32> = offset.into();
@@ -1467,7 +1509,12 @@ impl MouseDragListener for EntryCoreDragListener {
     fn mouse_down(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
         self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
-                let i = text_layout_info.cursor_index_from_global_point(hview, state.scroll, loc.x);
+                let i = text_layout_info.cursor_index_from_global_point(
+                    hview,
+                    state.scroll,
+                    &self.inner.style_elem,
+                    loc.x,
+                );
                 state.sel_range = [i, i];
             }
         });
@@ -1476,7 +1523,12 @@ impl MouseDragListener for EntryCoreDragListener {
     fn mouse_motion(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
         self.update_selection(wm, |state| {
             if let Some(text_layout_info) = &state.text_layout_info {
-                let i = text_layout_info.cursor_index_from_global_point(hview, state.scroll, loc.x);
+                let i = text_layout_info.cursor_index_from_global_point(
+                    hview,
+                    state.scroll,
+                    &self.inner.style_elem,
+                    loc.x,
+                );
                 state.sel_range[1] = i;
             }
         });
