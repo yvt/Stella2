@@ -263,14 +263,14 @@ impl iface::CanvasText<TextLayout> for BitmapBuilder {
         let orig_matrix = pango_ctx.get_matrix();
 
         self.cairo_ctx.move_to(origin.x as f64, origin.y as f64);
-        pangocairo::functions::update_layout(&self.cairo_ctx, pango_layout);
+        pangocairo::functions::update_layout(&self.cairo_ctx, &pango_layout);
         self.cairo_ctx.set_source_rgba(
             color.r as f64,
             color.g as f64,
             color.b as f64,
             color.a as f64,
         );
-        pangocairo::functions::show_layout(&self.cairo_ctx, pango_layout);
+        pangocairo::functions::show_layout(&self.cairo_ctx, &pango_layout);
 
         // Restore the original matrix
         pango_ctx.set_matrix(orig_matrix.as_ref());

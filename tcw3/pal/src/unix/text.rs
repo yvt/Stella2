@@ -5,7 +5,9 @@ use flags_macro::flags;
 use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
 use pango_sys::PangoLogAttr;
 use rgb::RGBA16;
-use std::{convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, os::raw::c_uint};
+use std::{
+    convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, os::raw::c_uint, sync::Mutex,
+};
 use unicount::{num_scalars_in_utf8_str, str_next, str_prev};
 
 use super::super::iface;
@@ -125,9 +127,9 @@ struct LineMetrics {
     start_index: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ImmutableLayout {
-    inner: Layout,
+    inner: Mutex<Layout>,
 }
 
 // I think `Layout`'s thread unsafety comes from mutability
@@ -136,9 +138,8 @@ unsafe impl Send for ImmutableLayout {}
 unsafe impl Sync for ImmutableLayout {}
 
 impl TextLayout {
-    pub(super) fn lock_layout(&self) -> &Layout {
-        // TODO: actually lock
-        &self.pango_layout.inner
+    pub(super) fn lock_layout(&self) -> impl std::ops::Deref<Target = Layout> + '_ {
+        self.pango_layout.inner.lock().unwrap()
     }
 }
 
@@ -198,7 +199,9 @@ impl iface::TextLayout for TextLayout {
         log::trace!("line_metrics = {:?}", line_metrics);
 
         Self {
-            pango_layout: ImmutableLayout { inner: layout },
+            pango_layout: ImmutableLayout {
+                inner: Mutex::new(layout),
+            },
             text_len: text.len(),
             line_metrics,
         }
