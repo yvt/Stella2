@@ -20,11 +20,7 @@ use cocoa::{
     foundation::{NSNotFound, NSPoint, NSRange, NSRect, NSSize, NSString, NSUInteger},
 };
 use flags_macro::flags;
-use objc::{
-    msg_send,
-    runtime::{BOOL, NO},
-    sel, sel_impl,
-};
+use objc::{msg_send, runtime::BOOL, sel, sel_impl};
 use std::{
     cell::{Cell, RefCell},
     cmp::min,
@@ -65,6 +61,11 @@ struct WndState {
     tictx: Cell<Option<Rc<TextInputCtx>>>,
     marked_range: Cell<Option<Range<usize>>>,
     hwnd: HWnd,
+    /// A non-zero value indicates `[NSWindow windowShouldClose:]` is in the
+    /// call stack.
+    closing: Cell<u8>,
+    /// `true` means `[NSWindow windowShouldClose:]` should return `true`.
+    should_close: Cell<bool>,
 }
 
 impl HWnd {
@@ -90,6 +91,8 @@ impl HWnd {
                 tictx: Cell::new(None),
                 marked_range: Cell::new(None),
                 hwnd: this.clone(),
+                closing: Cell::new(0),
+                should_close: Cell::new(false),
             });
 
             // Attach `WndState`
@@ -172,9 +175,21 @@ impl HWnd {
     }
 
     pub(super) fn remove(&self, _: Wm) {
+        let state = self.state();
+        if state.closing.get() > 0 {
+            // `[NSWindow windowShouldClose:]` is currently being called. We
+            // should return `true` from that method and shouldn't call `close`
+            // here.
+            //
+            // Calling `close` here causes a random memory corruption (bug in
+            // Cocoa?).
+            state.should_close.set(true);
+            return;
+        }
+
         with_autorelease_pool(|| {
             let () = unsafe { msg_send![*self.ctrler, close] };
-        });
+        })
     }
 
     pub(super) fn update(&self, _: Wm) {
@@ -419,10 +434,13 @@ unsafe fn method_impl<T>(ud: TCWListenerUserData, f: impl FnOnce(Wm, &WndState) 
 #[no_mangle]
 unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BOOL {
     method_impl(ud, |wm, state| {
+        state.closing.set(state.closing.get() + 1);
         state.listener.borrow().close_requested(wm, &state.hwnd);
-    });
+        state.closing.set(state.closing.get() - 1);
 
-    NO
+        state.should_close.get() as BOOL
+    })
+    .unwrap_or(1)
 }
 
 #[no_mangle]
