@@ -256,14 +256,23 @@ impl iface::Canvas for BitmapBuilder {
 
 impl iface::CanvasText<TextLayout> for BitmapBuilder {
     fn draw_text(&mut self, layout: &TextLayout, origin: Point2<f32>, color: iface::RGBAF32) {
+        let pango_layout = layout.lock_layout();
+        let pango_ctx = pango_layout.get_context().unwrap();
+
+        // Save the original matrix before `update_layout` modifies it
+        let orig_matrix = pango_ctx.get_matrix();
+
         self.cairo_ctx.move_to(origin.x as f64, origin.y as f64);
-        pangocairo::functions::update_layout(&self.cairo_ctx, layout.lock_layout());
+        pangocairo::functions::update_layout(&self.cairo_ctx, &pango_layout);
         self.cairo_ctx.set_source_rgba(
             color.r as f64,
             color.g as f64,
             color.b as f64,
             color.a as f64,
         );
-        pangocairo::functions::show_layout(&self.cairo_ctx, layout.lock_layout());
+        pangocairo::functions::show_layout(&self.cairo_ctx, &pango_layout);
+
+        // Restore the original matrix
+        pango_ctx.set_matrix(orig_matrix.as_ref());
     }
 }
