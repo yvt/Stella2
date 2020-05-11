@@ -398,3 +398,58 @@ fn is_disjoint_ranges_subset_of<T: PartialOrd + std::fmt::Debug>(
         endpoints[i].1 > 0 && endpoints[i + 1].0 >= range.end
     })
 }
+
+#[test]
+fn draw_text_should_not_change_layout_properties() {
+    let patterns = [
+        "",
+        " ",
+        "\r",
+        "\r\r",
+        "книга",
+        "good apple cider",
+        "✨🦄✨",
+        "🇳🇮",
+        // TODO: "🇳🇮\r",
+        "book - كِتَاب‎",
+        " 'book' translates to 'كِتَاب‎'.",
+        " 'book' translates \r to 'كِتَاب‎'.",
+    ];
+
+    let get_props = |layout: &pal::TextLayout, text: &str| {
+        let grapheme_boundary_indices: Vec<usize> = text
+            .grapheme_indices(false)
+            .map(|(i, _char)| i)
+            .chain(once(text.len()))
+            .collect();
+
+        let cursor_pos_list: Vec<_> = grapheme_boundary_indices
+            .iter()
+            .map(|&i| layout.cursor_pos(i))
+            .collect();
+
+        cursor_pos_list
+    };
+
+    let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
+        ..Default::default()
+    });
+
+    let mut bmp = pal::BitmapBuilder::new([42, 42]);
+    bmp.mult_transform(cgmath::Matrix3::from_nonuniform_scale_2d(3.0, 11.0));
+
+    for text in patterns.iter() {
+        log::info!("{:?}", text);
+
+        let text_layout = pal::TextLayout::from_text(text, &char_style, None);
+        log::debug!("  text_layout = {:?}", text_layout);
+
+        let props1 = get_props(&text_layout, text);
+
+        bmp.draw_text(&text_layout, cgmath::Point2::new(0.0, 0.0), [1.0; 4].into());
+
+        let props2 = get_props(&text_layout, text);
+
+        assert_eq!(props1, props2);
+    }
+}
