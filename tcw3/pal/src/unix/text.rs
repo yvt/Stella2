@@ -5,7 +5,7 @@ use flags_macro::flags;
 use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
 use pango_sys::PangoLogAttr;
 use rgb::RGBA16;
-use std::{convert::TryInto, mem::MaybeUninit, ops::Range, os::raw::c_uint};
+use std::{convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, os::raw::c_uint};
 use unicount::{num_scalars_in_utf8_str, str_next, str_prev};
 
 use super::super::iface;
@@ -67,10 +67,11 @@ impl iface::CharStyle for CharStyle {
                 | SysFontType::User
                 | SysFontType::Emph
                 | SysFontType::SmallEmph => {
-                    font_desc.set_family_static("Sans");
+                    font_desc.set_family_static_safe(CStr::from_bytes_with_nul(b"Sans\0").unwrap());
                 }
                 SysFontType::UserMonospace => {
-                    font_desc.set_family_static("Monospace");
+                    font_desc
+                        .set_family_static_safe(CStr::from_bytes_with_nul(b"Monospace\0").unwrap());
                 }
             }
         }
@@ -616,5 +617,22 @@ bitflags::bitflags! {
         const CURSOR_POSITION = 1 << 4;
         const WORD_START = 1 << 5;
         const WORD_END = 1 << 6;
+    }
+}
+
+trait FontDescExt {
+    /// The actually safe version of `FontDescription::set_family_static`.
+    fn set_family_static_safe(&mut self, family: &'static CStr);
+}
+
+impl FontDescExt for FontDescription {
+    fn set_family_static_safe(&mut self, family: &'static CStr) {
+        use glib::translate::ToGlibPtrMut;
+        unsafe {
+            pango_sys::pango_font_description_set_family_static(
+                self.to_glib_none_mut().0,
+                family.as_ptr(),
+            );
+        }
     }
 }
