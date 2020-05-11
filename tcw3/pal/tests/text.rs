@@ -13,6 +13,7 @@ fn test_text_layout_invariants() {
 
     let patterns = [
         "",
+        " ",
         "\r",
         "\r\r",
         "книга",
@@ -172,6 +173,25 @@ fn test_text_layout_invariants() {
                         rm.bounds.end,
                         expected
                     );
+                }
+            }
+
+            // For a unidirectional text, `cursor_pos` must return only a single
+            // position
+            let is_unidir = {
+                let f = run_metrics[0].flags & pal::RunFlags::RIGHT_TO_LEFT;
+                run_metrics
+                    .iter()
+                    .all(|m| (m.flags & pal::RunFlags::RIGHT_TO_LEFT) == f)
+            };
+
+            if is_unidir {
+                for &i in line_grapheme_boundary_indices.iter() {
+                    if i <= line_textual_range.end {
+                        let pos = text_layout.cursor_pos(i);
+                        log::debug!("    cursor_pos({:?}) = {:?}", i, pos);
+                        assert_eq!(pos[0].x, pos[1].x);
+                    }
                 }
             }
 
@@ -397,4 +417,59 @@ fn is_disjoint_ranges_subset_of<T: PartialOrd + std::fmt::Debug>(
 
         endpoints[i].1 > 0 && endpoints[i + 1].0 >= range.end
     })
+}
+
+#[test]
+fn empty_layout_should_have_sane_height() {
+    common::try_init_logger_for_default_harness();
+
+    let patterns = [
+        "", " ",   // U+0020
+        "　", // U+3000
+    ];
+
+    let char_style = pal::CharStyle::new(pal::CharStyleAttrs {
+        sys: Some(pal::SysFontType::Normal),
+        ..Default::default()
+    });
+
+    let ref_layout = pal::TextLayout::from_text("Z", &char_style, None);
+    log::debug!("ref_layout = {:?}", ref_layout);
+
+    for &text in patterns.iter() {
+        log::info!("{:?}", text);
+
+        let empty_layout = pal::TextLayout::from_text(text, &char_style, None);
+        log::debug!("  empty_layout = {:?}", empty_layout);
+
+        // layout_bounds
+        let layout_bounds = [empty_layout.layout_bounds(), ref_layout.layout_bounds()];
+        log::debug!("  layout_bounds = {:?}", layout_bounds);
+
+        let ratio = layout_bounds[0].size().y / layout_bounds[1].size().y;
+        assert!(ratio > 0.7 && ratio < 1.3);
+
+        // cursor_pos
+        let cursor_pos = [empty_layout.cursor_pos(0), ref_layout.cursor_pos(0)];
+        log::debug!("  cursor_pos = {:?}", cursor_pos);
+
+        for pos in cursor_pos[0].iter() {
+            let ratio = pos.height() / cursor_pos[1][0].height();
+            assert!(ratio > 0.7 && ratio < 1.3);
+        }
+
+        // line_vertical_bounds
+        let line_vertical_bounds = [
+            empty_layout.line_vertical_bounds(0),
+            ref_layout.line_vertical_bounds(0),
+        ];
+        log::debug!("  line_vertical_bounds = {:?}", line_vertical_bounds);
+
+        let line_heights = [
+            line_vertical_bounds[0].end - line_vertical_bounds[0].start,
+            line_vertical_bounds[1].end - line_vertical_bounds[1].start,
+        ];
+        let ratio = line_heights[0] / line_heights[1];
+        assert!(ratio > 0.7 && ratio < 1.3);
+    }
 }
