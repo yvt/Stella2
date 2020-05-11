@@ -351,7 +351,7 @@ impl ViewListener for SbViewListener {
 struct SbMouseDragListener {
     shared: Rc<Shared>,
     drag_start: Cell<Option<(f32, f64)>>,
-    listener: RefCell<Option<Box<dyn ScrollbarDragListener>>>,
+    listener: RefCell<Option<ListenerOnUpdateFilter>>,
 }
 
 impl MouseDragListener for SbMouseDragListener {
@@ -404,9 +404,8 @@ impl MouseDragListener for SbMouseDragListener {
                 self.shared.set_active(true);
 
                 if self.listener.borrow().is_none() {
-                    // TODO: Refactor - extra `Box`, inconsistent uses of `invoke_on_update`
                     let listener = self.shared.on_drag.borrow()(wm);
-                    let listener = Box::new(ListenerOnUpdateFilter::new(listener));
+                    let listener = ListenerOnUpdateFilter::new(listener);
                     *self.listener.borrow_mut() = Some(listener);
                 }
 
