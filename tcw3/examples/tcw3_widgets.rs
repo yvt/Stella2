@@ -7,7 +7,7 @@ use tcw3::{
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
-            Scrollbar,
+            Scrollbar, Slider,
         },
         AlignFlags,
     },
@@ -123,6 +123,20 @@ fn main() {
         });
     }
 
+    let slider = Slider::new(style_manager, false);
+    let slider = Rc::new(slider);
+    {
+        let slider_weak = Rc::downgrade(&slider);
+        slider.set_on_drag(move |_| {
+            let slider = slider_weak.upgrade().unwrap();
+            let value = slider.value();
+            Box::new(MySliderDragListener { value, slider })
+        });
+    }
+    {
+        // TODO
+    }
+
     let entry = Entry::new(style_manager);
 
     let button = Button::new(style_manager);
@@ -199,6 +213,7 @@ fn main() {
         TableLayout::stack_vert(vec![
             (label.view(), AlignFlags::VERT_JUSTIFY),
             (scrollbar.view(), AlignFlags::JUSTIFY),
+            (slider.view(), AlignFlags::JUSTIFY),
             (entry.view(), AlignFlags::JUSTIFY),
             (h_layout.clone(), AlignFlags::JUSTIFY),
         ])
@@ -221,5 +236,20 @@ impl ScrollbarDragListener for MyScrollbarDragListener {
 
     fn cancel(&self, _: pal::Wm) {
         self.scrollbar.set_value(self.value);
+    }
+}
+
+struct MySliderDragListener {
+    slider: Rc<Slider>,
+    value: f64,
+}
+
+impl ScrollbarDragListener for MySliderDragListener {
+    fn motion(&self, _: pal::Wm, new_value: f64) {
+        self.slider.set_value(new_value);
+    }
+
+    fn cancel(&self, _: pal::Wm) {
+        self.slider.set_value(self.value);
     }
 }
