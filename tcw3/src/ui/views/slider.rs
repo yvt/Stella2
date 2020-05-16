@@ -672,12 +672,6 @@ mod tests {
 
     struct OnDrop<F: FnOnce()>(Option<F>);
 
-    impl<F: FnOnce()> OnDrop<F> {
-        fn new(x: F) -> Self {
-            Self(Some(x))
-        }
-    }
-
     impl<F: FnOnce()> Drop for OnDrop<F> {
         fn drop(&mut self) {
             (self.0.take().unwrap())();
