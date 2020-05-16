@@ -13,8 +13,8 @@ use crate::{
     ui::{
         layouts::FillLayout,
         theming::{
-            roles, ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags, StyledBox,
-            StyledBoxOverride, Widget,
+            elem_id, roles, ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags,
+            StyledBox, StyledBoxOverride, Widget,
         },
     },
     uicore::{HView, HViewRef, MouseDragListener, ViewFlags, ViewListener},
@@ -52,11 +52,12 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 ///
 ///  - `style_elem > *` - Custom label views.
 ///
-///  - `style_elem > #SLIDER_KNOB` - The knob. See
+///  - `style_elem > `[`#SLIDER_KNOB`] - The knob. See
 ///    [`StyledBox`](crate::ui::theming::StyledBox)
 ///
 /// [`subviews[roles::SLIDER_KNOB]`]: crate::ui::theming::roles::SLIDER_KNOB
 /// [`subviews[roles::SLIDER_TICKS]`]: crate::ui::theming::roles::SLIDER_TICKS
+/// [`#SLIDER_KNOB`]: crate::ui::theming::elem_id::SLIDER_KNOB
 ///
 #[derive(Debug)]
 pub struct Slider {
@@ -113,6 +114,7 @@ impl Slider {
         frame.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
         let knob = StyledBox::new(style_manager, ViewFlags::default());
+        knob.set_class_set(elem_id::SLIDER_KNOB);
         frame.set_child(roles::SLIDER_KNOB, Some(&knob));
 
         let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG);
