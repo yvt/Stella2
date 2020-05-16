@@ -534,6 +534,9 @@ mod assets {
     pub static RADIO_LIGHT_ACT: Stvg = stvg!("assets/radio_light_act.svg");
     pub static RADIO_LIGHT_CHECKED: Stvg = stvg!("assets/radio_light_checked.svg");
     pub static RADIO_LIGHT_CHECKED_ACT: Stvg = stvg!("assets/radio_light_checked_act.svg");
+
+    pub static SLIDER_KNOB: Stvg = stvg!("assets/slider_knob.svg");
+    pub static SLIDER_KNOB_ACT: Stvg = stvg!("assets/slider_knob_act.svg");
 }
 
 const BUTTON_CORNER_RADIUS: f32 = 2.0;
@@ -544,6 +547,13 @@ const SCROLLBAR_VISUAL_WIDTH: f32 = 6.0;
 const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
 const SCROLLBAR_MARGIN: f32 = 6.0;
 const SCROLLBAR_LEN_MIN: f32 = 20.0;
+
+const SLIDER_WIDTH: f32 = 18.0;
+const SLIDER_TROUGH_WIDTH: f32 = 1.0;
+const SLIDER_KNOB_SIZE: f32 = 16.0;
+const SLIDER_KNOB_RADIUS: f32 = SLIDER_KNOB_SIZE / 2.0;
+const SLIDER_LEN_MARGIN: f32 = 10.0;
+const SLIDER_LEN_MIN: f32 = SLIDER_LEN_MARGIN * 2.0 + 10.0;
 
 const FIELD_HEIGHT: f32 = 20.0;
 
@@ -836,6 +846,57 @@ lazy_static! {
                 margin: [NAN, 0.0, 0.0, 0.0],
                 .. Metrics::default()
             },
+        },
+
+        // Slider
+        ([.SLIDER]) (priority = 100) {
+            num_layers: 1,
+            layer_opacity[0]: 0.7,
+            layer_bg_color[0]: RGBAF32::new(0.7, 0.7, 0.7, 1.0),
+        },
+        ([.SLIDER.HOVER]) (priority = 150) {
+            layer_opacity[0]: 1.0,
+        },
+        ([.SLIDER:not(.VERTICAL)]) (priority = 100) {
+            subview_metrics[roles::SLIDER_KNOB]: Metrics {
+                margin: [NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS],
+                .. Metrics::default()
+            },
+            allow_grow: [true, false],
+            min_size: Vector2::new(SLIDER_LEN_MIN, SLIDER_WIDTH),
+
+            layer_metrics[0]: Metrics {
+                margin: [NAN, SLIDER_LEN_MARGIN, NAN, SLIDER_LEN_MARGIN],
+                size: Vector2::new(NAN, SLIDER_TROUGH_WIDTH),
+            },
+        },
+        ([.SLIDER.VERTICAL]) (priority = 100) {
+            subview_metrics[roles::SLIDER_KNOB]: Metrics {
+                margin: [SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN],
+                .. Metrics::default()
+            },
+            allow_grow: [false, true],
+            min_size: Vector2::new(SLIDER_WIDTH, SLIDER_LEN_MIN),
+
+            layer_metrics[0]: Metrics {
+                margin: [SLIDER_LEN_MARGIN, NAN, SLIDER_LEN_MARGIN, NAN],
+                size: Vector2::new(SLIDER_TROUGH_WIDTH, NAN),
+            },
+        },
+
+        // Slider thumb
+        ([] < [.SLIDER]) (priority = 100) {
+            num_layers: 1,
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB)),
+            min_size: Vector2::new(SLIDER_KNOB_SIZE, SLIDER_KNOB_SIZE),
+        },
+        ([] < [.SLIDER:not(.VERTICAL)]) (priority = 100) {
+        },
+        ([] < [.SLIDER.VERTICAL]) (priority = 100) {
+        },
+
+        ([] < [.SLIDER.ACTIVE]) (priority = 150) {
+            #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB_ACT)),
         },
 
         // Splitter

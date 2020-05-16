@@ -21,6 +21,7 @@ pub mod views {
     mod entry;
     mod label;
     pub mod scrollbar;
+    pub mod slider;
     mod spacer;
     pub mod split;
     pub mod table;
@@ -30,6 +31,7 @@ pub mod views {
         entry::{Entry, EntryCore},
         label::Label,
         scrollbar::Scrollbar,
+        slider::Slider,
         spacer::{new_spacer, Spacer},
         split::Split,
         table::{ScrollableTable, Table},

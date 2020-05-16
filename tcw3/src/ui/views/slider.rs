@@ -1,4 +1,4 @@
-//! Implements the scrollbar.
+//! Implements the slider.
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::Point2;
@@ -11,7 +11,6 @@ use std::{
 
 use crate::{
     pal,
-    prelude::*,
     ui::{
         layouts::FillLayout,
         theming::{
@@ -22,125 +21,118 @@ use crate::{
     uicore::{HView, HViewRef, MouseDragListener, ViewFlags, ViewListener},
 };
 
-/// A scrollbar widget.
-///
-/// The widget is translucent and designed to be overlaid on contents.
-#[derive(Debug)]
-pub struct Scrollbar {
-    shared: Rc<Shared>,
-}
+// Reuse some items from the scrollbar implementation
+use super::scrollbar::ListenerOnUpdateFilter;
+#[doc(no_inline)]
+pub use super::scrollbar::{Dir, ScrollbarDragListener};
 
-/// Specifies the direction of page step scrolling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Dir {
-    Incr = 1,
-    Decr = -1,
+/// A slider widget.
+///
+/// # Styling
+///
+///  - `style_elem` - See [`StyledBox`](crate::ui::theming::StyledBox)
+///     - `subviews[role]`: A custom label view with a role `role`.
+///       The primary axis range of `frame` is overriden using the label's
+///       value. The original `frame` represents the value range. The size along
+///       the primary axis is always set to minimum.
+///
+///     - [`subviews[roles::SLIDER_KNOB]`]: The knob. `Slider` overrides the
+///       knob's `frame` using the current value. The original `frame`
+///       represents the knob's movable range. The size along the primary axis
+///       is always set to minimum.
+///
+///       *Note:* "The original `frame`" is the initial `frame` calculated by
+///       `StyledBox`'s layout algorithm and is bounded by the subview's maximum
+///       size. The overall size of `Slider` will be affected as normally it
+///       would. You need to make sure the maximum size is set to infinity to
+///       achieve a desired effect.
+///
+///     - [`subviews[roles::SLIDER_TICKS]`]: The container for ticks. Should
+///       align with the movable range of the knob for it to make sense to the
+///       application user.
+///
+///  - `style_elem > *` - Custom label views.
+///
+///  - `style_elem > #SLIDER_KNOB` - The knob. See
+///    [`StyledBox`](crate::ui::theming::StyledBox)
+///
+/// [`subviews[roles::SLIDER_KNOB]`]: crate::ui::theming::roles::SLIDER_KNOB
+/// [`subviews[roles::SLIDER_TICKS]`]: crate::ui::theming::roles::SLIDER_TICKS
+///
+#[derive(Debug)]
+pub struct Slider {
+    shared: Rc<Shared>,
 }
 
 struct Shared {
     vertical: bool,
     value: Cell<f64>,
-    page_step: Cell<f64>,
     on_drag: RefCell<DragHandler>,
-    on_page_step: RefCell<PageStepHandler>,
+    on_step: RefCell<StepHandler>,
     wrapper: HView,
     frame: StyledBox,
-    thumb: StyledBox,
+    knob: StyledBox,
     layout_state: Cell<LayoutState>,
 }
 
 type DragHandler = Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>;
-type PageStepHandler = Box<dyn Fn(pal::Wm, Dir)>;
+type StepHandler = Box<dyn Fn(pal::Wm, Dir)>;
 
 impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Shared")
             .field("vertical", &self.vertical)
             .field("value", &self.value)
-            .field("page_step", &self.page_step)
             .field("on_drag", &())
-            .field("on_page_step", &())
+            .field("on_step", &())
             .field("frame", &self.frame)
-            .field("thumb", &self.thumb)
+            .field("knob", &self.knob)
             .field("layout_state", &self.layout_state)
             .finish()
     }
 }
 
-/// Information obtained from the actual geometry of the scrollbar's elements.
+/// Information obtained from the actual geometry of the slider's elements.
 #[derive(Copy, Clone, Debug, Default)]
 struct LayoutState {
-    thumb_start: f32,
-    thumb_end: f32,
+    knob_start: f32,
+    knob_end: f32,
+    /// The left/top local coordinate of the range in which the origin point of
+    /// the knob can move.
+    knob_origin_start: f64,
     clearance: f64,
 }
 
-/// Drag gesture handlers for [`Scrollbar`]. It has semantics similar to
-/// `MouseDragListener`.
-///
-/// They are all called inside `invoke_on_update`. The event rate is limited by
-/// the screen update rate.
-pub trait ScrollbarDragListener {
-    /// The thumb is about to be moved. `new_value` specifies the current
-    /// [`value`].
-    ///
-    /// [`value`]: crate::ui::views::scrollbar::Scrollbar::value
-    fn down(&self, _: pal::Wm, _new_value: f64) {}
-
-    /// The thumb is being moved. `new_value` specifies the new [`value`].
-    /// The implementation is responsible for updating `Scrollbar` with a new
-    /// value.
-    ///
-    /// [`value`]: crate::ui::views::scrollbar::Scrollbar::value
-    fn motion(&self, _: pal::Wm, _new_value: f64) {}
-
-    /// The thumb was moved.
-    fn up(&self, _: pal::Wm) {}
-
-    /// The drag gesture was cancelled. The implementation is responsible for
-    /// updating `Scrollbar` with an original value.
-    fn cancel(&self, _: pal::Wm) {}
-}
-
-impl ScrollbarDragListener for () {}
-
-impl<T: ScrollbarDragListener + 'static> From<T> for Box<dyn ScrollbarDragListener> {
-    fn from(x: T) -> Box<dyn ScrollbarDragListener> {
-        Box::new(x)
-    }
-}
-
-impl Scrollbar {
+impl Slider {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
         let frame = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
         frame.set_class_set(if vertical {
-            ClassSet::SCROLLBAR | ClassSet::VERTICAL
+            ClassSet::SLIDER | ClassSet::VERTICAL
         } else {
-            ClassSet::SCROLLBAR
+            ClassSet::SLIDER
         });
         frame.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
-        let thumb = StyledBox::new(style_manager, ViewFlags::default());
-        frame.set_child(roles::GENERIC, Some(&thumb));
+        let knob = StyledBox::new(style_manager, ViewFlags::default());
+        frame.set_child(roles::SLIDER_KNOB, Some(&knob));
 
-        let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::NO_FOCUS_ON_CLICK);
+        let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG);
         wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
             vertical,
             value: Cell::new(0.0),
-            page_step: Cell::new(0.1),
             on_drag: RefCell::new(Box::new(|_| Box::new(()))),
-            on_page_step: RefCell::new(Box::new(|_, _| {})),
+            on_step: RefCell::new(Box::new(|_, _| {})),
             wrapper,
             frame,
-            thumb,
+            knob,
             layout_state: Cell::new(LayoutState::default()),
         });
 
         Shared::update_sb_override((&shared).into());
 
-        shared.wrapper.set_listener(SbViewListener {
+        shared.wrapper.set_listener(SlViewListener {
             shared: Rc::clone(&shared),
         });
 
@@ -149,13 +141,13 @@ impl Scrollbar {
 
     /// Set the class set of the inner `StyledBox`.
     ///
-    /// It defaults to `ClassSet::SCROLLBAR`. Some bits (e.g., `ACTIVE`) are
+    /// It defaults to `ClassSet::SLIDER`. Some bits (e.g., `ACTIVE`) are
     /// internally enforced and cannot be modified.
     pub fn set_class_set(&self, mut class_set: ClassSet) {
         let frame = &self.shared.frame;
 
         // Protected bits
-        let protected = ClassSet::ACTIVE | ClassSet::HOVER;
+        let protected = ClassSet::ACTIVE;
         class_set -= protected;
         class_set |= frame.class_set() & protected;
         frame.set_class_set(class_set);
@@ -184,22 +176,8 @@ impl Scrollbar {
         Shared::update_sb_override((&self.shared).into());
     }
 
-    /// Get the page step size.
-    pub fn page_step(&self) -> f64 {
-        self.shared.page_step.get()
-    }
-
-    /// Set the page step size. Must be greater than or equal to zero. Can be
-    /// infinity, in which case the scrollbar is disabled.
-    pub fn set_page_step(&self, new_value: f64) {
-        debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
-
-        self.shared.page_step.set(new_value);
-        Shared::update_sb_override((&self.shared).into());
-    }
-
     /// Set the factory function for gesture event handlers used when the user
-    /// grabs the thumb.
+    /// grabs the knob.
     ///
     /// The function is called when the user starts a mouse drag gesture.
     pub fn set_on_drag(
@@ -209,12 +187,12 @@ impl Scrollbar {
         *self.shared.on_drag.borrow_mut() = Box::new(handler);
     }
 
-    /// Set the handler function called when the user clicks the trough (the
-    /// region outside the thumb).
+    /// Set the handler function called when the user hits an arrow key to
+    /// manipulate the slider.
     ///
     /// The function is called through `invoke_on_update`.
-    pub fn set_on_page_step(&self, handler: impl Fn(pal::Wm, Dir) + 'static) {
-        *self.shared.on_page_step.borrow_mut() = Box::new(handler);
+    pub fn set_on_step(&self, handler: impl Fn(pal::Wm, Dir) + 'static) {
+        *self.shared.on_step.borrow_mut() = Box::new(handler);
     }
 
     /// Get an owned handle to the view representing the widget.
@@ -233,7 +211,7 @@ impl Scrollbar {
     }
 }
 
-impl Widget for Scrollbar {
+impl Widget for Slider {
     fn view_ref(&self) -> HViewRef<'_> {
         self.view_ref()
     }
@@ -245,9 +223,8 @@ impl Widget for Scrollbar {
 
 impl Shared {
     fn update_sb_override(this: RcBorrow<'_, Shared>) {
-        this.frame.set_override(SbStyledBoxOverride {
+        this.frame.set_override(SlStyledBoxOverride {
             value: this.value.get(),
-            page_step: this.page_step.get(),
             shared: RcBorrow::upgrade(this),
         })
     }
@@ -261,10 +238,9 @@ impl Shared {
     }
 }
 
-/// Implements `StyledBoxOverride` for `Scrollbar`.
-struct SbStyledBoxOverride {
+/// Implements `StyledBoxOverride` for `Slider`.
+struct SlStyledBoxOverride {
     value: f64,
-    page_step: f64,
     /// This reference to `Shared` is used to provide layout feedback. The above
     /// fields should remain to ensure the logical immutability of this
     /// `StyledBoxOverride`. (This is actually never a problem in the current
@@ -272,50 +248,46 @@ struct SbStyledBoxOverride {
     shared: Rc<Shared>,
 }
 
-impl StyledBoxOverride for SbStyledBoxOverride {
+impl StyledBoxOverride for SlStyledBoxOverride {
     fn modify_arrangement(
         &self,
         ModifyArrangementArgs {
-            size_traits, frame, ..
+            size_traits,
+            frame,
+            role,
+            ..
         }: ModifyArrangementArgs<'_>,
     ) {
+        assert_eq!(role, roles::SLIDER_KNOB, "TODO: support other roles");
+
         let pri = self.shared.vertical as usize;
 
         let bar_len = frame.size()[pri] as f64;
         let bar_start = frame.min[pri] as f64;
 
-        // A scrollbar represents the entire length (`1 + page_step`) of
-        // a scrollable area, and the thumb the visible portion of size
-        // `page_step`. Calculate the size of the thumb based on this parallel.
-        let thumb_ratio_1 = self.page_step / (1.0 + self.page_step);
-        // `thumb_ratio_1` asymptotically approaches `1` as `thumb_ratio_1` → ∞
-        // but it might generate NaN with floating-point arithmetic. (And even
-        // 0 with a non-default rounding mode, which we assume never happens)
-        // `x.fmin(1.0)` returns `1.0` if `x` is NaN. Bonus: `fmin` lowers to
-        // `minsd` in x86_64
-        let thumb_ratio = thumb_ratio_1.fmin(1.0);
+        let knob_len = size_traits.min[pri] as f64;
+        let clearance = bar_len - knob_len;
 
-        let min_thumb_len = size_traits.min[pri] as f64;
-        let thumb_len = (bar_len * thumb_ratio).fmax(min_thumb_len);
-        let clearance = bar_len - thumb_len;
+        let knob_origin_start = bar_start + knob_len * 0.5;
 
-        let thumb_start = bar_start + self.value * clearance;
-        let thumb_end = thumb_start + thumb_len;
-        frame.min[pri] = thumb_start as f32;
-        frame.max[pri] = thumb_end as f32;
+        let knob_start = bar_start + self.value * clearance;
+        let knob_end = knob_start + knob_len;
+        frame.min[pri] = knob_start as f32;
+        frame.max[pri] = knob_end as f32;
 
         // Layout feedback
         self.shared.layout_state.set(LayoutState {
-            thumb_start: thumb_start as f32,
-            thumb_end: thumb_end as f32,
+            knob_start: knob_start as f32,
+            knob_end: knob_end as f32,
             clearance,
+            knob_origin_start,
         });
     }
 
     fn dirty_flags(&self, other: &dyn StyledBoxOverride) -> PropKindFlags {
         use as_any::Downcast;
         if let Some(other) = (*other).downcast_ref::<Self>() {
-            if (self.value, self.page_step) == (other.value, other.page_step) {
+            if self.value == other.value {
                 PropKindFlags::empty()
             } else {
                 PropKindFlags::LAYOUT
@@ -326,12 +298,12 @@ impl StyledBoxOverride for SbStyledBoxOverride {
     }
 }
 
-/// Implements `ViewListener` for `Scrollbar`.
-struct SbViewListener {
+/// Implements `ViewListener` for `Slider`.
+struct SlViewListener {
     shared: Rc<Shared>,
 }
 
-impl ViewListener for SbViewListener {
+impl ViewListener for SlViewListener {
     fn mouse_drag(
         &self,
         _: pal::Wm,
@@ -339,7 +311,7 @@ impl ViewListener for SbViewListener {
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
-        Box::new(SbMouseDragListener {
+        Box::new(SlMouseDragListener {
             shared: Rc::clone(&self.shared),
             drag_start: Cell::new(None),
             listener: RefCell::new(None),
@@ -347,14 +319,14 @@ impl ViewListener for SbViewListener {
     }
 }
 
-/// Implements `MouseDragListener` for `Scrollbar`.
-struct SbMouseDragListener {
+/// Implements `MouseDragListener` for `Slider`.
+struct SlMouseDragListener {
     shared: Rc<Shared>,
     drag_start: Cell<Option<(f32, f64)>>,
     listener: RefCell<Option<ListenerOnUpdateFilter>>,
 }
 
-impl MouseDragListener for SbMouseDragListener {
+impl MouseDragListener for SlMouseDragListener {
     fn mouse_motion(&self, wm: pal::Wm, _: HViewRef<'_>, loc: Point2<f32>) {
         if let Some((init_pos, init_value)) = self.drag_start.get() {
             let pri = self.shared.vertical as usize;
@@ -383,33 +355,37 @@ impl MouseDragListener for SbMouseDragListener {
             let layout_state = self.shared.layout_state.get();
             let local_loc = loc - view.global_frame().min[pri];
 
-            let page_step_dir = if local_loc > layout_state.thumb_end {
-                Some(Dir::Incr)
-            } else if local_loc < layout_state.thumb_start {
-                Some(Dir::Decr)
-            } else {
-                None
-            };
+            let on_knob =
+                local_loc >= layout_state.knob_start && local_loc <= layout_state.knob_end;
 
-            if let Some(dir) = page_step_dir {
-                // Trough clicked
-                // TODO: Support cancellation?
-                let shared = Rc::clone(&self.shared);
-                wm.invoke_on_update(move |wm| {
-                    shared.on_page_step.borrow()(wm, dir);
-                });
-            } else {
-                // Dragging the thumb
+            if on_knob {
                 self.drag_start.set(Some((loc, self.shared.value.get())));
-                self.shared.set_active(true);
+            } else {
+                // Jump to the clicked point if `on_knob == false`
+                let knob_origin_start = layout_state.knob_origin_start;
+                let value = ((local_loc as f64 - knob_origin_start) / layout_state.clearance)
+                    .fmax(0.0)
+                    .fmin(1.0);
+                self.drag_start.set(Some((loc, value)));
+            }
 
-                if self.listener.borrow().is_none() {
-                    let listener = self.shared.on_drag.borrow()(wm);
-                    let listener = ListenerOnUpdateFilter::new(listener);
-                    *self.listener.borrow_mut() = Some(listener);
+            self.shared.set_active(true);
+
+            if self.listener.borrow().is_none() {
+                let listener = self.shared.on_drag.borrow()(wm);
+                let listener = ListenerOnUpdateFilter::new(listener);
+                *self.listener.borrow_mut() = Some(listener);
+            }
+
+            (self.listener.borrow().as_ref().unwrap()).down(wm, self.shared.value.get());
+
+            // Jump to the clicked point if `on_knob == false`
+            if !on_knob {
+                if let (Some(listener), Some((_, init_value))) =
+                    (self.listener.borrow().as_ref(), self.drag_start.get())
+                {
+                    listener.motion(wm, init_value);
                 }
-
-                (self.listener.borrow().as_ref().unwrap()).down(wm, self.shared.value.get());
             }
         }
     }
@@ -424,70 +400,6 @@ impl MouseDragListener for SbMouseDragListener {
             self.shared.set_active(false);
         }
         self.listener.borrow().as_ref().unwrap().cancel(wm);
-    }
-}
-
-/// Wraps `ScrollbarDragListener` to limit the event generation rate using
-/// `invoke_on_update`.
-pub(super) struct ListenerOnUpdateFilter {
-    inner: Rc<ListenerOnUpdateFilterInner>,
-    motion_queued: Cell<bool>,
-}
-
-struct ListenerOnUpdateFilterInner {
-    listener: Box<dyn ScrollbarDragListener>,
-    motion_value: Cell<f64>,
-}
-
-impl ListenerOnUpdateFilter {
-    pub(super) fn new(listener: Box<dyn ScrollbarDragListener>) -> Self {
-        Self {
-            inner: Rc::new(ListenerOnUpdateFilterInner {
-                listener,
-                motion_value: Cell::new(0.0),
-            }),
-            motion_queued: Cell::new(false),
-        }
-    }
-}
-
-impl ScrollbarDragListener for ListenerOnUpdateFilter {
-    fn down(&self, wm: pal::Wm, new_value: f64) {
-        self.motion_queued.set(false);
-
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |wm| {
-            inner.listener.down(wm, new_value);
-        });
-    }
-
-    fn motion(&self, wm: pal::Wm, new_value: f64) {
-        // Only store the latest value
-        self.inner.motion_value.set(new_value);
-
-        // Do not enqueue more than one `motion` event per frame
-        if self.motion_queued.get() {
-            return;
-        }
-
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |wm| {
-            inner.listener.motion(wm, inner.motion_value.get());
-        });
-    }
-
-    fn up(&self, wm: pal::Wm) {
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |wm| {
-            inner.listener.up(wm);
-        });
-    }
-
-    fn cancel(&self, wm: pal::Wm) {
-        let inner = Rc::clone(&self.inner);
-        wm.invoke_on_update(move |wm| {
-            inner.listener.cancel(wm);
-        });
     }
 }
 
@@ -541,11 +453,11 @@ mod tests {
         }
     }
 
-    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Scrollbar>, HWnd, pal::HWnd) {
+    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Slider>, HWnd, pal::HWnd) {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Rc::new(Scrollbar::new(style_manager, vertical));
+        let sb = Rc::new(Slider::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
         wnd.content_view().set_layout(FillLayout::new(sb.view()));
@@ -560,36 +472,35 @@ mod tests {
     }
 
     #[test]
-    fn thumb_size_horizontal() {
-        thumb_size(false);
+    fn knob_size_horizontal() {
+        knob_size(false);
     }
 
     #[test]
-    fn thumb_size_vertical() {
-        thumb_size(true);
+    fn knob_size_vertical() {
+        knob_size(true);
     }
 
     #[use_testing_wm(testing = "crate::testing")]
-    fn thumb_size(twm: &dyn TestingWm, vert: bool) {
+    fn knob_size(twm: &dyn TestingWm, vert: bool) {
         let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
         let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
-        sb.set_page_step(0.02);
         twm.step_unsend();
         twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
         twm.step_unsend();
 
         let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
-        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.knob.view().global_frame().t_if(vert);
 
         assert!(fr2.size().x < fr1.size().x * 0.2);
         assert!(fr2.size().y > fr1.size().y * 0.1);
         assert!(fr1.contains_box(&fr2));
     }
 
-    struct ValueUpdatingDragListener(Weak<Scrollbar>, f64);
+    struct ValueUpdatingDragListener(Weak<Slider>, f64);
 
     impl ValueUpdatingDragListener {
-        fn new(sb: &Rc<Scrollbar>) -> Self {
+        fn new(sb: &Rc<Slider>) -> Self {
             Self(Rc::downgrade(sb), sb.value())
         }
     }
@@ -608,30 +519,28 @@ mod tests {
     }
 
     #[test]
-    fn thumb_drag_horizontal() {
-        thumb_drag(false);
+    fn knob_drag_horizontal() {
+        knob_drag(false);
     }
 
     #[test]
-    fn thumb_drag_vertical() {
-        thumb_drag(true);
+    fn knob_drag_vertical() {
+        knob_drag(true);
     }
 
     #[use_testing_wm(testing = "crate::testing")]
-    fn thumb_drag(twm: &dyn TestingWm, vert: bool) {
+    fn knob_drag(twm: &dyn TestingWm, vert: bool) {
         let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
         let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
         twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
-        sb.set_page_step(0.1);
         sb.set_value(0.0);
         sb.set_on_drag(enc!((sb) move |_| {
             ValueUpdatingDragListener::new(&sb).into()
         }));
-        sb.set_on_page_step(|_, _| unreachable!());
         twm.step_unsend();
 
         let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
-        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.knob.view().global_frame().t_if(vert);
 
         debug!("fr1 = {:?}", fr1);
         debug!("fr2 = {:?}", fr2);
@@ -641,7 +550,7 @@ mod tests {
         let mut value = sb.value();
         let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
 
-        // Grab the thumb
+        // Grab the knob
         drag.mouse_down([x, y].t_if(vert).into(), 0);
 
         assert!(sb.class_set().contains(ClassSet::ACTIVE));
@@ -662,14 +571,14 @@ mod tests {
                 break;
             }
 
-            let fr2b = sb.shared.thumb.view().global_frame().t_if(vert);
+            let fr2b = sb.shared.knob.view().global_frame().t_if(vert);
             debug!("fr2b = {:?}", fr2b);
 
-            // The movement of the thumb must follow the mouse pointer
+            // The movement of the knob must follow the mouse pointer
             let offset = fr2b.min.x - fr2.min.x;
             assert_abs_diff_eq!(offset, x - st_x, epsilon = 0.1);
 
-            // The length of the thumb must not change
+            // The length of the knob must not change
             assert_abs_diff_eq!(fr2b.size().x, fr2.size().x, epsilon = 0.1);
 
             assert!(
@@ -678,7 +587,7 @@ mod tests {
             );
         }
 
-        // Release the thumb
+        // Release the knob
         drag.mouse_up([x, y].t_if(vert).into(), 0);
 
         assert!(!sb.class_set().contains(ClassSet::ACTIVE));
@@ -699,26 +608,22 @@ mod tests {
         let (sb, _hwnd, pal_hwnd) = make_wnd(twm, vert);
         let min_size = twm.wnd_attrs(&pal_hwnd).unwrap().min_size.t_if(vert);
         twm.set_wnd_size(&pal_hwnd, [400, min_size[1]].t_if(vert));
-        sb.set_page_step(0.1);
         sb.set_value(0.4);
-        sb.set_on_drag(|_| unreachable!());
-        sb.set_on_page_step(enc!((sb) move |_, dir| {
-            debug!("on_page_step({:?})", dir);
-            let new_value = sb.value() + sb.page_step() * dir as i8 as f64;
-            sb.set_value(new_value.fmax(0.0).fmin(1.0));
+        sb.set_on_drag(enc!((sb) move |_| {
+            ValueUpdatingDragListener::new(&sb).into()
         }));
         twm.step_unsend();
 
         let fr1 = sb.shared.frame.view().global_frame().t_if(vert);
-        let fr2 = sb.shared.thumb.view().global_frame().t_if(vert);
+        let fr2 = sb.shared.knob.view().global_frame().t_if(vert);
 
         debug!("fr1 = {:?}", fr1);
         debug!("fr2 = {:?}", fr2);
 
         let y = fr2.mid().y;
-        let mut value = sb.value();
+        let value = sb.value();
 
-        // Click the trough to lower the value
+        // Click the trough to set the value
         let x = fr1.min.x.average2(&fr2.min.x);
         info!("clicking at {:?}", [x, y]);
         let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
@@ -728,23 +633,6 @@ mod tests {
         let new_value = sb.value();
         debug!("new_value = {}", new_value);
         assert!(new_value < value);
-
-        drag.mouse_up([x, y].t_if(vert).into(), 0);
-        twm.step_unsend();
-        drop(drag);
-
-        value = new_value;
-
-        // Click the trough to raise the value
-        let x = fr1.max.x.average2(&fr2.max.x);
-        info!("clicking at {:?}", [x, y]);
-        let drag = twm.raise_mouse_drag(&pal_hwnd, [x, y].t_if(vert).into(), 0);
-        drag.mouse_down([x, y].t_if(vert).into(), 0);
-        twm.step_unsend();
-
-        let new_value = sb.value();
-        debug!("new_value = {}", new_value);
-        assert!(new_value > value);
 
         drag.mouse_up([x, y].t_if(vert).into(), 0);
         twm.step_unsend();

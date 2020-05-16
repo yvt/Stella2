@@ -35,6 +35,8 @@ bitflags! {
         const HAS_HORIZONTAL_SCROLLBAR = 1 << 8;
         /// The scrollable container has a vertical scrollbar.
         const HAS_VERTICAL_SCROLLBAR = 1 << 9;
+        /// The element is a slider.
+        const SLIDER = 1 << 10;
         /// The element is a text entry widget.
         const ENTRY = 1 << 11;
         /// The element is a checkbox widget.
@@ -107,6 +109,7 @@ pub mod elem_id {
     iota::iota! {
         pub const SPLITTER: ClassSet = ClassSet::id(iota + SYS_START_VALUE);
                 , TEXT_SELECTION
+                , SLIDER_KNOB
     }
 }
 
@@ -132,6 +135,9 @@ pub mod roles {
                 , HORZ_SCROLLBAR
                 , VERT_SCROLLBAR
     }
+
+    pub const SLIDER_KNOB: super::Role = super::Role::max_value();
+    pub const SLIDER_TICKS: super::Role = super::Role::max_value() - 1;
 }
 
 #[macro_use]
