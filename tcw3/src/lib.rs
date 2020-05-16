@@ -20,8 +20,17 @@ pub use rob;
 
 pub mod ui;
 pub mod uicore;
+pub mod utils {
+    pub mod resetiter;
+    #[doc(no_inline)]
+    pub use self::resetiter::ResetIter;
+}
 
 pub mod prelude {
     #[doc(no_inline)]
-    pub use crate::{pal::prelude::*, uicore::WmExt};
+    pub use crate::{
+        pal::prelude::*,
+        uicore::WmExt,
+        utils::resetiter::{IntoResetIter, ResetIter, ResetIterExt},
+    };
 }
