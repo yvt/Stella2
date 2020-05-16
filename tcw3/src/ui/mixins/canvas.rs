@@ -51,6 +51,16 @@ impl Default for CanvasMixin {
     }
 }
 
+#[cfg(debug_assertions)]
+impl Drop for CanvasMixin {
+    fn drop(&mut self) {
+        debug_assert!(
+            self.state.is_none(),
+            "`CanvasMixin` was dropped while being mounted. This causes a memory leak."
+        );
+    }
+}
+
 impl CanvasMixin {
     /// Construct a `CanvasMixin`.
     pub fn new() -> Self {
