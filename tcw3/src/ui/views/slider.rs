@@ -2,11 +2,10 @@
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::Point2;
-use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use crate::{
@@ -130,10 +129,10 @@ impl Slider {
             layout_state: Cell::new(LayoutState::default()),
         });
 
-        Shared::update_sb_override((&shared).into());
+        Shared::update_sb_override(&shared);
 
         shared.wrapper.set_listener(SlViewListener {
-            shared: Rc::clone(&shared),
+            shared: Rc::downgrade(&shared),
         });
 
         Self { shared }
@@ -173,7 +172,7 @@ impl Slider {
         }
 
         self.shared.value.set(new_value);
-        Shared::update_sb_override((&self.shared).into());
+        Shared::update_sb_override(&self.shared);
     }
 
     /// Set the factory function for gesture event handlers used when the user
@@ -222,10 +221,10 @@ impl Widget for Slider {
 }
 
 impl Shared {
-    fn update_sb_override(this: RcBorrow<'_, Shared>) {
+    fn update_sb_override(this: &Rc<Shared>) {
         this.frame.set_override(SlStyledBoxOverride {
             value: this.value.get(),
-            shared: RcBorrow::upgrade(this),
+            shared: Rc::downgrade(this),
         })
     }
 
@@ -245,7 +244,7 @@ struct SlStyledBoxOverride {
     /// fields should remain to ensure the logical immutability of this
     /// `StyledBoxOverride`. (This is actually never a problem in the current
     /// implementation of `StyledBox`, though.)
-    shared: Rc<Shared>,
+    shared: Weak<Shared>,
 }
 
 impl StyledBoxOverride for SlStyledBoxOverride {
@@ -258,9 +257,15 @@ impl StyledBoxOverride for SlStyledBoxOverride {
             ..
         }: ModifyArrangementArgs<'_>,
     ) {
+        let shared = if let Some(shared) = self.shared.upgrade() {
+            shared
+        } else {
+            return;
+        };
+
         assert_eq!(role, roles::SLIDER_KNOB, "TODO: support other roles");
 
-        let pri = self.shared.vertical as usize;
+        let pri = shared.vertical as usize;
 
         let bar_len = frame.size()[pri] as f64;
         let bar_start = frame.min[pri] as f64;
@@ -276,7 +281,7 @@ impl StyledBoxOverride for SlStyledBoxOverride {
         frame.max[pri] = knob_end as f32;
 
         // Layout feedback
-        self.shared.layout_state.set(LayoutState {
+        shared.layout_state.set(LayoutState {
             knob_start: knob_start as f32,
             knob_end: knob_end as f32,
             clearance,
@@ -300,7 +305,7 @@ impl StyledBoxOverride for SlStyledBoxOverride {
 
 /// Implements `ViewListener` for `Slider`.
 struct SlViewListener {
-    shared: Rc<Shared>,
+    shared: Weak<Shared>,
 }
 
 impl ViewListener for SlViewListener {
@@ -311,11 +316,15 @@ impl ViewListener for SlViewListener {
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
-        Box::new(SlMouseDragListener {
-            shared: Rc::clone(&self.shared),
-            drag_start: Cell::new(None),
-            listener: RefCell::new(None),
-        })
+        if let Some(shared) = self.shared.upgrade() {
+            Box::new(SlMouseDragListener {
+                shared,
+                drag_start: Cell::new(None),
+                listener: RefCell::new(None),
+            })
+        } else {
+            Box::new(())
+        }
     }
 }
 
@@ -636,5 +645,42 @@ mod tests {
 
         drag.mouse_up([x, y].t_if(vert).into(), 0);
         twm.step_unsend();
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn not_leaking_shared(twm: &dyn TestingWm) {
+        let wm = twm.wm();
+
+        let style_manager = Manager::global(wm);
+        let sb = Rc::new(Slider::new(style_manager, false));
+
+        // Store the drop detector in `Shared`
+        let dropped = Rc::new(Cell::new(false));
+        let drop_detector = OnDrop(Some(enc!((dropped) move || dropped.set(true))));
+        sb.set_on_drag(move |_| {
+            let _ = &drop_detector;
+            unreachable!()
+        });
+
+        // Drop `Slider`
+        drop(sb);
+        twm.step_unsend();
+
+        assert!(dropped.get(), "`Shared` was leaked");
+    }
+
+    struct OnDrop<F: FnOnce()>(Option<F>);
+
+    impl<F: FnOnce()> OnDrop<F> {
+        fn new(x: F) -> Self {
+            Self(Some(x))
+        }
+    }
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            (self.0.take().unwrap())();
+        }
     }
 }

@@ -2,11 +2,10 @@
 use alt_fp::FloatOrd;
 use cggeom::prelude::*;
 use cgmath::Point2;
-use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell},
     fmt,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use crate::{
@@ -138,10 +137,10 @@ impl Scrollbar {
             layout_state: Cell::new(LayoutState::default()),
         });
 
-        Shared::update_sb_override((&shared).into());
+        Shared::update_sb_override(&shared);
 
         shared.wrapper.set_listener(SbViewListener {
-            shared: Rc::clone(&shared),
+            shared: Rc::downgrade(&shared),
         });
 
         Self { shared }
@@ -181,7 +180,7 @@ impl Scrollbar {
         }
 
         self.shared.value.set(new_value);
-        Shared::update_sb_override((&self.shared).into());
+        Shared::update_sb_override(&self.shared);
     }
 
     /// Get the page step size.
@@ -195,7 +194,7 @@ impl Scrollbar {
         debug_assert!(new_value >= 0.0, "{} >= 0.0", new_value);
 
         self.shared.page_step.set(new_value);
-        Shared::update_sb_override((&self.shared).into());
+        Shared::update_sb_override(&self.shared);
     }
 
     /// Set the factory function for gesture event handlers used when the user
@@ -244,11 +243,11 @@ impl Widget for Scrollbar {
 }
 
 impl Shared {
-    fn update_sb_override(this: RcBorrow<'_, Shared>) {
+    fn update_sb_override(this: &Rc<Shared>) {
         this.frame.set_override(SbStyledBoxOverride {
             value: this.value.get(),
             page_step: this.page_step.get(),
-            shared: RcBorrow::upgrade(this),
+            shared: Rc::downgrade(this),
         })
     }
 
@@ -269,7 +268,7 @@ struct SbStyledBoxOverride {
     /// fields should remain to ensure the logical immutability of this
     /// `StyledBoxOverride`. (This is actually never a problem in the current
     /// implementation of `StyledBox`, though.)
-    shared: Rc<Shared>,
+    shared: Weak<Shared>,
 }
 
 impl StyledBoxOverride for SbStyledBoxOverride {
@@ -279,7 +278,13 @@ impl StyledBoxOverride for SbStyledBoxOverride {
             size_traits, frame, ..
         }: ModifyArrangementArgs<'_>,
     ) {
-        let pri = self.shared.vertical as usize;
+        let shared = if let Some(shared) = self.shared.upgrade() {
+            shared
+        } else {
+            return;
+        };
+
+        let pri = shared.vertical as usize;
 
         let bar_len = frame.size()[pri] as f64;
         let bar_start = frame.min[pri] as f64;
@@ -305,7 +310,7 @@ impl StyledBoxOverride for SbStyledBoxOverride {
         frame.max[pri] = thumb_end as f32;
 
         // Layout feedback
-        self.shared.layout_state.set(LayoutState {
+        shared.layout_state.set(LayoutState {
             thumb_start: thumb_start as f32,
             thumb_end: thumb_end as f32,
             clearance,
@@ -328,7 +333,7 @@ impl StyledBoxOverride for SbStyledBoxOverride {
 
 /// Implements `ViewListener` for `Scrollbar`.
 struct SbViewListener {
-    shared: Rc<Shared>,
+    shared: Weak<Shared>,
 }
 
 impl ViewListener for SbViewListener {
@@ -339,11 +344,15 @@ impl ViewListener for SbViewListener {
         _loc: Point2<f32>,
         _button: u8,
     ) -> Box<dyn MouseDragListener> {
-        Box::new(SbMouseDragListener {
-            shared: Rc::clone(&self.shared),
-            drag_start: Cell::new(None),
-            listener: RefCell::new(None),
-        })
+        if let Some(shared) = self.shared.upgrade() {
+            Box::new(SbMouseDragListener {
+                shared,
+                drag_start: Cell::new(None),
+                listener: RefCell::new(None),
+            })
+        } else {
+            Box::new(())
+        }
     }
 }
 
@@ -748,5 +757,42 @@ mod tests {
 
         drag.mouse_up([x, y].t_if(vert).into(), 0);
         twm.step_unsend();
+    }
+
+    #[use_testing_wm(testing = "crate::testing")]
+    #[test]
+    fn not_leaking_shared(twm: &dyn TestingWm) {
+        let wm = twm.wm();
+
+        let style_manager = Manager::global(wm);
+        let sb = Rc::new(Scrollbar::new(style_manager, false));
+
+        // Store the drop detector in `Shared`
+        let dropped = Rc::new(Cell::new(false));
+        let drop_detector = OnDrop(Some(enc!((dropped) move || dropped.set(true))));
+        sb.set_on_drag(move |_| {
+            let _ = &drop_detector;
+            unreachable!()
+        });
+
+        // Drop `Scrollbar`
+        drop(sb);
+        twm.step_unsend();
+
+        assert!(dropped.get(), "`Shared` was leaked");
+    }
+
+    struct OnDrop<F: FnOnce()>(Option<F>);
+
+    impl<F: FnOnce()> OnDrop<F> {
+        fn new(x: F) -> Self {
+            Self(Some(x))
+        }
+    }
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            (self.0.take().unwrap())();
+        }
     }
 }
