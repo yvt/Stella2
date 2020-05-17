@@ -111,6 +111,7 @@ pub mod elem_id {
                 , TEXT_SELECTION
                 , SLIDER_KNOB
                 , SLIDER_TICKS
+                , SLIDER_LABELS
     }
 }
 
@@ -135,10 +136,10 @@ pub mod roles {
         pub const GENERIC: super::Role = iota;
                 , HORZ_SCROLLBAR
                 , VERT_SCROLLBAR
+                , SLIDER_KNOB
+                , SLIDER_TICKS
+                , SLIDER_LABELS
     }
-
-    pub const SLIDER_KNOB: super::Role = super::Role::max_value();
-    pub const SLIDER_TICKS: super::Role = super::Role::max_value() - 1;
 }
 
 #[macro_use]

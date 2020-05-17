@@ -3,7 +3,7 @@ use tcw3::{
     pal,
     pal::prelude::*,
     ui::{
-        layouts::TableLayout,
+        layouts::{FillLayout, TableLayout},
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
@@ -123,9 +123,29 @@ fn main() {
         });
     }
 
+    let slider_labels = [
+        Label::new(style_manager),
+        Label::new(style_manager),
+        Label::new(style_manager),
+        Label::new(style_manager),
+        Label::new(style_manager),
+    ];
+    slider_labels[0].set_text("Stop");
+    slider_labels[1].set_text("Trot");
+    slider_labels[2].set_text("Canter");
+    slider_labels[3].set_text("Gallop");
+    slider_labels[4].set_text("Warp");
+
     let slider = Slider::new(style_manager, false);
     let slider = Rc::new(slider);
-    slider.set_uniform_ticks(8);
+    slider.set_uniform_ticks(5);
+    slider.set_labels([
+        (0, Some((0.0, &slider_labels[0] as &dyn theming::Widget))),
+        (1, Some((0.2, &slider_labels[1] as &dyn theming::Widget))),
+        (2, Some((0.4, &slider_labels[2] as &dyn theming::Widget))),
+        (3, Some((0.6, &slider_labels[3] as &dyn theming::Widget))),
+        (4, Some((1.0, &slider_labels[4] as &dyn theming::Widget))),
+    ]);
     {
         let slider_weak = Rc::downgrade(&slider);
         slider.set_on_drag(move |_| {
@@ -137,6 +157,12 @@ fn main() {
     {
         // TODO
     }
+
+    let slider = {
+        let view = HView::new(Default::default());
+        view.set_layout(FillLayout::new(slider.view()).with_margin([0.0, 10.0, 0.0, 10.0]));
+        view
+    };
 
     let entry = Entry::new(style_manager);
 
@@ -214,7 +240,7 @@ fn main() {
         TableLayout::stack_vert(vec![
             (label.view(), AlignFlags::VERT_JUSTIFY),
             (scrollbar.view(), AlignFlags::JUSTIFY),
-            (slider.view(), AlignFlags::JUSTIFY),
+            (slider, AlignFlags::JUSTIFY),
             (entry.view(), AlignFlags::JUSTIFY),
             (h_layout.clone(), AlignFlags::JUSTIFY),
         ])

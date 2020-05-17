@@ -12,12 +12,12 @@ use crate::{
     pal,
     prelude::*,
     ui::{
-        layouts::FillLayout,
+        layouts::{EmptyLayout, FillLayout},
         mixins::CanvasMixin,
         theming,
         theming::{
             elem_id, roles, ClassSet, GetPropValue, HElem, Manager, ModifyArrangementArgs,
-            PropKindFlags, StyledBox, StyledBoxOverride, Widget,
+            PropKindFlags, Role, StyledBox, StyledBoxOverride, Widget,
         },
     },
     uicore::{HView, HViewRef, HWndRef, MouseDragListener, UpdateCtx, ViewFlags, ViewListener},
@@ -31,13 +31,19 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 
 /// A slider widget.
 ///
+/// # Custom Label Views
+///
+/// A slider can have *custom label views* tethered to specific values. They can
+/// be set by calling [`Slider::set_labels`].
+///
+/// *Performance notes:* Custom label views use O(n²) algorithms in many of
+/// their code paths. Please keep the number of views low (< 8).
+///
 /// # Styling
 ///
 ///  - `style_elem` - See [`StyledBox`](crate::ui::theming::StyledBox)
-///     - `subviews[role]`: A custom label view with a role `role`.
-///       The primary axis range of `frame` is overriden using the label's
-///       value. The original `frame` represents the value range. The size along
-///       the primary axis is always set to minimum.
+///     - [`subviews[roles::SLIDER_LABELS]`]: The wrapper for custom label
+///       views.
 ///
 ///     - [`subviews[roles::SLIDER_KNOB]`]: The knob. `Slider` overrides the
 ///       knob's `frame` using the current value. The original `frame`
@@ -54,17 +60,24 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 ///       Should align with the movable range of the knob for it to make sense
 ///       to the application user.
 ///
-///  - `style_elem > *` - Custom label views.
-///
 ///  - `style_elem > `[`#SLIDER_KNOB`] - The knob. See
 ///    [`StyledBox`](crate::ui::theming::StyledBox)
 ///
 ///  - `style_elem > `[`#SLIDER_TICKS`] - The ticks. Supports `FgColor`.
 ///
+///  - `style_elem > `[`#SLIDER_LABELS`] - The wrapper for custom label views.
+///     - `subviews[role]`: The custom label view with a role `role`.
+///       The original `frame` represents the value range. The size along
+///       the primary axis is always set to minimum.
+///
+///  - `style_elem > #SLIDER_LABELS > *` - Custom label views.
+///
 /// [`subviews[roles::SLIDER_KNOB]`]: crate::ui::theming::roles::SLIDER_KNOB
 /// [`subviews[roles::SLIDER_TICKS]`]: crate::ui::theming::roles::SLIDER_TICKS
+/// [`subviews[roles::SLIDER_LABELS]`]: crate::ui::theming::roles::SLIDER_LABELS
 /// [`#SLIDER_KNOB`]: crate::ui::theming::elem_id::SLIDER_KNOB
 /// [`#SLIDER_TICKS`]: crate::ui::theming::elem_id::SLIDER_TICKS
+/// [`#SLIDER_LABELS`]: crate::ui::theming::elem_id::SLIDER_LABELS
 ///
 #[derive(Debug)]
 pub struct Slider {
@@ -85,6 +98,17 @@ struct Shared {
     ticks_elem: theming::Elem,
     ticks_state: Rc<RefCell<TicksState>>,
     ticks_empty: Cell<bool>,
+
+    labels_wrapper: StyledBox,
+    labels: RefCell<Vec<Label>>,
+}
+
+struct Label {
+    role: Role,
+    value: f32,
+    /// Wraps the given view to make sure `SizeTraits::max` is infinity.
+    /// (We don't want the slider's maximum size limited by the labels within)
+    wrap_view: HView,
 }
 
 type DragHandler = Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>;
@@ -143,6 +167,10 @@ impl Slider {
         knob.set_class_set(elem_id::SLIDER_KNOB);
         frame.set_child(roles::SLIDER_KNOB, Some(&knob));
 
+        // Wrapper for custom labels
+        let labels_wrapper = StyledBox::new(style_manager, ViewFlags::default());
+        labels_wrapper.set_class_set(elem_id::SLIDER_LABELS);
+
         let shared = Rc::new(Shared {
             vertical,
             value: Cell::new(0.0),
@@ -156,6 +184,8 @@ impl Slider {
             ticks_elem,
             ticks_state,
             ticks_empty: Cell::new(true),
+            labels_wrapper,
+            labels: RefCell::new(Vec::new()),
         });
 
         Shared::update_sb_override(&shared);
@@ -256,6 +286,81 @@ impl Slider {
         );
     }
 
+    /// Set custom label views attached to specified values.
+    pub fn set_labels<'a>(&self, children: impl AsRef<[(Role, Option<(f64, &'a dyn Widget)>)]>) {
+        self.set_labels_inner(children.as_ref());
+    }
+
+    fn set_labels_inner(&self, children: &[(Role, Option<(f64, &dyn Widget)>)]) {
+        let mut labels = self.shared.labels.borrow_mut();
+        let labels_wrapper = &self.shared.labels_wrapper;
+
+        // `wrap_view` has flexible margin values so that the slider's maximum
+        // size is not constrained by individual custom labels.
+        use std::f32::NAN;
+        let wrap_view_margin = [
+            // Horizontal - the top edge of the label is fixed
+            [0.0, NAN, NAN, NAN],
+            // Vertical - the left edge of the label is fixed
+            [NAN, NAN, NAN, 0.0],
+        ][self.shared.vertical as usize];
+
+        for &(role, label) in children.iter() {
+            if let Some((new_value, new_widget)) = label {
+                let new_value = new_value as f32;
+                let wrap_view =
+                    if let Some(label) = labels.iter_mut().find(|label| label.role == role) {
+                        // Replace the existing label
+                        label.value = new_value;
+                        &label.wrap_view
+                    } else {
+                        // Add a new label
+                        let wrap_view = HView::new(ViewFlags::default());
+                        labels_wrapper.set_subview(role, Some(wrap_view.clone()));
+                        labels.push(Label {
+                            role,
+                            wrap_view,
+                            value: new_value,
+                        });
+                        &labels.last_mut().unwrap().wrap_view
+                    };
+                wrap_view.set_layout(
+                    FillLayout::new(new_widget.view_ref().cloned()).with_margin(wrap_view_margin),
+                );
+            } else {
+                if let Some(i) = labels.iter().position(|label| label.role == role) {
+                    // Remove the label
+                    let label = labels.swap_remove(i);
+                    debug_assert_eq!(label.role, role);
+                    labels_wrapper.set_subview(role, None);
+                    label
+                        .wrap_view
+                        .set_layout(EmptyLayout::new(Default::default()));
+                }
+            }
+
+            labels_wrapper.set_subelement(role, label.and_then(|(_, widget)| widget.style_elem()));
+        }
+
+        if labels.is_empty() {
+            self.shared.frame.set_child(roles::SLIDER_LABELS, None);
+        } else {
+            // Display `SLIDER_LABELS` only if there's a label. This way, the
+            // slider will have an extra size only when necessary.
+            self.shared
+                .frame
+                .set_child(roles::SLIDER_LABELS, Some(labels_wrapper));
+
+            labels_wrapper.set_override(LabelsStyledBoxOverride {
+                vertical: self.shared.vertical,
+                labels: labels
+                    .iter()
+                    .map(|label| (label.role, label.value))
+                    .collect(),
+            });
+        }
+    }
+
     /// Set the factory function for gesture event handlers used when the user
     /// grabs the knob.
     ///
@@ -338,50 +443,93 @@ impl StyledBoxOverride for SlStyledBoxOverride {
             ..
         }: ModifyArrangementArgs<'_>,
     ) {
-        let shared = if let Some(shared) = self.shared.upgrade() {
-            shared
-        } else {
-            return;
-        };
-
         match role {
-            roles::SLIDER_KNOB => {}
-            roles::SLIDER_TICKS => {
-                return;
+            roles::SLIDER_TICKS | roles::SLIDER_LABELS => {
+                // Do not modify the arrangement of these subviews.
             }
-            _ => {
-                todo!();
+            roles::SLIDER_KNOB => {
+                let shared = if let Some(shared) = self.shared.upgrade() {
+                    shared
+                } else {
+                    return;
+                };
+
+                let pri = shared.vertical as usize;
+
+                let bar_len = frame.size()[pri] as f64;
+                let bar_start = frame.min[pri] as f64;
+
+                let knob_len = size_traits.min[pri] as f64;
+                let clearance = bar_len - knob_len;
+
+                let knob_origin_start = bar_start + knob_len * 0.5;
+
+                let knob_start = bar_start + self.value * clearance;
+                let knob_end = knob_start + knob_len;
+                frame.min[pri] = knob_start as f32;
+                frame.max[pri] = knob_end as f32;
+
+                // Layout feedback
+                shared.layout_state.set(LayoutState {
+                    knob_start: knob_start as f32,
+                    knob_end: knob_end as f32,
+                    clearance,
+                    knob_origin_start,
+                });
             }
+            _ => unreachable!(),
         }
-
-        let pri = shared.vertical as usize;
-
-        let bar_len = frame.size()[pri] as f64;
-        let bar_start = frame.min[pri] as f64;
-
-        let knob_len = size_traits.min[pri] as f64;
-        let clearance = bar_len - knob_len;
-
-        let knob_origin_start = bar_start + knob_len * 0.5;
-
-        let knob_start = bar_start + self.value * clearance;
-        let knob_end = knob_start + knob_len;
-        frame.min[pri] = knob_start as f32;
-        frame.max[pri] = knob_end as f32;
-
-        // Layout feedback
-        shared.layout_state.set(LayoutState {
-            knob_start: knob_start as f32,
-            knob_end: knob_end as f32,
-            clearance,
-            knob_origin_start,
-        });
     }
 
     fn dirty_flags(&self, other: &dyn StyledBoxOverride) -> PropKindFlags {
         use as_any::Downcast;
         if let Some(other) = (*other).downcast_ref::<Self>() {
             if self.value == other.value {
+                PropKindFlags::empty()
+            } else {
+                PropKindFlags::LAYOUT
+            }
+        } else {
+            PropKindFlags::all()
+        }
+    }
+}
+
+/// Implements `StyledBoxOverride` for custom label views.
+struct LabelsStyledBoxOverride {
+    vertical: bool,
+    labels: Vec<(Role, f32)>,
+}
+
+impl StyledBoxOverride for LabelsStyledBoxOverride {
+    fn modify_arrangement(
+        &self,
+        ModifyArrangementArgs {
+            size_traits,
+            frame,
+            role,
+            ..
+        }: ModifyArrangementArgs<'_>,
+    ) {
+        let pri = self.vertical as usize;
+
+        let value = self
+            .labels
+            .iter()
+            .find(|&&(r, _)| r == role)
+            .map(|&(_, value)| value)
+            .unwrap_or(0.0);
+
+        let label_size = size_traits.min[pri];
+        let label_pos = frame.min[pri] + (frame.max[pri] - frame.min[pri]) * value;
+        frame.min[pri] = label_pos - label_size / 2.0;
+        frame.max[pri] = label_pos + label_size / 2.0;
+    }
+
+    fn dirty_flags(&self, other: &dyn StyledBoxOverride) -> PropKindFlags {
+        use as_any::Downcast;
+        if let Some(other) = (*other).downcast_ref::<Self>() {
+            if self.labels == other.labels {
                 PropKindFlags::empty()
             } else {
                 PropKindFlags::LAYOUT
