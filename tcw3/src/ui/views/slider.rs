@@ -42,10 +42,10 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 /// # Styling
 ///
 ///  - `style_elem` - See [`StyledBox`](crate::ui::theming::StyledBox)
-///     - [`subviews[roles::SLIDER_LABELS]`]: The wrapper for custom label
+///     - `subviews[`[`roles::SLIDER_LABELS`]`]`: The wrapper for custom label
 ///       views.
 ///
-///     - [`subviews[roles::SLIDER_KNOB]`]: The knob. `Slider` overrides the
+///     - `subviews[`[`roles::SLIDER_KNOB`]`]`: The knob. `Slider` overrides the
 ///       knob's `frame` using the current value. The original `frame`
 ///       represents the knob's movable range. The size along the primary axis
 ///       is always set to minimum.
@@ -56,28 +56,28 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 ///       would. You need to make sure the maximum size is set to infinity to
 ///       achieve a desired effect.
 ///
-///     - [`subviews[roles::SLIDER_TICKS]`]: The container for tick marks.
+///     - `subviews[`[`roles::SLIDER_TICKS`]`]`: The container for tick marks.
 ///       Should align with the movable range of the knob for it to make sense
 ///       to the application user.
 ///
-///  - `style_elem > `[`#SLIDER_KNOB`] - The knob. See
+///  - `style_elem > #`[`SLIDER_KNOB`] - The knob. See
 ///    [`StyledBox`](crate::ui::theming::StyledBox)
 ///
-///  - `style_elem > `[`#SLIDER_TICKS`] - The ticks. Supports `FgColor`.
+///  - `style_elem > #`[`SLIDER_TICKS`] - The ticks. Supports `FgColor`.
 ///
-///  - `style_elem > `[`#SLIDER_LABELS`] - The wrapper for custom label views.
+///  - `style_elem > #`[`SLIDER_LABELS`] - The wrapper for custom label views.
 ///     - `subviews[role]`: The custom label view with a role `role`.
 ///       The original `frame` represents the value range. The size along
 ///       the primary axis is always set to minimum.
 ///
 ///  - `style_elem > #SLIDER_LABELS > *` - Custom label views.
 ///
-/// [`subviews[roles::SLIDER_KNOB]`]: crate::ui::theming::roles::SLIDER_KNOB
-/// [`subviews[roles::SLIDER_TICKS]`]: crate::ui::theming::roles::SLIDER_TICKS
-/// [`subviews[roles::SLIDER_LABELS]`]: crate::ui::theming::roles::SLIDER_LABELS
-/// [`#SLIDER_KNOB`]: crate::ui::theming::elem_id::SLIDER_KNOB
-/// [`#SLIDER_TICKS`]: crate::ui::theming::elem_id::SLIDER_TICKS
-/// [`#SLIDER_LABELS`]: crate::ui::theming::elem_id::SLIDER_LABELS
+/// [`roles::SLIDER_KNOB`]: crate::ui::theming::roles::SLIDER_KNOB
+/// [`roles::SLIDER_TICKS`]: crate::ui::theming::roles::SLIDER_TICKS
+/// [`roles::SLIDER_LABELS`]: crate::ui::theming::roles::SLIDER_LABELS
+/// [`SLIDER_KNOB`]: crate::ui::theming::elem_id::SLIDER_KNOB
+/// [`SLIDER_TICKS`]: crate::ui::theming::elem_id::SLIDER_TICKS
+/// [`SLIDER_LABELS`]: crate::ui::theming::elem_id::SLIDER_LABELS
 ///
 #[derive(Debug)]
 pub struct Slider {
