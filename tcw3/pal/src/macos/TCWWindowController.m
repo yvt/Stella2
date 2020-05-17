@@ -63,11 +63,6 @@ extern CGSConnection CGSDefaultConnectionForThread();
         // cursor-updating logic. So, disable cursor rects entirely.
         [self->window disableCursorRects];
 
-        // Enable "blur behind"
-        CGSConnection connection = CGSDefaultConnectionForThread();
-        CGSSetWindowBackgroundBlurRadius(connection, self->window.windowNumber,
-                                         100);
-
         // Create the first gesture handler view
         self->gestureHandler = [self newGestureHandlerView];
     }
@@ -141,6 +136,12 @@ extern CGSConnection CGSDefaultConnectionForThread();
         self->window.backgroundColor = [NSColor windowBackgroundColor];
         self->window.opaque = YES;
     }
+
+    // Enable "blur behind"
+    CGSConnection connection = CGSDefaultConnectionForThread();
+    CGSSetWindowBackgroundBlurRadius(
+        connection, self->window.windowNumber,
+        (flags & kTCW3WndFlagsTransparentBackdropBlur) ? 100 : 0);
 
     if (flags & kTCW3WndFlagsFullSizeContent) {
         masks |= NSWindowStyleMaskFullSizeContentView;
