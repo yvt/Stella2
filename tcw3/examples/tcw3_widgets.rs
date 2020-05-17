@@ -125,6 +125,7 @@ fn main() {
 
     let slider = Slider::new(style_manager, false);
     let slider = Rc::new(slider);
+    slider.set_uniform_ticks(8);
     {
         let slider_weak = Rc::downgrade(&slider);
         slider.set_on_drag(move |_| {

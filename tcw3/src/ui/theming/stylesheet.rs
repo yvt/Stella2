@@ -548,12 +548,14 @@ const SCROLLBAR_VISUAL_RADIUS: f32 = SCROLLBAR_VISUAL_WIDTH / 2.0;
 const SCROLLBAR_MARGIN: f32 = 6.0;
 const SCROLLBAR_LEN_MIN: f32 = 20.0;
 
-const SLIDER_WIDTH: f32 = 18.0;
+const SLIDER_WIDTH: f32 = 28.0;
 const SLIDER_TROUGH_WIDTH: f32 = 1.0;
 const SLIDER_KNOB_SIZE: f32 = 16.0;
 const SLIDER_KNOB_RADIUS: f32 = SLIDER_KNOB_SIZE / 2.0;
 const SLIDER_LEN_MARGIN: f32 = 10.0;
 const SLIDER_LEN_MIN: f32 = SLIDER_LEN_MARGIN * 2.0 + 10.0;
+const SLIDER_TICKS_DISTANCE: f32 = 4.0;
+const SLIDER_TICKS_SIZE: f32 = 3.0;
 
 const FIELD_HEIGHT: f32 = 20.0;
 
@@ -862,6 +864,15 @@ lazy_static! {
                 margin: [NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS],
                 .. Metrics::default()
             },
+            subview_metrics[roles::SLIDER_TICKS]: Metrics {
+                margin: [
+                    SLIDER_WIDTH * 0.5 + SLIDER_KNOB_RADIUS +SLIDER_TICKS_DISTANCE,
+                    SLIDER_LEN_MARGIN,
+                    NAN,
+                    SLIDER_LEN_MARGIN,
+                ],
+                size: Vector2::new(NAN, SLIDER_TICKS_SIZE),
+            },
             allow_grow: [true, false],
             min_size: Vector2::new(SLIDER_LEN_MIN, SLIDER_WIDTH),
 
@@ -875,6 +886,15 @@ lazy_static! {
                 margin: [SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN, SLIDER_LEN_MARGIN - SLIDER_KNOB_RADIUS, NAN],
                 .. Metrics::default()
             },
+            subview_metrics[roles::SLIDER_TICKS]: Metrics {
+                margin: [
+                    SLIDER_LEN_MARGIN,
+                    NAN,
+                    SLIDER_LEN_MARGIN,
+                    SLIDER_WIDTH * 0.5 + SLIDER_KNOB_RADIUS +SLIDER_TICKS_DISTANCE,
+                ],
+                size: Vector2::new(NAN, SLIDER_TICKS_SIZE),
+            },
             allow_grow: [false, true],
             min_size: Vector2::new(SLIDER_WIDTH, SLIDER_LEN_MIN),
 
@@ -884,7 +904,7 @@ lazy_static! {
             },
         },
 
-        // Slider thumb
+        // Slider knob
         ([] < [.SLIDER]) (priority = 100) {
             num_layers: 1,
             #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB)),
@@ -897,6 +917,11 @@ lazy_static! {
 
         ([] < [.SLIDER.ACTIVE]) (priority = 150) {
             #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB_ACT)),
+        },
+
+        // Slider tick marks
+        ([#SLIDER_TICKS]) (priority = 100) {
+            fg_color: RGBAF32::new(0.5, 0.5, 0.5, 1.0),
         },
 
         // Splitter

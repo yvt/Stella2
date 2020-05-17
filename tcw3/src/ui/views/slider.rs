@@ -1,6 +1,6 @@
 //! Implements the slider.
 use alt_fp::FloatOrd;
-use cggeom::prelude::*;
+use cggeom::{box2, prelude::*};
 use cgmath::Point2;
 use std::{
     cell::{Cell, RefCell},
@@ -10,14 +10,18 @@ use std::{
 
 use crate::{
     pal,
+    prelude::*,
     ui::{
         layouts::FillLayout,
+        mixins::CanvasMixin,
+        theming,
         theming::{
-            elem_id, roles, ClassSet, HElem, Manager, ModifyArrangementArgs, PropKindFlags,
-            StyledBox, StyledBoxOverride, Widget,
+            elem_id, roles, ClassSet, GetPropValue, HElem, Manager, ModifyArrangementArgs,
+            PropKindFlags, StyledBox, StyledBoxOverride, Widget,
         },
     },
-    uicore::{HView, HViewRef, MouseDragListener, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, HWndRef, MouseDragListener, UpdateCtx, ViewFlags, ViewListener},
+    utils::resetiter,
 };
 
 // Reuse some items from the scrollbar implementation
@@ -46,18 +50,21 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 ///       would. You need to make sure the maximum size is set to infinity to
 ///       achieve a desired effect.
 ///
-///     - [`subviews[roles::SLIDER_TICKS]`]: The container for ticks. Should
-///       align with the movable range of the knob for it to make sense to the
-///       application user.
+///     - [`subviews[roles::SLIDER_TICKS]`]: The container for tick marks.
+///       Should align with the movable range of the knob for it to make sense
+///       to the application user.
 ///
 ///  - `style_elem > *` - Custom label views.
 ///
 ///  - `style_elem > `[`#SLIDER_KNOB`] - The knob. See
 ///    [`StyledBox`](crate::ui::theming::StyledBox)
 ///
+///  - `style_elem > `[`#SLIDER_TICKS`] - The ticks. Supports `FgColor`.
+///
 /// [`subviews[roles::SLIDER_KNOB]`]: crate::ui::theming::roles::SLIDER_KNOB
 /// [`subviews[roles::SLIDER_TICKS]`]: crate::ui::theming::roles::SLIDER_TICKS
 /// [`#SLIDER_KNOB`]: crate::ui::theming::elem_id::SLIDER_KNOB
+/// [`#SLIDER_TICKS`]: crate::ui::theming::elem_id::SLIDER_TICKS
 ///
 #[derive(Debug)]
 pub struct Slider {
@@ -73,6 +80,11 @@ struct Shared {
     frame: StyledBox,
     knob: StyledBox,
     layout_state: Cell<LayoutState>,
+
+    ticks_view: HView,
+    ticks_elem: theming::Elem,
+    ticks_state: Rc<RefCell<TicksState>>,
+    ticks_empty: Cell<bool>,
 }
 
 type DragHandler = Box<dyn Fn(pal::Wm) -> Box<dyn ScrollbarDragListener>>;
@@ -113,12 +125,23 @@ impl Slider {
         });
         frame.set_auto_class_set(ClassSet::HOVER | ClassSet::FOCUS);
 
+        let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG);
+        wrapper.set_layout(FillLayout::new(frame.view()));
+
+        // Tick marks
+        let ticks_view = HView::new(ViewFlags::default());
+        let ticks_elem = theming::Elem::new(style_manager);
+        ticks_elem.set_class_set(elem_id::SLIDER_TICKS);
+        let ticks_state = Rc::new(RefCell::new(TicksState {
+            canvas: CanvasMixin::new(),
+            values: Box::new(resetiter::empty()),
+        }));
+        frame.set_subelement(roles::SLIDER_TICKS, Some(ticks_elem.helem()));
+
+        // Knob
         let knob = StyledBox::new(style_manager, ViewFlags::default());
         knob.set_class_set(elem_id::SLIDER_KNOB);
         frame.set_child(roles::SLIDER_KNOB, Some(&knob));
-
-        let wrapper = HView::new(ViewFlags::ACCEPT_MOUSE_DRAG);
-        wrapper.set_layout(FillLayout::new(frame.view()));
 
         let shared = Rc::new(Shared {
             vertical,
@@ -129,12 +152,21 @@ impl Slider {
             frame,
             knob,
             layout_state: Cell::new(LayoutState::default()),
+            ticks_view,
+            ticks_elem,
+            ticks_state,
+            ticks_empty: Cell::new(true),
         });
 
         Shared::update_sb_override(&shared);
 
         shared.wrapper.set_listener(SlViewListener {
             shared: Rc::downgrade(&shared),
+        });
+
+        shared.ticks_view.set_listener(TicksViewListener {
+            shared: Rc::downgrade(&shared),
+            state: Rc::clone(&shared.ticks_state),
         });
 
         Self { shared }
@@ -175,6 +207,53 @@ impl Slider {
 
         self.shared.value.set(new_value);
         Shared::update_sb_override(&self.shared);
+    }
+
+    /// Set the tick mark positions.
+    pub fn set_ticks<I>(&self, new_ticks: I)
+    where
+        I: resetiter::IntoResetIter<Item = f64>,
+        I::IntoResetIter: 'static,
+    {
+        self.set_ticks_inner(Box::new(new_ticks.into_reset_iter()));
+    }
+
+    fn set_ticks_inner(&self, mut new_ticks: Box<dyn resetiter::ResetIter<Item = f64>>) {
+        let is_empty = new_ticks.is_empty();
+
+        let mut ticks_state = self.shared.ticks_state.borrow_mut();
+        ticks_state.values = new_ticks;
+
+        if is_empty != self.shared.ticks_empty.get() {
+            self.shared.ticks_empty.set(is_empty);
+            self.shared.frame.set_subview(
+                roles::SLIDER_TICKS,
+                if is_empty {
+                    None
+                } else {
+                    Some(self.shared.ticks_view.clone())
+                },
+            );
+        }
+
+        if !is_empty {
+            ticks_state
+                .canvas
+                .pend_draw(self.shared.ticks_view.as_ref());
+        }
+    }
+
+    /// Arrange tick marks uniformly by calling `set_ticks`.
+    ///
+    /// `num_segments` must not be zero.
+    pub fn set_uniform_ticks(&self, num_segments: usize) {
+        debug_assert!(num_segments != 0);
+        let num_segments_f64 = num_segments as f64;
+        self.set_ticks(
+            (0..=num_segments)
+                .into_reset_iter()
+                .map(move |i| i as f64 / num_segments_f64),
+        );
     }
 
     /// Set the factory function for gesture event handlers used when the user
@@ -265,7 +344,15 @@ impl StyledBoxOverride for SlStyledBoxOverride {
             return;
         };
 
-        assert_eq!(role, roles::SLIDER_KNOB, "TODO: support other roles");
+        match role {
+            roles::SLIDER_KNOB => {}
+            roles::SLIDER_TICKS => {
+                return;
+            }
+            _ => {
+                todo!();
+            }
+        }
 
         let pri = shared.vertical as usize;
 
@@ -411,6 +498,73 @@ impl MouseDragListener for SlMouseDragListener {
             self.shared.set_active(false);
         }
         self.listener.borrow().as_ref().unwrap().cancel(wm);
+    }
+}
+
+/// Implements `ViewListener` for the view displaying tick marks.
+struct TicksViewListener {
+    shared: Weak<Shared>,
+    state: Rc<RefCell<TicksState>>,
+}
+
+struct TicksState {
+    canvas: CanvasMixin,
+    values: Box<dyn resetiter::ResetIter<Item = f64>>,
+}
+
+impl ViewListener for TicksViewListener {
+    fn mount(&self, wm: pal::Wm, view: HViewRef<'_>, wnd: HWndRef<'_>) {
+        self.state.borrow_mut().canvas.mount(wm, view, wnd);
+    }
+
+    fn unmount(&self, wm: pal::Wm, view: HViewRef<'_>) {
+        self.state.borrow_mut().canvas.unmount(wm, view);
+    }
+
+    fn position(&self, wm: pal::Wm, view: HViewRef<'_>) {
+        self.state.borrow_mut().canvas.position(wm, view);
+    }
+
+    fn update(&self, wm: pal::Wm, view: HViewRef<'_>, ctx: &mut UpdateCtx<'_>) {
+        let mut state = self.state.borrow_mut();
+        let state = &mut *state; // enable split borrow
+
+        // Make the visual bounds slightly larger than the frame so that
+        // the tickmarks at `0` and `1` are not clipped
+        let size = view.frame().size();
+        let visual_bounds = box2! {
+            top_left: [-1.0, 0.0],
+            size: [size.x + 2.0, size.y]
+        };
+
+        // The tick marks' color
+        let color = if let Some(shared) = self.shared.upgrade() {
+            shared.ticks_elem.computed_values().fg_color()
+        } else {
+            [0.0, 0.0, 0.0, 0.0].into()
+        };
+
+        // Render all tick marks in a single layer
+        let values = &mut *state.values;
+        state
+            .canvas
+            .update_layer(wm, view, ctx.hwnd(), visual_bounds, move |draw_ctx| {
+                let c = &mut draw_ctx.canvas;
+
+                c.set_stroke_rgb(color);
+                c.begin_path();
+
+                for x in values.iter().map(|x| x as f32 * size.x) {
+                    c.move_to([x, 0.0].into());
+                    c.line_to([x, size.y].into());
+                }
+
+                c.stroke();
+            });
+
+        if ctx.layers().len() != 1 {
+            ctx.set_layers(vec![state.canvas.layer().unwrap().clone()]);
+        }
     }
 }
 
