@@ -757,7 +757,7 @@ fn new_custom_platform_stylesheet() -> impl Stylesheet {
         // Remove the rounded corners on Windows
         ([#SEARCH_FIELD]) (priority = 20000) {
             // Focus ring
-            #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 1.0]).radius(2.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect([0.1, 0.4, 0.8, 0.5]).radius(2.0)]),
 
             // Background fill
             #[dyn] layer_img[1]: Some(himg_figures![

@@ -539,6 +539,8 @@ mod assets {
     pub static SLIDER_KNOB_ACT: Stvg = stvg!("assets/slider_knob_act.svg");
 }
 
+const FOCUS_RING_COLOR: RGBAF32 = RGBAF32::new(0.2, 0.4, 0.9, 0.5);
+
 const BUTTON_CORNER_RADIUS: f32 = 2.0;
 
 const CHECKBOX_IMG_SIZE: Vector2<f32> = Vector2::new(16.0, 16.0);
@@ -720,7 +722,7 @@ lazy_static! {
             num_layers: 2,
 
             // Focus ring
-            #[dyn] layer_img[0]: Some(himg_figures![rect([0.2, 0.4, 0.9, 1.0]).radius(5.0)]),
+            #[dyn] layer_img[0]: Some(himg_figures![rect(FOCUS_RING_COLOR).radius(5.0)]),
             layer_center[0]: box2! { point: [0.5, 0.5] },
             layer_opacity[0]: 0.0,
             layer_metrics[0]: Metrics {
@@ -737,7 +739,7 @@ lazy_static! {
             },
         },
         ([.ENTRY.FOCUS]) (priority = 200) {
-            layer_opacity[0]: 0.5,
+            layer_opacity[0]: 1.0,
         },
         // Entry text in `Entry`
         ([] < [.ENTRY]) (priority = 100) {
