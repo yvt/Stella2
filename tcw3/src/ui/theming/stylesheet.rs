@@ -596,8 +596,24 @@ use elem_id::*;
 lazy_static! {
     static ref DEFAULT_STYLESHEET: StylesheetMacroOutput = stylesheet! {
         ([.BUTTON]) (priority = 100) {
-            num_layers: 1,
+            num_layers: 2,
+
+            // Focus ring
             #[dyn] layer_img[0]: Some(himg_figures![
+                rect(FOCUS_RING_COLOR)
+                    .radius(2.0 + BUTTON_CORNER_RADIUS),
+                rect([0.95, 0.95, 0.95, 1.0])
+                    .radius(BUTTON_CORNER_RADIUS)
+                    .margin([2.0; 4]),
+            ]),
+            layer_center[0]: box2! { point: [0.5, 0.5] },
+            layer_opacity[0]: 0.0,
+            layer_metrics[0]: Metrics {
+                margin: [-2.0; 4],
+                ..Metrics::default()
+            },
+
+            #[dyn] layer_img[1]: Some(himg_figures![
                 // Shadow
                 rect([0.0, 0.0, 0.0, 0.05])
                     .radius(BUTTON_CORNER_RADIUS + 0.5)
@@ -613,22 +629,26 @@ lazy_static! {
                     .radius(BUTTON_CORNER_RADIUS)
                     .margin([1.0; 4]),
             ]),
-            layer_metrics[0]: Metrics {
+            layer_metrics[1]: Metrics {
                 margin: [-1.0; 4],
                 .. Metrics::default()
             },
-            layer_center[0]: box2! { point: [0.5, 0.5] },
-            layer_opacity[0]: 0.8,
+            layer_center[1]: box2! { point: [0.5, 0.5] },
+            layer_opacity[1]: 0.8,
+
             subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 8.0],
                 .. Metrics::default()
             },
         },
-        ([.BUTTON.HOVER]) (priority = 200) {
+        ([.BUTTON.FOCUS]) (priority = 200) {
             layer_opacity[0]: 1.0,
         },
+        ([.BUTTON.HOVER]) (priority = 200) {
+            layer_opacity[1]: 1.0,
+        },
         ([.BUTTON.ACTIVE]) (priority = 200) {
-            #[dyn] layer_img[0]: Some(himg_figures![
+            #[dyn] layer_img[1]: Some(himg_figures![
                 // Shadow
                 rect([0.0, 0.0, 0.0, 0.05])
                     .radius(BUTTON_CORNER_RADIUS + 0.5)

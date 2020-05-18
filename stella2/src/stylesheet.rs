@@ -255,21 +255,21 @@ fn new_custom_stylesheet() -> impl Stylesheet {
 
         // Toolbar buttons
         ([#SHOW_MENU.BUTTON]) (priority = 10000) {
-            num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::MENU)),
-            layer_metrics[1]: TOOLBAR_IMG_METRICS,
+            num_layers: 3,
+            #[dyn] layer_img[2]: Some(himg_from_stvg(&assets::toolbar::MENU)),
+            layer_metrics[2]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_SHOW.BUTTON]) (priority = 10000) {
-            num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_SHOW)),
-            layer_metrics[1]: TOOLBAR_IMG_METRICS,
+            num_layers: 3,
+            #[dyn] layer_img[2]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_SHOW)),
+            layer_metrics[2]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
         ([#SIDEBAR_HIDE.BUTTON]) (priority = 10000) {
-            num_layers: 2,
-            #[dyn] layer_img[1]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_HIDE)),
-            layer_metrics[1]: TOOLBAR_IMG_METRICS,
+            num_layers: 3,
+            #[dyn] layer_img[2]: Some(himg_from_stvg(&assets::toolbar::SIDEBAR_HIDE)),
+            layer_metrics[2]: TOOLBAR_IMG_METRICS,
             min_size: TOOLBAR_BTN_MIN_SIZE,
         },
 
