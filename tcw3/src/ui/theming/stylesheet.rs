@@ -677,56 +677,102 @@ lazy_static! {
 
         // Checkbox
         ([.CHECKBOX]) (priority = 100) {
-            num_layers: 1,
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT)),
+            num_layers: 2,
+
+            // Focus ring
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect(FOCUS_RING_COLOR)
+                        .radius(4.0)
+                        .margin([1.0; 4]),
+                    rect([0.95, 0.95, 0.95, 1.0])
+                        .radius(2.0)
+                        .margin([3.0; 4]),
+                ],
+                [CHECKBOX_IMG_SIZE.x + 4.0; 2],
+            )),
             layer_metrics[0]: Metrics {
+                margin: [NAN, NAN, NAN, 2.0],
+                size: Vector2::new(CHECKBOX_IMG_SIZE.x + 4.0, CHECKBOX_IMG_SIZE.y + 4.0),
+            },
+            layer_opacity[0]: 0.0,
+
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::CHECKBOX_LIGHT)),
+            layer_metrics[1]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: CHECKBOX_IMG_SIZE,
             },
-            layer_opacity[0]: 0.9,
+            layer_opacity[1]: 0.9,
+
             subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
                 .. Metrics::default()
             },
         },
-        ([.CHECKBOX.HOVER]) (priority = 200) {
+        ([.CHECKBOX.FOCUS]) (priority = 200) {
             layer_opacity[0]: 1.0,
         },
+        ([.CHECKBOX.HOVER]) (priority = 200) {
+            layer_opacity[1]: 1.0,
+        },
         ([.CHECKBOX.ACTIVE]) (priority = 200) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_ACT)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_ACT)),
         },
         ([.CHECKBOX.CHECKED]) (priority = 300) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED)),
         },
         ([.CHECKBOX.ACTIVE.CHECKED]) (priority = 400) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED_ACT)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::CHECKBOX_LIGHT_CHECKED_ACT)),
         },
 
         // Radio button (identical to checkbox except for images)
         ([.RADIO_BUTTON]) (priority = 100) {
-            num_layers: 1,
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT)),
+            num_layers: 2,
+
+            // Focus ring
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![
+                    rect(FOCUS_RING_COLOR)
+                        .radius(CHECKBOX_IMG_SIZE.x * 0.5 + 1.0)
+                        .margin([1.0; 4]),
+                    rect([0.95, 0.95, 0.95, 1.0])
+                        .radius(CHECKBOX_IMG_SIZE.x * 0.5 - 1.0)
+                        .margin([3.0; 4]),
+                ],
+                [CHECKBOX_IMG_SIZE.x + 4.0; 2],
+            )),
             layer_metrics[0]: Metrics {
+                margin: [NAN, NAN, NAN, 2.0],
+                size: Vector2::new(CHECKBOX_IMG_SIZE.x + 4.0, CHECKBOX_IMG_SIZE.y + 4.0),
+            },
+            layer_opacity[0]: 0.0,
+
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::RADIO_LIGHT)),
+            layer_metrics[1]: Metrics {
                 margin: [NAN, NAN, NAN, 4.0],
                 size: CHECKBOX_IMG_SIZE,
             },
-            layer_opacity[0]: 0.9,
+            layer_opacity[1]: 0.9,
+
             subview_metrics[roles::GENERIC]: Metrics {
                 margin: [3.0, 8.0, 3.0, 10.0 + CHECKBOX_IMG_SIZE.x],
                 .. Metrics::default()
             },
         },
-        ([.RADIO_BUTTON.HOVER]) (priority = 200) {
+        ([.RADIO_BUTTON.FOCUS]) (priority = 200) {
             layer_opacity[0]: 1.0,
         },
+        ([.RADIO_BUTTON.HOVER]) (priority = 200) {
+            layer_opacity[1]: 1.0,
+        },
         ([.RADIO_BUTTON.ACTIVE]) (priority = 200) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_ACT)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::RADIO_LIGHT_ACT)),
         },
         ([.RADIO_BUTTON.CHECKED]) (priority = 300) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED)),
         },
         ([.RADIO_BUTTON.ACTIVE.CHECKED]) (priority = 400) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED_ACT)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::RADIO_LIGHT_CHECKED_ACT)),
         },
 
         // Checkbox label
