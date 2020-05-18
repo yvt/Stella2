@@ -428,19 +428,33 @@ bitflags! {
         /// This flag also enables the standard behaviors regarding keyboard
         /// focus management including:
         ///  - Focusing the next widget when the <kbd>Tab</kbd> key is pressed;
-        ///  - Focusing a widget when clicked. (This can be disabled by setting
-        ///   `NO_FOCUS_ON_CLICK` on subviews with `ACCEPT_MOUSE_DRAG`)
+        ///  - Focusing a widget when clicked. (Requires `STRONG_FOCUS`. This
+        ///    can be suppressed by setting `NO_FOCUS_ON_CLICK` on subviews with
+        ///    `ACCEPT_MOUSE_DRAG`)
         ///
         /// When this flag is cleared, the view automatically gives up the
         /// keyboard focus if it has one.
         const TAB_STOP = 1 << 6;
 
         /// Prevents the focus-on-click behavior.
+        ///
+        /// The view with this flag does not alter the containing window's
+        /// keyboard focus state in any way when clicked.
         const NO_FOCUS_ON_CLICK = 1 << 7;
+
+        /// Enables the focus-on-click behavior.
+        ///
+        /// Set this flag on views that require a keyboard focus for
+        /// interaction. When this flag is not set, the view can receive a
+        /// keyboard focus only by tab navigation. The views without this flag
+        /// automatically lose a keyboard focus on mouse input.
+        ///
+        /// This flag doesn't have an effect if `TAB_STOP` is not set.
+        const STRONG_FOCUS = 1 << 8;
 
         /// The view defines a draggable area for the containing window. The
         /// hit testing follows the same rules as mouse drag events.
-        const DRAG_AREA = 1 << 8;
+        const DRAG_AREA = 1 << 9;
     }
 }
 
@@ -454,7 +468,7 @@ impl Default for ViewFlags {
 impl ViewFlags {
     fn mutable_flags() -> Self {
         flags![ViewFlags::{NO_CLIP_HITTEST | DENY_MOUSE | ACCEPT_MOUSE_DRAG |
-            TAB_STOP}]
+            TAB_STOP | STRONG_FOCUS}]
     }
 }
 

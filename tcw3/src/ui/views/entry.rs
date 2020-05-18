@@ -162,7 +162,8 @@ impl EntryCore {
             ViewFlags::default()
                 | ViewFlags::ACCEPT_MOUSE_OVER
                 | ViewFlags::ACCEPT_MOUSE_DRAG
-                | ViewFlags::TAB_STOP,
+                | ViewFlags::TAB_STOP
+                | ViewFlags::STRONG_FOCUS,
         );
         let weak_view = view.downgrade();
 

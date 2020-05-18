@@ -124,6 +124,10 @@ impl HWndRef<'_> {
         self.wnd.focused_view.borrow().clone()
     }
 
+    pub(super) fn borrow_focused_view(&self) -> impl std::ops::Deref<Target = Option<HView>> + '_ {
+        self.wnd.focused_view.borrow()
+    }
+
     /// Raise `focus_(lost|leave|enter|got)` events as response to a change in
     /// the window's focus state.
     pub(super) fn raise_view_focus_events_for_wnd_focus_state_change(self) {
@@ -329,6 +333,24 @@ impl HViewRef<'_> {
             }
         } else {
             false
+        }
+    }
+
+    /// Get a flag indicating whether the view should receive a keyboard focus
+    /// based on the strong focus policy, in which a view may receive a keyboard
+    /// focus by clicking.
+    pub(super) fn has_strong_focus_policy(self) -> bool {
+        if self.view.flags.get().contains(ViewFlags::TAB_STOP) {
+            self.view.flags.get().contains(ViewFlags::STRONG_FOCUS)
+        } else {
+            let maybe_superview = (self.view.superview.borrow())
+                .view()
+                .and_then(|weak| weak.upgrade());
+            if let Some(superview) = maybe_superview {
+                HView { view: superview }.as_ref().has_strong_focus_policy()
+            } else {
+                false
+            }
         }
     }
 

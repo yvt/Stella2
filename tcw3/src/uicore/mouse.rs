@@ -259,8 +259,22 @@ impl HWnd {
 
         if let Some(hit_view) = hit_view {
             if !(hit_view.view.flags.get()).contains(ViewFlags::NO_FOCUS_ON_CLICK) {
-                // Focus the view (if it or its superview accepts a keyboard focus)
-                hit_view.focus();
+                if hit_view.as_ref().has_strong_focus_policy() {
+                    // Focus the view (if it or its superview accepts a keyboard focus)
+                    hit_view.focus();
+                } else {
+                    // If the currently focused view doesn't follow the strong
+                    // focus policy, steal the focus.
+                    let should_steal =
+                        if let Some(focused_view) = &*self.as_ref().borrow_focused_view() {
+                            !(focused_view.view.flags.get()).contains(ViewFlags::STRONG_FOCUS)
+                        } else {
+                            false
+                        };
+                    if should_steal {
+                        self.set_focused_view(None);
+                    }
+                }
             }
 
             // Call the view's drag event handler

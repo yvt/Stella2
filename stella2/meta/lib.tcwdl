@@ -173,7 +173,8 @@ comp crate::view::MainView {
         view_flags = {
             // `ACCEPT_MOUSE_OVER`: Make `set_cursor_shape` work
             ViewFlags::default() | ViewFlags::ACCEPT_MOUSE_OVER |
-                ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP
+                ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::TAB_STOP |
+                ViewFlags::STRONG_FOCUS
         },
         class_set = elem_id::EDITOR_FIELD,
         auto_class_set = ClassSet::FOCUS,

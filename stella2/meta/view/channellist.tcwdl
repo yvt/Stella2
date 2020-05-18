@@ -17,8 +17,8 @@ pub(crate) comp crate::view::channellist::ChannelListView {
     const style_manager: &Manager { pub set; get clone; }
 
     const view { pub get borrow; } = HView::new! {
-        flags = ViewFlags::default() |
-            ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG,
+        flags = ViewFlags::default() | ViewFlags::TAB_STOP |
+        ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::STRONG_FOCUS,
         layout = tcw3::ui::layouts::FillLayout::new(get!(table.view)),
     };
     const style_elem: theming::HElem { pub get clone; } = get!(&elem).helem();

@@ -491,7 +491,49 @@ fn access_focus_state_in_handler(twm: &dyn TestingWm) {
 
 #[use_testing_wm]
 #[test]
-fn focus_on_click(twm: &dyn TestingWm) {
+fn focus_on_click_strong_focus(twm: &dyn TestingWm) {
+    let wm = twm.wm();
+    let wnd = HWnd::new(wm);
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+
+    macro_rules! flush_and_assert_events {
+        ($expected:expr) => {
+            twm.step_unsend();
+            assert_eq!(replace(&mut *events.borrow_mut(), Vec::new()), $expected);
+        };
+    }
+
+    let view0 =
+        HView::new(ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::STRONG_FOCUS);
+    view0.set_listener(RecordingViewListener(0, events.clone()));
+
+    wnd.content_view()
+        .set_layout(new_layout(Some(view0.clone())));
+    view0.set_layout(EmptyLayout::new(
+        SizeTraits::default().with_preferred([20.0; 2].into()),
+    ));
+
+    wnd.set_visibility(true);
+    twm.step_unsend();
+
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
+    flush_and_assert_events!([]);
+
+    // Click `view0`
+    let _drag = twm.raise_mouse_drag(&pal_hwnd, view0.global_frame().mid(), 0);
+
+    flush_and_assert_events!([(0, Event::FocusEnter), (0, Event::FocusGot),]);
+}
+
+#[use_testing_wm]
+#[test]
+fn focus_on_click_weak_focus(twm: &dyn TestingWm) {
     let wm = twm.wm();
     let wnd = HWnd::new(wm);
 
@@ -527,5 +569,6 @@ fn focus_on_click(twm: &dyn TestingWm) {
     // Click `view0`
     let _drag = twm.raise_mouse_drag(&pal_hwnd, view0.global_frame().mid(), 0);
 
-    flush_and_assert_events!([(0, Event::FocusEnter), (0, Event::FocusGot),]);
+    // It doesn't have `STRONG_FOCUS`, so it shouldn't receive a keyboard focus
+    flush_and_assert_events!([]);
 }
