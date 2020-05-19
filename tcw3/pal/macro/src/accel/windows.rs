@@ -47,7 +47,7 @@ fn gen_key_binding<'a>(
 
     let vk = match pat.key {
         // `WinUser.h`
-        Key::Char(c @ 'a'..='z') | Key::Char(c @ '0'..='9') => {
+        Key::Char(c @ 'a'..='z') | Key::Char(c @ '0'..='9') | Key::Char(c @ ' ') => {
             let val = c.to_ascii_uppercase() as u32;
             let val: u16 = val.try_into().unwrap();
             quote::quote! { #val }
