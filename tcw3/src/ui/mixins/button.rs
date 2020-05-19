@@ -5,8 +5,9 @@ use flags_macro::flags;
 use std::{cell::Cell, rc::Rc};
 
 use crate::{
+    pal,
     pal::Wm,
-    uicore::{HViewRef, MouseDragListener},
+    uicore::{HViewRef, KeyEvent, MouseDragListener},
 };
 
 /// A view listener mix-in that allows the client to implement the behaviour of
@@ -37,6 +38,13 @@ bitflags! {
     struct StateFlags: u8 {
         const DRAG = 1;
         const PRESS = 1 << 1;
+        const KEY_PRESS = 1 << 2;
+    }
+}
+
+impl StateFlags {
+    fn is_pressed(self) -> bool {
+        self.intersects(StateFlags::PRESS | StateFlags::KEY_PRESS)
     }
 }
 
@@ -56,6 +64,24 @@ impl ButtonMixin {
         }
     }
 
+    /// Handles [`ViewListener::focus_leave`].
+    ///
+    /// [`ViewListener::focus_leave`]: crate::uicore::ViewListener::focus_leave
+    pub fn focus_leave(
+        &self,
+        wm: Wm,
+        view: HViewRef<'_>,
+        listener: Box<dyn ButtonListener + 'static>,
+    ) {
+        // Cancel key press
+        self.inner.set_state(
+            &*listener,
+            wm,
+            view,
+            self.inner.state.get() - StateFlags::KEY_PRESS,
+        );
+    }
+
     /// Handles [`ViewListener::mouse_drag`].
     ///
     /// [`ViewListener::mouse_drag`]: crate::uicore::ViewListener::mouse_drag
@@ -69,6 +95,51 @@ impl ButtonMixin {
         })
     }
 
+    pub fn key_down(
+        &self,
+        wm: Wm,
+        view: HViewRef<'_>,
+        e: &KeyEvent<'_>,
+        listener: Box<dyn ButtonListener + 'static>,
+    ) -> bool {
+        if e.translate_accel(&ACCEL_TABLE) == Some(ACTION_PRESS) {
+            self.inner.set_state(
+                &*listener,
+                wm,
+                view,
+                self.inner.state.get() | StateFlags::KEY_PRESS,
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn key_up(
+        &self,
+        wm: Wm,
+        view: HViewRef<'_>,
+        e: &KeyEvent<'_>,
+        listener: Box<dyn ButtonListener + 'static>,
+    ) -> bool {
+        if e.translate_accel(&ACCEL_TABLE) == Some(ACTION_PRESS) {
+            if self.inner.state.get().contains(StateFlags::KEY_PRESS) {
+                self.inner.set_state(
+                    &*listener,
+                    wm,
+                    view,
+                    self.inner.state.get() - StateFlags::KEY_PRESS,
+                );
+                listener.activate(wm, view);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     /// Get a flag indicating if the push button is currently pressed.
     ///
     /// This method returns `true` if the push button is currently pressed down
@@ -78,9 +149,13 @@ impl ButtonMixin {
     /// button to be drawn. The client should listen to changes in this value by
     /// implementing [`ButtonListener::update`].
     pub fn is_pressed(&self) -> bool {
-        self.inner.state.get().contains(StateFlags::PRESS)
+        self.inner.state.get().is_pressed()
     }
 }
+
+const ACTION_PRESS: pal::ActionId = 0;
+static ACCEL_TABLE: pal::AccelTable =
+    pal::accel_table![(ACTION_PRESS, windows(" "), macos(" "), gtk(" "))];
 
 struct MouseDragListenerImpl {
     inner: Rc<Inner>,
@@ -145,7 +220,7 @@ impl Inner {
         view: HViewRef<'_>,
         new_flags: StateFlags,
     ) {
-        let should_call_update = (new_flags ^ self.state.get()).contains(StateFlags::PRESS);
+        let should_call_update = new_flags.is_pressed() != self.state.get().is_pressed();
         self.state.set(new_flags);
         if should_call_update {
             listener.update(wm, view);

@@ -11,7 +11,7 @@ use crate::{
         theming::{roles, ClassSet, HElem, Manager, StyledBox, Widget},
         views::Label,
     },
-    uicore::{HView, HViewRef, Sub, ViewFlags, ViewListener},
+    uicore::{HView, HViewRef, KeyEvent, Sub, ViewFlags, ViewListener},
 };
 
 /// A push button widget.
@@ -136,7 +136,21 @@ struct ButtonViewListener {
     inner: Rc<Inner>,
 }
 
+impl ButtonViewListener {
+    fn build_button_mixin_listener(&self) -> Box<dyn crate::ui::mixins::button::ButtonListener> {
+        Box::new(ButtonMixinListener {
+            inner: Rc::clone(&self.inner),
+        })
+    }
+}
+
 impl ViewListener for ButtonViewListener {
+    fn focus_leave(&self, wm: pal::Wm, view: HViewRef<'_>) {
+        self.inner
+            .button_mixin
+            .focus_leave(wm, view, self.build_button_mixin_listener())
+    }
+
     fn mouse_drag(
         &self,
         _: pal::Wm,
@@ -146,9 +160,19 @@ impl ViewListener for ButtonViewListener {
     ) -> Box<dyn crate::uicore::MouseDragListener> {
         self.inner
             .button_mixin
-            .mouse_drag(Box::new(ButtonMixinListener {
-                inner: Rc::clone(&self.inner),
-            }))
+            .mouse_drag(self.build_button_mixin_listener())
+    }
+
+    fn key_down(&self, wm: pal::Wm, view: HViewRef<'_>, e: &KeyEvent<'_>) -> bool {
+        self.inner
+            .button_mixin
+            .key_down(wm, view, e, self.build_button_mixin_listener())
+    }
+
+    fn key_up(&self, wm: pal::Wm, view: HViewRef<'_>, e: &KeyEvent<'_>) -> bool {
+        self.inner
+            .button_mixin
+            .key_up(wm, view, e, self.build_button_mixin_listener())
     }
 }
 
