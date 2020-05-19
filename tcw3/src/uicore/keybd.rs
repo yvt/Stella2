@@ -9,8 +9,8 @@ impl HWndRef<'_> {
     /// Focus the specified view.
     ///
     /// If `new_focused_view` does not have `TAB_STOP`, the method searches for
-    /// a closest view with `TAB_STOP` from `new_focused_view`'s ancestors. If
-    /// there isn't such a view, this method does nothing.
+    /// a closest view with `TAB_STOP` from `new_focused_view`'s children and
+    /// ancestors. If there isn't such a view, this method does nothing.
     pub fn set_focused_view(self, mut new_focused_view: Option<HView>) {
         let focused_view_cell = self.wnd.focused_view.borrow();
 
@@ -28,24 +28,15 @@ impl HWndRef<'_> {
             );
 
             // Find the closest view with `TAB_STOP`
-            loop {
-                if view.view.flags.get().contains(ViewFlags::TAB_STOP) {
-                    break;
-                }
-
-                let maybe_superview = (view.view.superview.borrow())
-                    .view()
-                    .and_then(|weak| weak.upgrade());
-                if let Some(superview) = maybe_superview {
-                    *view = HView { view: superview };
-                } else {
-                    trace!(
-                        "{:?}: Rejecting `set_focused_view` because the view \
-                        doesn't have a focusable ancestor",
-                        self
-                    );
-                    return;
-                }
+            if let Some(focusable_view) = view.as_ref().closest_focusable_view() {
+                *view = focusable_view;
+            } else {
+                trace!(
+                    "{:?}: Rejecting `set_focused_view` because the system \
+                        couldn't find a closest focusable view",
+                    self
+                );
+                return;
             }
         }
 
@@ -336,21 +327,47 @@ impl HViewRef<'_> {
         }
     }
 
+    /// If `self` has `TAB_STOP`, return `self`. Otherwise, this method searches
+    /// for a closest view with `TAB_STOP` from `self`'s children and ancestors.
+    fn closest_focusable_view(self) -> Option<HView> {
+        if self.view.flags.get().contains(ViewFlags::TAB_STOP) {
+            return Some(self.cloned());
+        }
+
+        if let Some(focusable_view) = self.tab_order_local_next_view() {
+            return Some(focusable_view);
+        }
+
+        let mut view = self.cloned();
+        loop {
+            if view.view.flags.get().contains(ViewFlags::TAB_STOP) {
+                return Some(view);
+            }
+
+            let maybe_superview = (view.view.superview.borrow())
+                .view()
+                .and_then(|weak| weak.upgrade());
+            if let Some(superview) = maybe_superview {
+                view = HView { view: superview };
+            } else {
+                trace!(
+                    "{:?}: Rejecting `set_focused_view` because the view \
+                    doesn't have a focusable ancestor",
+                    self
+                );
+                return None;
+            }
+        }
+    }
+
     /// Get a flag indicating whether the view should receive a keyboard focus
     /// based on the strong focus policy, in which a view may receive a keyboard
     /// focus by clicking.
     pub(super) fn has_strong_focus_policy(self) -> bool {
-        if self.view.flags.get().contains(ViewFlags::TAB_STOP) {
-            self.view.flags.get().contains(ViewFlags::STRONG_FOCUS)
+        if let Some(view) = self.closest_focusable_view() {
+            view.view.flags.get().contains(ViewFlags::STRONG_FOCUS)
         } else {
-            let maybe_superview = (self.view.superview.borrow())
-                .view()
-                .and_then(|weak| weak.upgrade());
-            if let Some(superview) = maybe_superview {
-                HView { view: superview }.as_ref().has_strong_focus_policy()
-            } else {
-                false
-            }
+            false
         }
     }
 

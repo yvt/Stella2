@@ -110,7 +110,7 @@ impl HViewRef<'_> {
 
     /// In the tab order, find the first view following `self` but not after
     /// all subviews of `self`.
-    fn tab_order_local_next_view(self) -> Option<HView> {
+    pub(super) fn tab_order_local_next_view(self) -> Option<HView> {
         if let Some(first_last_children) = self
             .view
             .focus_link_override

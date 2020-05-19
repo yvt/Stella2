@@ -112,9 +112,14 @@ fn focus_evts(twm: &dyn TestingWm) {
 
     flush_and_assert_events!([]);
 
-    // `view0` does not have `TAB_STOP`, so it won't accept a keyboard focus
+    // `view0` does not have `TAB_STOP`. The first view having `TAB_STOP` in the
+    // tab order is `view1`.
     view0.focus();
-    flush_and_assert_events!([]);
+    flush_and_assert_events!([
+        (0, Event::FocusEnter),
+        (1, Event::FocusEnter),
+        (1, Event::FocusGot),
+    ]);
 
     // `view5` doesn't have `TAB_STOP`, so `view2` instead receives a keyboard
     // focus. `view2` has a keyboard focus, which is a child of `view1`.
@@ -122,8 +127,7 @@ fn focus_evts(twm: &dyn TestingWm) {
     // `focus_enter`.
     view5.focus();
     flush_and_assert_events!([
-        (0, Event::FocusEnter),
-        (1, Event::FocusEnter),
+        (1, Event::FocusLost),
         (2, Event::FocusEnter),
         (2, Event::FocusGot),
     ]);
