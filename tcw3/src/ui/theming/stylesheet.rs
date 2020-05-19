@@ -1018,13 +1018,27 @@ lazy_static! {
 
         // Slider knob
         ([#SLIDER_KNOB] < [.SLIDER]) (priority = 100) {
-            num_layers: 1,
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB)),
+            num_layers: 2,
+
+            // Focus ring
+            #[dyn] layer_img[0]: Some(himg_from_figures_with_size(
+                figures![rect(FOCUS_RING_COLOR).radius(SLIDER_KNOB_SIZE)],
+                [SLIDER_KNOB_SIZE + 2.0; 2],
+            )),
+            layer_metrics[0]: Metrics {
+                margin: [-1.0; 4],
+                ..Metrics::default()
+            },
+            layer_opacity[0]: 0.0,
+
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::SLIDER_KNOB)),
             min_size: Vector2::new(SLIDER_KNOB_SIZE, SLIDER_KNOB_SIZE),
         },
-
+        ([#SLIDER_KNOB] < [.SLIDER.FOCUS]) (priority = 150) {
+            layer_opacity[0]: 1.0,
+        },
         ([#SLIDER_KNOB] < [.SLIDER.ACTIVE]) (priority = 150) {
-            #[dyn] layer_img[0]: Some(recolor_tint(&assets::SLIDER_KNOB_ACT)),
+            #[dyn] layer_img[1]: Some(recolor_tint(&assets::SLIDER_KNOB_ACT)),
         },
 
         // Slider tick marks

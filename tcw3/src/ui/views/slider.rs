@@ -141,7 +141,10 @@ struct LayoutState {
 
 impl Slider {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
-        let frame = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
+        let frame = StyledBox::new(
+            style_manager,
+            ViewFlags::ACCEPT_MOUSE_OVER | ViewFlags::TAB_STOP,
+        );
         frame.set_class_set(if vertical {
             ClassSet::SLIDER | ClassSet::VERTICAL
         } else {
