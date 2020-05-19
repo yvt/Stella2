@@ -69,6 +69,7 @@ fn gen_key_binding<'a>(
         Key::Char('x') => &["x", "X"],
         Key::Char('y') => &["y", "Y"],
         Key::Char('z') => &["z", "Z"],
+        Key::Char(' ') => &["space"],
         Key::Escape => &["Escape"],
         Key::Backspace => &["BackSpace"],
         Key::Return => &["Return"],
