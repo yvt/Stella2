@@ -1,5 +1,4 @@
 use array::Array2;
-use flags_macro::flags;
 use log::trace;
 use std::{
     cell::{Cell, RefCell},
@@ -773,13 +772,12 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             if let Some(action) = action {
                 // The action was found. Can the window handle it?
                 let status = listener.validate_action(wm, &pal_hwnd, action);
-                if !status.contains(flags![iface::ActionStatus::{VALID | ENABLED}]) {
+                if status.contains(iface::ActionStatus::VALID) {
+                    if status.contains(iface::ActionStatus::ENABLED) {
+                        listener.perform_action(wm, &pal_hwnd, action);
+                    }
                     return 0;
                 }
-
-                listener.perform_action(wm, &pal_hwnd, action);
-
-                return 0;
             }
 
             let handled = listener.key_down(wm, &pal_hwnd, &KeyEvent { key, mod_flags });
