@@ -1,5 +1,4 @@
 use cgmath::{Point2, Vector2};
-use flags_macro::flags;
 use gdk::prelude::*;
 use glib::{
     glib_object_wrapper, glib_wrapper,
@@ -638,13 +637,13 @@ extern "C" fn tcw_wnd_widget_key_press_handler(
         if let Some(action) = action {
             // The action was found. Can the window handle it?
             let status = listener.validate_action(wm, &hwnd, action);
-            if !status.contains(flags![iface::ActionStatus::{VALID | ENABLED}]) {
+            if status.contains(iface::ActionStatus::VALID) {
+                if status.contains(iface::ActionStatus::ENABLED) {
+                    listener.perform_action(wm, &hwnd, action);
+                    return 1; // Handled
+                }
                 return 0;
             }
-
-            listener.perform_action(wm, &hwnd, action);
-
-            return 1; // Handled
         }
 
         let handled = listener.key_down(wm, &hwnd, &KeyEvent { keyval, mod_flags });
