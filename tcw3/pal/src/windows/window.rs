@@ -307,14 +307,21 @@ pub fn set_wnd_attr(_: Wm, pal_hwnd: &HWnd, attrs: WndAttrs<'_>) {
             }
 
             // Calculate the outer size
-            unsafe {
-                let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
-                let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
+            if !pal_hwnd
+                .wnd
+                .flags
+                .get()
+                .contains(iface::WndFlags::FULL_SIZE_CONTENT)
+            {
+                unsafe {
+                    let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
+                    let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
 
-                assert_win32_ok(winuser::AdjustWindowRectExForDpi(
-                    &mut rect, style, 0, // the window doesn't have a menu
-                    exstyle, dpi,
-                ));
+                    assert_win32_ok(winuser::AdjustWindowRectExForDpi(
+                        &mut rect, style, 0, // the window doesn't have a menu
+                        exstyle, dpi,
+                    ));
+                }
             }
 
             // Resize the window
@@ -660,7 +667,10 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             let orig_size = get_wnd_size(wm, &pal_hwnd);
 
             // Calculate the outer size using the new DPI
-            let req_size = log_inner_to_phy_outer(hwnd, new_dpi, orig_size);
+            let should_adjust_for_border =
+                !(pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT);
+            let req_size =
+                log_inner_to_phy_outer(hwnd, new_dpi, orig_size, should_adjust_for_border);
 
             trace!(
                 "Received WM_GETDPISCALEDSIZE (new_dpi = {:?}, suggested_size = {:?}). Returning {:?}",
@@ -679,8 +689,20 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             use std::cmp::{max, min};
             let mut mmi = unsafe { &mut *(lparam as *mut winuser::MINMAXINFO) };
             let dpi = unsafe { winuser::GetDpiForWindow(hwnd) } as u32;
-            let min_size = log_inner_to_phy_outer(hwnd, dpi, pal_hwnd.wnd.min_size.get());
-            let max_size = log_inner_to_phy_outer(hwnd, dpi, pal_hwnd.wnd.max_size.get());
+            let should_adjust_for_border =
+                !(pal_hwnd.wnd.flags.get()).contains(iface::WndFlags::FULL_SIZE_CONTENT);
+            let min_size = log_inner_to_phy_outer(
+                hwnd,
+                dpi,
+                pal_hwnd.wnd.min_size.get(),
+                should_adjust_for_border,
+            );
+            let max_size = log_inner_to_phy_outer(
+                hwnd,
+                dpi,
+                pal_hwnd.wnd.max_size.get(),
+                should_adjust_for_border,
+            );
 
             mmi.ptMinTrackSize.x = max(mmi.ptMinTrackSize.x, min_size[0]);
             mmi.ptMinTrackSize.y = max(mmi.ptMinTrackSize.y, min_size[1]);
@@ -1139,7 +1161,12 @@ fn lparam_to_mouse_loc(hwnd: HWND, lparam: LPARAM, is_screen: bool) -> cgmath::P
 }
 
 /// Calculate the physical outer size for a given logical inner size.
-fn log_inner_to_phy_outer(hwnd: HWND, dpi: u32, size: [u32; 2]) -> [i32; 2] {
+fn log_inner_to_phy_outer(
+    hwnd: HWND,
+    dpi: u32,
+    size: [u32; 2],
+    should_adjust_for_border: bool,
+) -> [i32; 2] {
     unsafe {
         let phy_size = size.map(|i| log_to_phy(i, dpi));
         let mut rect = RECT {
@@ -1151,10 +1178,12 @@ fn log_inner_to_phy_outer(hwnd: HWND, dpi: u32, size: [u32; 2]) -> [i32; 2] {
         let style = winuser::GetWindowLongW(hwnd, winuser::GWL_STYLE) as _;
         let exstyle = winuser::GetWindowLongW(hwnd, winuser::GWL_EXSTYLE) as _;
 
-        assert_win32_ok(winuser::AdjustWindowRectExForDpi(
-            &mut rect, style, 0, // the window doesn't have a menu
-            exstyle, dpi,
-        ));
+        if should_adjust_for_border {
+            assert_win32_ok(winuser::AdjustWindowRectExForDpi(
+                &mut rect, style, 0, // the window doesn't have a menu
+                exstyle, dpi,
+            ));
+        }
 
         [rect.right - rect.left, rect.bottom - rect.top]
     }
