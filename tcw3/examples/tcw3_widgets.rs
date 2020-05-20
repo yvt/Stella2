@@ -155,7 +155,12 @@ fn main() {
         });
     }
     {
-        // TODO
+        let slider_weak = Rc::downgrade(&slider);
+        slider.set_on_step(move |_, dir| {
+            let slider = slider_weak.upgrade().unwrap();
+            let value = slider.value() + dir as i8 as f64 * 0.2;
+            slider.set_value(value.max(0.0).min(1.0));
+        });
     }
 
     let slider = {

@@ -20,7 +20,9 @@ use crate::{
             PropKindFlags, Role, StyledBox, StyledBoxOverride, Widget,
         },
     },
-    uicore::{HView, HViewRef, HWndRef, MouseDragListener, UpdateCtx, ViewFlags, ViewListener},
+    uicore::{
+        HView, HViewRef, HWndRef, KeyEvent, MouseDragListener, UpdateCtx, ViewFlags, ViewListener,
+    },
     utils::resetiter,
 };
 
@@ -549,6 +551,33 @@ struct SlViewListener {
 }
 
 impl ViewListener for SlViewListener {
+    fn key_down(&self, wm: pal::Wm, _: HViewRef<'_>, e: &KeyEvent<'_>) -> bool {
+        let shared = if let Some(shared) = self.shared.upgrade() {
+            shared
+        } else {
+            return false;
+        };
+
+        let is_view_vertical = if shared.vertical {
+            ACTION_BIT_VERTICAL
+        } else {
+            0
+        };
+        match e.translate_accel(&ACCEL_TABLE) {
+            Some(action) if (action & ACTION_BIT_VERTICAL) == is_view_vertical => {
+                let dir = if (action & ACTION_BIT_INCR) != 0 {
+                    Dir::Incr
+                } else {
+                    Dir::Decr
+                };
+
+                shared.on_step.borrow()(wm, dir);
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn mouse_drag(
         &self,
         _: pal::Wm,
@@ -567,6 +596,20 @@ impl ViewListener for SlViewListener {
         }
     }
 }
+
+const ACTION_BIT_VERTICAL: pal::ActionId = 1;
+const ACTION_BIT_INCR: pal::ActionId = 1 << 1;
+const ACTION_LEFT: pal::ActionId = 0;
+const ACTION_RIGHT: pal::ActionId = ACTION_BIT_INCR;
+const ACTION_UP: pal::ActionId = ACTION_BIT_VERTICAL;
+const ACTION_BOTTOM: pal::ActionId = ACTION_BIT_VERTICAL | ACTION_BIT_INCR;
+
+static ACCEL_TABLE: pal::AccelTable = pal::accel_table![
+    (ACTION_LEFT, windows("Left"), macos("Left"), gtk("Left")),
+    (ACTION_RIGHT, windows("Right"), macos("Right"), gtk("Right")),
+    (ACTION_UP, windows("Up"), macos("Up"), gtk("Up")),
+    (ACTION_BOTTOM, windows("Down"), macos("Down"), gtk("Down")),
+];
 
 /// Implements `MouseDragListener` for `Slider`.
 struct SlMouseDragListener {
