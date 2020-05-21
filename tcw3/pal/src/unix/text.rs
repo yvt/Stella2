@@ -3,7 +3,6 @@ use cggeom::{box2, Box2};
 use cgmath::Point2;
 use flags_macro::flags;
 use pango::{FontDescription, FontMapExt, Layout, LayoutLine};
-use pango_sys::PangoLogAttr;
 use rgb::RGBA16;
 use std::{
     convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, os::raw::c_uint, sync::Mutex,
@@ -526,11 +525,11 @@ fn point_to_pango_xy(x: Point2<f32>) -> [i32; 2] {
 }
 
 trait LayoutExt {
-    fn get_log_attrs_readonly(&self) -> &[PangoLogAttr];
+    fn get_log_attrs_readonly(&self) -> &[LogAttrFlags];
 }
 
 impl LayoutExt for Layout {
-    fn get_log_attrs_readonly(&self) -> &[PangoLogAttr] {
+    fn get_log_attrs_readonly(&self) -> &[LogAttrFlags] {
         use glib::translate::ToGlibPtr;
         unsafe {
             let mut count = MaybeUninit::uninit();
@@ -542,7 +541,7 @@ impl LayoutExt for Layout {
             let count = count.assume_init().try_into().expect("integer overflow");
             debug_assert_ne!(count, 0);
 
-            std::slice::from_raw_parts(attrs, count)
+            std::slice::from_raw_parts(attrs as *const LogAttrFlags, count)
         }
     }
 }
@@ -603,23 +602,31 @@ impl GlyphStringExt for pango::GlyphString {
     }
 }
 
-trait PangoLogAttrExt {
-    fn intersects(&self, flags: LogAttrFlags) -> bool;
+#[cfg(target_endian = "little")]
+const fn bitfield_flag(i: u32) -> c_uint {
+    1 << i
 }
 
-impl PangoLogAttrExt for pango_sys::PangoLogAttr {
-    fn intersects(&self, flags: LogAttrFlags) -> bool {
-        (self.is_line_break & flags.bits() as c_uint) != 0
-    }
+#[cfg(target_endian = "big")]
+const fn bitfield_flag(i: u32) -> c_uint {
+    const C_UINT_BITS: u32 = (std::mem::size_of::<c_uint>() / 8) as u32;
+    1 << (C_UINT_BITS - 1 - i)
 }
 
-// <https://developer.gnome.org/pango/stable/pango-Text-Processing.html#PangoLogAttr>
 bitflags::bitflags! {
-    struct LogAttrFlags: u32 {
-        const MANDATORY_BREAK = 1 << 1;
-        const CURSOR_POSITION = 1 << 4;
-        const WORD_START = 1 << 5;
-        const WORD_END = 1 << 6;
+    /// `PangoLogAttr`
+    ///
+    /// GTK documentation:
+    /// <https://developer.gnome.org/pango/stable/pango-Text-Processing.html#PangoLogAttr>
+    ///
+    /// gtk-rs/gir (automatic binding generator for gtk-rs) currently don't
+    /// support structs with bitfields (https://github.com/gtk-rs/gir/issues/465)
+    /// and translates them to incorrectly-sized `struct`s.
+    struct LogAttrFlags: c_uint {
+        const MANDATORY_BREAK = bitfield_flag(1);
+        const CURSOR_POSITION = bitfield_flag(4);
+        const WORD_START = bitfield_flag(5);
+        const WORD_END = bitfield_flag(6);
     }
 }
 
@@ -637,5 +644,38 @@ impl FontDescExt for FontDescription {
                 family.as_ptr(),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::{CharStyle as _, TextLayout as _};
+
+    /// Verifies the layout of `LogAttrFlags` by checking if `CURSOR_POSITION`
+    /// is set for all expected cursor positions.
+    #[test]
+    fn log_attrs_cursor_position() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let char_style = CharStyle::new(CharStyleAttrs {
+            sys: Some(iface::SysFontType::Normal),
+            ..Default::default()
+        });
+
+        let layout = TextLayout::from_text("friendship", &char_style, None);
+        let pango_layout = layout.lock_layout();
+        let log_attrs = pango_layout.get_log_attrs_readonly();
+        log::debug!(
+            "attrs = {:#?}",
+            log_attrs
+                .iter()
+                .map(|a| format!("{:032b}", a))
+                .collect::<Vec<_>>()
+        );
+
+        assert!(log_attrs
+            .iter()
+            .all(|a| a.intersects(LogAttrFlags::CURSOR_POSITION)));
     }
 }
