@@ -141,10 +141,12 @@ impl HViewRef<'_> {
     /// certain circumstances. The layout system arranges to make sure that all
     /// views in a window have up-to-date `frame` coordinates before calling
     /// [`ViewListener::position`], a handler method for detecting changes in
-    /// `frame`. Thus, `ViewListener::position` is the only place where the
-    /// final value of `frame` can be retrieved reliably.
+    /// `frame`. Thus, `ViewListener::position` and [`ViewListener::update`]
+    /// (which is pended as necessary by `position`) are the only place where
+    /// the final value of `frame` can be retrieved reliably.
     ///
     /// [`ViewListener::position`]: crate::uicore::ViewListener::position
+    /// [`ViewListener::update`]: crate::uicore::ViewListener::update
     pub fn frame(self) -> Box2<f32> {
         self.view.frame.get()
     }
