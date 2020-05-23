@@ -528,7 +528,7 @@ impl EntryCoreListener {
     }
 
     fn handle_move(&self, view: HViewRef<'_>, selecting: bool, get_new_pos: MoveHandler) {
-        update_sel_range(view, RcBorrow::from(&self.inner), |state| {
+        update_state(view, RcBorrow::from(&self.inner), &mut |state| {
             log::trace!("... original sel_range = {:?}", state.sel_range);
 
             state.ensure_text_layout(&self.inner.style_elem);
@@ -553,6 +553,7 @@ impl EntryCoreListener {
             state.history.mark_logical_op_break();
 
             log::trace!("... new sel_range = {:?}", state.sel_range);
+            UpdateStateFlags::SEL
         });
     }
 
@@ -780,15 +781,16 @@ impl ViewListener for EntryCoreListener {
         match action {
             actions::SELECT_ALL | actions::SELECT_LINE | actions::SELECT_PARAGRAPH => {
                 log::trace!("Handling a 'select all' command (SELECT_ALL, etc.)");
-                update_sel_range(view, RcBorrow::from(&self.inner), |state| {
+                update_state(view, RcBorrow::from(&self.inner), &mut |state| {
                     log::trace!("... original sel_range = {:?}", state.sel_range);
                     state.sel_range = [0, state.text.len()];
                     log::trace!("... new sel_range = {:?}", state.sel_range);
+                    UpdateStateFlags::SEL
                 });
             }
             actions::SELECT_WORD => {
                 log::trace!("Handling SELECT_WORD");
-                update_sel_range(view, RcBorrow::from(&self.inner), |state| {
+                update_state(view, RcBorrow::from(&self.inner), &mut |state| {
                     state.ensure_text_layout(&self.inner.style_elem);
                     let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
                     let [mut start, mut end] = state.sel_range;
@@ -803,6 +805,7 @@ impl ViewListener for EntryCoreListener {
 
                     state.sel_range = [start, end];
                     log::trace!("... new sel_range = {:?}", state.sel_range);
+                    UpdateStateFlags::SEL
                 });
             }
             actions::COPY => {
@@ -1420,20 +1423,6 @@ bitflags::bitflags! {
     }
 }
 
-/// Update the selection using a given closure. This method mustn't be used
-/// in an implementation of `TextInputCtxEdit` because it calls
-/// `text_input_ctx_on_selection_change`.
-fn update_sel_range(
-    hview: HViewRef<'_>,
-    inner: RcBorrow<'_, Inner>,
-    mut f: impl FnMut(&mut State),
-) {
-    update_state(hview, inner, &mut move |state| {
-        f(state);
-        UpdateStateFlags::SEL
-    });
-}
-
 /// Update the text and/or selection using a given closure. This method mustn't
 /// be used in an implementation of `TextInputCtxEdit` because it calls
 /// `text_input_ctx_on_selection_change` and/or `text_input_ctx_reset`.
@@ -1528,12 +1517,13 @@ impl EntryCoreDragListener {
     }
 
     fn update_selection(&self, mut f: impl FnMut(&mut State)) {
-        update_sel_range(
+        update_state(
             self.view.as_ref(),
             RcBorrow::from(&self.inner),
-            move |state| {
+            &mut move |state| {
                 state.history.mark_logical_op_break();
                 f(state);
+                UpdateStateFlags::SEL
             },
         );
     }
