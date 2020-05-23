@@ -17,14 +17,11 @@ pub comp crate::ui::views::SpacerWidget {
 
     /// Retrieves `HView` representing the widget.
     pub const view = HView::new! {
-        layout = EmptyLayout::new! {
-            // FIXME: `const` can't use values from `prop`
-            size_traits = crate::uicore::SizeTraits {
-                min: get!(min),
-                max: get!(max),
-                preferred: get!(preferred),
-            },
-        },
+        layout = EmptyLayout::new(SizeTraits {
+            min: get!(min),
+            max: get!(max),
+            preferred: get!(preferred),
+        }),
     };
 }
 
