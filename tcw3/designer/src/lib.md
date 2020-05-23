@@ -300,8 +300,8 @@ restrictions on the kinds of the inputs' referents:
    nothing at the moment.
  - **`#[builder(simple)]`** changes the builder API to the simple builder
    API often used by standard widgets. Because Designer does not support
-   generating the code generation for the simple builder API,
-   **`#[prototype_only]` must also be specified**.
+   code generation for the simple builder API, **`#[prototype_only]` must also
+   be specified**.
 
 ## Lifetime Elision
 
