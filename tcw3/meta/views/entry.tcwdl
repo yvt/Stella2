@@ -4,6 +4,7 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
 #[widget]
 #[builder(simple)]
 pub comp crate::ui::views::Entry {
+    const wm: crate::pal::Wm { pub set; }
     const style_manager: &Manager { pub set; }
 
     prop class_set: ClassSet { pub set; get clone; } = ?;
@@ -18,6 +19,7 @@ pub comp crate::ui::views::Entry {
 #[widget]
 #[builder(simple)]
 pub comp crate::ui::views::EntryCore {
+    const wm: crate::pal::Wm { pub set; }
     const style_manager: &Manager { pub set; }
 
     const view: HView { pub get clone; } = ?;

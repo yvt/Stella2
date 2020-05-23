@@ -169,7 +169,7 @@ fn main() {
         view
     };
 
-    let entry = Entry::new(style_manager);
+    let entry = Entry::new(wm, style_manager);
 
     let button = Button::new(style_manager);
     button.set_caption("Please don't touch this button");

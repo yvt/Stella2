@@ -30,7 +30,7 @@ fn text_input_ctx_activation(twm: &dyn TestingWm) {
 
     let style_manager = Manager::global(wm);
 
-    let entry = Entry::new(style_manager);
+    let entry = Entry::new(wm, style_manager);
     let empty_view =
         HView::new(ViewFlags::TAB_STOP | ViewFlags::ACCEPT_MOUSE_DRAG | ViewFlags::STRONG_FOCUS);
     empty_view.set_layout(EmptyLayout::new(

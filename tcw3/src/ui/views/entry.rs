@@ -40,8 +40,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(style_manager: &'static theming::Manager) -> Self {
-        let core = EntryCore::new(style_manager);
+    pub fn new(wm: pal::Wm, style_manager: &'static theming::Manager) -> Self {
+        let core = EntryCore::new(wm, style_manager);
 
         let styled_box = theming::StyledBox::new(style_manager, ViewFlags::default());
         styled_box.set_class_set(ClassSet::ENTRY);
@@ -111,6 +111,7 @@ pub struct EntryCore {
 
 #[derive(Debug)]
 struct Inner {
+    wm: pal::Wm,
     view: WeakHView,
     state: RefCell<State>,
     style_elem: theming::Elem,
@@ -152,7 +153,7 @@ struct TextLayoutInfo {
 }
 
 impl EntryCore {
-    pub fn new(style_manager: &'static theming::Manager) -> Self {
+    pub fn new(wm: pal::Wm, style_manager: &'static theming::Manager) -> Self {
         let style_elem = theming::Elem::new(style_manager);
         let style_sel_elem = theming::Elem::new(style_manager);
         style_sel_elem.set_class_set(elem_id::TEXT_SELECTION);
@@ -170,6 +171,7 @@ impl EntryCore {
         let this = Self {
             view,
             inner: Rc::new(Inner {
+                wm,
                 view: weak_view,
                 state: RefCell::new(State {
                     text: String::new(),
@@ -288,11 +290,11 @@ impl State {
     /// used while deciding whether the timer should be running or not.
     fn reset_timer(
         &mut self,
-        wm: pal::Wm,
         hview: HViewRef<'_>,
         inner: RcBorrow<'_, Inner>,
         override_focus: Option<bool>,
     ) {
+        let wm = inner.wm;
         if let Some(hinv) = self.caret_blink_timer.take() {
             wm.cancel_invoke(&hinv);
         }
@@ -302,7 +304,7 @@ impl State {
             && self.sel_range[0] == self.sel_range[1];
 
         if should_start_timer {
-            self.caret_blink_timer = Some(self.schedule_timer(wm, RcBorrow::upgrade(inner)));
+            self.caret_blink_timer = Some(self.schedule_timer(RcBorrow::upgrade(inner)));
         } else {
             log::trace!("Not scheduling a deferred invocation because the caret is invisible now");
         }
@@ -310,15 +312,15 @@ impl State {
 
     /// Schedule a deferred invocation which toggles `caret_blink` and get the
     /// handle representing the invocation.
-    fn schedule_timer(&mut self, wm: pal::Wm, inner: Rc<Inner>) -> pal::HInvoke {
+    fn schedule_timer(&mut self, inner: Rc<Inner>) -> pal::HInvoke {
         use std::time::Duration;
 
         log::trace!("Scheduling a deferred invocation for blinking the caret");
 
         // TODO: Retrieve the preferred period from the operating system
-        wm.invoke_after(
+        inner.wm.invoke_after(
             Duration::from_millis(400)..Duration::from_millis(700),
-            move |wm| {
+            move |_| {
                 if let Some(hview) = inner.view.upgrade() {
                     // Toggle the caret's visibility
                     let mut state = inner.state.borrow_mut();
@@ -326,7 +328,7 @@ impl State {
                     hview.pend_update();
 
                     // Schedule the next invocation
-                    state.caret_blink_timer = Some(state.schedule_timer(wm, Rc::clone(&inner)));
+                    state.caret_blink_timer = Some(state.schedule_timer(Rc::clone(&inner)));
                 }
             },
         )
@@ -434,11 +436,10 @@ impl EntryCoreListener {
 
     fn handle_delete(
         &self,
-        wm: pal::Wm,
         view: HViewRef<'_>,
         get_range: fn(usize, &pal::TextLayout, &str) -> usize,
     ) {
-        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+        update_state(view, RcBorrow::from(&self.inner), &mut |state| {
             state.ensure_text_layout(&self.inner.style_elem);
             let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
             let [mut start, mut end] = state.sel_range;
@@ -483,14 +484,8 @@ impl EntryCoreListener {
         });
     }
 
-    fn handle_move(
-        &self,
-        wm: pal::Wm,
-        view: HViewRef<'_>,
-        selecting: bool,
-        get_new_pos: MoveHandler,
-    ) {
-        update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
+    fn handle_move(&self, view: HViewRef<'_>, selecting: bool, get_new_pos: MoveHandler) {
+        update_sel_range(view, RcBorrow::from(&self.inner), |state| {
             log::trace!("... original sel_range = {:?}", state.sel_range);
 
             state.ensure_text_layout(&self.inner.style_elem);
@@ -518,8 +513,8 @@ impl EntryCoreListener {
         });
     }
 
-    fn handle_undo(&self, wm: pal::Wm, view: HViewRef<'_>) {
-        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+    fn handle_undo(&self, view: HViewRef<'_>) {
+        update_state(view, RcBorrow::from(&self.inner), &mut |state| {
             if let Some(edit) = state.history.undo() {
                 log::debug!("Undoing {:?}", edit);
 
@@ -537,8 +532,8 @@ impl EntryCoreListener {
         });
     }
 
-    fn handle_redo(&self, wm: pal::Wm, view: HViewRef<'_>) {
-        update_state(wm, view, RcBorrow::from(&self.inner), &mut |state| {
+    fn handle_redo(&self, view: HViewRef<'_>) {
+        update_state(view, RcBorrow::from(&self.inner), &mut |state| {
             if let Some(edit) = state.history.redo() {
                 log::debug!("Redoing {:?}", edit);
 
@@ -582,7 +577,7 @@ impl ViewListener for EntryCoreListener {
 
         // Stop the caret-blinking timer by specifying
         // `override_focus = Some(false)`.
-        state.reset_timer(wm, view, RcBorrow::from(&self.inner), Some(false));
+        state.reset_timer(view, RcBorrow::from(&self.inner), Some(false));
 
         drop(state);
 
@@ -606,7 +601,7 @@ impl ViewListener for EntryCoreListener {
         // `hview.is_focused() returns `true` at this point, so `reset_timer`
         // will think the view is not focused yet. Override this behavior by
         // specifying `override_focus = Some(true)`.
-        state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(true));
+        state.reset_timer(hview, RcBorrow::from(&self.inner), Some(true));
 
         // Introduce a breakpoint in history coalescing
         state.history.mark_logical_op_break();
@@ -625,7 +620,7 @@ impl ViewListener for EntryCoreListener {
         // `hview.is_focused() returns `true` at this point, so `reset_timer`
         // will think the view is still focuse. Override this behavior by
         // specifying `override_focus = Some(false)`.
-        state.reset_timer(wm, hview, RcBorrow::from(&self.inner), Some(false));
+        state.reset_timer(hview, RcBorrow::from(&self.inner), Some(false));
     }
 
     fn validate_action(&self, _: pal::Wm, _: HViewRef<'_>, action: ActionId) -> ActionStatus {
@@ -710,7 +705,7 @@ impl ViewListener for EntryCoreListener {
         status
     }
 
-    fn perform_action(&self, wm: pal::Wm, view: HViewRef<'_>, action: ActionId) {
+    fn perform_action(&self, _: pal::Wm, view: HViewRef<'_>, action: ActionId) {
         let move_backward: MoveHandler = |sel, layout, _| {
             if sel[0] == sel[1] {
                 layout.next_char(sel[0], false)
@@ -742,7 +737,7 @@ impl ViewListener for EntryCoreListener {
         match action {
             actions::SELECT_ALL | actions::SELECT_LINE | actions::SELECT_PARAGRAPH => {
                 log::trace!("Handling a 'select all' command (SELECT_ALL, etc.)");
-                update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
+                update_sel_range(view, RcBorrow::from(&self.inner), |state| {
                     log::trace!("... original sel_range = {:?}", state.sel_range);
                     state.sel_range = [0, state.text.len()];
                     log::trace!("... new sel_range = {:?}", state.sel_range);
@@ -750,7 +745,7 @@ impl ViewListener for EntryCoreListener {
             }
             actions::SELECT_WORD => {
                 log::trace!("Handling SELECT_WORD");
-                update_sel_range(wm, view, RcBorrow::from(&self.inner), |state| {
+                update_sel_range(view, RcBorrow::from(&self.inner), |state| {
                     state.ensure_text_layout(&self.inner.style_elem);
                     let layout = &state.text_layout_info.as_ref().unwrap().text_layout;
                     let [mut start, mut end] = state.sel_range;
@@ -778,89 +773,89 @@ impl ViewListener for EntryCoreListener {
             }
             actions::DELETE_BACKWARD => {
                 log::trace!("Handling DELETE_BACKWARD");
-                self.handle_delete(wm, view, |i, layout, _| layout.next_char(i, false));
+                self.handle_delete(view, |i, layout, _| layout.next_char(i, false));
             }
             actions::DELETE_BACKWARD_DECOMPOSING => {
                 log::trace!("Handling DELETE_BACKWARD_DECOMPOSING");
-                self.handle_delete(wm, view, |i, _, text| str_prev(text, i));
+                self.handle_delete(view, |i, _, text| str_prev(text, i));
             }
             actions::DELETE_BACKWARD_WORD => {
                 log::trace!("Handling DELETE_BACKWARD_WORD");
-                self.handle_delete(wm, view, |i, layout, _| layout.next_word(i, false));
+                self.handle_delete(view, |i, layout, _| layout.next_word(i, false));
             }
             actions::DELETE_FORWARD => {
                 log::trace!("Handling DELETE_FORWARD");
-                self.handle_delete(wm, view, |i, layout, _| layout.next_char(i, true));
+                self.handle_delete(view, |i, layout, _| layout.next_char(i, true));
             }
             actions::DELETE_FORWARD_WORD => {
                 log::trace!("Handling DELETE_FORWARD_WORD");
-                self.handle_delete(wm, view, |i, layout, _| layout.next_word(i, true));
+                self.handle_delete(view, |i, layout, _| layout.next_word(i, true));
             }
 
             actions::MOVE_BACKWARD => {
                 log::trace!("Handling MOVE_BACKWARD");
-                self.handle_move(wm, view, false, move_backward);
+                self.handle_move(view, false, move_backward);
             }
             actions::MOVE_BACKWARD_SELECTING => {
                 log::trace!("Handling MOVE_BACKWARD_SELECTING");
-                self.handle_move(wm, view, true, move_backward);
+                self.handle_move(view, true, move_backward);
             }
             actions::MOVE_FORWARD => {
                 log::trace!("Handling MOVE_FORWARD");
-                self.handle_move(wm, view, false, move_forward);
+                self.handle_move(view, false, move_forward);
             }
             actions::MOVE_FORWARD_SELECTING => {
                 log::trace!("Handling MOVE_FORWARD_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_forward);
+                self.handle_move(view, true, move_forward);
             }
             actions::MOVE_LEFT => {
                 log::trace!("Handling MOVE_LEFT");
-                self.handle_move(wm, view, false, move_left);
+                self.handle_move(view, false, move_left);
             }
             actions::MOVE_LEFT_SELECTING => {
                 log::trace!("Handling MOVE_LEFT_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_left);
+                self.handle_move(view, true, move_left);
             }
             actions::MOVE_RIGHT => {
                 log::trace!("Handling MOVE_RIGHT");
-                self.handle_move(wm, view, false, move_right);
+                self.handle_move(view, false, move_right);
             }
             actions::MOVE_RIGHT_SELECTING => {
                 log::trace!("Handling MOVE_RIGHT_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_right);
+                self.handle_move(view, true, move_right);
             }
 
             actions::MOVE_BACKWARD_WORD => {
                 log::trace!("Handling MOVE_BACKWARD_WORD");
-                self.handle_move(wm, view, false, move_backward_word);
+                self.handle_move(view, false, move_backward_word);
             }
             actions::MOVE_BACKWARD_WORD_SELECTING => {
                 log::trace!("Handling MOVE_BACKWARD_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_backward_word);
+                self.handle_move(view, true, move_backward_word);
             }
             actions::MOVE_FORWARD_WORD => {
                 log::trace!("Handling MOVE_FORWARD_WORD");
-                self.handle_move(wm, view, false, move_forward_word);
+                self.handle_move(view, false, move_forward_word);
             }
             actions::MOVE_FORWARD_WORD_SELECTING => {
                 log::trace!("Handling MOVE_FORWARD_WORD_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_forward_word);
+                self.handle_move(view, true, move_forward_word);
             }
             actions::MOVE_LEFT_WORD => {
                 log::trace!("Handling MOVE_LEFT_WORD");
-                self.handle_move(wm, view, false, move_left_word);
+                self.handle_move(view, false, move_left_word);
             }
             actions::MOVE_LEFT_WORD_SELECTING => {
                 log::trace!("Handling MOVE_LEFT_WORD_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_left_word);
+                self.handle_move(view, true, move_left_word);
             }
             actions::MOVE_RIGHT_WORD => {
                 log::trace!("Handling MOVE_RIGHT_WORD");
-                self.handle_move(wm, view, false, move_right_word);
+                self.handle_move(view, false, move_right_word);
             }
             actions::MOVE_RIGHT_WORD_SELECTING => {
                 log::trace!("Handling MOVE_RIGHT_WORD_WORD_SELECTING");
-                self.handle_move(wm, view, true, move_right_word);
+                self.handle_move(view, true, move_right_word);
             }
 
             actions::MOVE_UP
@@ -872,7 +867,7 @@ impl ViewListener for EntryCoreListener {
                     "Handling a 'move to start' command \
                     (MOVE_START_OF_LINE, etc.)"
                 );
-                self.handle_move(wm, view, false, move_start);
+                self.handle_move(view, false, move_start);
             }
             actions::MOVE_UP_SELECTING
             | actions::MOVE_UP_PAGE_SELECTING
@@ -883,7 +878,7 @@ impl ViewListener for EntryCoreListener {
                     "Handling a 'move to start and modify selection' \
                     command (MOVE_START_OF_LINE_SELECTING, etc.)"
                 );
-                self.handle_move(wm, view, true, move_start);
+                self.handle_move(view, true, move_start);
             }
 
             actions::MOVE_DOWN
@@ -895,7 +890,7 @@ impl ViewListener for EntryCoreListener {
                     "Handling a 'move to end' command \
                     (MOVE_END_OF_LINE, etc.)"
                 );
-                self.handle_move(wm, view, false, move_end);
+                self.handle_move(view, false, move_end);
             }
             actions::MOVE_DOWN_SELECTING
             | actions::MOVE_DOWN_PAGE_SELECTING
@@ -906,34 +901,34 @@ impl ViewListener for EntryCoreListener {
                     "Handling a 'move to end and modify selection' \
                     command (MOVE_END_OF_LINE_SELECTING, etc.)"
                 );
-                self.handle_move(wm, view, true, move_end);
+                self.handle_move(view, true, move_end);
             }
 
             actions::MOVE_LEFT_END_OF_LINE => {
                 log::trace!("Handling MOVE_LEFT_END_OF_LINE");
-                self.handle_move(wm, view, false, move_left_end);
+                self.handle_move(view, false, move_left_end);
             }
             actions::MOVE_LEFT_END_OF_LINE_SELECTING => {
                 log::trace!("Handling MOVE_LEFT_END_OF_LINE_SELECTING");
-                self.handle_move(wm, view, true, move_left_end);
+                self.handle_move(view, true, move_left_end);
             }
 
             actions::MOVE_RIGHT_END_OF_LINE => {
                 log::trace!("Handling MOVE_RIGHT_END_OF_LINE");
-                self.handle_move(wm, view, false, move_right_end);
+                self.handle_move(view, false, move_right_end);
             }
             actions::MOVE_RIGHT_END_OF_LINE_SELECTING => {
                 log::trace!("Handling MOVE_RIGHT_END_OF_LINE_SELECTING");
-                self.handle_move(wm, view, true, move_right_end);
+                self.handle_move(view, true, move_right_end);
             }
 
             actions::UNDO => {
                 log::trace!("Handling UNDO");
-                self.handle_undo(wm, view);
+                self.handle_undo(view);
             }
             actions::REDO => {
                 log::trace!("Handling REDO");
-                self.handle_redo(wm, view);
+                self.handle_redo(view);
             }
 
             unknown_action => {
@@ -1135,12 +1130,11 @@ impl ViewListener for EntryCoreListener {
 impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
     fn edit(
         &self,
-        wm: pal::Wm,
+        _: pal::Wm,
         _: &pal::HTextInputCtx,
         _mutating: bool,
     ) -> Box<dyn pal::iface::TextInputCtxEdit<pal::Wm> + '_> {
         Box::new(Edit {
-            wm,
             state: self.inner.state.borrow_mut(),
             view: self.inner.view.upgrade().unwrap(),
             inner: RcBorrow::from(&self.inner),
@@ -1160,7 +1154,6 @@ impl pal::iface::TextInputCtxListener<pal::Wm> for EntryCoreListener {
 
 /// Implements `TextInputCtxEdit`.
 struct Edit<'a> {
-    wm: pal::Wm,
     state: RefMut<'a, State>,
     inner: RcBorrow<'a, Inner>,
     view: HView,
@@ -1222,8 +1215,7 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         self.state.caret = None;
 
         // Update the timer's state
-        self.state
-            .reset_timer(self.wm, self.view.as_ref(), self.inner, None);
+        self.state.reset_timer(self.view.as_ref(), self.inner, None);
         self.state.caret_blink = true;
     }
 
@@ -1275,7 +1267,7 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
         state.canvas.pend_draw(self.view.as_ref());
 
         // Reset the timer's phase
-        state.reset_timer(self.wm, self.view.as_ref(), self.inner, None);
+        state.reset_timer(self.view.as_ref(), self.inner, None);
         state.caret_blink = true;
     }
 
@@ -1389,12 +1381,11 @@ bitflags::bitflags! {
 /// in an implementation of `TextInputCtxEdit` because it calls
 /// `text_input_ctx_on_selection_change`.
 fn update_sel_range(
-    wm: pal::Wm,
     hview: HViewRef<'_>,
     inner: RcBorrow<'_, Inner>,
     mut f: impl FnMut(&mut State),
 ) {
-    update_state(wm, hview, inner, &mut move |state| {
+    update_state(hview, inner, &mut move |state| {
         f(state);
         UpdateStateFlags::SEL
     });
@@ -1407,11 +1398,11 @@ fn update_sel_range(
 /// If the provided closure modifies the text, it is responsible for updating
 /// the undo history accordingly.
 fn update_state(
-    wm: pal::Wm,
     hview: HViewRef<'_>,
     inner: RcBorrow<'_, Inner>,
     f: &mut dyn FnMut(&mut State) -> UpdateStateFlags,
 ) {
+    let wm = inner.wm;
     let mut state = inner.state.borrow_mut();
     let old_sel_range = state.sel_range;
 
@@ -1455,7 +1446,7 @@ fn update_state(
 
     // Update the caret-blinking timer
     state.caret_blink = true;
-    state.reset_timer(wm, hview, inner, None);
+    state.reset_timer(hview, inner, None);
 
     // Invalidate the remembered caret position
     state.caret = None;
@@ -1493,9 +1484,8 @@ impl EntryCoreDragListener {
         }
     }
 
-    fn update_selection(&self, wm: pal::Wm, mut f: impl FnMut(&mut State)) {
+    fn update_selection(&self, mut f: impl FnMut(&mut State)) {
         update_sel_range(
-            wm,
             self.view.as_ref(),
             RcBorrow::from(&self.inner),
             move |state| {
@@ -1507,8 +1497,8 @@ impl EntryCoreDragListener {
 }
 
 impl MouseDragListener for EntryCoreDragListener {
-    fn mouse_down(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
-        self.update_selection(wm, |state| {
+    fn mouse_down(&self, _: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>, _button: u8) {
+        self.update_selection(|state| {
             if let Some(text_layout_info) = &state.text_layout_info {
                 let i = text_layout_info.cursor_index_from_global_point(
                     hview,
@@ -1521,8 +1511,8 @@ impl MouseDragListener for EntryCoreDragListener {
         });
     }
 
-    fn mouse_motion(&self, wm: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
-        self.update_selection(wm, |state| {
+    fn mouse_motion(&self, _: pal::Wm, hview: HViewRef<'_>, loc: Point2<f32>) {
+        self.update_selection(|state| {
             if let Some(text_layout_info) = &state.text_layout_info {
                 let i = text_layout_info.cursor_index_from_global_point(
                     hview,
@@ -1535,9 +1525,9 @@ impl MouseDragListener for EntryCoreDragListener {
         });
     }
 
-    fn cancel(&self, wm: pal::Wm, _: HViewRef<'_>) {
+    fn cancel(&self, _: pal::Wm, _: HViewRef<'_>) {
         let orig_sel_range = &self.orig_sel_range;
-        self.update_selection(wm, |state| {
+        self.update_selection(|state| {
             // Before resetting the selection, make sure `orig_sel_range` is
             // still a valid selection range
             let start = orig_sel_range[0].min(orig_sel_range[0]);

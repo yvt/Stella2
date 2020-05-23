@@ -118,9 +118,7 @@ comp crate::view::MainView {
         child_generic = get!(&search_bar_entry),
     };
 
-    const search_bar_entry = EntryCore::new! {
-        style_manager,
-    };
+    const search_bar_entry = EntryCore::new! { wm, style_manager };
 
     const channel_list_wrap = StyledBox::new! {
         style_manager,
