@@ -521,7 +521,7 @@ impl AnalyzeCtx<'_, '_> {
         {
             self.diag.emit(&[Diagnostic {
                 level: Level::Error,
-                message: "`#[builder(simple)]` requires `#[prototype_only]".to_string(),
+                message: "`#[builder(simple)]` requires `#[prototype_only]`".to_string(),
                 code: None,
                 spans: span_to_codemap(comp.orig_path.span(), self.file)
                     .map(|span| SpanLabel {
