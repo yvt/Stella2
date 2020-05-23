@@ -23,6 +23,10 @@ pub trait TcwdlVisitMut: VisitMut {
         visit_comp_item_field_mut(self, i);
     }
 
+    fn visit_field_init_mut(&mut self, i: &mut FieldInit) {
+        visit_field_init_mut(self, i);
+    }
+
     fn visit_field_accessor_mut(&mut self, i: &mut FieldAccessor) {
         visit_field_accessor_mut(self, i);
     }
@@ -110,7 +114,14 @@ pub fn visit_comp_item_field_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut 
             .for_each(|i| v.visit_field_accessor_mut(i));
     }
     if let Some(i) = &mut i.dyn_expr {
-        v.visit_dyn_expr_mut(i);
+        v.visit_field_init_mut(i);
+    }
+}
+
+pub fn visit_field_init_mut(v: &mut (impl TcwdlVisitMut + ?Sized), i: &mut FieldInit) {
+    match i {
+        FieldInit::Definite(expr) => v.visit_dyn_expr_mut(expr),
+        FieldInit::Indefinite { .. } => {}
     }
 }
 

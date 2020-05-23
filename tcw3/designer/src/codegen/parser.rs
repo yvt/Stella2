@@ -235,7 +235,7 @@ pub struct CompItemField {
     pub ident: Ident,
     pub ty: Option<Type>,
     pub accessors: Option<Vec<FieldAccessor>>,
-    pub dyn_expr: Option<DynExpr>,
+    pub dyn_expr: Option<FieldInit>,
     pub semi_token: Option<Token![;]>,
 }
 
@@ -318,6 +318,25 @@ impl Parse for FieldType {
             input.parse::<kw::wire>().map(|_| FieldType::Wire)
         } else {
             Err(la.error())
+        }
+    }
+}
+
+pub enum FieldInit {
+    /// The initial value is defined here
+    Definite(DynExpr),
+    /// `?` - The initial value is defined by external code
+    Indefinite { token: Token![?] },
+}
+
+impl Parse for FieldInit {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(Token![?]) {
+            Ok(Self::Indefinite {
+                token: input.parse()?,
+            })
+        } else {
+            Ok(Self::Definite(input.parse()?))
         }
     }
 }

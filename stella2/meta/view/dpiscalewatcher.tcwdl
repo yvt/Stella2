@@ -7,7 +7,7 @@ pub(crate) comp crate::view::dpiscalewatcher::DpiScaleWatcher {
     const subview: HView { pub get clone; pub set; }
     const view_flags: ViewFlags { pub set; }
 
-    const view: HView { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
 
     pub event dpi_scale_changed(wm: pal::Wm, hwnd: HWnd);
 }

@@ -6,12 +6,9 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
 pub comp crate::ui::views::Label {
     const style_manager: &Manager { pub set; }
 
-    // The initializers specified here are not actually used because
-    // this component has `#[prototype_only]`. Without initializers, the consts
-    // are considered non-initializable and the component inconstructible
-    prop text: String { pub set; } = unreachable!();
-    prop class_set: ClassSet { pub set; get clone; } = unreachable!();
+    prop text: String { pub set; } = ?;
+    prop class_set: ClassSet { pub set; get clone; } = ?;
 
-    const view: HView { pub get clone; } = unreachable!();
-    const style_elem: HElem { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
+    const style_elem: HElem { pub get clone; } = ?;
 }

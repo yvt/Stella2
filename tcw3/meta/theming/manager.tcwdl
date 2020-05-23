@@ -5,9 +5,9 @@ use crate::ui::theming::{ClassSet, HElem, Manager, ElemChangeCb};
 pub comp crate::ui::theming::Elem {
     const style_manager: &Manager { pub set; }
 
-    prop on_change: ElemChangeCb { pub set; } = unreachable!();
+    prop on_change: ElemChangeCb { pub set; } = ?;
 
-    prop class_set: ClassSet { pub set; pub get; } = unreachable!();
+    prop class_set: ClassSet { pub set; pub get; } = ?;
 
-    const helem: HElem { pub get clone; } = unreachable!();
+    const helem: HElem { pub get clone; } = ?;
 }

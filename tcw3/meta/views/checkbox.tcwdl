@@ -8,12 +8,12 @@ pub comp crate::ui::views::Checkbox {
 
     pub event activated(wm: pal::Wm);
 
-    prop caption: String { pub set; } = unreachable!();
-    prop class_set: ClassSet { pub set; pub get clone; } = unreachable!();
-    prop checked: bool { pub set; pub get clone; } = unreachable!();
+    prop caption: String { pub set; } = ?;
+    prop class_set: ClassSet { pub set; pub get clone; } = ?;
+    prop checked: bool { pub set; pub get clone; } = ?;
 
-    const view: HView { pub get clone; } = unreachable!();
-    const style_elem: HElem { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
+    const style_elem: HElem { pub get clone; } = ?;
 }
 
 #[prototype_only]
@@ -24,11 +24,11 @@ pub comp crate::ui::views::RadioButton {
 
     pub event activated(wm: pal::Wm);
 
-    prop caption: String { pub set; } = unreachable!();
-    prop class_set: ClassSet { pub set; pub get clone; } = unreachable!();
-    prop checked: bool { pub set; pub get clone; } = unreachable!();
+    prop caption: String { pub set; } = ?;
+    prop class_set: ClassSet { pub set; pub get clone; } = ?;
+    prop checked: bool { pub set; pub get clone; } = ?;
 
-    const view: HView { pub get clone; } = unreachable!();
-    const style_elem: HElem { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
+    const style_elem: HElem { pub get clone; } = ?;
 }
 

@@ -68,6 +68,8 @@ fn run_should_error(source_path: &str) {
 // TODO: `comp_path_external`
 should_error!(comp_path_unknown, "comp_path_unknown.tcwdl");
 should_error!(comp_path_super, "comp_path_super.tcwdl");
+should_error!(const_definite, "const_definite.tcwdl");
+should_error!(const_indefinite, "const_indefinite.tcwdl");
 should_error!(const_uninitable, "const_uninitable.tcwdl");
 should_error!(const_watch, "const_watch.tcwdl");
 should_error!(input_circular, "input_circular.tcwdl");

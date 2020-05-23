@@ -1,0 +1,6 @@
+#[prototype_only]
+pub comp crate::Comp1 {
+    // A definite value is not allowed in a `#[prototype_only]` component
+    const field: u32 { pub set; } = 42;
+    //~^ ERROR Fields cannot have a definite value in a `#[prototype_only]` component
+}

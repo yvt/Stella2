@@ -8,26 +8,26 @@ use crate::{pal, uicore::{HWnd, ViewFlags, CursorShape, Layout, ViewListener}};
 pub comp crate::uicore::HView {
     // TODO: `flags` is actually a `prop`. But some flags can be set only
     //       through `new`
-    const flags: ViewFlags { pub set; pub get clone; } = Default::default();
+    const flags: ViewFlags { pub set; pub get clone; } = ?;
 
     /// Sets a new `ViewListener` for the view.
-    prop listener: Box<ViewListener> { pub set; } = unreachable!();
+    prop listener: Box<ViewListener> { pub set; } = ?;
 
     /// Sets a new `Layout` for the view.
-    prop layout: Box<dyn Layout> { pub set; } = unreachable!();
+    prop layout: Box<dyn Layout> { pub set; } = ?;
 
     /// Sets or retrieves the desired apperance of the mouse cursor for a given
     /// view.
-    prop cursor_shape: Option<CursorShape> { pub set; pub get clone; } = unreachable!();
+    prop cursor_shape: Option<CursorShape> { pub set; pub get clone; } = ?;
 
     /// Retrieves the frame (bounding rectangle) of a view in the superview's
     /// coordinate space.
-    wire frame: Box2<f32> { pub get clone; } = unreachable!();
+    wire frame: Box2<f32> { pub get clone; } = ?;
 
     /// Retrieves the frame (bounding rectangle) of a view in the containing
     /// window's coordinate space.
-    wire global_frame: Box2<f32> { pub get clone; } = unreachable!();
+    wire global_frame: Box2<f32> { pub get clone; } = ?;
 
     /// Retrieves the containing window for the view.
-    wire containing_wnd: Option<HWnd> { pub get clone; } = unreachable!();
+    wire containing_wnd: Option<HWnd> { pub get clone; } = ?;
 }

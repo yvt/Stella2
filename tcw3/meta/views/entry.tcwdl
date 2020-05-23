@@ -6,12 +6,12 @@ use crate::{ui::theming::{ClassSet, StyledBox, HElem, Manager}, uicore::HView};
 pub comp crate::ui::views::Entry {
     const style_manager: &Manager { pub set; }
 
-    prop class_set: ClassSet { pub set; get clone; } = unreachable!();
+    prop class_set: ClassSet { pub set; get clone; } = ?;
 
-    const core: crate::ui::views::EntryCore { pub get borrow; } = unreachable!();
+    const core: crate::ui::views::EntryCore { pub get borrow; } = ?;
 
-    const view: HView { pub get clone; } = unreachable!();
-    const style_elem: HElem { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
+    const style_elem: HElem { pub get clone; } = ?;
 }
 
 #[prototype_only]
@@ -20,6 +20,6 @@ pub comp crate::ui::views::Entry {
 pub comp crate::ui::views::EntryCore {
     const style_manager: &Manager { pub set; }
 
-    const view: HView { pub get clone; } = unreachable!();
-    const style_elem: HElem { pub get clone; } = unreachable!();
+    const view: HView { pub get clone; } = ?;
+    const style_elem: HElem { pub get clone; } = ?;
 }

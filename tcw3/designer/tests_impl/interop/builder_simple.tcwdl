@@ -1,9 +1,9 @@
 #[prototype_only]
 #[builder(simple)]
 comp crate::interop::builder_simple::ExtComp {
-    const const1: u32 { get; set; } = Default::default();
+    const const1: u32 { get; set; } = ?;
     const const2: u32 { get; set; }
-    prop prop1: u32 = Default::default();
+    prop prop1: u32 = ?;
 }
 
 comp crate::interop::builder_simple::Comp {

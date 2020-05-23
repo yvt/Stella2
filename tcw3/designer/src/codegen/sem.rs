@@ -205,6 +205,9 @@ pub struct FieldDef<'a> {
     /// - Can be `None` unless `field_ty` is `Wire`. `None` means
     ///   the value must be supplied via the constructor.
     /// - Can be `Some(ObjInit(_))` only if `field_ty` is `Const`.
+    ///
+    /// For a `PROTOTYPE_ONLY` component, whether this is `Some` or `None` still
+    /// matters, whereas the inner value of `Some` doesn't.
     pub value: Option<DynExpr>,
     pub syn: Option<&'a parser::CompItemField>,
 }
@@ -534,8 +537,44 @@ impl AnalyzeCtx<'_, '_> {
             }]);
         }
 
-        // TODO: If `SIMPLE_BUILDER`, check that all optional `const`s have
-        //       `Default::default()` as the default value
+        {
+            // Definite field values aren't allowed in `#[prototype_only]`
+            // components because Designer will never actually use them.
+            //
+            // For other components, indefinite field values aren't allowed
+            // because Designer will need definite values.
+            let needs_indefinite_values = this.flags.contains(CompFlags::PROTOTYPE_ONLY);
+
+            let bad_fields: Vec<_> = comp
+                .items
+                .iter()
+                .filter_map(|item| try_match!(parser::CompItem::Field(field) = item).ok())
+                .filter(|field| match &field.dyn_expr {
+                    Some(parser::FieldInit::Definite(_)) if needs_indefinite_values => true,
+                    Some(parser::FieldInit::Indefinite { .. }) if !needs_indefinite_values => true,
+                    _ => false,
+                })
+                .collect();
+
+            if !bad_fields.is_empty() {
+                self.diag.emit(&[Diagnostic {
+                    level: Level::Error,
+                    message: if needs_indefinite_values {
+                        "Fields cannot have a definite value in a `#[prototype_only]` component"
+                    }  else {
+                        "Fields cannot have a indefinite value in a non-`#[prototype_only]` component"
+                    }
+                            .to_string(),
+                    code: None,
+                    spans: bad_fields.iter().filter_map(|field|span_to_codemap(field.ident.span(), self.file))
+                    .map(|span|SpanLabel {
+                            span,
+                            label: None,
+                            style: SpanStyle::Primary,
+                        }).collect(),
+                }]);
+            }
+        }
 
         this
     }
@@ -756,7 +795,7 @@ impl AnalyzeCtx<'_, '_> {
         }
 
         let ty = if let Some(mut ty) = item.ty.clone() {
-            if let Some(parser::DynExpr::ObjInit(_)) = item.dyn_expr {
+            if let Some(parser::FieldInit::Definite(parser::DynExpr::ObjInit(_))) = item.dyn_expr {
                 // Because we can't check if the type is compatible with
                 // the object literal in a reliable way.
                 self.diag.emit(&[Diagnostic {
@@ -786,7 +825,9 @@ impl AnalyzeCtx<'_, '_> {
             );
 
             Some(ty)
-        } else if let Some(parser::DynExpr::ObjInit(init)) = &item.dyn_expr {
+        } else if let Some(parser::FieldInit::Definite(parser::DynExpr::ObjInit(init))) =
+            &item.dyn_expr
+        {
             if accessors.set.is_some() {
                 self.diag.emit(&[Diagnostic {
                     level: Level::Error,
@@ -876,23 +917,30 @@ impl AnalyzeCtx<'_, '_> {
             ident: Ident::from_syn(&item.ident, self.file),
             ty,
             accessors,
-            value: item.dyn_expr.as_ref().map(|d| {
-                if item.field_ty == FieldType::Const {
-                    match d {
-                        parser::DynExpr::Func(func) => DynExpr::Func(self.analyze_func(func)),
-                        parser::DynExpr::ObjInit(init) => DynExpr::ObjInit(self.analyze_obj_init(
-                            init,
+            value: item.dyn_expr.as_ref().map(|init| match init {
+                parser::FieldInit::Definite(d) => {
+                    if item.field_ty == FieldType::Const {
+                        match d {
+                            parser::DynExpr::Func(func) => DynExpr::Func(self.analyze_func(func)),
+                            parser::DynExpr::ObjInit(init) => DynExpr::ObjInit(
+                                self.analyze_obj_init(init, default_vis_path, out_lifted_fields),
+                            ),
+                        }
+                    } else {
+                        // `ObjInit` is not allowed for non-`const` fields
+                        DynExpr::Func(self.analyze_dyn_expr_as_func(
+                            d,
                             default_vis_path,
                             out_lifted_fields,
-                        )),
+                        ))
                     }
-                } else {
-                    // `ObjInit` is not allowed for non-`const` fields
-                    DynExpr::Func(self.analyze_dyn_expr_as_func(
-                        d,
-                        default_vis_path,
-                        out_lifted_fields,
-                    ))
+                }
+                parser::FieldInit::Indefinite { .. } => {
+                    // Assign a dummy expression
+                    DynExpr::Func(Func {
+                        inputs: Vec::new(),
+                        body: syn::Expr::Verbatim(proc_macro2::TokenStream::new()),
+                    })
                 }
             }),
             syn: Some(item),

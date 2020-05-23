@@ -162,6 +162,25 @@ prop prop1: u32;                      // ok: the builder provides a value
 prop prop2: u32 {}                    // ERROR
 ```
 
+Indefinite values (`?`) mean their values are provided by somewhere else. They
+can be used in and only in a `#[prototype_only]` component. Conversely, fields
+in a non-`#[prototype_only]` component are not allowed to have definite values.
+
+```text,should_error
+comp Comp {
+    const const1: u32 { pub set; } = ?;   // ERROR
+    const const1: u32 { pub set; } = 42;  // ok: A definite default value
+    const const2: u32 { pub set; }        // ok: No default value
+}
+
+#[prototype_only]
+comp ProtoOnlyComp {
+    const const1: u32 { pub set; } = ?;   // ok: An indefinite default value
+    const const1: u32 { pub set; } = 42;  // ERROR
+    const const2: u32 { pub set; }        // ok: No default value
+}
+```
+
 ## Dynamic Expressions: `42`, `get!(prop1) + 1`, etc.
 
 Fields (`const`, `prop`, and `wire`) and event handlers (`on`) may have *a
@@ -488,9 +507,8 @@ impl ComponentBuilder<u32> { pub fn build() -> Component { /* ... */ } }
 Components with `#[builder(simple)]` use *the simple builder API*.
 The simple builder API does not provide a builder type and instead the
 component is instantiated by its method `new` that accepts initial field
-values in the order defined in the component. Optional `const` fields
-are assumed to have `Default::default()` as the default value.
-**Default values specified in the component definition are ignored.**
+values in the order defined in the component. Optional `const` fields must have
+indefinite default values (`?`), which are assumed to be `Default::default()`.
 
 ```rust,no_compile
 // Standard builder
