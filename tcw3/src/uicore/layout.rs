@@ -1,5 +1,5 @@
 use as_any::AsAny;
-use cggeom::{prelude::*, Box2};
+use cggeom::{box2, prelude::*, Box2};
 use cgmath::{vec2, Point2, Vector2};
 use flags_macro::flags;
 use log::trace;
@@ -162,6 +162,25 @@ impl HViewRef<'_> {
         self.view.global_frame.get()
     }
 
+    /// Get the visible portion of `global_frame` in the containing window's
+    /// coordinate space.
+    ///
+    /// `global_visible_frame` represents the intersection of `global_frame` of
+    /// all clipping ancestors (viz., those having [`CLIP_VISIBLE_FRAME`]). The
+    /// resulting rectangle may be empty.
+    ///
+    /// This method is useful for restricting the painted region of a view to
+    /// the inside of a visible portion.
+    ///
+    /// This method might return an out-dated value unless it's called under
+    /// certain circumstances. See [`frame`] for details.
+    ///
+    /// [`CLIP_VISIBLE_FRAME`]: crate::uicore::ViewFlags::CLIP_VISIBLE_FRAME
+    /// [`frame`]: crate::uicore::HView::frame
+    pub fn global_visible_frame(self) -> Box2<f32> {
+        self.view.global_visible_frame.get()
+    }
+
     /// Update `size_traits` of a view. This implements the *up phase* of the
     /// layouting algorithm.
     ///
@@ -291,43 +310,44 @@ impl HViewRef<'_> {
 
     /// Call `ViewListener::position` for subviews as necessary.
     pub(super) fn flush_position_event(self, wm: Wm) {
-        fn update_global_frame(this: HViewRef<'_>, global_offset: Point2<f32>) {
-            // Global position
-            let frame = this.view.frame.get();
-            let global_frame = frame.translate(vec2(global_offset.x, global_offset.y));
-            this.view.global_frame.set(global_frame);
+        #[derive(Copy, Clone)]
+        #[repr(align(16))]
+        struct Ctx {
+            clip: Box2<f32>,
+            global_offset: Point2<f32>,
+            extra_flags: ViewDirtyFlags,
         }
 
-        fn traverse_all(
-            this: HViewRef<'_>,
-            cb: &mut impl FnMut(HViewRef<'_>),
-            global_offset: Point2<f32>,
-        ) {
-            let dirty = &this.view.dirty;
-            let layout = this.view.layout.borrow();
+        fn update_global_frame(this: HViewRef<'_>, ctx: &Ctx) {
+            // Global position
+            let frame = this.view.frame.get();
+            let global_offset = ctx.global_offset;
+            let global_frame = frame.translate(vec2(global_offset.x, global_offset.y));
+            this.view.global_frame.set(global_frame);
 
-            update_global_frame(this, global_offset);
+            // Clipped global position
+            this.view.global_visible_frame.set(box2! {
+                min: ctx.clip.min.element_wise_max(&global_frame.min),
+                max: ctx.clip.max.element_wise_min(&global_frame.max),
+            });
+        }
 
-            dirty.set(
-                dirty.get() - flags![ViewDirtyFlags::{POSITION_EVENT | DESCENDANT_POSITION_EVENT}],
-            );
-            cb(this);
-
-            for subview in layout.subviews().iter() {
-                traverse_all(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
+        fn transform_ctx_for_subviews(this: HViewRef<'_>, ctx: &mut Ctx) {
+            let global_frame = this.view.global_frame.get();
+            ctx.global_offset = global_frame.min;
+            if (this.view.flags.get()).contains(ViewFlags::CLIP_VISIBLE_FRAME) {
+                ctx.clip.min = ctx.clip.min.element_wise_max(&global_frame.min);
+                ctx.clip.max = ctx.clip.max.element_wise_min(&global_frame.max);
             }
         }
 
-        fn traverse(
-            this: HViewRef<'_>,
-            cb: &mut impl FnMut(HViewRef<'_>),
-            global_offset: Point2<f32>,
-        ) {
+        fn traverse(this: HViewRef<'_>, cb: &mut impl FnMut(HViewRef<'_>), mut ctx: Ctx) {
             let dirty = &this.view.dirty;
             let layout = this.view.layout.borrow();
+            dirty.set(dirty.get() | ctx.extra_flags);
 
             if dirty.get().intersects(ViewDirtyFlags::POSITION_EVENT) {
-                update_global_frame(this, global_offset);
+                update_global_frame(this, &ctx);
 
                 dirty.set(
                     dirty.get()
@@ -337,18 +357,21 @@ impl HViewRef<'_> {
 
                 // If we encounter `POSITION_EVENT`, call `position` on every
                 // descendant.
-                for subview in layout.subviews().iter() {
-                    traverse_all(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
-                }
+                ctx.extra_flags |= ViewDirtyFlags::POSITION_EVENT;
             } else if dirty
                 .get()
                 .intersects(ViewDirtyFlags::DESCENDANT_POSITION_EVENT)
             {
                 dirty.set(dirty.get() - ViewDirtyFlags::DESCENDANT_POSITION_EVENT);
+            } else {
+                // No subviews have `POSITION_EVENT`, so return early
+                return;
+            }
 
-                for subview in layout.subviews().iter() {
-                    traverse(subview.as_ref(), &mut *cb, this.view.global_frame.get().min);
-                }
+            transform_ctx_for_subviews(this, &mut ctx);
+
+            for subview in layout.subviews().iter() {
+                traverse(subview.as_ref(), &mut *cb, ctx);
             }
         }
 
@@ -357,7 +380,14 @@ impl HViewRef<'_> {
             &mut |hview| {
                 hview.view.listener.borrow().position(wm, hview);
             },
-            Point2::new(0.0, 0.0),
+            Ctx {
+                clip: box2! {
+                    min: [f32::NEG_INFINITY, f32::NEG_INFINITY],
+                    max: [f32::INFINITY, f32::INFINITY],
+                },
+                global_offset: Point2::new(0.0, 0.0),
+                extra_flags: ViewDirtyFlags::empty(),
+            },
         );
     }
 

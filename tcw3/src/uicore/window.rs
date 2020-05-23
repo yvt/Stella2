@@ -625,7 +625,7 @@ impl pal::iface::WndListener<Wm> for PalWndListener {
 }
 
 pub(crate) fn new_root_content_view() -> HView {
-    let view = HView::new(ViewFlags::LAYER_GROUP);
+    let view = HView::new(flags![ViewFlags::{LAYER_GROUP | CLIP_VISIBLE_FRAME}]);
     view.set_listener(RootViewListener::new());
     view
 }

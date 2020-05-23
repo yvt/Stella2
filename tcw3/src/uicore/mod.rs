@@ -401,6 +401,9 @@ bitflags! {
         /// [`ViewListener::update`] and add [`UpdateCtx::sublayers`]`()` to
         /// a client-provided PAL layer as sublayers.
         ///
+        /// When you use this flag to clip subviews, it's highly suggested that
+        /// you also set [`ViewFlags::CLIP_VISIBLE_FRAME`] on the same view.
+        ///
         /// This flag cannot be added or removed once a view is created.
         const LAYER_GROUP = 1;
 
@@ -455,6 +458,13 @@ bitflags! {
         /// The view defines a draggable area for the containing window. The
         /// hit testing follows the same rules as mouse drag events.
         const DRAG_AREA = 1 << 9;
+
+        /// Clips subviews' [`global_visible_frame`] by the view's frame.
+        ///
+        /// [`global_visible_frame`]: HViewRef::global_visible_frame
+        ///
+        /// This flag cannot be added or removed once a view is created.
+        const CLIP_VISIBLE_FRAME = 1 << 10;
     }
 }
 
@@ -634,6 +644,7 @@ struct View {
     size_traits: Cell<SizeTraits>,
     frame: Cell<Box2<f32>>,
     global_frame: Cell<Box2<f32>>,
+    global_visible_frame: Cell<Box2<f32>>,
 
     /// When debug assertions are enabled, this field is used during layouting
     /// to check invariants.
@@ -686,6 +697,7 @@ impl View {
             size_traits: Cell::new(SizeTraits::default()),
             frame: Cell::new(Box2::zero()),
             global_frame: Cell::new(Box2::zero()),
+            global_visible_frame: Cell::new(Box2::zero()),
             #[cfg(debug_assertions)]
             has_frame: Cell::new(false),
             layers: RefCell::new(Vec::new()),
@@ -1107,6 +1119,7 @@ impl HView {
         // `layout.rs`
         pub fn frame(&self) -> Box2<f32>;
         pub fn global_frame(&self) -> Box2<f32>;
+        pub fn global_visible_frame(&self) -> Box2<f32>;
 
         // `window.rs`
         pub fn containing_wnd(&self) -> Option<HWnd>;
@@ -1404,8 +1417,8 @@ bitflags! {
         const DESCENDANT_SUBVIEWS_FRAME = 1 << 3;
 
         /// `ViewListener::position` needs to be called on the view and all of
-        /// its descendants. Also, `global_frame` of the view and its
-        /// descendants may be out-of-date.
+        /// its descendants. Also, `global_frame` and `global_visible_frame` of
+        /// the view and its descendants may be out-of-date.
         const POSITION_EVENT = 1 << 4;
 
         /// Some of the descendants have `POSITION_EVENT`.
