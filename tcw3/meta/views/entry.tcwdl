@@ -13,6 +13,13 @@ pub comp crate::ui::views::Entry {
 
     const view: HView { pub get clone; } = ?;
     const style_elem: HElem { pub get clone; } = ?;
+
+    /// Set or retrieve the text content.
+    ///
+    /// When you assign to this property, if the new value is different from the
+    /// current one, it resets various internal states such as an undo history.
+    /// Otherwise, it does nothing.
+    prop text: String { pub set; pub get clone; } = ?;
 }
 
 #[prototype_only]
@@ -24,4 +31,11 @@ pub comp crate::ui::views::EntryCore {
 
     const view: HView { pub get clone; } = ?;
     const style_elem: HElem { pub get clone; } = ?;
+
+    /// Set or retrieve the text content.
+    ///
+    /// When you assign to this property, if the new value is different from the
+    /// current one, it resets various internal states such as an undo history.
+    /// Otherwise, it does nothing.
+    prop text: String { pub set; pub get clone; } = ?;
 }

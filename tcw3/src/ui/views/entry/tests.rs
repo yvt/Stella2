@@ -72,3 +72,79 @@ fn text_input_ctx_activation(twm: &dyn TestingWm) {
 
     assert!(twm.expect_unique_active_text_input_ctx().is_none());
 }
+
+#[allow(dead_code)]
+struct TestWithOneEntry {
+    wm: pal::Wm,
+    hwnd: HWnd,
+    pal_hwnd: pal::HWnd,
+    entry: Entry,
+}
+fn init_test_with_one_entry(twm: &dyn TestingWm) -> TestWithOneEntry {
+    let wm = twm.wm();
+
+    let style_manager = Manager::global(wm);
+
+    let entry = Entry::new(wm, style_manager);
+
+    let wnd = HWnd::new(wm);
+    wnd.content_view().set_layout(TableLayout::stack_vert(vec![
+        (entry.view(), AlignFlags::JUSTIFY),
+        (
+            Spacer::new().with_min([100.0, 0.0]).into_view(),
+            AlignFlags::JUSTIFY,
+        ),
+    ]));
+    wnd.set_visibility(true);
+
+    twm.step_unsend();
+
+    // Focus the window
+    let pal_hwnd = try_match!([x] = twm.hwnds().as_slice() => x.clone())
+        .expect("could not get a single window");
+
+    twm.set_wnd_focused(&pal_hwnd, true);
+    twm.step_unsend();
+
+    TestWithOneEntry {
+        wm,
+        hwnd: wnd,
+        pal_hwnd,
+        entry,
+    }
+}
+
+#[use_testing_wm(testing = "crate::testing")]
+#[test]
+fn set_text(twm: &dyn TestingWm) {
+    let TestWithOneEntry {
+        entry,
+        hwnd: _hwnd,
+        pal_hwnd,
+        ..
+    } = init_test_with_one_entry(twm);
+
+    // Focus the text field by clicking it
+    let bounds = entry.view_ref().global_frame();
+    simulate_click(twm, &pal_hwnd, bounds.min.average2(&bounds.min));
+
+    // Type something
+    {
+        let mut edit = twm.raise_edit(&twm.expect_unique_active_text_input_ctx().unwrap(), true);
+        edit.replace(0..0, "hello");
+    }
+    twm.step_unsend();
+
+    assert!(entry.core().inner.state.borrow().history.can_undo());
+    assert_eq!(entry.text(), "hello");
+
+    // Assign a new text
+    entry.set_text("world");
+    twm.step_unsend();
+
+    // The new text should be there
+    assert_eq!(entry.text(), "world");
+
+    // .. and that history should be forgotten
+    assert!(!entry.core().inner.state.borrow().history.can_undo());
+}

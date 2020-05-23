@@ -4,6 +4,7 @@ use arrayvec::ArrayVec;
 use cggeom::{box2, prelude::*, Box2};
 use cgmath::{Matrix3, Point2, Vector2};
 use flags_macro::flags;
+use momo::momo;
 use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell, RefMut},
@@ -83,6 +84,19 @@ impl Entry {
     /// Get the class set of the inner `StyledBox`.
     pub fn class_set(&self) -> ClassSet {
         self.styled_box.class_set()
+    }
+
+    /// Get the text content.
+    pub fn text(&self) -> String {
+        self.core.text()
+    }
+
+    /// Set the text content.
+    ///
+    /// If the new value is different from the current one, it resets various
+    /// internal states such as an undo history. Otherwise, it does nothing.
+    pub fn set_text(&self, value: impl Into<String>) {
+        self.core.set_text(value)
     }
 }
 
@@ -237,6 +251,35 @@ impl EntryCore {
     /// Get the styling element representing the widget.
     pub fn style_elem(&self) -> theming::HElem {
         self.inner.style_elem.helem()
+    }
+
+    /// Get the text content.
+    pub fn text(&self) -> String {
+        self.inner.state.borrow().text.clone()
+    }
+
+    /// Set the text content.
+    ///
+    /// If the new value is different from the current one, it resets various
+    /// internal states such as an undo history. Otherwise, it does nothing.
+    #[momo]
+    pub fn set_text(&self, value: impl Into<String>) {
+        if self.inner.state.borrow().text == value {
+            return;
+        }
+
+        let mut value = Some(value);
+        update_state(
+            self.view.as_ref(),
+            RcBorrow::from(&self.inner),
+            &mut |state| {
+                state.text = value.take().unwrap();
+                state.sel_range = [0, 0];
+                state.history = history::History::new();
+
+                UpdateStateFlags::ANY
+            },
+        );
     }
 }
 
