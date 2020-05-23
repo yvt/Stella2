@@ -347,7 +347,7 @@ impl State {
             && self.sel_range[0] == self.sel_range[1];
 
         if should_start_timer {
-            self.caret_blink_timer = Some(self.schedule_timer(RcBorrow::upgrade(inner)));
+            self.caret_blink_timer = Some(State::schedule_timer(RcBorrow::upgrade(inner)));
         } else {
             log::trace!("Not scheduling a deferred invocation because the caret is invisible now");
         }
@@ -355,7 +355,9 @@ impl State {
 
     /// Schedule a deferred invocation which toggles `caret_blink` and get the
     /// handle representing the invocation.
-    fn schedule_timer(&mut self, inner: Rc<Inner>) -> pal::HInvoke {
+    ///
+    /// This is implemented as a free function to allow recursive calls.
+    fn schedule_timer(inner: Rc<Inner>) -> pal::HInvoke {
         use std::time::Duration;
 
         log::trace!("Scheduling a deferred invocation for blinking the caret");
@@ -371,7 +373,7 @@ impl State {
                     hview.pend_update();
 
                     // Schedule the next invocation
-                    state.caret_blink_timer = Some(state.schedule_timer(Rc::clone(&inner)));
+                    state.caret_blink_timer = Some(Self::schedule_timer(Rc::clone(&inner)));
                 }
             },
         )
