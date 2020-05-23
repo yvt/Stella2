@@ -641,8 +641,8 @@ impl ViewListener for EntryCoreListener {
         state.pend_update_after_focus_event(hview);
 
         // Start the caret-blinking timer if needed.
-        // `hview.is_focused() returns `true` at this point, so `reset_timer`
-        // will think the view is not focused yet. Override this behavior by
+        // `hview.is_focused() returns `false` at this point, so `reset_timer`
+        // would think the view is not focused yet. Override this behavior by
         // specifying `override_focus = Some(true)`.
         state.reset_timer(hview, RcBorrow::from(&self.inner), Some(true));
 
@@ -661,7 +661,7 @@ impl ViewListener for EntryCoreListener {
 
         // Stop the caret-blinking timer.
         // `hview.is_focused() returns `true` at this point, so `reset_timer`
-        // will think the view is still focuse. Override this behavior by
+        // would think the view is still focused. Override this behavior by
         // specifying `override_focus = Some(false)`.
         state.reset_timer(hview, RcBorrow::from(&self.inner), Some(false));
     }
