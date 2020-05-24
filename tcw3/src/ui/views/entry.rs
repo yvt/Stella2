@@ -8,9 +8,11 @@ use momo::momo;
 use rc_borrow::RcBorrow;
 use std::{
     cell::{Cell, RefCell, RefMut},
+    fmt,
     ops::Range,
     rc::Rc,
 };
+use subscriber_list::SubscriberList;
 use unicount::{str_ceil, str_floor, str_prev};
 
 use crate::{
@@ -25,7 +27,7 @@ use crate::{
     },
     uicore::{
         actions, ActionId, ActionStatus, CursorShape, HView, HViewRef, HWndRef, MouseDragListener,
-        SizeTraits, UpdateCtx, ViewFlags, ViewListener, WeakHView,
+        SizeTraits, Sub, UpdateCtx, ViewFlags, ViewListener, WeakHView, WmExt,
     },
 };
 
@@ -98,6 +100,13 @@ impl Entry {
     pub fn set_text(&self, value: impl Into<String>) {
         self.core.set_text(value)
     }
+
+    /// Add a function called after the text content is modified.
+    ///
+    /// See [`EntryCore::subscribe_changed`].
+    pub fn subscribe_changed(&self, cb: Box<dyn Fn(pal::Wm)>) -> Sub {
+        self.core.subscribe_changed(cb)
+    }
 }
 
 impl Widget for Entry {
@@ -123,7 +132,6 @@ pub struct EntryCore {
     inner: Rc<Inner>,
 }
 
-#[derive(Debug)]
 struct Inner {
     wm: pal::Wm,
     view: WeakHView,
@@ -131,6 +139,25 @@ struct Inner {
     style_elem: theming::Elem,
     style_sel_elem: theming::Elem,
     tictx_event_mask: Cell<pal::TextInputCtxEventFlags>,
+
+    /// The list of subscribers of the `change` event.
+    change_handlers: RefCell<SubscriberList<Box<dyn Fn(pal::Wm)>>>,
+    /// `true` means the calls to `change_handlers` are pended.
+    pending_change_handler: Cell<bool>,
+}
+
+impl fmt::Debug for Inner {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Inner")
+            .field("wm", &self.wm)
+            .field("view", &self.view)
+            .field("state", &self.state)
+            .field("style_elem", &self.style_elem)
+            .field("style_sel_elem", &self.style_sel_elem)
+            .field("tictx_event_mask", &self.tictx_event_mask)
+            .field("pending_change_handler", &self.pending_change_handler)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -204,6 +231,8 @@ impl EntryCore {
                 style_elem,
                 style_sel_elem,
                 tictx_event_mask: Cell::new(pal::TextInputCtxEventFlags::empty()),
+                change_handlers: RefCell::new(SubscriberList::new()),
+                pending_change_handler: Cell::new(false),
             }),
         };
 
@@ -280,6 +309,18 @@ impl EntryCore {
                 UpdateStateFlags::ANY
             },
         );
+    }
+
+    /// Add a function called when the text content is modified.
+    ///
+    /// The function may be called spuriously, i.e., even when the text content
+    /// is not actually modified.
+    ///
+    /// The function is called via `Wm::invoke`, thus allowed to modify
+    /// view hierarchy and view attributes. However, it's not allowed to call
+    /// `subscribe_changed` when one of the handlers is being called.
+    pub fn subscribe_changed(&self, cb: Box<dyn Fn(pal::Wm)>) -> Sub {
+        self.inner.change_handlers.borrow_mut().insert(cb).untype()
     }
 }
 
@@ -1234,6 +1275,10 @@ impl Drop for Edit<'_> {
 
         if let Some(history_tx) = self.history_tx.take() {
             history_tx.finish(&mut state.history, &state.text);
+
+            // `text` might have changed, so raise `changed`
+            // (False positives are positive because of `set_composition_range`)
+            pend_raise_change(self.inner);
         }
 
         if self
@@ -1482,6 +1527,11 @@ fn update_state(
     state.caret_blink = true;
     state.reset_timer(hview, inner, None);
 
+    // Raise `changed`
+    if flags.contains(UpdateStateFlags::ANY) {
+        pend_raise_change(inner);
+    }
+
     // Invalidate the remembered caret position
     state.caret = None;
 
@@ -1500,6 +1550,27 @@ fn update_state(
             }
         }
     }
+}
+
+/// Pend calls to the `change` event handlers.
+fn pend_raise_change(inner: RcBorrow<'_, Inner>) {
+    if inner.pending_change_handler.get() {
+        return;
+    }
+
+    // FIXME: Remove this extra `upgrade`-ing
+    let inner_weak = Rc::downgrade(&RcBorrow::upgrade(inner));
+
+    inner.wm.invoke_on_update(move |wm| {
+        if let Some(inner) = inner_weak.upgrade() {
+            inner.pending_change_handler.set(false);
+
+            let handlers = inner.change_handlers.borrow();
+            for handler in handlers.iter() {
+                handler(wm);
+            }
+        }
+    });
 }
 
 struct EntryCoreDragListener {

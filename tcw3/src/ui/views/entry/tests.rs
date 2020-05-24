@@ -10,7 +10,9 @@ use crate::{
     uicore::{HView, HWnd, SizeTraits, ViewFlags},
 };
 use cggeom::prelude::*;
+use enclose::enc;
 use log::info;
+use std::{cell::RefCell, rc::Rc};
 use try_match::try_match;
 
 use super::Entry;
@@ -78,14 +80,15 @@ struct TestWithOneEntry {
     wm: pal::Wm,
     hwnd: HWnd,
     pal_hwnd: pal::HWnd,
-    entry: Entry,
+    entry: Rc<Entry>,
+    changed_events: Rc<RefCell<Vec<String>>>,
 }
 fn init_test_with_one_entry(twm: &dyn TestingWm) -> TestWithOneEntry {
     let wm = twm.wm();
 
     let style_manager = Manager::global(wm);
 
-    let entry = Entry::new(wm, style_manager);
+    let entry = Rc::new(Entry::new(wm, style_manager));
 
     let wnd = HWnd::new(wm);
     wnd.content_view().set_layout(TableLayout::stack_vert(vec![
@@ -106,11 +109,21 @@ fn init_test_with_one_entry(twm: &dyn TestingWm) -> TestWithOneEntry {
     twm.set_wnd_focused(&pal_hwnd, true);
     twm.step_unsend();
 
+    // Register a `changed` event handler
+    let changed_events = Rc::new(RefCell::new(Vec::new()));
+    let entry_weak = Rc::downgrade(&entry);
+    entry.subscribe_changed(Box::new(enc!((changed_events) move |_| {
+        if let Some(entry) = entry_weak.upgrade() {
+            changed_events.borrow_mut().push(entry.text());
+        }
+    })));
+
     TestWithOneEntry {
         wm,
         hwnd: wnd,
         pal_hwnd,
         entry,
+        changed_events,
     }
 }
 
@@ -121,6 +134,7 @@ fn set_text(twm: &dyn TestingWm) {
         entry,
         hwnd: _hwnd,
         pal_hwnd,
+        changed_events,
         ..
     } = init_test_with_one_entry(twm);
 
@@ -137,6 +151,7 @@ fn set_text(twm: &dyn TestingWm) {
 
     assert!(entry.core().inner.state.borrow().history.can_undo());
     assert_eq!(entry.text(), "hello");
+    assert_eq!(changed_events.borrow()[..], ["hello"][..]);
 
     // Assign a new text
     entry.set_text("world");
@@ -147,4 +162,7 @@ fn set_text(twm: &dyn TestingWm) {
 
     // .. and that history should be forgotten
     assert!(!entry.core().inner.state.borrow().history.can_undo());
+
+    // .. and a `changed` event should be generated
+    assert_eq!(changed_events.borrow()[..], ["hello", "world"][..]);
 }

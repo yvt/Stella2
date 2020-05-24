@@ -19,7 +19,13 @@ pub comp crate::ui::views::Entry {
     /// When you assign to this property, if the new value is different from the
     /// current one, it resets various internal states such as an undo history.
     /// Otherwise, it does nothing.
-    prop text: String { pub set; pub get clone; } = ?;
+    prop text: String { pub set; pub get clone; pub watch event(changed); } = ?;
+
+    /// Raised after the text content is modified.
+    ///
+    /// The event may be raised spuriously, i.e., even when the text content
+    /// is not actually modified.
+    pub event changed(wm: pal::Wm);
 }
 
 #[prototype_only]
@@ -37,5 +43,11 @@ pub comp crate::ui::views::EntryCore {
     /// When you assign to this property, if the new value is different from the
     /// current one, it resets various internal states such as an undo history.
     /// Otherwise, it does nothing.
-    prop text: String { pub set; pub get clone; } = ?;
+    prop text: String { pub set; pub get clone; pub watch event(changed); } = ?;
+
+    /// Raised after the text content is modified.
+    ///
+    /// The event may be raised spuriously, i.e., even when the text content
+    /// is not actually modified.
+    pub event changed(wm: pal::Wm);
 }
