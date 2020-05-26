@@ -321,6 +321,13 @@ restrictions on the kinds of the inputs' referents:
    API often used by standard widgets. Because Designer does not support
    code generation for the simple builder API, **`#[prototype_only]` must also
    be specified**.
+ - **`#[alias(pub crate::AltName)]`** indicates that the component is also
+   available under the path `crate::AltName` (which must be a full path).
+   Note that Designer doesn't generate `use` automatically. The parent module of
+   the alias is responsible for exposing reimports for all public types (e.g.,
+   `ComponentBuilder` and `WeakComponent`) pertaining to that component, using
+   the same type naming rules but substituting the component name with the
+   alias.
 
 ## Lifetime Elision
 

@@ -1,0 +1,10 @@
+use tcw3::pal;
+
+use crate::objinit::alias::{Comp, CompOther, CompOtherAlias};
+
+comp Comp {
+    const other = CompOtherAlias::new! {};
+}
+
+#[alias(crate::objinit::alias::CompOtherAlias)]
+comp CompOther {}

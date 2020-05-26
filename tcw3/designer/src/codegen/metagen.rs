@@ -113,9 +113,12 @@ impl CompResolver<'_> {
                     // part because (1) we already know it has the correct crate
                     // name; and (2) one path might use `crate` while the other
                     // one is using the crate name.
-                    let segs1 = comp.path.syn_path.segments.iter().skip(1).map(|s| &s.ident);
-                    let segs2 = path.segments.iter().skip(1).map(|s| &s.ident);
-                    segs1.eq(segs2)
+                    let segs1 = path.segments.iter().skip(1).map(|s| &s.ident);
+                    let segs2 = std::iter::once(&comp.path)
+                        .chain(comp.path_aliases.iter())
+                        .map(|p| p.syn_path.segments.iter().skip(1).map(|s| &s.ident));
+
+                    { segs2 }.any(|p| segs1.clone().eq(p.clone()))
                 })?;
 
             return Some((self.local_crate_i, comp_i));
@@ -130,9 +133,10 @@ impl CompResolver<'_> {
         let crate_i = *self.imports_crate_i.get(&*crate_name.to_string())?;
         let kuleto = &self.deps_crates[crate_i];
         let comp_i = kuleto.comps.iter().position(|comp: &metadata::CompDef| {
-            let segs1 = comp.paths[0].idents.iter();
-            let segs2 = path.segments.iter().skip(1).map(|s| &s.ident);
-            segs2.eq(segs1)
+            let segs1 = path.segments.iter().skip(1).map(|s| &s.ident);
+            let segs2 = comp.paths.iter().map(|p| p.idents.iter());
+
+            { segs2 }.any(|p| segs1.clone().eq(p.clone()))
         })?;
 
         Some((crate_i, comp_i))
@@ -152,7 +156,10 @@ fn gen_comp(ctx: &mut Ctx<'_, '_>, comp: &sem::CompDef<'_>) -> metadata::CompDef
     let mut this = metadata::CompDef {
         flags: comp.flags,
         vis: gen_vis(ctx, &comp.vis),
-        paths: vec![gen_path(ctx, &comp.path)], // TODO: validate path
+        // TODO: validate path
+        paths: std::iter::once(gen_path(ctx, &comp.path))
+            .chain(comp.path_aliases.iter().map(|p| gen_path(ctx, &p)))
+            .collect(),
         items: comp
             .items
             .iter()

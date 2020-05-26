@@ -7,8 +7,9 @@ use crate::{
 
 #[prototype_only]
 #[widget]
+#[alias(pub crate::ui::views::Split)]
 #[builder(simple)]
-pub comp crate::ui::views::Split {
+pub comp crate::ui::views::split::Split {
     const style_manager: &Manager { pub set; }
 
     /// Specifies the split direction.

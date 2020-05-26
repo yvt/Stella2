@@ -29,5 +29,6 @@ mod misc {
 }
 
 mod objinit {
+    mod alias;
     mod shorthand;
 }

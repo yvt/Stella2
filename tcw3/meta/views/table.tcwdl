@@ -10,8 +10,9 @@ use crate::{
 
 #[prototype_only]
 #[widget]
+#[alias(pub crate::ui::views::Table)]
 #[builder(simple)]
-pub comp crate::ui::views::Table {
+pub comp crate::ui::views::table::Table {
     /// Get a handle to the view representing the widget.
     const view: HView { pub get clone; } = ?;
 
@@ -37,8 +38,9 @@ pub comp crate::ui::views::Table {
 
 #[prototype_only]
 #[widget]
+#[alias(pub crate::ui::views::ScrollableTable)]
 #[builder(simple)]
-pub comp crate::ui::views::ScrollableTable {
+pub comp crate::ui::views::table::ScrollableTable {
     const style_manager: &Manager { pub set; }
 
     /// Get a handle to the view representing the widget.

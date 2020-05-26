@@ -151,6 +151,7 @@ pub struct CompDef<'a> {
     pub vis: Visibility,
     pub doc_attrs: Vec<DocAttr>,
     pub path: Path,
+    pub path_aliases: Vec<Path>,
     /// The last component of `path`.
     pub ident: Ident,
     pub items: Vec<CompItemDef<'a>>,
@@ -433,6 +434,7 @@ impl AnalyzeCtx<'_, '_> {
             vis: Visibility::from_syn(&comp.vis, &parent_path, self.file),
             doc_attrs: Vec::new(),
             path,
+            path_aliases: Vec::new(),
             ident: Ident::from_syn(&comp.path.segments.last().unwrap().ident, self.file),
             items: comp
                 .items
@@ -502,6 +504,8 @@ impl AnalyzeCtx<'_, '_> {
                 }
             } else if attr.path.is_ident("builder") {
                 self.analyze_comp_builder_attr(&mut this, attr.tokens.clone());
+            } else if attr.path.is_ident("alias") {
+                self.analyze_comp_alias_attr(&mut this, attr.tokens.clone());
             } else {
                 self.diag.emit(&[Diagnostic {
                     level: Level::Error,
@@ -577,6 +581,41 @@ impl AnalyzeCtx<'_, '_> {
         }
 
         this
+    }
+
+    fn analyze_comp_alias_attr(&mut self, this: &mut CompDef<'_>, input: proc_macro2::TokenStream) {
+        struct AliasAttr {
+            vis: syn::Visibility,
+            path: syn::Path,
+        }
+
+        impl Parse for AliasAttr {
+            fn parse(input: ParseStream) -> Result<Self> {
+                let content;
+                syn::parenthesized!(content in input);
+
+                let vis = content.parse()?;
+                let path = content.parse()?;
+
+                if !content.is_empty() {
+                    return Err(content.error("Unexpected token"));
+                }
+
+                Ok(Self { vis, path })
+            }
+        }
+
+        match syn::parse2::<AliasAttr>(input) {
+            Ok(attr) => {
+                let _ = attr.vis; // TODO: use visibility
+
+                this.path_aliases
+                    .push(Path::from_syn(&attr.path, self.file));
+            }
+            Err(e) => {
+                emit_syn_errors_as_diag(e, self.diag, self.file);
+            }
+        }
     }
 
     fn analyze_comp_builder_attr(
