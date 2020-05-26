@@ -1,0 +1,17 @@
+use tcw3::pal;
+comp crate::field::bug_type_deduction::Comp {
+    const wm: pal::Wm { set; }
+
+    // An old implementation of Designer produced implementation code
+    // that didn't type-check for these fields:
+    //
+    //  error[E0282]: type annotations needed
+    //      |
+    //  695 | let __tmp_1 = match () { () => { "a" . into ( ) } };
+    //      |     ------- consider giving `__tmp_1` a type
+    //  696 | let __tmp_2 = match ((&__tmp_1), ) { (_input_0, ) => { _input_0 . len ( ) } };
+    //      |                                                                   ^^^ cannot infer type
+    //
+    const const1: String = "a".into();
+    const const2: usize = get!(&const1).len();
+}

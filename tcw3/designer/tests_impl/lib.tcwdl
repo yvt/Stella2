@@ -1,5 +1,6 @@
 import!("commit/remotetrigger.tcwdl");
 import!("field/accessors.tcwdl");
+import!("field/bug_type_deduction.tcwdl");
 import!("field/lifetime_elision.tcwdl");
 import!("field/prop.tcwdl");
 import!("func/inline.tcwdl");

@@ -10,6 +10,7 @@ mod commit {
 
 mod field {
     mod accessors;
+    mod bug_type_deduction;
     mod lifetime_elision;
     mod prop;
 }

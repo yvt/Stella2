@@ -5,6 +5,7 @@ use pathfinding::directed::{
     strongly_connected_components::strongly_connected_components,
     topological_sort::topological_sort,
 };
+use quote::ToTokens;
 use std::{cell::Cell, collections::HashMap, fmt::Write, ops::Range};
 use try_match::try_match;
 
@@ -1044,7 +1045,7 @@ pub fn gen_construct(
 
             DepNode::Field { item_i } => {
                 let field = comp.items[*item_i].field().unwrap();
-                write!(out, "let {} = ", var).unwrap();
+                write!(out, "let {}: {} = ", var, field.ty.to_token_stream()).unwrap();
 
                 if field.value.is_none() {
                     // Mandatory field - the value is always available
