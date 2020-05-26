@@ -6,6 +6,7 @@ import!("func/inline.tcwdl");
 import!("interop/builder_simple.tcwdl");
 import!("misc/exprpath.tcwdl");
 import!("misc/genericresolve.tcwdl");
+import!("misc/primitives.tcwdl");
 import!("misc/weakref.tcwdl");
 import!("objinit/alias.tcwdl");
 import!("objinit/shorthand.tcwdl");

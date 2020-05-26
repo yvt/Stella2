@@ -1,0 +1,24 @@
+use tcw3::pal;
+
+comp crate::misc::primitives::Comp {
+    const wm: pal::Wm { set; }
+
+    // Primitive types should be treated as-is and shouldn't be
+    prop f_bool: bool = false;
+    prop f_char: char = 'x';
+    prop f_f32: f32 = 0.0;
+    prop f_f64: f64 = 0.0;
+    prop f_i128: i128 = 0;
+    prop f_i16: i16 = 0;
+    prop f_i32: i32 = 0;
+    prop f_i64: i64 = 0;
+    prop f_i8: i8 = 0;
+    prop f_isize: isize = 0;
+    prop f_str: Box<str> = String::new().into_boxed_str();
+    prop f_u128: u128 = 0;
+    prop f_u16: u16 = 0;
+    prop f_u32: u32 = 0;
+    prop f_u64: u64 = 0;
+    prop f_u8: u8 = 0;
+    prop f_usize: usize = 0;
+}

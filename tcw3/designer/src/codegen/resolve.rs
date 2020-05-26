@@ -250,7 +250,7 @@ fn is_path_rooted_or_crate(path: &Path) -> bool {
 fn is_builtin_type_ident(ident: &Ident) -> bool {
     [
         "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f32", "f64", "bool",
-        "char", "str",
+        "char", "str", "usize", "isize",
     ]
     .iter()
     .any(|&s| *ident == s)
