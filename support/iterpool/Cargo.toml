@@ -7,3 +7,10 @@ edition = "2018"
 
 [dependencies]
 array_intrusive_list = { path = "../array_intrusive_list" }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "pool"
+harness = false
