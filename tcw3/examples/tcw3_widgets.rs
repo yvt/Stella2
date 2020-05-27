@@ -7,7 +7,7 @@ use tcw3::{
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
-            Scrollbar, Slider,
+            Scrollbar, SliderRaw,
         },
         AlignFlags,
     },
@@ -136,7 +136,7 @@ fn main() {
     slider_labels[3].set_text("Gallop");
     slider_labels[4].set_text("Warp");
 
-    let slider = Slider::new(style_manager, false);
+    let slider = SliderRaw::new(style_manager, false);
     let slider = Rc::new(slider);
     slider.set_uniform_ticks(5);
     slider.set_labels([
@@ -272,7 +272,7 @@ impl ScrollbarDragListener for MyScrollbarDragListener {
 }
 
 struct MySliderDragListener {
-    slider: Rc<Slider>,
+    slider: Rc<SliderRaw>,
     value: f64,
 }
 

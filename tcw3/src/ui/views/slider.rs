@@ -36,7 +36,7 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 /// # Custom Label Views
 ///
 /// A slider can have *custom label views* tethered to specific values. They can
-/// be set by calling [`Slider::set_labels`].
+/// be set by calling [`SliderRaw::set_labels`].
 ///
 /// *Performance notes:* Custom label views use O(n²) algorithms in many of
 /// their code paths. Please keep the number of views low (< 8).
@@ -47,14 +47,14 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 ///     - `subviews[`[`roles::SLIDER_LABELS`]`]`: The wrapper for custom label
 ///       views.
 ///
-///     - `subviews[`[`roles::SLIDER_KNOB`]`]`: The knob. `Slider` overrides the
-///       knob's `frame` using the current value. The original `frame`
+///     - `subviews[`[`roles::SLIDER_KNOB`]`]`: The knob. `SliderRaw` overrides
+///       the knob's `frame` using the current value. The original `frame`
 ///       represents the knob's movable range. The size along the primary axis
 ///       is always set to minimum.
 ///
 ///       *Note:* "The original `frame`" is the initial `frame` calculated by
 ///       `StyledBox`'s layout algorithm and is bounded by the subview's maximum
-///       size. The overall size of `Slider` will be affected as normally it
+///       size. The overall size of `SliderRaw` will be affected as normally it
 ///       would. You need to make sure the maximum size is set to infinity to
 ///       achieve a desired effect.
 ///
@@ -82,7 +82,7 @@ pub use super::scrollbar::{Dir, ScrollbarDragListener};
 /// [`SLIDER_LABELS`]: crate::ui::theming::elem_id::SLIDER_LABELS
 ///
 #[derive(Debug)]
-pub struct Slider {
+pub struct SliderRaw {
     shared: Rc<Shared>,
 }
 
@@ -141,7 +141,7 @@ struct LayoutState {
     clearance: f64,
 }
 
-impl Slider {
+impl SliderRaw {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
         let frame = StyledBox::new(
             style_manager,
@@ -401,7 +401,7 @@ impl Slider {
     }
 }
 
-impl Widget for Slider {
+impl Widget for SliderRaw {
     fn view_ref(&self) -> HViewRef<'_> {
         self.view_ref()
     }
@@ -428,7 +428,7 @@ impl Shared {
     }
 }
 
-/// Implements `StyledBoxOverride` for `Slider`.
+/// Implements `StyledBoxOverride` for `SliderRaw`.
 struct SlStyledBoxOverride {
     value: f64,
     /// This reference to `Shared` is used to provide layout feedback. The above
@@ -545,7 +545,7 @@ impl StyledBoxOverride for LabelsStyledBoxOverride {
     }
 }
 
-/// Implements `ViewListener` for `Slider`.
+/// Implements `ViewListener` for `SliderRaw`.
 struct SlViewListener {
     shared: Weak<Shared>,
 }
@@ -611,7 +611,7 @@ static ACCEL_TABLE: pal::AccelTable = pal::accel_table![
     (ACTION_BOTTOM, windows("Down"), macos("Down"), gtk("Down")),
 ];
 
-/// Implements `MouseDragListener` for `Slider`.
+/// Implements `MouseDragListener` for `SliderRaw`.
 struct SlMouseDragListener {
     shared: Rc<Shared>,
     drag_start: Cell<Option<(f32, f64)>>,
@@ -812,11 +812,11 @@ mod tests {
         }
     }
 
-    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Slider>, HWnd, pal::HWnd) {
+    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<SliderRaw>, HWnd, pal::HWnd) {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Rc::new(Slider::new(style_manager, vertical));
+        let sb = Rc::new(SliderRaw::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
         wnd.content_view().set_layout(FillLayout::new(sb.view()));
@@ -856,10 +856,10 @@ mod tests {
         assert!(fr1.contains_box(&fr2));
     }
 
-    struct ValueUpdatingDragListener(Weak<Slider>, f64);
+    struct ValueUpdatingDragListener(Weak<SliderRaw>, f64);
 
     impl ValueUpdatingDragListener {
-        fn new(sb: &Rc<Slider>) -> Self {
+        fn new(sb: &Rc<SliderRaw>) -> Self {
             Self(Rc::downgrade(sb), sb.value())
         }
     }
@@ -1003,7 +1003,7 @@ mod tests {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Rc::new(Slider::new(style_manager, false));
+        let sb = Rc::new(SliderRaw::new(style_manager, false));
 
         // Store the drop detector in `Shared`
         let dropped = Rc::new(Cell::new(false));
@@ -1013,7 +1013,7 @@ mod tests {
             unreachable!()
         });
 
-        // Drop `Slider`
+        // Drop `SliderRaw`
         drop(sb);
         twm.step_unsend();
 
