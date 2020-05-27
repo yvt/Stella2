@@ -8,7 +8,7 @@ use crate::{
     pal,
     ui::{
         scrolling::piecewise::piecewise_map,
-        views::scrollbar::{Scrollbar, ScrollbarDragListener},
+        views::scrollbar::{ScrollbarDragListener, ScrollbarRaw},
     },
 };
 
@@ -36,7 +36,7 @@ impl TableScrollbarDragState {
     /// Handles [`ScrollbarDragListener::down`].
     ///
     /// [`ScrollbarDragListener::down`]: crate::ui::views::scrollbar::ScrollbarDragListener::down
-    pub fn down(&self, sb: &Scrollbar, edit: &mut TableEdit<'_>, _line_ty: LineTy) {
+    pub fn down(&self, sb: &ScrollbarRaw, edit: &mut TableEdit<'_>, _line_ty: LineTy) {
         assert!(self.initial.get().is_none());
 
         let vp = edit.new_vp(edit.scroll_pos());
@@ -50,7 +50,7 @@ impl TableScrollbarDragState {
     /// [`ScrollbarDragListener::motion`]: crate::ui::views::scrollbar::ScrollbarDragListener::motion
     pub fn motion(
         &self,
-        sb: &Scrollbar,
+        sb: &ScrollbarRaw,
         edit: &mut TableEdit<'_>,
         line_ty: LineTy,
         new_value: f64,
@@ -83,7 +83,7 @@ impl TableScrollbarDragState {
     /// Handles [`ScrollbarDragListener::cancel`].
     ///
     /// [`ScrollbarDragListener::cancel`]: crate::ui::views::scrollbar::ScrollbarDragListener::cancel
-    pub fn cancel(&self, sb: &Scrollbar, edit: &mut TableEdit<'_>, line_ty: LineTy) {
+    pub fn cancel(&self, sb: &ScrollbarRaw, edit: &mut TableEdit<'_>, line_ty: LineTy) {
         if let Some(point) = self.initial.take() {
             // Restore the original scroll position
             let mut vp_pos = edit.scroll_pos();
@@ -99,7 +99,7 @@ impl TableScrollbarDragState {
     /// Handles [`ScrollbarDragListener::up`].
     ///
     /// [`ScrollbarDragListener::up`]: crate::ui::views::scrollbar::ScrollbarDragListener::up
-    pub fn up(&self, sb: &Scrollbar, edit: &mut TableEdit<'_>, line_ty: LineTy) {
+    pub fn up(&self, sb: &ScrollbarRaw, edit: &mut TableEdit<'_>, line_ty: LineTy) {
         let point = self.initial.take().unwrap();
         edit.remove_vp(point.vp);
 
@@ -110,7 +110,7 @@ impl TableScrollbarDragState {
 }
 
 /// Wraps [`TableScrollbarDragState`] and implements [`ScrollbarDragListener`].
-/// `A` is used to get references to a `Table` and `Scrollbar` which are to
+/// `A` is used to get references to a `Table` and `ScrollbarRaw` which are to
 /// be bound.
 #[derive(Debug)]
 pub struct TableScrollbarDragListener<A> {
@@ -139,7 +139,7 @@ impl<A, T, S> ScrollbarDragListener for TableScrollbarDragListener<A>
 where
     A: Fn() -> Option<(T, S)>,
     T: std::ops::Deref<Target = Table>,
-    S: std::ops::Deref<Target = Scrollbar>,
+    S: std::ops::Deref<Target = ScrollbarRaw>,
 {
     fn down(&self, _: pal::Wm, _new_value: f64) {
         if let Some((table, sb)) = (self.accessor)() {

@@ -7,7 +7,7 @@ use tcw3::{
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
-            Scrollbar, SliderRaw,
+            ScrollbarRaw, SliderRaw,
         },
         AlignFlags,
     },
@@ -104,7 +104,7 @@ fn main() {
     let label = Label::new(style_manager);
     label.set_text("Hello, world! «coi ro do .ui» Saluton! nuqneH");
 
-    let scrollbar = Scrollbar::new(style_manager, false);
+    let scrollbar = ScrollbarRaw::new(style_manager, false);
     let scrollbar = Rc::new(scrollbar);
     {
         let scrollbar_weak = Rc::downgrade(&scrollbar);
@@ -257,7 +257,7 @@ fn main() {
 }
 
 struct MyScrollbarDragListener {
-    scrollbar: Rc<Scrollbar>,
+    scrollbar: Rc<ScrollbarRaw>,
     value: f64,
 }
 

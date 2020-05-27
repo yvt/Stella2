@@ -30,7 +30,7 @@ pub mod views {
         checkbox::{Checkbox, RadioButton},
         entry::{Entry, EntryCore},
         label::Label,
-        scrollbar::Scrollbar,
+        scrollbar::ScrollbarRaw,
         slider::SliderRaw,
         spacer::{new_spacer, Spacer},
         split::Split,

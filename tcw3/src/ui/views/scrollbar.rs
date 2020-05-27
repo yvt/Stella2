@@ -25,7 +25,7 @@ use crate::{
 ///
 /// The widget is translucent and designed to be overlaid on contents.
 #[derive(Debug)]
-pub struct Scrollbar {
+pub struct ScrollbarRaw {
     shared: Rc<Shared>,
 }
 
@@ -74,7 +74,7 @@ struct LayoutState {
     clearance: f64,
 }
 
-/// Drag gesture handlers for [`Scrollbar`]. It has semantics similar to
+/// Drag gesture handlers for [`ScrollbarRaw`]. It has semantics similar to
 /// `MouseDragListener`.
 ///
 /// They are all called inside `invoke_on_update`. The event rate is limited by
@@ -83,21 +83,21 @@ pub trait ScrollbarDragListener {
     /// The thumb is about to be moved. `new_value` specifies the current
     /// [`value`].
     ///
-    /// [`value`]: crate::ui::views::scrollbar::Scrollbar::value
+    /// [`value`]: crate::ui::views::scrollbar::ScrollbarRaw::value
     fn down(&self, _: pal::Wm, _new_value: f64) {}
 
     /// The thumb is being moved. `new_value` specifies the new [`value`].
-    /// The implementation is responsible for updating `Scrollbar` with a new
+    /// The implementation is responsible for updating `ScrollbarRaw` with a new
     /// value.
     ///
-    /// [`value`]: crate::ui::views::scrollbar::Scrollbar::value
+    /// [`value`]: crate::ui::views::scrollbar::ScrollbarRaw::value
     fn motion(&self, _: pal::Wm, _new_value: f64) {}
 
     /// The thumb was moved.
     fn up(&self, _: pal::Wm) {}
 
     /// The drag gesture was cancelled. The implementation is responsible for
-    /// updating `Scrollbar` with an original value.
+    /// updating `ScrollbarRaw` with an original value.
     fn cancel(&self, _: pal::Wm) {}
 }
 
@@ -109,7 +109,7 @@ impl<T: ScrollbarDragListener + 'static> From<T> for Box<dyn ScrollbarDragListen
     }
 }
 
-impl Scrollbar {
+impl ScrollbarRaw {
     pub fn new(style_manager: &'static Manager, vertical: bool) -> Self {
         let frame = StyledBox::new(style_manager, ViewFlags::ACCEPT_MOUSE_OVER);
         frame.set_class_set(if vertical {
@@ -232,7 +232,7 @@ impl Scrollbar {
     }
 }
 
-impl Widget for Scrollbar {
+impl Widget for ScrollbarRaw {
     fn view_ref(&self) -> HViewRef<'_> {
         self.view_ref()
     }
@@ -260,7 +260,7 @@ impl Shared {
     }
 }
 
-/// Implements `StyledBoxOverride` for `Scrollbar`.
+/// Implements `StyledBoxOverride` for `ScrollbarRaw`.
 struct SbStyledBoxOverride {
     value: f64,
     page_step: f64,
@@ -331,7 +331,7 @@ impl StyledBoxOverride for SbStyledBoxOverride {
     }
 }
 
-/// Implements `ViewListener` for `Scrollbar`.
+/// Implements `ViewListener` for `ScrollbarRaw`.
 struct SbViewListener {
     shared: Weak<Shared>,
 }
@@ -356,7 +356,7 @@ impl ViewListener for SbViewListener {
     }
 }
 
-/// Implements `MouseDragListener` for `Scrollbar`.
+/// Implements `MouseDragListener` for `ScrollbarRaw`.
 struct SbMouseDragListener {
     shared: Rc<Shared>,
     drag_start: Cell<Option<(f32, f64)>>,
@@ -550,11 +550,11 @@ mod tests {
         }
     }
 
-    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<Scrollbar>, HWnd, pal::HWnd) {
+    fn make_wnd(twm: &dyn TestingWm, vertical: bool) -> (Rc<ScrollbarRaw>, HWnd, pal::HWnd) {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Rc::new(Scrollbar::new(style_manager, vertical));
+        let sb = Rc::new(ScrollbarRaw::new(style_manager, vertical));
 
         let wnd = HWnd::new(wm);
         wnd.content_view().set_layout(FillLayout::new(sb.view()));
@@ -595,10 +595,10 @@ mod tests {
         assert!(fr1.contains_box(&fr2));
     }
 
-    struct ValueUpdatingDragListener(Weak<Scrollbar>, f64);
+    struct ValueUpdatingDragListener(Weak<ScrollbarRaw>, f64);
 
     impl ValueUpdatingDragListener {
-        fn new(sb: &Rc<Scrollbar>) -> Self {
+        fn new(sb: &Rc<ScrollbarRaw>) -> Self {
             Self(Rc::downgrade(sb), sb.value())
         }
     }
@@ -765,7 +765,7 @@ mod tests {
         let wm = twm.wm();
 
         let style_manager = Manager::global(wm);
-        let sb = Rc::new(Scrollbar::new(style_manager, false));
+        let sb = Rc::new(ScrollbarRaw::new(style_manager, false));
 
         // Store the drop detector in `Shared`
         let dropped = Rc::new(Cell::new(false));
@@ -775,7 +775,7 @@ mod tests {
             unreachable!()
         });
 
-        // Drop `Scrollbar`
+        // Drop `ScrollbarRaw`
         drop(sb);
         twm.step_unsend();
 

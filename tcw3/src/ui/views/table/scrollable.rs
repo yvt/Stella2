@@ -21,7 +21,7 @@ use crate::{
         layouts::FillLayout,
         mixins::scrollwheel::{ScrollAxisFlags, ScrollModel, ScrollWheelMixin},
         theming::{roles, ClassSet, HElem, Manager, StyledBox, Widget},
-        views::Scrollbar,
+        views::ScrollbarRaw,
     },
     uicore::{HView, HViewRef, ScrollDelta, ScrollListener, SizeTraits, ViewFlags, ViewListener},
 };
@@ -37,7 +37,7 @@ struct Inner {
     wrapper: HView,
     styled_box: StyledBox,
     table: Table,
-    scrollbars: [Scrollbar; 2],
+    scrollbars: [ScrollbarRaw; 2],
     drag_active: [Cell<bool>; 2],
     scroll_mixin: ScrollWheelMixin,
 }
@@ -48,8 +48,8 @@ impl ScrollableTable {
         let styled_box = StyledBox::new(style_manager, ViewFlags::default());
         let table = Table::new();
         let scrollbars = [
-            Scrollbar::new(style_manager, false),
-            Scrollbar::new(style_manager, true),
+            ScrollbarRaw::new(style_manager, false),
+            ScrollbarRaw::new(style_manager, true),
         ];
 
         styled_box.set_subview(roles::GENERIC, Some(table.view()));
@@ -114,7 +114,7 @@ impl ScrollableTable {
                     }
 
                     // `TableScrollbarDragListener` uses this closure to borrow
-                    // `Table` and `Scrollbar`
+                    // `Table` and `ScrollbarRaw`
                     let accessor = move || {
                         inner_ref.0.upgrade().map(|inner| {
                             let inner2 = Rc::clone(&inner);
