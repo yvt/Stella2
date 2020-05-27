@@ -1,4 +1,4 @@
-/// Provides the internal implementation of `tcw3_pal::new_accel`.
+//! Provides the internal implementation of `tcw3_pal::new_accel`.
 extern crate proc_macro;
 
 mod accel;
