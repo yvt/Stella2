@@ -1558,8 +1558,7 @@ fn pend_raise_change(inner: RcBorrow<'_, Inner>) {
         return;
     }
 
-    // FIXME: Remove this extra `upgrade`-ing
-    let inner_weak = Rc::downgrade(&RcBorrow::upgrade(inner));
+    let inner_weak = RcBorrow::to_weak(inner);
 
     inner.wm.invoke_on_update(move |wm| {
         if let Some(inner) = inner_weak.upgrade() {

@@ -9,7 +9,7 @@ use std::{
     cell::RefCell,
     cmp::{max, min},
     pin::Pin,
-    rc::{Rc, Weak},
+    rc::Weak,
 };
 
 use super::{
@@ -82,7 +82,7 @@ impl HWndRef<'_> {
             pal_wnd_cell.as_ref().unwrap(),
             pal::WndAttrs {
                 listener: Some(Box::new(PalWndListener {
-                    wnd: Rc::downgrade(&RcBorrow::upgrade(self.wnd)),
+                    wnd: RcBorrow::to_weak(self.wnd),
                 })),
                 ..Default::default()
             },
