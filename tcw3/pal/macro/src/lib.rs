@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "windows", feature(or_patterns))] // `|` in subpatterns
 //! Provides the internal implementation of `tcw3_pal::new_accel`.
 extern crate proc_macro;
 
