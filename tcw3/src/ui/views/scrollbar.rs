@@ -79,6 +79,9 @@ struct LayoutState {
 ///
 /// They are all called inside `invoke_on_update`. The event rate is limited by
 /// the screen update rate.
+///
+/// The use of `ScrollbarDragListener` is finished by a call to `up` or
+/// `cancel`, after which the object will be dropped.
 pub trait ScrollbarDragListener {
     /// The thumb is about to be moved. `new_value` specifies the current
     /// [`value`].
