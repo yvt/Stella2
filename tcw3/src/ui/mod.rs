@@ -31,7 +31,7 @@ pub mod views {
         entry::{Entry, EntryCore},
         label::Label,
         scrollbar::ScrollbarRaw,
-        slider::SliderRaw,
+        slider::{Slider, SliderRaw},
         spacer::{new_spacer, Spacer},
         split::Split,
         table::{ScrollableTable, Table},

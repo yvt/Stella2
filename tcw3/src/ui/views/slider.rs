@@ -31,7 +31,13 @@ use super::scrollbar::ListenerOnUpdateFilter;
 #[doc(no_inline)]
 pub use super::scrollbar::{Dir, ScrollbarDragListener};
 
-/// A slider widget.
+// High-level interface including `Slider`
+mod wrap;
+pub use self::wrap::*;
+
+/// A raw slider widget.
+///
+/// See [`Slider`] for a high-level interface for this widget.
 ///
 /// # Custom Label Views
 ///
