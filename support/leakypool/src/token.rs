@@ -62,7 +62,7 @@ pub struct LeakyTokenId {
 ///
 /// # Safety
 ///
-/// Given `token_store1` and `token_store2`, each an instance of
+/// Given `token_store1` and `token_store2`, two instances of
 /// `TokenStore`; `token`, an instance of  `Token` returned by
 /// `token_store1.token_ref()` or `token_store1.token_mut()`;
 /// and `id`, an instance of `TokenId` returned by `token_store2.id()`,
@@ -172,6 +172,12 @@ pub struct UncheckedToken {
 
 impl UncheckedToken {
     /// Construct an `UncheckedToken`.
+    ///
+    /// # Safety
+    ///
+    /// This method allows the creation of multiple instances of
+    /// `UncheckedToken`, which violates the safety requirement of
+    /// [`TokenStore`].
     pub const unsafe fn new() -> Self {
         Self {
             _ctor_is_unsafe: (),
@@ -291,6 +297,12 @@ impl<Tag: SingletonTag> Default for SingletonToken<Tag> {
 
 impl<Tag> SingletonToken<Tag> {
     /// Construct an `SingletonToken` without checking the uniqueness.
+    ///
+    /// # Safety
+    ///
+    /// This method is `unsafe` because it bypasses the uniqueness check which
+    /// is usually done by `new` and `try_new`. Constructing multiple instances
+    /// violates the safety requirement of [`TokenStore`].
     pub unsafe fn new_unchecked() -> Self {
         Self {
             _tag: PhantomData,
