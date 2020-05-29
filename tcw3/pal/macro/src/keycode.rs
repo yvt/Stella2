@@ -64,7 +64,7 @@ pub enum Key {
 
 bitflags::bitflags! {
     pub struct ModFlags: u8 {
-        const SHIFT = 1 << 0;
+        const SHIFT = 1;
         const CONTROL = 1 << 1;
         const ALT = 1 << 2;
         const SUPER = 1 << 3;
@@ -110,12 +110,12 @@ impl std::str::FromStr for KeyPattern {
                 return Err(format!("Unknown key: {:?}", s));
             }
 
-            if s.len() == 0 {
+            if s.is_empty() {
                 return Err("Key symbol is missing".to_owned());
             }
 
             // For convenience, convert the character to lower case
-            Key::Char(s.chars().nth(0).unwrap().to_ascii_lowercase())
+            Key::Char(s.chars().next().unwrap().to_ascii_lowercase())
         };
 
         Ok(Self { key, mod_flags })

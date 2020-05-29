@@ -948,6 +948,7 @@ bitflags! {
 ///
 /// The implementations of these methods are not allowed to use [`Wm`]'s methods
 /// to manipulate the current text input context.
+#[allow(clippy::len_without_is_empty)]
 pub trait TextInputCtxEdit<T: Wm> {
     /// Get the current selection.
     ///

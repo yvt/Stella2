@@ -608,10 +608,14 @@ impl iface::TextLayout for TextLayout {
         let text = &self.text.as_bytes();
 
         if forward {
+            // If `forward == true` and `i` is already at the end of the text,
+            // return `i`
             if i >= text.len() {
                 return i;
             }
         } else {
+            // If `forward == false` and `i` is already at the start of the text,
+            // return `i`
             if i == 0 {
                 return 0;
             }
@@ -851,7 +855,7 @@ fn ctrun_get_status(this: &CTRun) -> CTRunStatus {
 
 #[allow(dead_code)]
 fn ctrun_get_advances(this: &CTRun, start: isize, out_advances: &mut [MaybeUninit<CGSize>]) {
-    if out_advances.len() == 0 {
+    if out_advances.is_empty() {
         return;
     }
 

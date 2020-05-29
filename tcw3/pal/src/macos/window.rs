@@ -374,7 +374,7 @@ impl AccelTable {
                     && charcode_unmod == binding.charcode
             })
             .map(|binding| binding.action)
-            .nth(0)
+            .next() // get the first matching one (if any)
     }
 
     fn find_action_with_sel(&self, sel: &[u8]) -> Option<iface::ActionId> {
@@ -382,7 +382,7 @@ impl AccelTable {
             .iter()
             .filter(|binding| binding.sel.as_bytes() == sel)
             .map(|binding| binding.action)
-            .nth(0)
+            .next() // get the first matching one (if any)
     }
 }
 
@@ -1244,7 +1244,7 @@ unsafe extern "C" fn tcw_wnd_get_selected_range(ud: TCWListenerUserData) -> NSRa
         log::trace!("tcw_wnd_get_selected_range → {}..+{}", start, len);
         NSRange::new(start as _, len as _)
     })
-    .unwrap_or(nsrange_not_found())
+    .unwrap_or_else(nsrange_not_found)
 }
 
 #[no_mangle]
@@ -1280,7 +1280,7 @@ unsafe extern "C" fn tcw_wnd_get_marked_range(ud: TCWListenerUserData) -> NSRang
         log::trace!("tcw_wnd_get_marked_range → {}..+{}", start, len);
         NSRange::new(start as _, len as _)
     })
-    .unwrap_or(nsrange_not_found())
+    .unwrap_or_else(nsrange_not_found)
 }
 
 #[no_mangle]
@@ -1314,8 +1314,8 @@ unsafe extern "C" fn tcw_wnd_get_text(
         let (range_u8, range_actual_u16, text) =
             edit_convert_range_to_utf8_with_text(&mut *edit, start..start.saturating_add(len));
 
-        log::trace!("... actual range (UTF-8) = {:?}", range_u8.clone());
-        log::trace!("... actual range (UTF-16) = {:?}", range_actual_u16.clone());
+        log::trace!("... actual range (UTF-8) = {:?}", range_u8);
+        log::trace!("... actual range (UTF-16) = {:?}", range_actual_u16);
 
         if let Some(actual_range_cell) = actual_range {
             *actual_range_cell = NSRange::new(
@@ -1330,7 +1330,7 @@ unsafe extern "C" fn tcw_wnd_get_text(
 
         NSString::alloc(nil).init_str(slice)
     })
-    .unwrap_or_else(|| std::ptr::null_mut())
+    .unwrap_or_else(std::ptr::null_mut)
 }
 
 fn empty_nsrect() -> NSRect {
@@ -1401,11 +1401,9 @@ unsafe extern "C" fn tcw_wnd_get_text_rect(
 
         // Convert `Box2<f32>` to `NSRect`. Our Objective-C handler method
         // handles the conversion to screen coordinates.
-        let bounds = ns_rect_from_box2(cg_bounds.cast::<f64>().unwrap());
-
-        bounds
+        ns_rect_from_box2(cg_bounds.cast::<f64>().unwrap())
     })
-    .unwrap_or(empty_nsrect())
+    .unwrap_or_else(empty_nsrect)
 }
 
 #[no_mangle]

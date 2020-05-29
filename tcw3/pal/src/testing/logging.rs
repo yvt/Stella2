@@ -187,8 +187,8 @@ impl RecordSend {
             .target(&self.target)
             .level(self.level)
             .args(format_args!("{}", self.args))
-            .module_path(self.module_path.as_ref().map(String::as_str))
-            .file(self.file.as_ref().map(String::as_str))
+            .module_path(self.module_path.as_deref())
+            .file(self.file.as_deref())
             .line(self.line)
             .build())
     }

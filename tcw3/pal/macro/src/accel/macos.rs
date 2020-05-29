@@ -147,7 +147,7 @@ fn gen_key_binding(
     // Some characters are included in both of a normal keyboard and a numerical
     // keypad. `Key` distinguishes between them.
     let needs_keypad_disambiguation = if charcode < 128 {
-        "0123456789*+,-./".as_bytes().contains(&(charcode as u8))
+        b"0123456789*+,-./".contains(&(charcode as u8))
     } else {
         false
     };
