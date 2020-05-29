@@ -5,6 +5,7 @@ import!("views/button.tcwdl");
 import!("views/checkbox.tcwdl");
 import!("views/entry.tcwdl");
 import!("views/label.tcwdl");
+import!("views/slider.tcwdl");
 import!("views/spacer.tcwdl");
 import!("views/split.tcwdl");
 import!("views/table.tcwdl");

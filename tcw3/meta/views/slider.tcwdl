@@ -1,0 +1,62 @@
+use crate::{
+    ui::{
+        theming::{ClassSet, StyledBox, HElem, Manager},
+        views::slider::SliderTraits,
+    },
+    uicore::HView,
+    utils::resetiter,
+};
+
+/// A high-level interface for `SliderRaw`.
+#[prototype_only]
+#[widget]
+#[alias(pub crate::ui::views::Slider)]
+#[builder(simple)]
+pub comp crate::ui::views::slider::Slider {
+    const wm: crate::pal::Wm { pub set; }
+    const style_manager: &Manager { pub set; }
+    /// Specifies the direction of the slider widget.
+    const vertical: bool { pub set; }
+
+    /// Sets or retrieves the class set of the inner `StyledBox`.
+    ///
+    /// It defaults to `ClassSet::SLIDER`. Some bits (e.g., `ACTIVE`) are
+    /// internally enforced and cannot be modified.
+    prop class_set: ClassSet { pub set; get clone; } = ?;
+
+    /// Retrieves a handle to the view representing the widget.
+    const view: HView { pub get clone; } = ?;
+    /// Retrieves a handle to the styling element representing the widget.
+    const style_elem: HElem { pub get clone; } = ?;
+
+    /// Assigns a `SliderTraits`.
+    ///
+    /// The default value is `SmoothSliderTraits::new()`.
+    prop traits: impl Into<Box<dyn SliderTraits>> + 'static { pub set; } = ?;
+
+    /// Sets or retrieves the current value in range `[0, 1]`.
+    ///
+    /// Changing the value cancels any ongoing mouse drag operation.
+    prop value: f64 { pub set; pub get clone; pub watch event(changed); } = ?;
+
+    /// Retrieves the current uncommitted value.
+    wire uncommitted_value: f64 { pub get clone; pub watch event(changing); } = ?;
+
+    /// Raised whenever `value` changes.
+    pub event changed(wm: pal::Wm);
+
+    /// Raised whenever `uncommitted_value` changes.
+    pub event changing(wm: pal::Wm);
+
+    /// Sets the tick mark positions.
+    prop ticks: impl resetiter::IntoResetIter<Item = f64> + 'static { pub set; } = ?;
+
+    /// Arranges tick marks uniformly by automatically assiging a value to
+    /// `ticks`.
+    ///
+    /// The value must not be zero.
+    prop uniform_ticks: usize { pub set; } = ?;
+
+    /// Sets custom label views attached to specified values.
+    prop labels: impl AsRef<[(Role, Option<(f64, &dyn Widget)>)]> { pub set; } = ?;
+}

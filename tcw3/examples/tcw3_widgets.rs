@@ -7,7 +7,7 @@ use tcw3::{
         theming,
         views::{
             scrollbar::ScrollbarDragListener, Button, Checkbox, Entry, Label, RadioButton,
-            Scrollbar, Slider,
+            ScrollbarRaw, Slider,
         },
         AlignFlags,
     },
@@ -104,7 +104,7 @@ fn main() {
     let label = Label::new(style_manager);
     label.set_text("Hello, world! «coi ro do .ui» Saluton! nuqneH");
 
-    let scrollbar = Scrollbar::new(style_manager, false);
+    let scrollbar = ScrollbarRaw::new(style_manager, false);
     let scrollbar = Rc::new(scrollbar);
     {
         let scrollbar_weak = Rc::downgrade(&scrollbar);
@@ -134,10 +134,9 @@ fn main() {
     slider_labels[1].set_text("Trot");
     slider_labels[2].set_text("Canter");
     slider_labels[3].set_text("Gallop");
-    slider_labels[4].set_text("Warp");
+    slider_labels[4].set_text("Teleport");
 
-    let slider = Slider::new(style_manager, false);
-    let slider = Rc::new(slider);
+    let slider = Slider::new(wm, style_manager, false);
     slider.set_uniform_ticks(5);
     slider.set_labels([
         (0, Some((0.0, &slider_labels[0] as &dyn theming::Widget))),
@@ -146,22 +145,7 @@ fn main() {
         (3, Some((0.6, &slider_labels[3] as &dyn theming::Widget))),
         (4, Some((1.0, &slider_labels[4] as &dyn theming::Widget))),
     ]);
-    {
-        let slider_weak = Rc::downgrade(&slider);
-        slider.set_on_drag(move |_| {
-            let slider = slider_weak.upgrade().unwrap();
-            let value = slider.value();
-            Box::new(MySliderDragListener { value, slider })
-        });
-    }
-    {
-        let slider_weak = Rc::downgrade(&slider);
-        slider.set_on_step(move |_, dir| {
-            let slider = slider_weak.upgrade().unwrap();
-            let value = slider.value() + dir as i8 as f64 * 0.2;
-            slider.set_value(value.max(0.0).min(1.0));
-        });
-    }
+    slider.set_traits(tcw3::ui::views::slider::UniformStepSliderTraits::new(20));
 
     let slider = {
         let view = HView::new(Default::default());
@@ -257,7 +241,7 @@ fn main() {
 }
 
 struct MyScrollbarDragListener {
-    scrollbar: Rc<Scrollbar>,
+    scrollbar: Rc<ScrollbarRaw>,
     value: f64,
 }
 
@@ -268,20 +252,5 @@ impl ScrollbarDragListener for MyScrollbarDragListener {
 
     fn cancel(&self, _: pal::Wm) {
         self.scrollbar.set_value(self.value);
-    }
-}
-
-struct MySliderDragListener {
-    slider: Rc<Slider>,
-    value: f64,
-}
-
-impl ScrollbarDragListener for MySliderDragListener {
-    fn motion(&self, _: pal::Wm, new_value: f64) {
-        self.slider.set_value(new_value);
-    }
-
-    fn cancel(&self, _: pal::Wm) {
-        self.slider.set_value(self.value);
     }
 }
