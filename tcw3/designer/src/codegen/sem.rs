@@ -770,7 +770,6 @@ impl AnalyzeCtx<'_, '_> {
                         label: None,
                         style: SpanStyle::Primary,
                     })
-                    .into_iter()
                     .collect();
 
                 if spans.len() > 1 {
@@ -780,7 +779,7 @@ impl AnalyzeCtx<'_, '_> {
                         code: None,
                         spans: codemap_spans,
                     }]);
-                } else if spans.len() > 0 && deny_acc_ty.contains(&i) {
+                } else if !spans.is_empty() && deny_acc_ty.contains(&i) {
                     self.diag.emit(&[Diagnostic {
                         level: Level::Error,
                         message: format!(
@@ -1248,7 +1247,7 @@ impl AnalyzeCtx<'_, '_> {
         } else if selectors[0].is_field_with_ident("event") {
             // e.g., `event.mouse_position`
 
-            if selectors.len() == 0 {
+            if selectors.is_empty() {
                 self.diag.emit(&[Diagnostic {
                     level: Level::Error,
                     message: "Parameter name must be specified (e.g., `event.wm`)".to_string(),

@@ -6,7 +6,6 @@ use std::{
     env, fmt,
     fs::File,
     io::{prelude::*, BufWriter},
-    mem::replace,
     path::{Path, PathBuf},
 };
 
@@ -297,7 +296,7 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
         // Put all known crates into `repo.crates`
         for &(dep_i, crate_i, uuid) in uuids.iter() {
             let cr_cell = &mut deps[dep_i].1.crates[crate_i];
-            let mut cr = replace(cr_cell, Default::default());
+            let mut cr = std::mem::take(cr_cell);
 
             // `uuid` is the primary information of `uuids`. `(dep_i, crate_i)`
             // is optimization for a faster lookup

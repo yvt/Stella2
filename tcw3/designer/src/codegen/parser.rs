@@ -278,7 +278,7 @@ impl Parse for CompItemField {
         };
 
         // A semicolon is required if it's terminated by `DynExpr` or `Type`.
-        let semi_token = if !accessors.is_some() || dyn_expr.is_some() {
+        let semi_token = if accessors.is_none() || dyn_expr.is_some() {
             Some(input.parse()?)
         } else {
             None

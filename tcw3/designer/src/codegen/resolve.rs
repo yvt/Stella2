@@ -54,7 +54,6 @@ pub fn resolve_paths(
                         label: None,
                         style: SpanStyle::Primary,
                     })
-                    .into_iter()
                     .collect(),
             }]);
         }
@@ -120,7 +119,6 @@ pub fn resolve_paths(
                                 label: None,
                                 style: SpanStyle::Primary,
                             })
-                            .into_iter()
                             .collect(),
                     }]);
                     break;
@@ -304,7 +302,7 @@ fn process_use_tree(
         UseTree::Name(t) => {
             let rename = if t.ident == "self" {
                 if let Some(last) = path.segments.last().cloned() {
-                    last.ident.clone()
+                    last.ident
                 } else {
                     // This case is not supported. The error is reported during
                     // the recursive call to `process_use_tree`

@@ -540,7 +540,7 @@ fn analyze_dep(
         // Find the associated event
         let event = comp.items[watch.event_item_i].event().unwrap();
 
-        if event.inputs.len() > 0 {
+        if !event.inputs.is_empty() {
             // This may be a temporary restriction. We could pick up values
             // such as `wm` from the component's fields.
             diag.emit(&[Diagnostic {

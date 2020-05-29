@@ -611,7 +611,6 @@ fn make_name_map<T>(
                     label: None,
                     style: SpanStyle::Primary,
                 })
-                .into_iter()
                 .collect(),
         }]);
     }

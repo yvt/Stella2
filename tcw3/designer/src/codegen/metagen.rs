@@ -230,7 +230,6 @@ fn validate_comp_path(ctx: &mut Ctx<'_, '_>, path: &metadata::Path, orig_path: &
                     label: None,
                     style: SpanStyle::Primary,
                 })
-                .into_iter()
                 .collect(),
         }]);
     }
