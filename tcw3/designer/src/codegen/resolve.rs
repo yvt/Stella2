@@ -268,7 +268,7 @@ fn process_use(
     item: &ItemUse,
 ) {
     let mut empty_path = Path {
-        leading_colon: item.leading_colon.clone(),
+        leading_colon: item.leading_colon,
         segments: Punctuated::new(),
     };
 

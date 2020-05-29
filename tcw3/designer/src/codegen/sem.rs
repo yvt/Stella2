@@ -45,7 +45,7 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    pub fn from_syn(i: &syn::Visibility, default_path: &Box<Path>, file: &codemap::File) -> Self {
+    pub fn from_syn(i: &syn::Visibility, default_path: &Path, file: &codemap::File) -> Self {
         match i {
             syn::Visibility::Public(_) => Visibility::Public {
                 span: parser::span_to_codemap(i.span(), file),
@@ -59,7 +59,7 @@ impl Visibility {
             },
             syn::Visibility::Inherited => Visibility::Restricted {
                 span: parser::span_to_codemap(i.span(), file),
-                path: default_path.clone(),
+                path: Box::new(default_path.clone()),
             },
         }
     }
@@ -143,6 +143,7 @@ impl<'a> ImportScope<'a> {
             .items
             .iter()
             .filter_map(|item| try_match!(parser::Item::Use(x) = item).ok())
+            .map(std::ops::Deref::deref)
     }
 }
 
@@ -656,7 +657,7 @@ impl AnalyzeCtx<'_, '_> {
         item: &'a parser::CompItem,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
         reloc: impl FnMut(CompReloc),
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
     ) -> CompItemDef<'a> {
         match item {
             parser::CompItem::Field(i) => CompItemDef::Field(self.analyze_field(
@@ -677,7 +678,7 @@ impl AnalyzeCtx<'_, '_> {
         item: &'a parser::CompItemField,
         out_lifted_fields: &mut Vec<FieldDef<'a>>,
         mut reloc: impl FnMut(CompReloc),
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
     ) -> FieldDef<'a> {
         let mut accessors;
         let default_accessors = match item.field_ty {
@@ -1000,7 +1001,7 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_event<'a>(
         &mut self,
         item: &'a parser::CompItemEvent,
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
     ) -> EventDef<'a> {
         let mut doc_attrs = Vec::new();
 
@@ -1040,7 +1041,7 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_dyn_expr_as_func(
         &mut self,
         d: &parser::DynExpr,
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> Func {
         match d {
@@ -1300,7 +1301,7 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_obj_init(
         &mut self,
         init: &parser::ObjInit,
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> ObjInit {
         let mut path = Path::from_syn_with_span_of(&init.path, &init.orig_path, self.file);
@@ -1331,7 +1332,7 @@ impl AnalyzeCtx<'_, '_> {
     fn analyze_obj_init_as_func(
         &mut self,
         init: &parser::ObjInit,
-        default_vis_path: &Box<Path>,
+        default_vis_path: &Path,
         out_lifted_fields: &mut Vec<FieldDef<'_>>,
     ) -> Func {
         let obj_init = self.analyze_obj_init(init, default_vis_path, out_lifted_fields);
@@ -1353,7 +1354,7 @@ impl AnalyzeCtx<'_, '_> {
         out_lifted_fields.push(FieldDef {
             vis: Visibility::Restricted {
                 span: None,
-                path: default_vis_path.clone(),
+                path: Box::new(default_vis_path.clone()),
             },
             doc_attrs: Vec::new(),
             field_ty: FieldType::Const,

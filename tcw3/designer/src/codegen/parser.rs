@@ -77,8 +77,8 @@ pub struct File {
 
 pub enum Item {
     Import(LitStr),
-    Use(ItemUse),
-    Comp(Comp),
+    Use(Box<ItemUse>),
+    Comp(Box<Comp>),
 }
 
 impl Parse for File {
@@ -128,9 +128,9 @@ impl Parse for Item {
 
         let la = ahead.lookahead1();
         let mut item = if la.peek(Token![use]) {
-            Item::Use(input.parse()?)
+            Item::Use(Box::new(input.parse()?))
         } else if la.peek(kw::comp) {
-            Item::Comp(input.parse()?)
+            Item::Comp(Box::new(input.parse()?))
         } else {
             return Err(la.error());
         };

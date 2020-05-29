@@ -36,8 +36,8 @@ enum OutputFile<'a> {
     Custom(&'a mut dyn Write),
 }
 
-impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
-    pub fn new() -> Self {
+impl Default for BuildScriptConfig<'_, '_, '_> {
+    fn default() -> Self {
         Self {
             in_root_source_file: None,
             out_source_file: OutputFile::FromEnv,
@@ -47,6 +47,12 @@ impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
             designer_runtime_path: "::tcw3::designer_runtime".to_string(),
             out_diag: None,
         }
+    }
+}
+
+impl<'a, 'b, 'c> BuildScriptConfig<'a, 'b, 'c> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn root_source_file(self, path: impl AsRef<Path>) -> Self {
