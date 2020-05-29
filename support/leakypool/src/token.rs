@@ -201,6 +201,7 @@ unsafe impl TokenStore for UncheckedToken {
     fn token_mut(&mut self) -> &mut Self::Token {
         self
     }
+    #[allow(clippy::unused_unit)]
     fn id(&mut self) -> Self::TokenId {
         ()
     }
