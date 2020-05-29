@@ -490,7 +490,8 @@ impl<'a> LayoutCtx<'a> {
         #[cfg(debug_assertions)]
         assert!(
             hview.view.has_frame.get(),
-            "The view {:?} doesn't have a frame set yet"
+            "The view {:?} doesn't have a frame set yet",
+            hview,
         );
 
         hview.view.frame.get()
