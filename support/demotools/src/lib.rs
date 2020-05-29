@@ -9,6 +9,12 @@ pub struct RateCounter {
     last_rate: f64,
 }
 
+impl Default for RateCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RateCounter {
     pub fn new() -> Self {
         Self {
