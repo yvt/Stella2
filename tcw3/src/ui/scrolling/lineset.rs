@@ -273,7 +273,7 @@ impl Lineset {
             let (mut iter, range) = self
                 .line_grs
                 .range(range_by_key(LineOff::index, Floor(range.start)..));
-            (*iter.nth(0).unwrap(), range.start)
+            (*iter.next().unwrap(), range.start)
         };
 
         // Endpoints of the line group (pre-insertion)

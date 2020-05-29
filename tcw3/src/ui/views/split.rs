@@ -432,7 +432,7 @@ impl Layout for SplitLayout {
         );
 
         // Arrange the panels
-        let mut frame1 = box2! { top_left: [0.0, 0.0].into(), size: size.into() };
+        let mut frame1 = box2! { top_left: [0.0, 0.0].into(), size: size };
         let mut frame2 = frame1;
         let mut spl_frame = frame1;
 

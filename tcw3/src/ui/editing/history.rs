@@ -175,15 +175,21 @@ impl<T: ?Sized + CoalescingCb<Text>, Text> CoalescingCb<Text> for &'_ mut T {
     }
 }
 
-impl<Text: TextTrait> CoalescingState<Text> {
-    /// Construct a `CoalescingState`.
-    pub fn new() -> Self {
+impl<Text> Default for CoalescingState<Text> {
+    fn default() -> Self {
         Self {
             composition_active: false,
             has_edit: false,
             num_coalescable_edits: 0,
             _phantom: std::marker::PhantomData,
         }
+    }
+}
+
+impl<Text: TextTrait> CoalescingState<Text> {
+    /// Construct a `CoalescingState`.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Resets the state of the algorithm.

@@ -318,6 +318,7 @@ impl SliderRaw {
 
         for &(role, label) in children.iter() {
             if let Some((new_value, new_widget)) = label {
+                // Assign a label
                 let new_value = new_value as f32;
                 let wrap_view =
                     if let Some(label) = labels.iter_mut().find(|label| label.role == role) {
@@ -339,8 +340,8 @@ impl SliderRaw {
                     FillLayout::new(new_widget.view_ref().cloned()).with_margin(wrap_view_margin),
                 );
             } else {
+                // Remove a label if there's one for `role`
                 if let Some(i) = labels.iter().position(|label| label.role == role) {
-                    // Remove the label
                     let label = labels.swap_remove(i);
                     debug_assert_eq!(label.role, role);
                     labels_wrapper.set_subview(role, None);

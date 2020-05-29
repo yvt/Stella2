@@ -411,7 +411,10 @@ macro_rules! rule {
         }
     ) => {{
         let start = $i;
-        $i += $crate::prop_count! { $($props)* };
+        // This lint misfires for `$i`
+        #[allow(clippy::eval_order_dependence)] {
+            $i += $crate::prop_count! { $($props)* };
+        }
         let end = $i;
 
         $crate::ui::theming::Rule {

@@ -1086,7 +1086,7 @@ impl ViewListener for EntryCoreListener {
             .update_layer(wm, view, ctx.hwnd(), visual_bounds, |draw_ctx| {
                 let c = &mut draw_ctx.canvas;
 
-                let mut sel_range = sel_range.clone();
+                let mut sel_range = *sel_range;
                 let text_layout = &text_layout_info.text_layout;
 
                 c.save();
@@ -1313,7 +1313,9 @@ impl pal::iface::TextInputCtxEdit<pal::Wm> for Edit<'_> {
     }
 
     fn set_composition_range(&mut self, range: Option<Range<usize>>) {
-        range.as_ref().map(|r| self.check_range(r));
+        if let Some(r) = &range {
+            self.check_range(r)
+        }
 
         let range = range.map(|r| [r.start, r.end]);
         if range == self.state.comp_range {

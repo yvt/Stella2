@@ -215,6 +215,7 @@ impl StyledBox {
         let mut subelems = self.shared.subelems.borrow_mut();
 
         if let Some(i) = subelems.iter().position(|&(r, _)| r == role) {
+            // There's already a subelement with `role`. Replace or remove it
             self.shared.style_elem.remove_child(subelems[i].1);
             if let Some(helem) = helem {
                 subelems[i].1 = helem;
@@ -222,6 +223,7 @@ impl StyledBox {
                 subelems.swap_remove(i);
             }
         } else {
+            // There's no subelement with `role`
             if let Some(helem) = helem {
                 subelems.push((role, helem));
             }
@@ -452,7 +454,7 @@ impl AbsInnerLayout {
         Self {
             subview_layout: subviews
                 .clone()
-                .map(|&(role, _)| (role, (*props.subview_metrics(role)).clone()))
+                .map(|&(role, _)| (role, *props.subview_metrics(role)))
                 .collect(),
             subviews: subviews.map(|x| x.1.clone()).collect(),
             overrider,
@@ -522,7 +524,7 @@ impl Layout for AbsInnerLayout {
     fn arrange(&self, ctx: &mut LayoutCtx<'_>, size: Vector2<f32>) {
         for (&(role, ref metrics), sv) in self.subview_layout.iter().zip(self.subviews.iter()) {
             let sv_traits = ctx.subview_size_traits(sv.as_ref());
-            let container = box2! {top_left: [0.0, 0.0].into(), size: size.into()};
+            let container = box2! {top_left: [0.0, 0.0].into(), size: size};
 
             let mut frame = metrics.arrange(container, sv_traits.preferred);
 

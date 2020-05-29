@@ -182,10 +182,8 @@ impl HWndRef<'_> {
         // Does this window recognize the action?
         let listener = self.wnd.listener.borrow();
         let status = listener.validate_action(wm, self, action);
-        if status.contains(ActionStatus::VALID) {
-            if perform && status.contains(ActionStatus::ENABLED) {
-                listener.perform_action(wm, self, action);
-            }
+        if perform && status.contains(ActionStatus::VALID | ActionStatus::ENABLED) {
+            listener.perform_action(wm, self, action);
         }
         status
     }
