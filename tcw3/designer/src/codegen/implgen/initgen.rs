@@ -876,6 +876,7 @@ fn analyze_dep(
 /// evaluates to the type named `CompTy(comp_path)`.
 ///
 /// Assumes settable fields are in `self` of type `xxxBuilder`.
+#[allow(clippy::single_match)]
 pub fn gen_construct(
     analysis: &analysis::Analysis,
     dep_analysis: &DepAnalysis,

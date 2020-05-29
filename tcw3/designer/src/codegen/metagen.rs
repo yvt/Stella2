@@ -124,10 +124,8 @@ impl CompResolver<'_> {
             return Some((self.local_crate_i, comp_i));
         }
 
-        if path.leading_colon.is_none() {
-            // Refers to Rust's built-in type
-            return None;
-        }
+        // If `path.leading_colon` is `None`, `path` refers to Rust's built-in type
+        path.leading_colon?;
 
         // Search the dependencies
         let crate_i = *self.imports_crate_i.get(&*crate_name.to_string())?;

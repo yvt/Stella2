@@ -302,7 +302,7 @@ fn process_use_tree(
             path.segments.pop();
         }
         UseTree::Name(t) => {
-            let rename = if t.ident.to_string() == "self" {
+            let rename = if t.ident == "self" {
                 if let Some(last) = path.segments.last().cloned() {
                     last.ident.clone()
                 } else {
@@ -328,7 +328,7 @@ fn process_use_tree(
         }
         UseTree::Rename(t) => {
             let mut path = path.clone();
-            if t.ident.to_string() == "self" {
+            if t.ident == "self" {
                 if path.segments.is_empty() {
                     diag.emit(&[Diagnostic {
                         level: Level::Error,
