@@ -751,7 +751,7 @@ unsafe extern "C" fn tcw_wndlistener_perform_selector(
     });
 }
 
-static TEXT_INPUT_ACCEL: AccelTable = accel_table_inner!(
+static TEXT_INPUT_ACCEL: AccelTable = tcw3_pal_macro::accel_table_inner!(
     crate,
     "macos",
     [

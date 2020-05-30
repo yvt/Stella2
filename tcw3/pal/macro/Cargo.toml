@@ -13,7 +13,6 @@ gtk = []
 bitflags = "1.1.0"
 enum-utils = "0.1.2"
 proc-macro-error = "1"
-proc-macro-hack = "0.5.11"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "1", features = ["full"] }

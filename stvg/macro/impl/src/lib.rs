@@ -9,7 +9,7 @@ use std::path::Path;
 use stvg_io::CmdEncoder;
 use syn::{parse_macro_input, spanned::Spanned, Lit, LitByteStr};
 
-#[proc_macro_hack::proc_macro_hack]
+#[proc_macro]
 pub fn include_stvg(params: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let path_lit: Lit = parse_macro_input!(params);
 

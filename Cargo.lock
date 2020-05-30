@@ -2439,7 +2439,6 @@ dependencies = [
 name = "stvg_macro"
 version = "0.1.0"
 dependencies = [
- "proc-macro-hack",
  "stvg_io",
  "stvg_macro_impl",
 ]
@@ -2450,7 +2449,6 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "pathfinder_geometry",
- "proc-macro-hack",
  "quote",
  "rgb",
  "stvg_io",
@@ -2713,7 +2711,6 @@ dependencies = [
  "pango-sys",
  "pangocairo",
  "pkg-config",
- "proc-macro-hack",
  "quickcheck",
  "quickcheck_macros",
  "rayon",
@@ -2738,7 +2735,6 @@ dependencies = [
  "bitflags",
  "enum-utils",
  "proc-macro-error",
- "proc-macro-hack",
  "proc-macro2",
  "quote",
  "syn",
