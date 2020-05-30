@@ -38,7 +38,6 @@ neo_linked_list = { path = "../../support/neo_linked_list" }
 once_cell = "1.2.0"
 owning_ref = "0.4.0"
 packed_simd = "0.3.0"
-proc-macro-hack = "0.5.11"
 rgb = "0.8.13"
 svgbobdoc = "0.2"
 try_match = "0.2.1"

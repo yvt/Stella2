@@ -45,16 +45,6 @@ pub mod prelude {
 mod cells;
 pub use self::cells::{MtLock, MtSticky};
 
-// This procedural macro can be used by backend implementations, so must
-// precede `mod macos`, etc.
-//
-// `#[proc_macro_hack]` makes it possible to use this procedural macro in
-// expression position without relying on an unstable rustc feature, but with
-// some restrictions. See `proc_macro_hack`'s documentation for more.
-#[doc(hidden)]
-#[proc_macro_hack::proc_macro_hack]
-pub use tcw3_pal_macro::accel_table_inner;
-
 // ============================================================================
 //
 // The main module for each target platform. The active one for the current
@@ -106,6 +96,9 @@ pub use self::native as current;
 //
 // Define `accel_table`. This is trickier than other items because macros
 // only have crate-level namespaces.
+
+#[doc(hidden)]
+pub use tcw3_pal_macro::accel_table_inner;
 
 // The implementation of `native_accel_table` is chosen based on the target
 // backend.

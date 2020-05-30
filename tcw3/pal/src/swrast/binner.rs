@@ -127,6 +127,7 @@ pub(super) struct ClipPlanes {
 
 impl Default for ClipPlanes {
     fn default() -> Self {
+        #[allow(clippy::reversed_empty_ranges)]
         Self {
             n: [0, 0].into(),
             d: 0..0,

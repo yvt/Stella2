@@ -54,7 +54,7 @@ impl AccelTable {
     }
 }
 
-pub(super) static TEXT_INPUT_ACCEL: AccelTable = accel_table_inner!(
+pub(super) static TEXT_INPUT_ACCEL: AccelTable = tcw3_pal_macro::accel_table_inner!(
     crate,
     "windows",
     [

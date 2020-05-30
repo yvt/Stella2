@@ -6,6 +6,5 @@ edition = "2018"
 license = "MIT"
 
 [dependencies]
-proc-macro-hack = "0.5.11"
 stvg_macro_impl = { path = "./impl" }
 stvg_io = { path = "../io" }
