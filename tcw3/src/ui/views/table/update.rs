@@ -129,6 +129,7 @@ impl Inner {
         }
 
         // Calculate the range of visible lines
+        #[allow(clippy::reversed_empty_ranges)]
         let mut new_cells_ranges = [0..0, 0..0];
         for &ty in &[LineTy::Col, LineTy::Row] {
             let size = self.size.get()[ty.i()];

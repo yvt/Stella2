@@ -494,6 +494,7 @@ impl Default for Table {
 impl Table {
     /// Construct a table view widget.
     pub fn new() -> Self {
+        #[allow(clippy::reversed_empty_ranges)]
         let inner = Inner {
             state: RefCell::new(State {
                 model_query: Box::new(()),
