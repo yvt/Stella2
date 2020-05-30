@@ -2832,9 +2832,9 @@ checksum = "a3bf66cac520f41df450d2d661bf302f3fbdf4302bd5eccc77d34c272221f669"
 
 [[package]]
 name = "try_match"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16621f8d5be82394d33e6715f26e35a10dbe8c4f53227e5dcce7d3e772163948"
+checksum = "138279d5e35e72a1b3822588aaf928126f161491e3dd9c25758efe59ef6f0e1c"
 dependencies = [
  "proc-macro-hack",
  "try_match_inner",
@@ -2842,9 +2842,9 @@ dependencies = [
 
 [[package]]
 name = "try_match_inner"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b56bbf3dea25dff37a37e1d0074cfef8368939f1ec0e386b1772c63460e2e0df"
+checksum = "bc75c0dd3d842ee7316d2fb1d6ea2012291d279907ea8b9564f741358b5ef82e"
 dependencies = [
  "proc-macro-error",
  "proc-macro-hack",
