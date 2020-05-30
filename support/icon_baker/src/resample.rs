@@ -94,5 +94,5 @@ fn svg_linear(source: &SvgImage, size: Size) -> Result<RgbaImage> {
                 size,
             ))
         })
-        .map_err(|err| Error::Nsvg(err))?
+        .map_err(Error::Nsvg)?
 }

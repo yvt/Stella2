@@ -41,7 +41,7 @@ pub fn from_fn<T>(mut gen: impl FnMut(usize) -> T, len: usize) -> Box<[T]> {
     debug_assert_eq!(v.capacity(), len);
     unsafe {
         for i in 0..len {
-            v.as_mut_ptr().offset(i as isize).write(gen(i));
+            v.as_mut_ptr().add(i).write(gen(i));
             v.set_len(i + 1);
         }
         v.set_len(v.capacity());

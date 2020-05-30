@@ -290,7 +290,7 @@ where
             .as_mut()
             .unwrap()
             .next = link.next.clone();
-        (self.map_link)(&mut self.pool[link.next.clone()])
+        (self.map_link)(&mut self.pool[link.next])
             .as_mut()
             .unwrap()
             .prev = link.prev;
@@ -743,7 +743,7 @@ where
     Index: PartialEq + Clone,
 {
     fn drop(&mut self) {
-        while let Some(_) = self.accessor.pop_back() {}
+        while self.accessor.pop_back().is_some() {}
     }
 }
 

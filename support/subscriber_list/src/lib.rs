@@ -166,6 +166,7 @@ impl UntypedSubscription {
     }
 
     /// Remove the element that `self` represents.
+    #[allow(clippy::unit_arg)] // for symmetry with `Subscription::unsubscribe`
     pub fn unsubscribe(self) -> Result<Option<()>, IterationActive> {
         if let Some(pool) = self.pool.upgrade() {
             let mut pool = pool.try_borrow_mut().map_err(|_| IterationActive)?;

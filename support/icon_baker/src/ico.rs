@@ -40,7 +40,7 @@ impl Icon for Ico {
         let size = icon.width();
         let data = ico::IconImage::from_rgba_data(size, size, icon.into_vec());
 
-        let entry = ico::IconDirEntry::encode(&data).map_err(|err| Error::Io(err))?;
+        let entry = ico::IconDirEntry::encode(&data).map_err(Error::Io)?;
         self.icon_dir.add_entry(entry);
 
         Ok(())

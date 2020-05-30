@@ -146,7 +146,7 @@ impl<T: PtrSized> Atom<T> {
 
     /// Return the inner object, consuming `self`.
     pub fn into_inner(mut self) -> Option<T> {
-        let p = mem::replace(&mut self.ptr, AtomicPtr::default()).into_inner();
+        let p = mem::take(&mut self.ptr).into_inner();
 
         // skip `drop`
         mem::forget(self);
@@ -309,7 +309,7 @@ where
     S: AsRawPtr<T>,
 {
     fn as_raw_ptr(&self) -> *const T {
-        if let &Some(ref p) = self {
+        if let Some(p) = self {
             p.as_raw_ptr()
         } else {
             ptr::null()

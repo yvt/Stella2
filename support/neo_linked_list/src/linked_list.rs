@@ -786,7 +786,7 @@ impl<T> LinkedList<T> {
 
 impl<T: ?Sized> Drop for LinkedList<T> {
     fn drop(&mut self) {
-        while let Some(_) = self.pop_front_node() {}
+        while self.pop_front_node().is_some() {}
     }
 }
 
