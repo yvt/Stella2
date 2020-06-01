@@ -2,7 +2,7 @@ use arrayvec::ArrayVec;
 use harmony::Elem;
 use tcw3::{
     ui::{
-        views::{Label, Button},
+        views::{Label, Button, Checkbox, Slider, slider::UniformStepSliderTraits},
         theming::{self, Manager, StyledBox, ClassSet, Widget},
     },
     uicore::{HView, ViewFlags},
@@ -107,5 +107,207 @@ comp crate::view::prefwnd::PrefView {
     const main_view = StyledBox::new! {
         style_manager,
         class_set = elem_id::PREF_MAIN,
+        child_generic = match get!(current_tab) {
+            0 => get!(&content_generic),
+            1 => get!(&content_accounts),
+            2 => get!(&content_connection),
+            3 => get!(&content_advanced),
+            4 => get!(&content_about),
+            _ => unreachable!(),
+        },
     };
+
+    // "Generic" tab
+    // -----------------------------------------------------------------------
+    const content_generic = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_CONTENT_GENERAL,
+        children = [
+            (0, Some(get!(&check_updates_row) as &dyn Widget)),
+            (1, Some(get!(&time_format_color_theme_row) as &dyn Widget)),
+            (2, Some(get!(&font_size_group) as &dyn Widget)),
+        ],
+    };
+
+    // "Check for updates automatically"
+    const check_updates_row = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::STACK_HORZ_LEFT_VCENTER,
+        children = [
+            (0, Some(get!(&check_updates_check) as &dyn Widget)),
+            (1, Some(get!(&check_updates_now) as &dyn Widget)),
+        ],
+    };
+
+    prop check_updates_state: bool { set; get; } = false;
+    const check_updates_check = Checkbox::new! {
+        style_manager,
+        checked = get!(check_updates_state),
+        caption = "Check for updates automatically",
+    };
+    on (check_updates_check.activated) {
+        get!(&self).set_check_updates_state(!get!(check_updates_state));
+    }
+
+    const check_updates_now = Button::new! {
+        style_manager,
+        caption = "Check Now",
+    };
+
+    // "Time Format" and "Color Theme"
+    const time_format_color_theme_row = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::STACK_HORZ_LEFT_TOP,
+        children = [
+            (0, Some(get!(&time_format_group) as &dyn Widget)),
+            (1, Some(get!(&color_theme_group) as &dyn Widget)),
+        ],
+    };
+
+    const time_format_group = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP,
+        children = [
+            (0, Some(get!(&time_format_caption) as &dyn Widget)),
+            (1, Some(get!(&time_format_list) as &dyn Widget)),
+        ],
+    };
+
+    const time_format_caption = Label::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP_CAPTION,
+        text = "Time Format",
+    };
+
+    prop current_time_format: u32 = 0;
+    const time_format_list = RadioListView::new! {
+        wm, style_manager,
+        items = ["12 Hour", "24 Hour"]
+            .iter()
+            .enumerate()
+            .map(|(i, &caption)| (i as u32, caption.to_owned(), ClassSet::RADIO_BUTTON))
+            .collect::<Vec<_>>(),
+        value = get!(current_time_format),
+        vertical = true,
+    };
+    on(time_format_list.change) { get!(&self).set_current_time_format(get!(event.value)); }
+
+    const color_theme_group = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP,
+        children = [
+            (0, Some(get!(&color_theme_caption) as &dyn Widget)),
+            (1, Some(get!(&color_theme_list) as &dyn Widget)),
+        ],
+    };
+
+    const color_theme_caption = Label::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP_CAPTION,
+        text = "Color Theme",
+    };
+
+    const color_theme_list = RadioListView::new! {
+        wm, style_manager,
+        items = ["Light"]
+            .iter()
+            .enumerate()
+            .map(|(i, &caption)| (i as u32, caption.to_owned(), ClassSet::RADIO_BUTTON))
+            .collect::<Vec<_>>(),
+        value = 0,
+        vertical = true,
+    };
+
+    // "Font Size"
+    const font_size_group = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP,
+        children = [
+            (0, Some(get!(&font_size_caption) as &dyn Widget)),
+            (1, Some(get!(&font_size_slider_and_preview) as &dyn Widget)),
+        ],
+    };
+
+    const font_size_caption = Label::new! {
+        style_manager,
+        class_set = elem_id::PREF_GROUP_CAPTION,
+        text = "Font Size",
+    };
+
+    const font_size_slider_and_preview = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_GENERAL_FONT_SIZE,
+        children = [
+            (0, Some(get!(&font_size_slider) as &dyn Widget)),
+            (1, Some(get!(&font_size_preview) as &dyn Widget)),
+        ],
+    };
+
+    const font_size_slider = Slider::new! {
+        wm, style_manager,
+        vertical = false,
+        traits = UniformStepSliderTraits::new(7),
+        uniform_ticks = 7,
+        value = 2.0 / 7.0,
+        labels = [
+            (0, Some((0.0, get!(&slider_label_10) as &dyn Widget))),
+            (1, Some((2.0 / 7.0, get!(&slider_label_12) as &dyn Widget))),
+            (2, Some((1.0, get!(&slider_label_17) as &dyn Widget))),
+        ],
+    };
+
+    const slider_label_10 = Label::new! { style_manager, text = "10pt" };
+    const slider_label_12 = Label::new! { style_manager, text = "12pt" };
+    const slider_label_17 = Label::new! { style_manager, text = "17pt" };
+
+    // TODO: Get this actually working
+    const font_size_preview = Label::new! { style_manager, text = "Lorem ipsum" };
+
+    // "Accounts" tab
+    // -----------------------------------------------------------------------
+    const content_accounts = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_CONTENT_GENERAL,
+        children = [
+            (0, Some(get!(&accounts_todo) as &dyn Widget)),
+        ],
+    };
+
+    const accounts_todo = Label::new! { style_manager, text = "TODO: Accounts" };
+
+    // "Connection" tab
+    // -----------------------------------------------------------------------
+    const content_connection = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_CONTENT_GENERAL,
+        children = [
+            (0, Some(get!(&connection_todo) as &dyn Widget)),
+        ],
+    };
+
+    const connection_todo = Label::new! { style_manager, text = "TODO: Connection" };
+
+    // "Advanced" tab
+    // -----------------------------------------------------------------------
+    const content_advanced = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_CONTENT_GENERAL,
+        children = [
+            (0, Some(get!(&advanced_todo) as &dyn Widget)),
+        ],
+    };
+
+    const advanced_todo = Label::new! { style_manager, text = "TODO: Advanced" };
+
+    // "About" tab
+    // -----------------------------------------------------------------------
+    const content_about = StyledBox::new! {
+        style_manager,
+        class_set = elem_id::PREF_CONTENT_GENERAL,
+        children = [
+            (0, Some(get!(&about_todo) as &dyn Widget)),
+        ],
+    };
+
+    const about_todo = Label::new! { style_manager, text = "TODO: About" };
 }

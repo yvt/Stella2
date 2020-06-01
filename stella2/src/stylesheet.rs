@@ -56,8 +56,16 @@ pub mod elem_id {
                 , PREF_TAB_CONNECTION
                 , PREF_TAB_ADVANCED
                 , PREF_TAB_ABOUT
+                , PREF_GROUP_CAPTION
+                , PREF_GROUP
+
+                , PREF_CONTENT_GENERAL
+                , PREF_GENERAL_FONT_SIZE
 
                 , WND
+
+                , STACK_HORZ_LEFT_TOP
+                , STACK_HORZ_LEFT_VCENTER
     }
 }
 
@@ -598,7 +606,7 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         ([#PREF_MAIN]) (priority = 10000) {
             num_layers: 1,
             layer_bg_color[0]: RGBAF32::new(0.95, 0.95, 0.95, 1.0),
-            min_size: Vector2::new(0.0, 200.0),
+            min_size: Vector2::new(0.0, 100.0),
         },
 
         // All tabs - each of them has something like `PREF_TAB_GENERAL`
@@ -710,6 +718,71 @@ fn new_custom_stylesheet() -> impl Stylesheet {
         },
         ([#PREF_TAB_ABOUT.CHECKED] /* < [#PREF_TAB_BAR] */ .. [#WND.ACTIVE]) (priority = 10300) {
             #[dyn] layer_img[1]: Some(himg_tab_icon_act(&assets::pref::TAB_ABOUT)),
+        },
+
+        ([#PREF_GROUP]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::from_bits_truncate(
+                AlignFlags::VERT_JUSTIFY.bits() | AlignFlags::LEFT.bits()),
+            subview_table_cell[1]: [0, 1],
+            subview_table_align[1]: AlignFlags::from_bits_truncate(
+                AlignFlags::VERT_JUSTIFY.bits() | AlignFlags::LEFT.bits()),
+            subview_table_row_spacing[0]: 5.0,
+        },
+        ([#PREF_GROUP_CAPTION]) (priority = 10000) {
+            font: SysFontType::Emph,
+        },
+
+        ([#PREF_CONTENT_GENERAL]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::from_bits_truncate(
+                AlignFlags::LEFT.bits() | AlignFlags::VERT_JUSTIFY.bits()),
+            subview_table_cell[1]: [0, 1],
+            subview_table_align[1]: AlignFlags::JUSTIFY,
+            subview_table_cell[2]: [0, 2],
+            subview_table_align[2]: AlignFlags::JUSTIFY,
+            subview_table_cell[3]: [0, 3],
+            subview_table_align[3]: AlignFlags::JUSTIFY,
+
+            subview_padding: [20.0; 4],
+            subview_table_row_spacing[0]: 20.0,
+            subview_table_row_spacing[1]: 20.0,
+            subview_table_row_spacing[2]: 20.0,
+        },
+
+        ([#PREF_GENERAL_FONT_SIZE]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::LEFT,
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::LEFT,
+            subview_table_col_spacing[0]: 20.0,
+        },
+        ([.SLIDER] .. [#PREF_GENERAL_FONT_SIZE]) (priority = 10000) {
+            min_size: Vector2::new(200.0, 0.0),
+        },
+        ([] .. [.SLIDER] .. [#PREF_GENERAL_FONT_SIZE]) (priority = 10000) {
+            font: SysFontType::Small,
+        },
+
+        // Utilities
+        ([#STACK_HORZ_LEFT_TOP]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::from_bits_truncate(
+                AlignFlags::LEFT.bits() | AlignFlags::TOP.bits()),
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::from_bits_truncate(
+                AlignFlags::LEFT.bits() | AlignFlags::TOP.bits()),
+        },
+        ([#STACK_HORZ_LEFT_VCENTER]) (priority = 10000) {
+            subview_layouter: Layouter::Table,
+            subview_table_cell[0]: [0, 0],
+            subview_table_align[0]: AlignFlags::LEFT,
+            subview_table_cell[1]: [1, 0],
+            subview_table_align[1]: AlignFlags::LEFT,
         },
     }
 }
