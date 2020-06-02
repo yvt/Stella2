@@ -24,6 +24,10 @@ jobs:
       components: [ rust-src ]
 
   - template: ../steps/set-rustflags.yml
+    parameters:
+      # Work-around <https://github.com/japaric/xargo/issues/292>
+      # (LTO builds on recent nightlies fail "to get bitcode from object file")
+      embed_bitcode: yes
 
   - script: cargo install xargo --version 0.3.17
     displayName: Install xargo

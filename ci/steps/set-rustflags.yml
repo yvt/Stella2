@@ -1,5 +1,6 @@
 parameters:
   target_cpu: nehalem  # e.g., native, core2, skylake, znver2
+  embed_bitcode: ''
 
 steps:
   - bash: |
@@ -7,6 +8,9 @@ steps:
       echo "[build]" >> "$CONFIG"
       echo "rustflags = [" >> "$CONFIG"
       echo "  \"-Ctarget-cpu=${{parameters.target_cpu}}\"," >> "$CONFIG"
+      if [ "${{parameters.embed_bitcode}}" != "" ]; then
+        echo "  \"-Cembed-bitcode=${{parameters.embed_bitcode}}\"," >> "$CONFIG"
+      fi
       echo "]" >> "$CONFIG"
     env:
       CONFIG: .cargo/config
