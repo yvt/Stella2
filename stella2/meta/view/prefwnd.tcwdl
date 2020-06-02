@@ -281,11 +281,20 @@ comp crate::view::prefwnd::PrefView {
         style_manager,
         class_set = elem_id::PREF_CONTENT_GENERAL,
         children = [
-            (0, Some(get!(&connection_todo) as &dyn Widget)),
+            (0, Some(get!(&proxy_list) as &dyn Widget)),
         ],
     };
 
-    const connection_todo = Label::new! { style_manager, text = "TODO: Connection" };
+    const proxy_list = RadioListView::new! {
+        wm, style_manager,
+        items = ["No proxy"]
+            .iter()
+            .enumerate()
+            .map(|(i, &caption)| (i as u32, caption.to_owned(), ClassSet::RADIO_BUTTON))
+            .collect::<Vec<_>>(),
+        value = 0,
+        vertical = true,
+    };
 
     // "Advanced" tab
     // -----------------------------------------------------------------------
