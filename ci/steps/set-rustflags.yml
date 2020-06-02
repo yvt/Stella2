@@ -9,6 +9,5 @@ steps:
       echo "  \"-Ctarget-cpu=${{parameters.target_cpu}}\"," >> "$CONFIG"
       echo "]" >> "$CONFIG"
     env:
-      TARGET_CPU: ${{parameters.target_cpu}}
       CONFIG: .cargo/config
     displayName: "Generate .cargo/config"
