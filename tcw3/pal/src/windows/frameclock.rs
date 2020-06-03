@@ -9,7 +9,7 @@ use std::{
 use winapi::um::{dwmapi::DwmFlush, synchapi::Sleep};
 
 use super::Wm;
-use crate::{iface::Wm as _, MtSticky};
+use crate::{iface::Wm as _, Init, MtSticky};
 
 struct DisplayLink {
     inner: SetOnceAtom<Box<DisplayLinkInner>>,
@@ -102,8 +102,7 @@ pub trait FrameClockClient {
 impl<T: FrameClockClient + 'static> FrameClockManager<T> {
     pub const fn new() -> Self {
         Self {
-            // This is safe because there's nothing `!Send` in it yet
-            pending_clients: unsafe { MtSticky::new_unchecked(RefCell::new(Vec::new())) },
+            pending_clients: Init::INIT,
             dl: DisplayLink::new(),
         }
     }

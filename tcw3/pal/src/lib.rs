@@ -19,7 +19,7 @@ pub mod iface;
 /// The trait [`Wm`](crate::iface::Wm) is re-exported as `WmTrait` so that it
 /// doesn't collide with the concrete type alias [`Wm`](crate::Wm).
 pub mod prelude {
-    pub use super::cells::MtLazyStatic;
+    pub use super::cells::{Init, MtLazyStatic, SendInit};
     pub use super::iface::{
         Bitmap, BitmapBuilder, BitmapBuilderNew, Canvas, CanvasText, CharStyle, KeyEvent,
         MouseDragListener, ScrollListener, TextInputCtxEdit, TextInputCtxListener, TextLayout,
@@ -43,7 +43,7 @@ pub mod prelude {
 //
 #[macro_use]
 mod cells;
-pub use self::cells::{MtLock, MtSticky};
+pub use self::cells::{Init, MtLock, MtSticky, SendInit};
 
 // ============================================================================
 //

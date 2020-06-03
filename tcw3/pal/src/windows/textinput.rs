@@ -18,7 +18,7 @@ use super::{
     utils::{assert_hresult_ok, cell_get_by_clone, result_from_hresult, ComPtr, ComPtrAsPtr},
     HWnd, Wm,
 };
-use crate::{cells::MtLazyStatic, iface, MtSticky};
+use crate::{cells::MtLazyStatic, iface, Init, MtSticky};
 use leakypool::{LazyToken, LeakyPool, PoolPtr, SingletonToken, SingletonTokenId};
 
 mod textstore;
@@ -233,10 +233,7 @@ pub struct HTextInputCtx {
     ptr: TextInputCtxPoolPtr,
 }
 
-static TEXT_INPUT_CTXS: MtSticky<RefCell<TextInputCtxPool>, Wm> = {
-    // `TextInputCtx` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
-};
+static TEXT_INPUT_CTXS: MtSticky<RefCell<TextInputCtxPool>, Wm> = Init::INIT;
 
 leakypool::singleton_tag!(struct Tag);
 type TextInputCtxPool = LeakyPool<TextInputCtx, LazyToken<SingletonToken<Tag>>>;

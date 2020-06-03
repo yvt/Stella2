@@ -26,10 +26,7 @@ leakypool::singleton_tag!(struct Tag);
 type WndPool = LeakyPool<Wnd, LazyToken<SingletonToken<Tag>>>;
 type WndPoolPtr = PoolPtr<Wnd, SingletonTokenId<Tag>>;
 
-static WNDS: MtSticky<RefCell<WndPool>, Wm> = {
-    // `Wnd` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
-};
+static WNDS: MtSticky<RefCell<WndPool>, Wm> = Init::INIT;
 
 pub(super) static COMPOSITOR: MtSticky<RefCell<comp::Compositor>, Wm> =
     MtSticky::new(RefCell::new(comp::Compositor::new()));

@@ -29,7 +29,7 @@ pub struct AssertUnpin<T: ?Sized> {
 impl<T: ?Sized> Unpin for AssertUnpin<T> {}
 
 impl<T> AssertUnpin<T> {
-    pub fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self { inner }
     }
 }

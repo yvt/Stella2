@@ -42,10 +42,7 @@ static MSG_HWND: AtomicUsize = AtomicUsize::new(0);
 /// `HANDLE`
 static MAIN_HTHREAD: AtomicUsize = AtomicUsize::new(0);
 
-static TIMERS: MtSticky<RefCell<TimerPool>, Wm> = {
-    // `Timer` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
-};
+static TIMERS: MtSticky<RefCell<TimerPool>, Wm> = Init::INIT;
 
 leakypool::singleton_tag!(struct Tag);
 type TimerPool = LeakyPool<Timer, LazyToken<SingletonToken<Tag>>>;

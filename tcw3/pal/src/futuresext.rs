@@ -49,10 +49,7 @@ impl WmFuturesExt for Wm {
 
 // ============================================================================
 
-static TASKS: MtSticky<RefCell<LeakyPool<Task>>> = {
-    // `Task` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
-};
+static TASKS: MtSticky<RefCell<LeakyPool<Task>>> = Init::INIT;
 
 struct Task {
     /// This future is moved out only when `pend_task` is making a progress.

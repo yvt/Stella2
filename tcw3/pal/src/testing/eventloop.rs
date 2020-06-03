@@ -16,14 +16,10 @@ use super::Wm;
 use crate::{
     prelude::MtLazyStatic,
     timerqueue::{HTask, TimerQueue},
-    MtLock, MtSticky,
+    Init, MtLock, MtSticky,
 };
 
-static UNSEND_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = {
-    // This is safe because the created value does not contain an actual
-    // unsendable content (`Box<dyn FnOnce(Wm)>`) yet
-    unsafe { MtSticky::new_unchecked(LinkedListCell::new()) }
-};
+static UNSEND_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = Init::INIT;
 
 static DISPATCH_RECV: MtLock<RefCell<Option<Receiver<Dispatch>>>> = MtLock::new(RefCell::new(None));
 

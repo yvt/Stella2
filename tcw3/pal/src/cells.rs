@@ -2,6 +2,9 @@ use std::{cell::UnsafeCell, fmt, marker::PhantomData, mem::ManuallyDrop};
 
 use super::{prelude::WmTrait, Wm};
 
+mod init;
+pub use self::init::*;
+
 /// Main-Thread Sticky — Like [`fragile::Sticky`], allows `!Send` types to be
 /// moved between threads, but there are a few differences:
 ///
@@ -40,6 +43,20 @@ impl<T: 'static, TWM: WmTrait> MtSticky<T, TWM> {
     /// This method allows you to send an unsendable value to a main thread
     /// without checking the calling thread.
     ///
+    /// The default values of many collection types are empty and thus safe to
+    /// send to a main thread. Such types are annotated with [`SendInit`], and
+    /// `MtSticky` implements `Init` when `T` is `SendInit`. *Consider using
+    /// `<MtSticky as Init>::INIT` whenever possible.*
+    /// See the following example:
+    ///
+    /// ```no_compile
+    /// static WNDS: MtSticky<RefCell<WndPool>, Wm> = {
+    ///     // `Wnd` is `!Send`, but there is no instance at this point, so this is safe
+    ///     unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
+    /// };
+    /// // The above code can be replaced with:
+    /// static WNDS: MtSticky<RefCell<WndPool>, Wm> = Init::INIT;
+    /// ```
     #[inline]
     pub const unsafe fn new_unchecked(x: T) -> Self {
         Self {

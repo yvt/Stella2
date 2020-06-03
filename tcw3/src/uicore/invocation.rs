@@ -4,11 +4,7 @@ use std::pin::Pin;
 use crate::pal::{prelude::*, MtSticky, Wm};
 
 #[allow(clippy::type_complexity)]
-static ON_UPDATE_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = {
-    // This is safe because the created value does not contain an actual
-    // unsendable content (`Box<dyn FnOnce(Wm)>`) yet
-    unsafe { MtSticky::new_unchecked(LinkedListCell::new()) }
-};
+static ON_UPDATE_DISPATCHES: MtSticky<LinkedListCell<AssertUnpin<dyn FnOnce(Wm)>>> = Init::INIT;
 
 /// Implements `WmExt::invoke_on_update`.
 pub fn invoke_on_update(wm: Wm, f: impl FnOnce(Wm) + 'static) {

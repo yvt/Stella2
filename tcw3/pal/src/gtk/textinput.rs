@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::{HWnd, Wm};
-use crate::{iface, MtSticky};
+use crate::{iface, Init, MtSticky};
 
 type DynTextInputCtxListener = dyn iface::TextInputCtxListener<Wm>;
 type BoxTextInputCtxListener = Box<DynTextInputCtxListener>;
@@ -26,10 +26,7 @@ leakypool::singleton_tag!(struct Tag);
 type CtxPool = LeakyPool<Ctx, LazyToken<SingletonToken<Tag>>>;
 type CtxPoolPtr = PoolPtr<Ctx, SingletonTokenId<Tag>>;
 
-static CTXS: MtSticky<RefCell<CtxPool>, Wm> = {
-    // `Ctx` is `!Send`, but there is no instance at this point, so this is safe
-    unsafe { MtSticky::new_unchecked(RefCell::new(LeakyPool::new())) }
-};
+static CTXS: MtSticky<RefCell<CtxPool>, Wm> = Init::INIT;
 
 struct Ctx {
     gtk_ctx: IMMulticontext,
