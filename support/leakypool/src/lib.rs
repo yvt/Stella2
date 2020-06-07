@@ -193,8 +193,8 @@ where
         let entry_state = ptr
             .entry
             .lock
-            .write(self.token_store.token_mut())
-            .unwrap_or_else(|| unsafe { unreachable_unchecked() });
+            .try_write(self.token_store.token_mut())
+            .unwrap_or_else(|_| unsafe { unreachable_unchecked() });
 
         // Assign the new element.
         let old_state = std::mem::replace(entry_state, EntryState::Occupied(x));
@@ -212,7 +212,9 @@ where
     pub fn deallocate(&mut self, ptr: PoolPtr<Element, TokenStoreTy::TokenId>) -> Option<Element> {
         // Get a mutable reference to the entry's `EntryState`. Return `None`
         // if `ptr` belongs to a different `LeakyPool`.
-        let entry_state = ptr.entry.lock.write(self.token_store.token_mut())?;
+        let entry_state = (ptr.entry.lock)
+            .try_write(self.token_store.token_mut())
+            .ok()?;
 
         // Return `None` if `ptr` refers to a vacant entry.
         if matches!(&*entry_state, EntryState::Vacant(_)) {
@@ -237,7 +239,8 @@ where
 
     pub fn get(&self, ptr: PoolPtr<Element, TokenStoreTy::TokenId>) -> Option<&Element> {
         (ptr.entry.lock)
-            .read(self.token_store.token_ref())
+            .try_read(self.token_store.token_ref())
+            .ok()
             .and_then(|entry_state| try_match!(EntryState::Occupied(element) = entry_state).ok())
     }
 
@@ -246,7 +249,8 @@ where
         ptr: PoolPtr<Element, TokenStoreTy::TokenId>,
     ) -> Option<&mut Element> {
         (ptr.entry.lock)
-            .write(self.token_store.token_mut())
+            .try_write(self.token_store.token_mut())
+            .ok()
             .and_then(|entry_state| try_match!(EntryState::Occupied(element) = entry_state).ok())
     }
 }

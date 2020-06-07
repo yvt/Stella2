@@ -2822,9 +2822,9 @@ dependencies = [
 
 [[package]]
 name = "tokenlock"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3bf66cac520f41df450d2d661bf302f3fbdf4302bd5eccc77d34c272221f669"
+checksum = "8548bd16a49ce560246e08f19568e28dd33c6e5eec636ac8039acdc058107b19"
 
 [[package]]
 name = "try_match"
