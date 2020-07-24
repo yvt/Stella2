@@ -6,7 +6,6 @@
 // deduced to `()`. Thus a call to `msg_send!` needs a unit value binding
 #![allow(clippy::let_unit_value)]
 #![allow(clippy::float_cmp)]
-#![feature(const_if_match)] // `match` in `const fn`
 
 use log::debug;
 use tcw3::pal::{self, prelude::*};
