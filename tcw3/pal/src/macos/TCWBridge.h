@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Represents a type-safe opaque handle.
-#define OPQAUE_HANDLE                                                          \
+#define OPAQUE_HANDLE                                                          \
     struct {                                                                   \
         void *__ptr;                                                           \
     }
@@ -17,9 +17,9 @@ typedef uint8_t TCW3ActionStatus;
 #define kTCW3ActionStatusChecked ((TCW3ActionStatus)(1 << 2))
 
 // These callbacks are defined in `window.rs`
-typedef OPQAUE_HANDLE TCWListenerUserData;
-typedef OPQAUE_HANDLE TCWMouseDragListenerUserData;
-typedef OPQAUE_HANDLE TCWScrollListenerUserData;
+typedef OPAQUE_HANDLE TCWListenerUserData;
+typedef OPAQUE_HANDLE TCWMouseDragListenerUserData;
+typedef OPAQUE_HANDLE TCWScrollListenerUserData;
 extern BOOL tcw_wndlistener_should_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_close(TCWListenerUserData ud);
 extern void tcw_wndlistener_resize(TCWListenerUserData ud);
