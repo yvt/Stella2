@@ -5,9 +5,9 @@ use packed_simd::{i8x32, m8x32, u8x32, FromCast};
 const HAS_U8X16: bool = cfg!(all(
     any(target_arch = "x86", target_arch = "x86_64"),
     target_feature = "sse2"
-)) || cfg!(all(target_aarch = "aarch64", target_feature = "neon"))
+)) || cfg!(all(target_arch = "aarch64", target_feature = "neon"))
     || cfg!(all(
-        target_aarch = "arm",
+        target_arch = "arm",
         target_feature = "v7",
         target_feature = "neon"
     ));

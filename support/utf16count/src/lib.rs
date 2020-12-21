@@ -51,23 +51,20 @@ const fn nibble_to_continuation_len(x: u8) -> u8 {
     ((NIBBLE_TO_CONTINUATION_LEN >> (x * 2)) & 0b11) as u8
 }
 
-/// Copied from [`Shuffle1Dyn`'s `cfg` attributes]. `true` means the target
-/// architecture natively supports `u8x16::shuffle1_dyn`.
+/// `true` means the target architecture natively supports `u8x16::shuffle1_dyn`.
 ///
-/// [`Shuffle1Dyn`'s `cfg` attributes]: https://github.com/rust-lang/packed_simd/blob/62a32e7b773b9176f8e13b52ee425aad9c88c3f2/src/codegen/shuffle1_dyn.rs#L87-L166
-const HAS_U8X16_SHUFFLE1_DYN: bool = cfg!(all(
-    any(target_arch = "x86", target_arch = "x86_64"),
-    target_feature = "ssse3"
-)) || cfg!(all(
-    target_aarch = "aarch64",
-    target_feature = "neon",
-    any(feature = "core_arch", libcore_neon)
-)) || cfg!(all(
-    target_aarch = "arm",
-    target_feature = "v7",
-    target_feature = "neon",
-    any(feature = "core_arch", libcore_neon)
-));
+/// TODO: NEON (Arm Advanced SIMD instruction set) does not seem to actually
+/// support it
+const HAS_U8X16_SHUFFLE1_DYN: bool =
+    cfg!(all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "ssse3"
+    )) || cfg!(all(target_arch = "aarch64", target_feature = "neon"))
+        || cfg!(all(
+            target_arch = "arm",
+            target_feature = "v7",
+            target_feature = "neon"
+        ));
 
 /// Get the number of UTF-16 units for a given UTF-8 string.
 ///
