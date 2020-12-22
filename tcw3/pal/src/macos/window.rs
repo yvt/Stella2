@@ -20,7 +20,11 @@ use cocoa::{
     foundation::{NSNotFound, NSPoint, NSRange, NSRect, NSSize, NSString, NSUInteger},
 };
 use flags_macro::flags;
-use objc::{msg_send, runtime::BOOL, sel, sel_impl};
+use objc::{
+    msg_send,
+    runtime::{BOOL, NO},
+    sel, sel_impl,
+};
 use std::{
     cell::{Cell, RefCell},
     cmp::min,
@@ -211,7 +215,7 @@ impl HWnd {
 
     pub(super) fn is_focused(&self, _: Wm) -> bool {
         let value: BOOL = unsafe { msg_send![*self.ctrler, isKeyWindow] };
-        value != 0
+        value != NO
     }
 }
 
@@ -440,7 +444,7 @@ unsafe extern "C" fn tcw_wndlistener_should_close(ud: TCWListenerUserData) -> BO
 
         state.should_close.get() as BOOL
     })
-    .unwrap_or(1)
+    .unwrap_or(true as BOOL)
 }
 
 #[no_mangle]
