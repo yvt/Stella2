@@ -1,5 +1,4 @@
 #![feature(unsized_locals)] // Call `dyn FnOnce`
-#![feature(const_if_match)] // `if` and `match` in `const fn`
 #![feature(const_fn)] // conditional expressions in `const fn`
 #![feature(external_doc)] // `#[doc(include = ...)]`
 #![allow(clippy::float_cmp)]

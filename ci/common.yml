@@ -1,5 +1,5 @@
 variables:
-  rustVersion: nightly-2020-05-30
+  rustVersion: nightly-2020-12-15
   linuxPrestep: |
     sudo apt-get update &&
     sudo apt-get install -y \

@@ -12,7 +12,7 @@ array = "0.0.1"
 cggeom = { path = "../../support/cggeom" }
 cgmath = "0.17.0"
 leakypool = { path = "../../support/leakypool" }
-packed_simd = "0.3.0"
+packed_simd = { version = "0.3.4", package = "packed_simd_2" }
 quick-error = "1.2.3"
 
 tcw3_pal = { path = "../pal" }

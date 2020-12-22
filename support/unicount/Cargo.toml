@@ -5,7 +5,7 @@ authors = ["yvt <i@yvt.jp>"]
 edition = "2018"
 
 [dependencies]
-packed_simd = "0.3.0"
+packed_simd = { version = "0.3.4", package = "packed_simd_2" }
 
 [dev-dependencies]
 criterion = "0.3"
